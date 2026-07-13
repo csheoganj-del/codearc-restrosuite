@@ -460,11 +460,103 @@
   /**
    * Wave 6/7: broader client filter — bill no, table, customer name/phone, pay method.
    */
+  let billsDateRange = 'today';
+  let billsCustomFrom = '';
+  let billsCustomTo = '';
+  try {
+    const saved = localStorage.getItem('rs_bills_date_range');
+    if (saved && /^(today|yesterday|7d|all|custom)$/.test(saved)) billsDateRange = saved;
+    billsCustomFrom = localStorage.getItem('rs_bills_date_from') || '';
+    billsCustomTo = localStorage.getItem('rs_bills_date_to') || '';
+  } catch (_) {}
+
+  function startOfLocalDay(d) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  /** Parse bill timestamp from ISO or common POS display strings. */
+  function parseBillDate(b) {
+    const raw = b && (b.dateTime || b.time || b.created_at || b.createdAt || '');
+    if (!raw) return null;
+    let d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return d;
+    const s = String(raw).trim();
+    // "13 Jul, 11:18 am" / "13 Jul 2026, 11:18 am"
+    const m = s.match(
+      /^(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?,?\s*(\d{4})?(?:,?\s*(\d{1,2}):(\d{2})\s*(am|pm))?/i
+    );
+    if (m) {
+      const months = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      };
+      const mon = months[String(m[2]).toLowerCase().slice(0, 3)];
+      if (mon != null) {
+        const year = m[3] ? Number(m[3]) : new Date().getFullYear();
+        let hour = m[4] != null ? Number(m[4]) : 12;
+        const min = m[5] != null ? Number(m[5]) : 0;
+        const ap = (m[6] || '').toLowerCase();
+        if (ap === 'pm' && hour < 12) hour += 12;
+        if (ap === 'am' && hour === 12) hour = 0;
+        d = new Date(year, mon, Number(m[1]), hour, min, 0, 0);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  }
+
+  function billInDateRange(b) {
+    const range = billsDateRange || 'today';
+    if (range === 'all') return true;
+    const d = parseBillDate(b);
+    if (!d) {
+      // Unparseable timestamps only show in All (avoids polluting Today stats)
+      return false;
+    }
+    const t = d.getTime();
+    const today0 = startOfLocalDay(new Date()).getTime();
+    const dayMs = 86400000;
+    if (range === 'today') return t >= today0 && t < today0 + dayMs;
+    if (range === 'yesterday') return t >= today0 - dayMs && t < today0;
+    if (range === '7d') return t >= today0 - 6 * dayMs && t < today0 + dayMs;
+    if (range === 'custom') {
+      let from = -Infinity;
+      let to = Infinity;
+      if (billsCustomFrom) {
+        const f = new Date(billsCustomFrom + 'T00:00:00');
+        if (!Number.isNaN(f.getTime())) from = startOfLocalDay(f).getTime();
+      }
+      if (billsCustomTo) {
+        const e = new Date(billsCustomTo + 'T00:00:00');
+        if (!Number.isNaN(e.getTime())) to = startOfLocalDay(e).getTime() + dayMs;
+      }
+      return t >= from && t < to;
+    }
+    return true;
+  }
+
+  function dateRangeLabels() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return { sales: "Yesterday's sales", count: 'Bills yesterday', refunds: 'Refunds yesterday' };
+      case '7d':
+        return { sales: '7-day sales', count: 'Bills (7 days)', refunds: 'Refunds (7 days)' };
+      case 'all':
+        return { sales: 'All-time sales', count: 'All bills', refunds: 'All refunds' };
+      case 'custom':
+        return { sales: 'Sales in range', count: 'Bills in range', refunds: 'Refunds in range' };
+      default:
+        return { sales: "Today's sales", count: "Today's bills", refunds: 'Refunds today' };
+    }
+  }
+
   function filterBills(bills, q, payFilter, statusFilter) {
     const needle = String(q || '').toLowerCase().trim();
-    let filtered = bills;
+    let filtered = (bills || []).filter(billInDateRange);
     if (needle) {
-      filtered = bills.filter((b) => {
+      filtered = filtered.filter((b) => {
         const hay = [
           b.no,
           b.orderId,
@@ -490,6 +582,14 @@
       filtered = filtered.filter((b) => b.status && String(b.status).toLowerCase() === sf);
     }
     return filtered;
+  }
+
+  function getFilteredBills() {
+    const q = ($('#bills-search') && $('#bills-search').value) || '';
+    const payFilter = ($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All';
+    const statusFilter = ($('#bills-status-filter') && $('#bills-status-filter').value) || 'All';
+    const localFiltered = filterBills(getBills(), q, payFilter, statusFilter);
+    return mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
   }
 
   /** Map cloud doppio_bills row → local bill shape used by the table. */
@@ -768,10 +868,9 @@
       const status = document.getElementById('bills-status-filter');
       const bar = document.getElementById('bills-filter-hint');
       if (bar) {
-        bar.hidden = !bar.hidden;
-        bar.setAttribute('aria-hidden', bar.hidden ? 'true' : 'false');
+        bar.hidden = false;
+        bar.setAttribute('aria-hidden', 'false');
       }
-      // Highlight header filters so staff see Payment / Status dropdowns
       [pay, status].forEach((el) => {
         if (!el) return;
         el.classList.add('bills-filter-flash');
@@ -782,7 +881,7 @@
           pay.focus();
         } catch (_) {}
       }
-      toast('Use Payment & Status filters in the table header', 'fa-filter');
+      toast('Use date chips + Payment / Status filters', 'fa-filter');
     });
   }
 
@@ -794,6 +893,17 @@
     return `<span class="pill" style="padding:3px 9px">${_e(b.status || '—')}</span>`;
   }
 
+  function closeAllBillMoreMenus(except) {
+    document.querySelectorAll('.bills-more-menu').forEach((menu) => {
+      if (except && menu === except) return;
+      menu.hidden = true;
+    });
+    document.querySelectorAll('.bills-more.is-open').forEach((wrap) => {
+      if (except && wrap.contains(except)) return;
+      wrap.classList.remove('is-open');
+    });
+  }
+
   function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
     if (!body) return;
@@ -803,76 +913,146 @@
       const hasFilter =
         q.trim() ||
         (($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All') !== 'All' ||
-        (($('#bills-status-filter') && $('#bills-status-filter').value) || 'All') !== 'All';
-      body.innerHTML = `<tr class="bills-empty-row"><td colspan="8" style="padding:0;border:none">
+        (($('#bills-status-filter') && $('#bills-status-filter').value) || 'All') !== 'All' ||
+        (billsDateRange && billsDateRange !== 'all');
+      const emptyTitle =
+        hasFilter
+          ? 'No bills match your filters'
+          : billsDateRange === 'today'
+            ? 'No bills yet today'
+            : 'No bills in this range';
+      const emptyHint = hasFilter
+        ? 'Try another date chip, clear search, or set Payment / Status to All.'
+        : 'Completed sales from POS appear here for reprint, export, and reports.';
+      body.innerHTML = `<tr class="bills-empty-row"><td colspan="9" style="padding:0;border:none">
         <div class="sr-empty" style="padding:40px 20px">
           <i class="fa-solid fa-file-invoice-dollar" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i>
-          <div style="font-weight:700;color:var(--text);margin-bottom:4px">${hasFilter ? 'No bills match your filters' : 'No bills yet today'}</div>
-          <div style="color:var(--text-soft);font-size:13px;max-width:360px;margin:0 auto">${
-            hasFilter
-              ? 'Clear search or set Payment / Status to All.'
-              : 'Completed sales from POS appear here for reprint, export, and day report.'
-          }</div>
+          <div style="font-weight:700;color:var(--text);margin-bottom:4px">${emptyTitle}</div>
+          <div style="color:var(--text-soft);font-size:13px;max-width:380px;margin:0 auto">${emptyHint}</div>
         </div>
       </td></tr>`;
       return;
     }
 
     body.innerHTML = filtered
-      .map(
-        (b) => `
+      .map((b) => {
+        const cust = b.customerName || b.customer || '';
+        const phone = b.customerPhone || '';
+        const custHtml = cust
+          ? `<div class="bc-name">${_e(cust)}</div>${phone ? `<div class="bc-phone">${_e(phone)}</div>` : ''}`
+          : phone
+            ? `<div class="bc-phone">${_e(phone)}</div>`
+            : `<span class="bc-empty">—</span>`;
+        const refunded = String(b.status || '').toLowerCase() === 'refunded';
+        return `
       <tr data-bill-no="${_e(b.no || b.orderId || b.id || '')}">
-        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td class="td-time" title="${_e(formatBillTimeIsoExcel(b) || '')}">${_e(formatBillTime(b) || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td>
+        <td class="td-time" title="${_e(formatBillTimeIsoExcel(b) || '')}">${_e(formatBillTime(b) || '-')}</td>
+        <td>${_e(b.table || '-')}</td>
+        <td class="td-cust">${custHtml}</td>
+        <td>${_e(b.items)}</td>
         <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay || '—')}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
         <td>${statusPillHtml(b)}</td>
-        <td><div class="row-actions"><button type="button" class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button type="button" class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button type="button" class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button><button type="button" class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button type="button" class="icon-act danger refund-act" title="Void / refund" aria-label="Void bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-ban"></i></button><button type="button" class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
-      </tr>`
-      )
+        <td>
+          <div class="row-actions bills-row-actions">
+            <button type="button" class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button>
+            <button type="button" class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button>
+            <button type="button" class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button>
+            <button type="button" class="icon-act wa-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button>
+            <div class="bills-more">
+              <button type="button" class="icon-act more-act" title="More actions" aria-label="More actions" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
+              <div class="bills-more-menu" hidden role="menu">
+                <button type="button" class="bills-more-item refund-act" role="menuitem" ${refunded ? 'disabled' : ''}><i class="fa-solid fa-ban"></i> Void / refund</button>
+                <button type="button" class="bills-more-item del-act danger" role="menuitem"><i class="fa-solid fa-trash-can"></i> Delete bill</button>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+      })
       .join('');
 
     const visibleBills = filtered;
     if (body._rsBillActionHandler) body.removeEventListener('click', body._rsBillActionHandler, true);
     body._rsBillActionHandler = (e) => {
-      const btn = e.target.closest('.icon-act');
+      const moreBtn = e.target.closest('.more-act');
+      if (moreBtn && body.contains(moreBtn)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const wrap = moreBtn.closest('.bills-more');
+        const menu = wrap && wrap.querySelector('.bills-more-menu');
+        if (!menu) return;
+        const open = menu.hidden;
+        closeAllBillMoreMenus();
+        if (open) {
+          menu.hidden = false;
+          wrap.classList.add('is-open');
+          moreBtn.setAttribute('aria-expanded', 'true');
+        }
+        return;
+      }
+
+      const menuItem = e.target.closest('.bills-more-item');
+      const btn = menuItem || e.target.closest('.icon-act');
       if (!btn || !body.contains(btn) || btn.disabled) return;
+      if (btn.classList.contains('more-act')) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       const row = btn.closest('tr');
-      const bill = visibleBills[[...body.children].indexOf(row)];
+      const bill = visibleBills[[...body.querySelectorAll('tr')].indexOf(row)];
       if (!bill) return;
-      // Prefer live RS.BILLS object when present (mutations stick)
       const live = getBills().find(
         (x) => x === bill || String(x.no || x.orderId) === String(bill.no || bill.orderId)
       );
       const target = live || bill;
+      closeAllBillMoreMenus();
       if (btn.classList.contains('go')) return showBillReceipt(target);
       if (btn.classList.contains('thermal-act')) return printBillThermal(target);
       if (btn.classList.contains('rebill-act')) return rebillToPos(target);
       if (btn.classList.contains('refund-act')) return markBillRefunded(target);
       if (btn.classList.contains('del-act')) return deleteBill(target);
+      if (btn.classList.contains('wa-act')) return shareBillReceipt(target);
       return shareBillReceipt(target);
     };
     body.addEventListener('click', body._rsBillActionHandler, true);
+
+    if (!document._rsBillsMoreDocBound) {
+      document._rsBillsMoreDocBound = true;
+      document.addEventListener('click', (ev) => {
+        if (!ev.target.closest('.bills-more')) closeAllBillMoreMenus();
+      });
+    }
   }
 
   function renderBills() {
     const BILLS = getBills();
-    const paidBills = BILLS.filter((b) => b.status === 'paid');
-    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const count = BILLS.length;
+    // Stats always match the active date range (before search/pay/status filters)
+    const ranged = BILLS.filter(billInDateRange);
+    const paidBills = ranged.filter((b) => String(b.status || '').toLowerCase() === 'paid');
+    const totalSales = paidBills.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+    const countInRange = ranged.length;
     const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
-    const refunds = BILLS.filter((b) => b.status === 'refunded').length;
+    const refunds = ranged.filter((b) => String(b.status || '').toLowerCase() === 'refunded').length;
+    const labels = dateRangeLabels();
 
     const salesEl = document.getElementById('bills-stat-sales');
     if (salesEl) salesEl.textContent = rs(totalSales);
     const countEl = document.getElementById('bills-stat-count');
-    if (countEl) countEl.textContent = count;
+    if (countEl) countEl.textContent = countInRange;
     const aovEl = document.getElementById('bills-stat-aov');
     if (aovEl) aovEl.textContent = rs(aov);
     const refundsEl = document.getElementById('bills-stat-refunds');
     if (refundsEl) refundsEl.textContent = refunds;
+    const salesLbl = document.getElementById('bills-stat-sales-label');
+    if (salesLbl) salesLbl.textContent = labels.sales;
+    const countLbl = document.getElementById('bills-stat-count-label');
+    if (countLbl) countLbl.textContent = labels.count;
+    const refundsLbl = document.getElementById('bills-stat-refunds-label');
+    if (refundsLbl) refundsLbl.textContent = labels.refunds;
+
+    syncDateChipsUi();
 
     const q = ($('#bills-search')?.value || '').toLowerCase();
     const payFilter = $('#bills-pay-filter')?.value || 'All';
@@ -882,24 +1062,25 @@
     const merged = mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
     paintBillsTable(merged);
 
-    // Visible count chip next to search
     const meta = document.getElementById('bills-result-meta');
     if (meta) {
       const n = merged.length;
-      const filtered =
+      const extraFilter =
         (q && q.trim()) || payFilter !== 'All' || statusFilter !== 'All';
-      meta.textContent = filtered ? `${n} of ${count}` : n ? `${n} bill${n === 1 ? '' : 's'}` : '';
-      meta.hidden = !n && !filtered;
+      meta.textContent = extraFilter
+        ? `${n} of ${countInRange}`
+        : n
+          ? `${n} bill${n === 1 ? '' : 's'}`
+          : '';
+      meta.hidden = !n && !extraFilter;
     }
 
-    // Wave 7: async server search when query is long enough
     const gen = ++_searchGen;
     if (String(q || '').trim().length >= 2) {
       searchBillsServer(q, 50).then((rows) => {
         if (gen !== _searchGen) return;
         if (!rows) return;
         _serverHits = rows;
-        // Merge server rows into memory cache (non-destructive for local-only fields)
         const list = getBills();
         rows.forEach((r) => {
           const key = String(r.no || r.orderId || '');
@@ -918,6 +1099,93 @@
     }
   }
 
+  function syncDateChipsUi() {
+    const chips = document.getElementById('bills-date-chips');
+    if (chips) {
+      chips.querySelectorAll('[data-range]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-range') === billsDateRange);
+      });
+    }
+    const custom = document.getElementById('bills-custom-range');
+    if (custom) custom.hidden = billsDateRange !== 'custom';
+    const from = document.getElementById('bills-date-from');
+    const to = document.getElementById('bills-date-to');
+    if (from && billsCustomFrom) from.value = billsCustomFrom;
+    if (to && billsCustomTo) to.value = billsCustomTo;
+  }
+
+  function wireDateChips() {
+    const chips = document.getElementById('bills-date-chips');
+    if (chips && !chips.dataset.rsBound) {
+      chips.dataset.rsBound = '1';
+      chips.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-range]');
+        if (!btn || !chips.contains(btn)) return;
+        billsDateRange = btn.getAttribute('data-range') || 'today';
+        try {
+          localStorage.setItem('rs_bills_date_range', billsDateRange);
+        } catch (_) {}
+        if (billsDateRange === 'custom') {
+          syncDateChipsUi();
+          const from = document.getElementById('bills-date-from');
+          if (from) {
+            try {
+              from.focus();
+            } catch (_) {}
+          }
+          return;
+        }
+        renderBills();
+      });
+    }
+    const apply = document.getElementById('bills-date-apply');
+    if (apply && !apply.dataset.rsBound) {
+      apply.dataset.rsBound = '1';
+      apply.addEventListener('click', () => {
+        const from = document.getElementById('bills-date-from');
+        const to = document.getElementById('bills-date-to');
+        billsCustomFrom = (from && from.value) || '';
+        billsCustomTo = (to && to.value) || '';
+        billsDateRange = 'custom';
+        try {
+          localStorage.setItem('rs_bills_date_range', 'custom');
+          localStorage.setItem('rs_bills_date_from', billsCustomFrom);
+          localStorage.setItem('rs_bills_date_to', billsCustomTo);
+        } catch (_) {}
+        if (!billsCustomFrom && !billsCustomTo) {
+          toast('Pick a from and/or to date', 'fa-calendar');
+          return;
+        }
+        renderBills();
+      });
+    }
+  }
+
+  function wireFilterHint() {
+    const bar = document.getElementById('bills-filter-hint');
+    const dismiss = document.getElementById('bills-hint-dismiss');
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem('rs_bills_hint_dismissed') === '1';
+    } catch (_) {}
+    if (bar && !dismissed) {
+      bar.hidden = false;
+      bar.setAttribute('aria-hidden', 'false');
+    }
+    if (dismiss && !dismiss.dataset.rsBound) {
+      dismiss.dataset.rsBound = '1';
+      dismiss.addEventListener('click', () => {
+        if (bar) {
+          bar.hidden = true;
+          bar.setAttribute('aria-hidden', 'true');
+        }
+        try {
+          localStorage.setItem('rs_bills_hint_dismissed', '1');
+        } catch (_) {}
+      });
+    }
+  }
+
   function debounce(fn, wait) {
     let t;
     return function debounced() {
@@ -929,6 +1197,8 @@
   }
 
   function bindFilters() {
+    wireDateChips();
+    wireFilterHint();
     renderBills();
     wireExportButton();
     wireFilterButton();
@@ -959,6 +1229,9 @@
     renderBills,
     bindFilters,
     filterBills,
+    getFilteredBills,
+    billInDateRange,
+    parseBillDate,
     searchBillsServer,
     normalizeServerBill,
     showRefundModal,
@@ -967,6 +1240,7 @@
     formatBillTime,
     wireExportButton,
     wireFilterButton,
+    getDateRange: () => billsDateRange,
   };
 
   global.RSBillsHistory = api;

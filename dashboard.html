@@ -81,7 +81,7 @@
   // (never marketing labels like "Systempatch"). Dirty URLs are rewritten so
   // the address bar always matches the version chip.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v152-20260713-online-orders';
+    var builtin = 'v153-20260713-bills-10';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -815,29 +815,44 @@
       <!-- ============ BILLS ============ -->
       <section class="tab-content" id="bills-tab" data-screen-label="Bills">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl">Bills generated</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl" id="bills-stat-sales-label">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl" id="bills-stat-count-label">Bills in range</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">₹0</div><div class="sl">Avg order value</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl">Refunds today</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl" id="bills-stat-refunds-label">Refunds in range</div></div></div>
         </div>
         <div class="panel panel-pad">
-          <div class="toolbar-row">
-            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…" autocomplete="off" aria-label="Search bills"></div>
+          <div class="toolbar-row bills-toolbar">
+            <div class="bills-date-chips" id="bills-date-chips" role="group" aria-label="Bill date range">
+              <button type="button" class="bills-date-chip is-active" data-range="today">Today</button>
+              <button type="button" class="bills-date-chip" data-range="yesterday">Yesterday</button>
+              <button type="button" class="bills-date-chip" data-range="7d">7 days</button>
+              <button type="button" class="bills-date-chip" data-range="all">All</button>
+              <button type="button" class="bills-date-chip" data-range="custom">Custom</button>
+            </div>
+            <div class="bills-custom-range" id="bills-custom-range" hidden>
+              <input type="date" id="bills-date-from" aria-label="From date">
+              <span class="bills-custom-sep">–</span>
+              <input type="date" id="bills-date-to" aria-label="To date">
+              <button type="button" class="btn btn-ghost btn-sm" id="bills-date-apply">Apply</button>
+            </div>
+            <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…" autocomplete="off" aria-label="Search bills"></div>
             <span id="bills-result-meta" class="bills-result-meta" hidden></span>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print report</button>
           </div>
           <div id="bills-filter-hint" class="bills-filter-hint" hidden aria-hidden="true">
             <i class="fa-solid fa-circle-info"></i>
-            Filters live in the <b>Payment</b> and <b>Status</b> columns of the table header. Export CSV respects the same filters.
+            <span>Date chips control stats + the table. Payment / Status filters are in the table header. Export respects the same filters.</span>
+            <button type="button" class="bills-hint-dismiss" id="bills-hint-dismiss" aria-label="Dismiss tip" title="Dismiss">×</button>
           </div>
-          <div class="table-scroll"><table class="data-table">
+          <div class="table-scroll"><table class="data-table bills-table">
             <thead>
               <tr>
                 <th>Bill No.</th>
                 <th>Time</th>
                 <th>Table</th>
+                <th>Customer</th>
                 <th>Items</th>
                 <th>
                   Payment

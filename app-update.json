@@ -1,13 +1,12 @@
 {
-  "version": "v152-20260713-online-orders",
+  "version": "v153-20260713-bills-10",
   "date": "2026-07-13",
-  "title": "Online Orders 10/10 hub",
-  "summary": "The Online Orders screen gets a polished empty state, platform and status filters, one-click webhook copy, platform-picker demos, and clearer order cards for Zomato, Swiggy, and ONDC.",
+  "title": "Bills history 10/10",
+  "summary": "Bill History now defaults to Today with matching stats, date chips (Yesterday / 7 days / All / Custom), a customer column, dismissible tips, and cleaner row actions with Void/Delete under a more menu.",
   "highlights": [
-    "Empty state: platform chips, 3-step flow (webhook → Accept+KOT → POS), clearer CTAs.",
-    "Clickable New / Preparing / Ready stats plus All · Swiggy · Zomato · ONDC filters.",
-    "Webhook modal with copy URL, setup steps, and sample JSON payload.",
-    "Demo order lets you pick Swiggy, Zomato, or ONDC instead of a random platform.",
-    "Order cards: item bullets, tappable phone, POS label, double-click guard on Accept, Listening status + last refreshed."
+    "Date chips: Today (default), Yesterday, 7 days, All, Custom — stats and table share the same range.",
+    "Customer column shows name and phone when captured on the bill.",
+    "Primary actions: reprint, thermal, rebill, WhatsApp; Void and Delete live under ⋯.",
+    "Filter tip is dismissible and remembered; Export / Print report respect active filters."
   ]
 }

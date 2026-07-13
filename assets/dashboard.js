@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v152-20260713-online-orders';
+    return 'v153-20260713-bills-10';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -2629,12 +2629,21 @@
       });
     }
 
-    // 5b. Print Day Report
+    // 5b. Print Day Report (respects Bills date range when available)
     const btnPrintDayReport = document.getElementById('btn-print-day-report');
     if (btnPrintDayReport) {
       btnPrintDayReport.onclick = () => {
-        const paidBills = BILLS.filter((b) => String(b.status || 'paid').toLowerCase() === 'paid');
-        if (!paidBills.length) return toast('No sales data for day report', 'fa-circle-exclamation');
+        let source = BILLS;
+        if (window.RSBillsHistory) {
+          if (typeof RSBillsHistory.getFilteredBills === 'function') {
+            // Range + search/pay/status currently on screen
+            source = RSBillsHistory.getFilteredBills() || [];
+          } else if (typeof RSBillsHistory.billInDateRange === 'function') {
+            source = BILLS.filter((b) => RSBillsHistory.billInDateRange(b));
+          }
+        }
+        const paidBills = source.filter((b) => String(b.status || 'paid').toLowerCase() === 'paid');
+        if (!paidBills.length) return toast('No sales data for this range', 'fa-circle-exclamation');
 
         const settings = window.RS_SETTINGS || {};
         const sess = window.RS_API && RS_API.session ? RS_API.session() : null;

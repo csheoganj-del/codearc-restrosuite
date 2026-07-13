@@ -1533,7 +1533,30 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .kds-item.done .kn { text-decoration: line-through; color: var(--text-faint); }
 .kds-foot { padding: 12px 15px; border-top: 1px solid var(--stroke); }
 
-/* Bills filters */
+/* Bills filters + 10/10 history chrome */
+.bills-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
+.bills-date-chips {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.bills-date-chip {
+  appearance: none; border: 1px solid var(--stroke-2); background: var(--glass);
+  color: var(--text-soft); font: inherit; font-size: 12px; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer; transition: var(--t);
+}
+.bills-date-chip:hover { color: var(--text); border-color: var(--stroke-hi); }
+.bills-date-chip.is-active {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(135deg, var(--orange), color-mix(in srgb, var(--orange) 72%, #000));
+}
+.bills-custom-range {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+}
+.bills-custom-range input[type="date"] {
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--stroke-2); background: var(--glass); color: var(--text);
+}
+.bills-custom-sep { color: var(--text-mute); font-size: 12px; }
 .bills-result-meta {
   font-size: 12px;
   font-weight: 600;
@@ -1554,7 +1577,13 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   border-radius: var(--r-sm);
   line-height: 1.4;
 }
+.bills-filter-hint > span { flex: 1; min-width: 0; }
 .bills-filter-hint i { color: var(--orange); margin-top: 2px; }
+.bills-hint-dismiss {
+  appearance: none; border: 0; background: transparent; color: var(--text-mute);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; margin-left: auto;
+}
+.bills-hint-dismiss:hover { color: var(--text); }
 #bills-pay-filter.bills-filter-flash,
 #bills-status-filter.bills-filter-flash {
   outline: 2px solid var(--orange);
@@ -1563,6 +1592,34 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   transition: outline .2s ease;
 }
 .data-table .td-time { white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--text-soft); }
+.data-table .td-cust { min-width: 110px; max-width: 160px; }
+.bc-name { font-weight: 600; font-size: 12.5px; color: var(--text); line-height: 1.25; }
+.bc-phone { font-size: 11.5px; color: var(--text-mute); margin-top: 2px; }
+.bc-empty { color: var(--text-faint); }
+.bills-row-actions { flex-wrap: nowrap; }
+.bills-more { position: relative; display: inline-flex; }
+.bills-more-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 40;
+  min-width: 160px; padding: 6px;
+  border-radius: 10px; border: 1px solid var(--stroke-2);
+  background: var(--panel-solid, var(--panel));
+  box-shadow: var(--shadow-md, 0 12px 28px rgba(0,0,0,.12));
+  display: flex; flex-direction: column; gap: 2px;
+}
+.bills-more-menu[hidden] { display: none !important; }
+.bills-more-item {
+  appearance: none; border: 0; background: transparent; text-align: left;
+  font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text);
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+}
+.bills-more-item:hover { background: var(--glass-2, var(--glass)); }
+.bills-more-item.danger { color: #ef4444; }
+.bills-more-item:disabled { opacity: .4; cursor: not-allowed; }
+@media (max-width: 900px) {
+  .bills-toolbar .pos-search { max-width: none !important; width: 100%; order: 5; }
+  .data-table .td-cust { max-width: 120px; }
+}
 
 /* ===================== REPORTS / charts ===================== */
 .report-grid { display: grid; grid-template-columns: var(--cols, 1.6fr 1fr); gap: 16px; }
