@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v162-20260713-naive-smooth';
+    var builtin = 'v163-20260713-smart-setup';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -421,6 +421,7 @@
       <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
+      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup · Menu · Recipe · Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
       <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
       <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
@@ -1638,6 +1639,7 @@
     <div id="mobile-more-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);" onclick="document.getElementById('mobile-more-sheet').style.display='none'"></div>
     <div style="position:absolute;bottom:70px;left:12px;right:12px;background:var(--panel);border:1px solid var(--stroke);border-radius:20px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
       <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-mute);grid-column:1/-1;margin-bottom:4px;">MORE SECTIONS</div>
+      <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
       <button class="mnav-more-btn" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></button>
       <button class="mnav-more-btn" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i><span>Menu Editor</span></button>
       <button class="mnav-more-btn" data-tab="employees-tab"><i class="fa-solid fa-users"></i><span>Employees</span></button>

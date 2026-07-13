@@ -1,15 +1,13 @@
 {
-  "version": "v162-20260713-naive-smooth",
+  "version": "v163-20260713-smart-setup",
   "date": "2026-07-13",
-  "title": "Menu · Recipe · Stock — smooth for everyone",
-  "summary": "Plain-language kitchen setup so any staff can connect Menu, Recipe, and Stock. 3-step checklist, progress bar, helper on every unlinked dish, tips on Menu Editor and POS.",
+  "title": "Smart Kitchen Setup — suggest, copy, one-tap",
+  "summary": "Kitchen Setup in the sidebar. Wizard suggests stock from dish names, copy recipe from similar dishes, badge shows how many dishes still need linking.",
   "highlights": [
-    "3-step setup checklist: Stock → Menu → Link recipes",
-    "Help me wizard with Save & link next dish",
-    "Progress bar: X% of dishes linked",
-    "Help me button on every unlinked recipe row",
-    "Menu Editor banner + Need help linking stock?",
-    "POS soft tip when dish has no recipe (stock won't move)",
-    "Plain words instead of FEFO/deduction jargon"
+    "Sidebar + mobile More: Kitchen Setup (3-step checklist)",
+    "Badge shows dishes still missing a recipe",
+    "Smart suggestions: Biryani → rice from your stock list",
+    "Copy recipe from a similar linked dish",
+    "Recipes table: Help me + Copy on unlinked rows"
   ]
 }

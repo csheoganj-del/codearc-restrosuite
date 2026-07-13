@@ -1720,6 +1720,43 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .klc-mini-banner-title { font-weight: 800; font-size: 12.5px; letter-spacing: .02em; }
 .klc-mini-banner-msg { font-size: 12.5px; color: var(--text-soft); line-height: 1.4; margin-top: 2px; }
 .klc-mini-banner-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.klc-suggest {
+  border: 1px dashed color-mix(in srgb, var(--orange) 45%, var(--stroke));
+  border-radius: 10px; padding: 10px 12px; margin-bottom: 10px;
+  background: color-mix(in srgb, var(--orange) 6%, var(--panel));
+}
+.klc-suggest-title {
+  font-size: 12px; font-weight: 800; color: var(--text); margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.klc-suggest-title i { color: var(--amber); }
+.klc-suggest-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.klc-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--stroke-2); border-radius: 999px;
+  background: var(--glass); padding: 6px 10px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--text);
+}
+.klc-chip:hover { border-color: var(--orange); background: var(--orange-tint); }
+.klc-chip i { font-size: 10px; color: var(--orange); }
+.klc-chip-meta { font-size: 11px; font-weight: 600; color: var(--text-mute); }
+.klc-copy-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.klc-copy-hint { font-size: 11.5px; color: var(--text-mute); }
+.sidebar-link.klc-setup-link {
+  border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent);
+  border-radius: 10px; margin: 2px 8px 6px; padding-left: 12px;
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.sidebar-link.klc-setup-link.klc-setup-done {
+  border-color: color-mix(in srgb, var(--green) 35%, transparent);
+  background: color-mix(in srgb, var(--green) 8%, transparent);
+}
+.sidebar-link.klc-setup-link .badge-count {
+  background: var(--orange); color: #fff;
+}
 @media (max-width: 640px) {
   .klc-arrow { display: none; }
   .klc-box { max-width: none; }

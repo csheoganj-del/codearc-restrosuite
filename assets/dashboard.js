@@ -313,7 +313,20 @@
       activateTab('pos-tab');
     }
   }
-  $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
+  $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{
+    e.preventDefault();
+    // Kitchen Setup is a coach modal, not a page tab
+    if (l.id === 'klc-sidebar-setup' || l.getAttribute('data-klc-nav') === 'setup') {
+      if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.openSetupChecklist) {
+        RSKitchenLinkCoach.openSetupChecklist();
+      } else if (typeof activateTab === 'function') {
+        activateTab('inventory-tab');
+      }
+      return;
+    }
+    if (!l.dataset.tab) return;
+    activateTab(l.dataset.tab);
+  }));
   document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
   /* ---------- SUPPORT (Call + WhatsApp) ---------- */
@@ -402,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v162-20260713-naive-smooth';
+    return 'v163-20260713-smart-setup';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

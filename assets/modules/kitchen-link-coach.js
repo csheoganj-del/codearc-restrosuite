@@ -55,6 +55,132 @@
     };
   }
 
+  /** Common Indian restaurant dish keywords → stock name fragments + default plate qty */
+  var SUGGEST_RULES = [
+    { keys: ['biryani', 'pulao', 'fried rice', 'rice bowl', 'jeera rice', 'steam rice', 'curd rice'], stock: ['rice', 'basmati', 'jeera'], qty: 0.15, unit: 'kg' },
+    { keys: ['naan', 'roti', 'paratha', 'kulcha', 'chapati', 'tandoori roti'], stock: ['flour', 'atta', 'wheat', 'maida'], qty: 0.08, unit: 'kg' },
+    { keys: ['paneer', 'kadai paneer', 'shahi paneer', 'palak paneer', 'butter paneer'], stock: ['paneer'], qty: 0.12, unit: 'kg' },
+    { keys: ['butter chicken', 'chicken curry', 'chicken tikka', 'tandoori chicken', 'chicken'], stock: ['chicken'], qty: 0.18, unit: 'kg' },
+    { keys: ['mutton', 'lamb', 'keema', 'rogan josh'], stock: ['mutton', 'lamb', 'goat'], qty: 0.18, unit: 'kg' },
+    { keys: ['fish', 'prawn', 'shrimp', 'seafood'], stock: ['fish', 'prawn', 'shrimp'], qty: 0.15, unit: 'kg' },
+    { keys: ['dal', 'daal', 'sambar', 'rasam'], stock: ['dal', 'daal', 'toor', 'moong', 'masoor', 'lentil'], qty: 0.08, unit: 'kg' },
+    { keys: ['dosa', 'idli', 'uttapam', 'vada'], stock: ['batter', 'rice', 'urad', 'dosa'], qty: 0.15, unit: 'kg' },
+    { keys: ['pizza', 'pasta', 'lasagna'], stock: ['cheese', 'pizza', 'pasta', 'dough', 'sauce'], qty: 0.1, unit: 'kg' },
+    { keys: ['burger', 'sandwich', 'wrap', 'roll'], stock: ['bun', 'bread', 'roll', 'wrap', 'patty'], qty: 1, unit: 'pcs' },
+    { keys: ['tea', 'chai', 'coffee', 'cappuccino'], stock: ['tea', 'coffee', 'milk', 'sugar'], qty: 0.02, unit: 'kg' },
+    { keys: ['lassi', 'shake', 'smoothie', 'juice', 'mocktail'], stock: ['milk', 'curd', 'yogurt', 'sugar', 'fruit'], qty: 0.2, unit: 'L' },
+    { keys: ['salad', 'raita'], stock: ['onion', 'cucumber', 'tomato', 'curd', 'lettuce'], qty: 0.05, unit: 'kg' },
+    { keys: ['soup'], stock: ['stock', 'soup', 'veg', 'cream'], qty: 0.25, unit: 'L' },
+    { keys: ['tikka', 'kebab', 'kabab', 'seekh'], stock: ['chicken', 'paneer', 'mutton', 'oil'], qty: 0.12, unit: 'kg' },
+    { keys: ['curry', 'gravy', 'masala'], stock: ['onion', 'tomato', 'oil', 'masala', 'cream', 'butter'], qty: 0.05, unit: 'kg' },
+    { keys: ['egg', 'omelette', 'omlette'], stock: ['egg'], qty: 2, unit: 'pcs' },
+    { keys: ['fries', 'french fry', 'chips'], stock: ['potato', 'oil'], qty: 0.15, unit: 'kg' },
+  ];
+
+  function norm(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function findStockMatch(fragments) {
+    const inv = inventory();
+    const frags = (fragments || []).map(norm).filter(Boolean);
+    for (let i = 0; i < frags.length; i++) {
+      const f = frags[i];
+      const hit =
+        inv.find((x) => norm(x.name) === f) ||
+        inv.find((x) => norm(x.name).includes(f) || f.includes(norm(x.name)));
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  /**
+   * Suggest stock lines for a dish name from rules + name overlap with inventory.
+   * Only returns items that exist in stock (never invents names).
+   */
+  function suggestIngredients(dishName) {
+    const name = norm(dishName);
+    if (!name || !inventory().length) return [];
+    const out = [];
+    const seen = {};
+
+    function push(invItem, qty, unit, why) {
+      if (!invItem || seen[invItem.name]) return;
+      seen[invItem.name] = true;
+      out.push({
+        name: invItem.name,
+        qty: qty != null ? qty : 1,
+        unit: unit || invItem.unit || 'unit',
+        why: why || 'suggested',
+      });
+    }
+
+    SUGGEST_RULES.forEach((rule) => {
+      const hitKey = rule.keys.some((k) => name.includes(k));
+      if (!hitKey) return;
+      rule.stock.forEach((frag) => {
+        const invItem = findStockMatch([frag]);
+        if (invItem) push(invItem, rule.qty, invItem.unit || rule.unit, 'matches “' + frag + '”');
+      });
+    });
+
+    // Also: any stock item whose name appears inside the dish name
+    inventory().forEach((invItem) => {
+      const n = norm(invItem.name);
+      if (n.length >= 3 && name.includes(n)) push(invItem, 0.1, invItem.unit || 'unit', 'name match');
+    });
+
+    return out.slice(0, 8);
+  }
+
+  function tokenSet(str) {
+    return new Set(
+      norm(str)
+        .split(/[^a-z0-9]+/)
+        .filter((t) => t.length > 2)
+    );
+  }
+
+  function similarityScore(a, b) {
+    const A = tokenSet(a);
+    const B = tokenSet(b);
+    if (!A.size || !B.size) return 0;
+    let inter = 0;
+    A.forEach((t) => {
+      if (B.has(t)) inter++;
+    });
+    return inter / Math.max(A.size, B.size);
+  }
+
+  /**
+   * Linked dishes ranked by name/category similarity (for copy recipe).
+   */
+  function similarLinkedDishes(forDish, limit) {
+    const target = forDish || {};
+    const linked = menu().filter(
+      (m) =>
+        String(m.id) !== String(target.id) &&
+        Array.isArray(m.ingredients) &&
+        m.ingredients.length
+    );
+    return linked
+      .map((m) => {
+        let score = similarityScore(target.name, m.name) * 3;
+        if (target.cat && m.cat && norm(target.cat) === norm(m.cat)) score += 1.2;
+        // bonus if same veg/nonveg
+        if (target.veg != null && m.veg != null && !!target.veg === !!m.veg) score += 0.3;
+        return { dish: m, score };
+      })
+      .filter((x) => x.score > 0.15 || linked.length <= 12)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit || 12)
+      .map((x) => x.dish);
+  }
+
   function goInventoryTab(sub) {
     if (global.RS && typeof RS.activateTab === 'function') {
       RS.activateTab('inventory-tab');
@@ -360,7 +486,7 @@
 
     function draftHtml() {
       if (!draft.length) {
-        return `<div class="sr-empty" style="padding:16px;font-size:13.5px">No stock items yet.<br>Tap <b>Add from store room</b> below.</div>`;
+        return `<div class="sr-empty" style="padding:16px;font-size:13.5px">No stock items yet.<br>Tap a <b>suggestion</b>, <b>copy</b> from another dish, or <b>Add from store room</b>.</div>`;
       }
       return draft
         .map((g, i) => {
@@ -373,6 +499,44 @@
           </div>`;
         })
         .join('');
+    }
+
+    function suggestionsHtml() {
+      if (!chosen) return '';
+      const sug = suggestIngredients(chosen.name).filter((s) => !draft.find((d) => d.name === s.name));
+      if (!sug.length) return '';
+      return `<div class="klc-suggest" id="klc-suggest">
+        <div class="klc-suggest-title"><i class="fa-solid fa-lightbulb"></i> Suggested for “${esc(chosen.name)}”</div>
+        <div class="klc-suggest-chips">
+          ${sug
+            .map(
+              (s) =>
+                `<button type="button" class="klc-chip" data-sug-n="${esc(s.name)}" data-sug-q="${esc(s.qty)}" data-sug-u="${esc(s.unit || '')}" title="${esc(s.why || '')}">
+                  <i class="fa-solid fa-plus"></i> ${esc(pretty(s.name))}
+                  <span class="klc-chip-meta">${esc(s.qty)} ${esc(s.unit || '')}</span>
+                </button>`
+            )
+            .join('')}
+          <button type="button" class="btn btn-ghost btn-sm" id="klc-add-all-sug" style="margin-left:2px">Add all</button>
+        </div>
+      </div>`;
+    }
+
+    function copyBarHtml() {
+      if (!chosen) return '';
+      const sims = similarLinkedDishes(chosen, 5);
+      const linkedN = menu().filter((m) => Array.isArray(m.ingredients) && m.ingredients.length && String(m.id) !== String(chosen.id)).length;
+      if (!linkedN) return '';
+      return `<div class="klc-copy-bar">
+        <button type="button" class="btn btn-ghost btn-sm" id="klc-copy-recipe">
+          <i class="fa-solid fa-copy"></i> Copy recipe from similar dish
+        </button>
+        ${
+          sims.length
+            ? `<span class="klc-copy-hint">e.g. ${esc(sims[0].name)}${sims[1] ? ', ' + esc(sims[1].name) : ''}</span>`
+            : ''
+        }
+      </div>`;
     }
 
     function bodyForStep() {
@@ -389,7 +553,9 @@
         return `
           <div class="klc-wiz">
             <div class="klc-wiz-step">Step 2 of 3 · What goes into <b>${esc(chosen.name)}</b></div>
-            <p class="klc-p">Add items from your <b>store room (stock)</b>. Example: rice 0.15 kg, oil 10 ml.</p>
+            <p class="klc-p">Add items from your <b>store room (stock)</b>. We suggest matches — adjust quantities for 1 plate.</p>
+            ${suggestionsHtml()}
+            ${copyBarHtml()}
             <div id="klc-draft">${draftHtml()}</div>
             <button type="button" class="btn btn-ghost btn-block" id="klc-add-ing" style="border-style:dashed;margin-top:10px">
               <i class="fa-solid fa-plus"></i> Add from store room
@@ -589,6 +755,55 @@
               });
             };
             refreshDraft();
+
+            // Smart suggestion chips
+            modal.querySelectorAll('[data-sug-n]').forEach((chip) => {
+              chip.onclick = () => {
+                const name = chip.getAttribute('data-sug-n');
+                if (draft.find((g) => g.name === name)) return;
+                draft.push({
+                  name,
+                  qty: Number(chip.getAttribute('data-sug-q')) || 1,
+                  unit: chip.getAttribute('data-sug-u') || 'unit',
+                });
+                close();
+                remount();
+              };
+            });
+            const addAll = modal.querySelector('#klc-add-all-sug');
+            if (addAll)
+              addAll.onclick = () => {
+                const sug = suggestIngredients(chosen.name);
+                sug.forEach((s) => {
+                  if (!draft.find((g) => g.name === s.name)) {
+                    draft.push({ name: s.name, qty: s.qty, unit: s.unit });
+                  }
+                });
+                if (!sug.length) toast('No suggestions match your stock yet', 'fa-circle-info');
+                else {
+                  toast('Added ' + sug.length + ' suggestion(s) — check quantities', 'fa-lightbulb');
+                  close();
+                  remount();
+                }
+              };
+
+            // Copy recipe from similar
+            const copyBtn = modal.querySelector('#klc-copy-recipe');
+            if (copyBtn)
+              copyBtn.onclick = () => {
+                openCopyRecipePicker(chosen, (src) => {
+                  if (!src || !Array.isArray(src.ingredients)) return;
+                  draft = src.ingredients.map((g) => ({
+                    name: g.name,
+                    qty: Number(g.qty) || 0,
+                    unit: g.unit || 'unit',
+                  }));
+                  toast('Copied from “' + src.name + '” — adjust if needed', 'fa-copy');
+                  close();
+                  remount();
+                });
+              };
+
             const addBtn = modal.querySelector('#klc-add-ing');
             if (addBtn)
               addBtn.onclick = () => {
@@ -604,6 +819,68 @@
     }
 
     remount();
+  }
+
+  /**
+   * Pick a linked dish to copy its recipe from.
+   */
+  function openCopyRecipePicker(forDish, onPick) {
+    if (!global.RSModal) return;
+    const list = similarLinkedDishes(forDish, 30);
+    const allLinked = menu().filter(
+      (m) =>
+        String(m.id) !== String(forDish && forDish.id) &&
+        Array.isArray(m.ingredients) &&
+        m.ingredients.length
+    );
+    const rows = list.length ? list : allLinked;
+    if (!rows.length) {
+      toast('No other dish has a recipe yet to copy', 'fa-circle-info');
+      return;
+    }
+    global.RSModal.open({
+      title: 'Copy recipe from…',
+      sub: forDish ? 'Reuse a similar dish for “' + forDish.name + '”' : 'Pick a dish with a recipe',
+      icon: 'fa-copy',
+      size: 'sm',
+      body: `<input class="form-input" id="klc-copy-q" placeholder="Search dish…" style="margin-bottom:10px">
+        <div id="klc-copy-list" class="klc-pick-list"></div>`,
+      foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>`,
+      onMount(m, close) {
+        m.querySelector('[data-x]').onclick = close;
+        const q = m.querySelector('#klc-copy-q');
+        const box = m.querySelector('#klc-copy-list');
+        function draw() {
+          const t = (q.value || '').toLowerCase();
+          const f = rows.filter((d) => String(d.name || '').toLowerCase().includes(t));
+          box.innerHTML =
+            f
+              .map((d) => {
+                const n = (d.ingredients || []).length;
+                const preview = (d.ingredients || [])
+                  .slice(0, 3)
+                  .map((g) => pretty(g.name))
+                  .join(', ');
+                return `<button type="button" class="klc-pick" data-copy="${esc(d.id)}">
+                  <span class="veg ${d.veg ? '' : 'nonveg'}"></span>
+                  <span class="klc-pick-t">${esc(d.name)}</span>
+                  <span class="klc-pick-s">${n} item${n === 1 ? '' : 's'}${preview ? ' · ' + esc(preview) : ''}</span>
+                </button>`;
+              })
+              .join('') || '<div class="sr-empty" style="padding:16px">No match</div>';
+          box.querySelectorAll('[data-copy]').forEach((btn) => {
+            btn.onclick = () => {
+              const src = menu().find((x) => String(x.id) === String(btn.getAttribute('data-copy')));
+              close();
+              if (src && onPick) onPick(src);
+            };
+          });
+        }
+        q.addEventListener('input', draw);
+        draw();
+        q.focus();
+      },
+    });
   }
 
   /**
@@ -697,6 +974,9 @@
           if (b) b.click();
         }, 200);
       };
+    try {
+      refreshSetupNav();
+    } catch (_) {}
   }
 
   function wireMiniBanner(root) {
@@ -781,14 +1061,78 @@
     } catch (_) {}
   }
 
+  /**
+   * Sidebar / mobile badge: how many dishes still need a recipe.
+   */
+  function refreshSetupNav() {
+    try {
+      const s = setupStatus();
+      const badge = document.getElementById('klc-setup-badge');
+      const link = document.getElementById('klc-sidebar-setup');
+      const mobile = document.getElementById('klc-mobile-setup');
+      const show = !s.allLinked;
+      if (badge) {
+        if (s.missing > 0) {
+          badge.style.display = '';
+          badge.textContent = String(s.missing);
+          badge.title = s.missing + ' dish(es) need a recipe';
+        } else if (!s.hasStock || !s.hasMenu) {
+          badge.style.display = '';
+          badge.textContent = '!';
+          badge.title = 'Kitchen setup incomplete';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+      if (link) {
+        link.classList.toggle('klc-setup-done', !!s.allLinked);
+        link.title = s.allLinked
+          ? 'Kitchen link ready · Menu · Recipe · Stock'
+          : 'Kitchen Setup · connect Menu, Recipe & Stock';
+      }
+      if (mobile) mobile.style.opacity = s.allLinked ? '0.75' : '1';
+      // Hide emphasis when fully done but keep link for "how it works"
+    } catch (_) {}
+  }
+
+  function wireSetupNav() {
+    function openFromNav(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      openSetupChecklist();
+    }
+    const link = document.getElementById('klc-sidebar-setup');
+    if (link && !link._klcNav) {
+      link._klcNav = true;
+      link.addEventListener('click', openFromNav, true);
+    }
+    const mobile = document.getElementById('klc-mobile-setup');
+    if (mobile && !mobile._klcNav) {
+      mobile._klcNav = true;
+      mobile.addEventListener('click', (e) => {
+        openFromNav(e);
+        const sheet = document.getElementById('mobile-more-sheet');
+        if (sheet) sheet.style.display = 'none';
+      });
+    }
+    refreshSetupNav();
+  }
+
   global.RSKitchenLinkCoach = {
     openHowItWorks,
     openLinkWizard,
     openSetupChecklist,
+    openCopyRecipePicker,
     coachCardHtml,
     miniBannerHtml,
     wireCoachCard,
     wireMiniBanner,
+    wireSetupNav,
+    refreshSetupNav,
+    suggestIngredients,
+    similarLinkedDishes,
     coverage,
     setupStatus,
     goInventoryTab,
@@ -796,14 +1140,29 @@
     posUnlinkedHint,
   };
 
-  // Soft first visit after app shell is ready
+  // Soft first visit + nav wiring after app shell is ready
   if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => {
         try {
+          wireSetupNav();
           maybeOfferFirstVisit();
         } catch (_) {}
       }, 1800);
+      // Re-badge when inventory/menu re-renders
+      document.addEventListener('rs:render-inventory', () => {
+        try {
+          refreshSetupNav();
+        } catch (_) {}
+      });
     });
+    // If script loads after DOMContentLoaded
+    if (document.readyState !== 'loading') {
+      setTimeout(() => {
+        try {
+          wireSetupNav();
+        } catch (_) {}
+      }, 400);
+    }
   }
 })(typeof window !== 'undefined' ? window : globalThis);

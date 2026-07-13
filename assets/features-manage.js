@@ -996,10 +996,13 @@
                       !ings.length
                         ? `<button type="button" class="btn btn-primary btn-sm" data-help-link="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;" title="Simple step-by-step">
                       <i class="fa-solid fa-wand-magic-sparkles"></i> Help me
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-copy-rec="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;" title="Copy recipe from another dish">
+                      <i class="fa-solid fa-copy"></i> Copy
                     </button>`
                         : ''
                     }
-                    <button type="button" class="btn ${ings.length ? 'btn-ghost' : 'btn-ghost'} btn-sm" data-edit-rec="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;">
+                    <button type="button" class="btn btn-ghost btn-sm" data-edit-rec="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;">
                       <i class="fa-solid fa-flask"></i> ${ings.length ? 'Edit' : 'Manual'}
                     </button>
                   </div>
@@ -1023,6 +1026,36 @@
                 const m = (RS.MENU || []).find((x) => String(x.id) === String(b.getAttribute('data-help-link')));
                 if (m) openRecipeEditModal(m);
               }
+            };
+          });
+          recipeListBody.querySelectorAll('[data-copy-rec]').forEach((b) => {
+            b.onclick = async () => {
+              const target = (RS.MENU || []).find((x) => String(x.id) === String(b.getAttribute('data-copy-rec')));
+              if (!target) return;
+              if (!window.RSKitchenLinkCoach || !RSKitchenLinkCoach.openCopyRecipePicker) {
+                RS.toast('Open Help me wizard to copy a recipe', 'fa-circle-info');
+                return;
+              }
+              RSKitchenLinkCoach.openCopyRecipePicker(target, async (src) => {
+                if (!src || !Array.isArray(src.ingredients) || !src.ingredients.length) return;
+                target.ingredients = src.ingredients.map((g) => ({
+                  name: g.name,
+                  qty: Number(g.qty) || 0,
+                  unit: g.unit || 'unit',
+                }));
+                try {
+                  if (RS.saveOne) await RS.saveOne('menu', target);
+                  else if (RS.save) await RS.save('menu');
+                  RS.toast('Copied recipe from “' + src.name + '” to “' + target.name + '”', 'fa-copy');
+                  if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.refreshSetupNav) {
+                    RSKitchenLinkCoach.refreshSetupNav();
+                  }
+                  drawPanes();
+                } catch (err) {
+                  console.warn(err);
+                  RS.toast('Could not save copied recipe', 'fa-circle-exclamation');
+                }
+              });
             };
           });
 
