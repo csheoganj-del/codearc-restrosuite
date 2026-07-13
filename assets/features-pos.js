@@ -1164,12 +1164,13 @@
     }
 
     async function showReceipt(bill) {
-      // Open modal immediately — do NOT await QR (that blocked scroll for seconds)
+      // Open modal immediately — never await QR/PDF (both freeze main-thread scroll)
       const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
       const st0 = bill.syncStatus || 'synced';
       const pending0 = isBillSyncPending(st0);
       let liveQr = null;
       let printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, null)}</div>`;
+      window.__rsSettleModalOpen = true;
 
       const connectBanner = !gwReady
         ? `<div id="rc-wa-cta" class="rc-wa-banner">
@@ -1181,7 +1182,7 @@
           </div>`
         : '';
 
-      RSModal.open({
+      const settle = RSModal.open({
         title: 'Bill settled',
         sub: `<span class="rc-bill-meta">${esc(bill.no || '')} | ${rs(bill.grand)}</span>${billSyncChipHtml(st0)}`,
         icon: 'fa-circle-check',
@@ -1189,6 +1190,7 @@
         iconId: 'rc-settle-ic',
         size: 'sm',
         modalClass: 'rc-settle-modal',
+        bodyClass: 'rc-settle-body',
         body: `${connectBanner}<div class="receipt-paper" id="rc-paper">${receiptHTML(bill, null)}</div>`,
         foot: `<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">
               <button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">
@@ -1205,6 +1207,21 @@
               </button>
             </div>`,
         onMount(modal, close) {
+          const mbody = modal.querySelector('.rs-mbody');
+          // Ensure body is the only scroll surface and starts unlocked
+          if (mbody) {
+            mbody.style.overflowY = 'auto';
+            mbody.style.webkitOverflowScrolling = 'touch';
+            mbody.style.touchAction = 'pan-y';
+            mbody.style.overscrollBehavior = 'contain';
+          }
+
+          const wrappedClose = () => {
+            window.__rsSettleModalOpen = false;
+            clearInterval(syncTimer);
+            close();
+          };
+
           const printBtn = modal.querySelector('#rc-print');
           if (printBtn) {
             printBtn.onclick = () => {
@@ -1226,20 +1243,37 @@
           const cta = modal.querySelector('#rc-wa-cta');
           if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
           const newBtn = modal.querySelector('#rc-new');
-          if (newBtn) newBtn.onclick = close;
+          if (newBtn) newBtn.onclick = wrappedClose;
+          const xBtn = modal.querySelector('.rs-mclose');
+          if (xBtn) {
+            xBtn.addEventListener('click', () => { window.__rsSettleModalOpen = false; clearInterval(syncTimer); }, { once: true });
+          }
 
-          // QR inject after first paint (keeps scroll free)
+          // Soft QR inject: append only QR block — never rewrite whole paper (preserves scroll)
           const injectQr = (qr) => {
+            if (!qr || !modal.isConnected) return;
             liveQr = qr;
             printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qr)}</div>`;
             const paper = modal.querySelector('#rc-paper');
-            if (paper && qr) paper.innerHTML = receiptHTML(bill, qr);
+            if (!paper || paper.querySelector('.rcp-qr-wrap')) return;
+            const y = mbody ? mbody.scrollTop : 0;
+            const wrap = document.createElement('div');
+            wrap.className = 'rcp-qr-wrap';
+            wrap.innerHTML =
+              '<img src="' + qr + '" width="100" height="100" alt="Digital bill QR" crossorigin="anonymous" />' +
+              '<div class="rcp-qr-label">Scan to view digital bill</div>';
+            const foot = paper.querySelector('.rcp-foot');
+            if (foot) paper.insertBefore(wrap, foot);
+            else paper.appendChild(wrap);
+            if (mbody) mbody.scrollTop = y;
           };
+          // Delay QR until after user can scroll freely
           setTimeout(() => {
+            if (!modal.isConnected) return;
             generateReceiptQrDataUri(bill).then(injectQr).catch(() => {});
-          }, 80);
+          }, 600);
 
-          // Live orange -> green when cloud save completes
+          // Live orange -> green when cloud save completes (DOM-only, no layout thrash)
           paintBillSettledSync(modal, st0);
           let ticks = 0;
           const syncTimer = setInterval(() => {
@@ -1259,21 +1293,25 @@
               bill.syncStatus = 'synced';
               paintBillSettledSync(modal, 'synced');
               clearInterval(syncTimer);
-            } else {
+            } else if (ticks % 2 === 0) {
               paintBillSettledSync(modal, st);
             }
-          }, 500);
+          }, 700);
 
-          // PDF warm long after open so first scroll never freezes
-          if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
-            const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
-            setTimeout(() => {
-              if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 8000 });
-              else warm();
-            }, 3500);
-          }
+          // NO PDF warm while this modal is open — that was freezing scroll (html2canvas).
+          // PDF builds on first WhatsApp send instead.
         }
       });
+      // If overlay dismissed by backdrop/Escape, clear flag
+      if (settle && settle.el) {
+        const obs = new MutationObserver(() => {
+          if (!settle.el.isConnected || !settle.el.classList.contains('show')) {
+            window.__rsSettleModalOpen = false;
+            obs.disconnect();
+          }
+        });
+        obs.observe(settle.el, { attributes: true, attributeFilter: ['class'], childList: true });
+      }
     }
 
     // PDF compilers: preview HTML capture (preferred for WhatsApp) + thermal jsPDF

@@ -600,14 +600,21 @@
     };
   }
 
-  // Warm PDF cache as soon as a bill is paid (faster WhatsApp tap)
+  // Do NOT warm PDF on bill-paid while Bill settled is open — html2canvas freezes
+  // main-thread scroll for several seconds. Warm only after modal is gone, or on demand.
   document.addEventListener('rs:bill-paid', (ev) => {
     try {
       const bill = ev && ev.detail && (ev.detail.bill || ev.detail);
       if (!bill || !global.RSReceiptEngine) return;
-      const warm = () => toPDF(bill).catch(() => {});
-      if (global.requestIdleCallback) global.requestIdleCallback(warm, { timeout: 3000 });
-      else setTimeout(warm, 500);
+      const warm = () => {
+        if (global.__rsSettleModalOpen || document.querySelector('.rc-settle-modal')) return;
+        toPDF(bill).catch(() => {});
+      };
+      // Far after settle UI interaction so scroll never fights the capture
+      setTimeout(() => {
+        if (global.requestIdleCallback) global.requestIdleCallback(warm, { timeout: 12000 });
+        else warm();
+      }, 12000);
     } catch (_) {}
   });
 

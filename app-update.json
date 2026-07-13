@@ -1,12 +1,11 @@
 {
-  "version": "v186-20260713-settle-polish",
+  "version": "v187-20260713-scroll-unlock",
   "date": "2026-07-13",
-  "title": "Bill settled polish: centered QR, free scroll, header sync",
-  "summary": "QR centered under receipt. Modal opens instantly (no scroll freeze). Bill synced moves to header chip; check icon goes orange then green when cloud save completes. WhatsApp connect line kept.",
+  "title": "Bill settled scroll no longer freezes",
+  "summary": "Scroll stuck because PDF capture (html2canvas) ran while the preview was open and blocked the main thread. PDF warm is disabled during Bill settled; QR inject no longer rewrites the whole receipt.",
   "highlights": [
-    "QR stacked and centered (not sideways)",
-    "No QR wait before open — scroll works immediately",
-    "Bill synced chip in upper bar",
-    "Header icon orange → green live when cloud done"
+    "No PDF/html2canvas while Bill settled is open",
+    "Soft QR append preserves scroll position",
+    "Modal body forced as the only scroll surface"
   ]
 }
