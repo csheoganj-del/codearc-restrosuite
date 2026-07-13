@@ -1584,6 +1584,96 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   font-weight: 700 !important;
 }
 
+/* Kitchen link coach — naive-user friendly */
+.klc-card {
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--stroke));
+  background:
+    radial-gradient(ellipse 80% 80% at 0% 0%, color-mix(in srgb, var(--orange) 12%, transparent), transparent 55%),
+    var(--panel);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.klc-card-ok {
+  border-color: color-mix(in srgb, var(--green) 40%, var(--stroke));
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+}
+.klc-card-top {
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.klc-card-top > i {
+  font-size: 20px; color: var(--orange); margin-top: 2px;
+}
+.klc-card-ok .klc-card-top > i { color: var(--green); }
+.klc-card-title { font-weight: 800; font-size: 15px; }
+.klc-card-sub { font-size: 12.5px; color: var(--text-soft); margin-top: 3px; line-height: 1.4; }
+.klc-mini-flow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+  margin: 12px 0 10px; font-size: 12.5px; font-weight: 600; color: var(--text-soft);
+}
+.klc-mini-flow i.fa-arrow-right { font-size: 11px; opacity: .5; }
+.klc-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.klc-how { font-size: 13.5px; }
+.klc-flow {
+  display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center;
+  gap: 8px; margin-bottom: 16px;
+}
+.klc-box {
+  flex: 1 1 120px; max-width: 160px; text-align: center;
+  border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 10px;
+  background: var(--glass);
+  position: relative;
+}
+.klc-box-mid {
+  border-color: color-mix(in srgb, var(--orange) 50%, var(--stroke));
+  background: color-mix(in srgb, var(--orange) 8%, var(--panel));
+}
+.klc-num {
+  position: absolute; top: 8px; left: 8px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--orange); color: #fff; font-size: 11px; font-weight: 800;
+  display: grid; place-items: center;
+}
+.klc-ico { font-size: 22px; color: var(--orange); margin: 8px 0 6px; }
+.klc-title { font-weight: 800; letter-spacing: .04em; font-size: 13px; }
+.klc-desc { font-size: 12px; color: var(--text-soft); margin-top: 6px; line-height: 1.35; }
+.klc-arrow { display: flex; align-items: center; color: var(--text-mute); padding: 0 2px; }
+.klc-example {
+  border: 1px dashed var(--stroke-2); border-radius: 10px; padding: 12px 14px;
+  background: var(--glass); margin-bottom: 12px; font-size: 13px; line-height: 1.5;
+  color: var(--text-soft);
+}
+.klc-ex-title { font-weight: 800; color: var(--text); margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.klc-warn { color: var(--amber); font-weight: 600; margin: 8px 0 0; }
+.klc-steps { margin: 0; padding-left: 18px; color: var(--text-soft); font-size: 13.5px; line-height: 1.55; }
+.klc-steps li { margin-bottom: 4px; }
+.klc-wiz-step { font-size: 12px; font-weight: 700; color: var(--orange); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+.klc-p { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--text-soft); }
+.klc-pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow: auto; }
+.klc-pick {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--stroke-2); background: var(--glass);
+  cursor: pointer; font: inherit; color: var(--text);
+}
+.klc-pick:hover { border-color: var(--orange); background: var(--orange-tint); }
+.klc-pick-t { flex: 1; font-weight: 700; font-size: 13.5px; }
+.klc-pick-s { font-size: 11.5px; color: var(--text-mute); font-weight: 600; }
+.klc-draft-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 0; border-bottom: 1px solid var(--stroke);
+}
+.klc-draft-name { font-weight: 700; min-width: 100px; flex: 1; }
+.klc-qty-lab { font-size: 12px; color: var(--text-soft); width: 100%; }
+.klc-unit { font-size: 12px; color: var(--text-mute); min-width: 36px; }
+.klc-confirm {
+  border: 1px solid var(--stroke); border-radius: 10px; padding: 12px 14px;
+  background: var(--glass); font-size: 14px; line-height: 1.6; font-weight: 600;
+}
+@media (max-width: 640px) {
+  .klc-arrow { display: none; }
+  .klc-box { max-width: none; }
+}
+
 /* Bills filters + 10/10 history chrome */
 .bills-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
 .bills-export-group {

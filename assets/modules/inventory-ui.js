@@ -510,6 +510,37 @@
     const low = INVENTORY.filter(isLowStock);
     paintInventoryBadge();
     paintExpiryBanner();
+    // Naive-user tip on stock: recipes still missing
+    try {
+      const tip = document.getElementById('inv-link-tip');
+      if (tip) {
+        const menu = (global.RS && RS.MENU) || [];
+        const missing = menu.filter((m) => !Array.isArray(m.ingredients) || !m.ingredients.length).length;
+        if (missing > 0 && menu.length) {
+          tip.style.display = 'flex';
+          tip.innerHTML = `<i class="fa-solid fa-link"></i>
+            <div style="flex:1"><b>Next:</b> ${missing} dish${missing === 1 ? '' : 'es'} still need a recipe so sales reduce stock.
+            <button type="button" class="btn btn-ghost btn-sm" id="inv-tip-link" style="margin-left:8px">Help me link</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="inv-tip-recipes">Open Recipes</button></div>`;
+          const a = tip.querySelector('#inv-tip-link');
+          const b = tip.querySelector('#inv-tip-recipes');
+          if (a)
+            a.onclick = () => {
+              if (global.RSKitchenLinkCoach) RSKitchenLinkCoach.openLinkWizard();
+            };
+          if (b)
+            b.onclick = () => {
+              if (global.RSKitchenLinkCoach) RSKitchenLinkCoach.goInventoryTab('recipes');
+              else {
+                const btn = document.querySelector('#inv-seg [data-inv-tab="recipes"]');
+                if (btn) btn.click();
+              }
+            };
+        } else {
+          tip.style.display = 'none';
+        }
+      }
+    } catch (_) {}
     const banner = $('#inv-banner');
     if (banner) banner.style.display = low.length ? 'flex' : 'none';
     const lowCount = $('#inv-low-count');

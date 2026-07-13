@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v160-20260713-recipes-10';
+    var builtin = 'v161-20260713-kitchen-coach';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -914,6 +914,7 @@
           <button type="button" class="btn btn-ghost btn-sm" id="btn-import-inventory" title="Import ingredients from CSV"><i class="fa-solid fa-file-import"></i> Import</button>
           <button type="button" class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
         </div>
+        <div id="inv-link-tip" class="banner warn" style="display:none;margin-bottom:12px" role="status"></div>
         <!-- Stock panel -->
         <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table inv-stock-table">
           <thead>
@@ -1688,6 +1689,7 @@
 <script src="assets/modules/bill-identity.js"></script>
 <script src="assets/modules/inventory-ledger.js"></script>
 <script src="assets/modules/inventory-batches.js"></script>
+<script src="assets/modules/kitchen-link-coach.js"></script>
 <script src="assets/modules/xlsx-lite.js"></script>
 <script src="assets/modules/bills-history.js"></script>
 <script src="assets/modules/inventory-ui.js"></script>

@@ -482,17 +482,18 @@
         }
 
         RSModal.open({
-          title: `Recipe: ${m.name}`,
-          sub: 'Define raw materials and quantities',
-          icon: 'fa-flask',
+          title: `What does “${m.name}” use?`,
+          sub: 'Add store-room items + how much for ONE plate',
+          icon: 'fa-clipboard-list',
           size: 'md',
           body: `
             <div style="display:flex;flex-direction:column;gap:12px">
+              <p style="margin:0;font-size:13px;color:var(--text-soft);line-height:1.45">When this dish is sold, these amounts leave stock automatically.</p>
               <div id="rec-modal-list" style="max-height:260px;overflow:auto"></div>
-              <button class="btn btn-ghost btn-block" id="rec-modal-add" style="border-style:dashed"><i class="fa-solid fa-plus"></i> Add Ingredient</button>
+              <button class="btn btn-ghost btn-block" id="rec-modal-add" style="border-style:dashed"><i class="fa-solid fa-plus"></i> Add from store room</button>
             </div>
           `,
-          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Save Recipe</button>`,
+          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Save</button>`,
           onMount(modal, close) {
             modal.querySelector('[data-x]').onclick = close;
             modal.querySelector('#rec-modal-add').onclick = () => {
@@ -567,16 +568,21 @@
       function drawPanes() {
         panes.innerHTML = `
           <div class="panel panel-pad subtab-pane" data-pane="recipes">
+            <div id="klc-coach-host" style="margin-bottom:14px">${
+              window.RSKitchenLinkCoach && RSKitchenLinkCoach.coachCardHtml
+                ? RSKitchenLinkCoach.coachCardHtml()
+                : ''
+            }</div>
             <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
               <div>
                 <h3 style="margin:0">Menu Recipes</h3>
-                <div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Link stock ingredients so sales auto-deduct (FEFO batches first)</div>
+                <div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Which store-room items each dish uses when sold</div>
               </div>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-all">All</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-linked">Linked</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-missing">Needs recipe</button>
-                <button type="button" class="btn btn-primary btn-sm" id="bulk-recipe-import"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
+                <button type="button" class="btn btn-primary btn-sm" id="bulk-recipe-import" title="For advanced users"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
               </div>
             </div>
             <div id="recipe-coverage-bar" class="recipe-coverage-bar" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
@@ -1024,6 +1030,11 @@
                 drawPanes();
               }, 140);
             });
+          }
+
+          // Plain-language coach (Help me link a dish)
+          if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.wireCoachCard) {
+            RSKitchenLinkCoach.wireCoachCard(panes);
           }
         }
 
