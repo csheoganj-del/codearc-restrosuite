@@ -1143,9 +1143,15 @@
       const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
       const st = bill.syncStatus || 'synced';
       const pay = bill.pay || bill.paymentMethod || '—';
-      const itemN = Array.isArray(bill._items)
-        ? bill._items.reduce((a, i) => a + (Number(i.qty) || 1), 0)
-        : bill.items || 0;
+      // bill.items is sometimes a count number, sometimes an array of lines
+      let itemN = 0;
+      if (Array.isArray(bill._items) && bill._items.length) {
+        itemN = bill._items.reduce((a, i) => a + (Number(i && i.qty) || 1), 0);
+      } else if (Array.isArray(bill.items)) {
+        itemN = bill.items.reduce((a, i) => a + (Number(i && i.qty) || 1), 0);
+      } else if (typeof bill.items === 'number' && isFinite(bill.items)) {
+        itemN = bill.items;
+      }
 
       const syncBanner =
         st === 'pending' || st === 'local' || st === 'saving'
