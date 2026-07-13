@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v158-20260713-fefo-expiry';
+    return 'v159-20260713-version-unstick';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -743,13 +743,15 @@
   }
 
   function resolveAppvForReload(preferred) {
-    // Short clean tag only (v151) — never "Systempatch", never long marketing labels.
+    // Always prefer the live short build tag so Save & Update never re-pins an old v151.
     const toShort = (v) => {
       const raw = String(v || '').trim().replace(/[^a-zA-Z0-9._-]/g, '');
       if (!isRealAppVersionTag(raw)) return '';
       return raw.split('-')[0] || raw;
     };
-    return toShort(preferred) || toShort(appVersion) || toShort(appVersionShort) || ('v' + Date.now());
+    const live = toShort(appVersion) || toShort(appVersionShort);
+    if (live) return live;
+    return toShort(preferred) || ('v' + Date.now());
   }
 
   function showUpdateDialog(releaseInfo, signature) {

@@ -77,32 +77,37 @@
     }
   }
 
-  // Canonical build tag. ?appv= is cache-bust only and must look like vNNN…
-  // (never marketing labels like "Systempatch"). Dirty URLs are rewritten so
-  // the address bar always matches the version chip.
+  // Canonical build tag. The SERVER builtin always wins for the version chip.
+  // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
+  // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v158-20260713-fefo-expiry';
+    var builtin = 'v159-20260713-version-unstick';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
       if (/system\s*patch/i.test(v)) return false;
       return /^v\d+/i.test(v);
     }
+    function majorNum(v) {
+      var m = String(v || '').match(/^v(\d+)/i);
+      return m ? parseInt(m[1], 10) : 0;
+    }
+    var shortBuiltin = builtin.split('-')[0]; // e.g. v159
     var q = '';
     try { q = String(new URLSearchParams(location.search).get('appv') || '').trim(); } catch (_) {}
-    // Bogus / legacy labels → current build. Valid short tag matching this
-    // major (v151) or full builtin → current build. Other valid tags kept for
-    // intentional cache-bust during staged deploys.
-    var shortBuiltin = builtin.split('-')[0];
+    // Always display/load this deploy's builtin — never stay stuck on an older appv.
     var resolved = builtin;
-    if (isReal(q)) {
-      if (q === shortBuiltin || q === builtin) resolved = builtin;
-      else resolved = q;
-    }
     try {
       var url = new URL(location.href);
       var cur = String(url.searchParams.get('appv') || '').trim();
-      if (cur && !isReal(cur)) {
+      var needRewrite = false;
+      if (!cur || !isReal(cur)) needRewrite = true;
+      else if (majorNum(cur) < majorNum(shortBuiltin)) needRewrite = true; // v151 < v159
+      else if (cur !== shortBuiltin && cur !== builtin) {
+        // Same major or newer short form → normalize to shortBuiltin for clean URLs
+        if (majorNum(cur) === majorNum(shortBuiltin)) needRewrite = true;
+      }
+      if (needRewrite) {
         url.searchParams.set('appv', shortBuiltin);
         history.replaceState(null, '', url.pathname + url.search + url.hash);
       }
