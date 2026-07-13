@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v131 (2026-07-13) — QR print: left preview · right options
+
+- **Split layout** (large modal): live card on the **left**, size + toggles on the **right**
+- No vertical scroll needed on normal screens; changes update the left preview live
+- Compact option chips; stacks on narrow mobile
+
 ## v130 (2026-07-13) — QR print options visible under preview
 
 - Modal body now **scrolls** (flex min-height fix) so size + toggles are not clipped

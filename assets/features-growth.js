@@ -1896,81 +1896,48 @@
         showPoweredBy: chk('qr-opt-powered', cur.showPoweredBy),
       };
     }
-    function buildQrPrintOptsHtml(meta, opts) {
+    function buildQrPrintOptsHtml(meta, opts, compact) {
       const o = opts || getQrPrintOpts();
       const m = meta || {};
       const hasWifi = !!(m.wifi && String(m.wifi).trim());
       const hasPass = !!(m.wifiPass && String(m.wifiPass).trim());
       const hasPhone = !!(m.phone && String(m.phone).trim());
+      const pad = compact ? '7px 9px' : '9px 11px';
       const row = (id, label, checked, hint, disabled) =>
-        `<label style="display:flex;align-items:flex-start;gap:10px;padding:9px 11px;border:1px solid var(--stroke-2);border-radius:10px;cursor:${
+        `<label style="display:flex;align-items:center;gap:8px;padding:${pad};border:1px solid var(--stroke-2);border-radius:9px;cursor:${
           disabled ? 'not-allowed' : 'pointer'
-        };background:var(--panel);opacity:${disabled ? '0.55' : '1'}">
+        };background:var(--panel);opacity:${disabled ? '0.55' : '1'};min-width:0">
           <input type="checkbox" id="${id}" ${checked && !disabled ? 'checked' : ''} ${
             disabled ? 'disabled' : ''
-          } style="margin-top:2px;accent-color:#c4a35a">
-          <span style="min-width:0">
-            <b style="font-size:12.5px;color:var(--text)">${label}</b>
-            ${hint ? `<div style="font-size:11px;color:var(--text-soft);margin-top:2px;line-height:1.35">${hint}</div>` : ''}
+          } style="margin:0;flex-shrink:0;accent-color:#c4a35a">
+          <span style="min-width:0;text-align:left">
+            <b style="font-size:${compact ? 12 : 12.5}px;color:var(--text);font-weight:700">${label}</b>
+            ${
+              hint && !compact
+                ? `<div style="font-size:11px;color:var(--text-soft);margin-top:2px;line-height:1.3">${hint}</div>`
+                : hint && compact
+                  ? `<div style="font-size:10px;color:var(--text-soft);margin-top:1px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${hint}</div>`
+                  : ''
+            }
           </span>
         </label>`;
       return `
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:14px 0 8px">On each card</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
-          ${row(
-            'qr-opt-table',
-            'Table number',
-            true,
-            'Always shown (required for guest order)',
-            true
-          )}
-          ${row(
-            'qr-opt-uses',
-            'Order + Call waiter',
-            o.showUses,
-            'Two main guest actions written on the card',
-            false
-          )}
-          ${row(
-            'qr-opt-tagline',
-            'Welcome line',
-            o.showTagline,
-            m.tagline ? esc(m.tagline) : 'Set in Settings → Guest welcome',
-            false
-          )}
-          ${row(
-            'qr-opt-wifi',
-            'Wi‑Fi name',
-            o.showWifi && hasWifi,
-            hasWifi ? esc(m.wifi) : 'Add in Settings → Outlet profile',
-            !hasWifi
-          )}
-          ${row(
-            'qr-opt-wifi-pass',
-            'Wi‑Fi password',
-            o.showWifiPass && hasPass,
-            hasPass ? '••••••••' : 'Add in Settings (optional)',
-            !hasPass
-          )}
-          ${row(
-            'qr-opt-phone',
-            'Outlet phone',
-            o.showPhone && hasPhone,
-            hasPhone ? esc(m.phone) : 'Add outlet phone in Settings',
-            !hasPhone
-          )}
-          ${row('qr-opt-steps', 'How to scan (1·2·3)', o.showSteps, 'Open camera → Scan → Use menu', false)}
-          ${row(
-            'qr-opt-powered',
-            'Powered by RestroSuite',
-            o.showPoweredBy,
-            'Logo + name ad strip at bottom of each card',
-            false
-          )}
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:0 0 6px">On each card</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:2px">
+          ${row('qr-opt-table', 'Table number', true, compact ? 'Always on' : 'Always shown', true)}
+          ${row('qr-opt-uses', 'Order + Call waiter', o.showUses, compact ? 'Main uses' : 'Two guest actions', false)}
+          ${row('qr-opt-tagline', 'Welcome line', o.showTagline, compact ? '' : m.tagline || 'Settings → Guest welcome', false)}
+          ${row('qr-opt-wifi', 'Wi‑Fi name', o.showWifi && hasWifi, hasWifi ? esc(m.wifi) : 'Set in Settings', !hasWifi)}
+          ${row('qr-opt-wifi-pass', 'Wi‑Fi password', o.showWifiPass && hasPass, hasPass ? '••••' : 'Optional', !hasPass)}
+          ${row('qr-opt-phone', 'Outlet phone', o.showPhone && hasPhone, hasPhone ? esc(m.phone) : 'Set in Settings', !hasPhone)}
+          ${row('qr-opt-steps', 'Scan steps', o.showSteps, compact ? '1·2·3' : 'Camera → Scan → Use', false)}
+          ${row('qr-opt-powered', 'Powered by RS', o.showPoweredBy, compact ? 'Logo + name' : 'RestroSuite ad strip', false)}
         </div>
-        <p style="font-size:11px;color:var(--text-soft);margin:8px 0 0;line-height:1.4">
-          Tip: edit Wi‑Fi / phone under <b>Settings → Outlet profile → Guest QR cards</b>, then print again.
-        </p>`;
+        ${
+          compact
+            ? `<p style="font-size:10.5px;color:var(--text-soft);margin:8px 0 0;line-height:1.35">Wi‑Fi / phone: <b>Settings → Outlet profile</b></p>`
+            : `<p style="font-size:11px;color:var(--text-soft);margin:8px 0 0;line-height:1.4">Tip: edit Wi‑Fi / phone under <b>Settings → Outlet profile → Guest QR cards</b>.</p>`
+        }`;
     }
 
     /**
@@ -2512,31 +2479,45 @@
 
       const savedSize = getSavedQrPrintSizeId();
       const savedOpts = getQrPrintOpts();
+      // Compact size chips (fit right column without scrolling)
       const sizeRadios = Object.keys(QR_PRINT_SIZES)
         .map((id) => {
           const s = QR_PRINT_SIZES[id];
           const checked = id === savedSize ? 'checked' : '';
-          return `<label class="qr-size-opt" data-size="${esc(id)}" style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid var(--stroke-2);border-radius:12px;cursor:pointer;background:var(--panel)">
-            <input type="radio" name="qr-print-size" value="${esc(id)}" ${checked} style="margin-top:3px;accent-color:#c4a35a">
+          return `<label class="qr-size-opt" data-size="${esc(id)}" style="display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid var(--stroke-2);border-radius:9px;cursor:pointer;background:var(--panel);min-width:0">
+            <input type="radio" name="qr-print-size" value="${esc(id)}" ${checked} style="margin:0;flex-shrink:0;accent-color:#c4a35a">
             <span style="min-width:0">
-              <b style="font-size:13px;color:var(--text)">${esc(s.label)}</b>
-              <div style="font-size:11.5px;color:var(--text-soft);margin-top:2px;line-height:1.35">${esc(s.hint)}</div>
+              <b style="font-size:12px;color:var(--text);display:block;line-height:1.2">${esc(s.label)}</b>
+              <span style="font-size:10px;color:var(--text-soft);line-height:1.2">${esc(
+                (s.hint || '').split('·')[0].trim()
+              )}</span>
             </span>
           </label>`;
         })
         .join('');
 
       const sample = tableQrs[0];
-      // Modal preview stays compact so size/toggles remain visible; print still uses real size
+      // Modal preview uses compact card sizes; print uses the real selected size
       const previewSizeFor = (id) => {
         if (id === 'mini') return 'mini';
         if (id === 'full' || id === 'large') return 'medium';
         return id === 'small' ? 'small' : 'medium';
       };
-      const livePreview = sample
-        ? `<div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:12px;padding:10px 10px 12px;margin:0 0 12px;border:1px solid var(--stroke-2)">
-            <div id="qr-preview-caption" style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);text-align:center;margin-bottom:6px">Live preview · ${(QR_PRINT_SIZES[savedSize] || {}).label || 'Medium'}</div>
-            <div id="qr-live-preview" style="max-width:220px;margin:0 auto;filter:drop-shadow(0 6px 14px rgba(12,31,26,.12))">
+
+      if (!window.RSModal) {
+        openQrPrintWindow('Table QR cards', buildCardsHtml(tableQrs, meta, savedSize, savedOpts), {
+          outlet: meta.name,
+          count: tableQrs.length,
+          sizeId: savedSize,
+          autoPrint: false,
+        });
+        return;
+      }
+
+      const previewCol = sample
+        ? `<div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:14px;padding:12px 10px 14px;border:1px solid var(--stroke-2);height:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:flex-start">
+            <div id="qr-preview-caption" style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);text-align:center;margin-bottom:8px">Live preview</div>
+            <div id="qr-live-preview" style="width:100%;max-width:240px;filter:drop-shadow(0 8px 18px rgba(12,31,26,.14))">
             ${buildGuestQrCardHtml({
               outletName: meta.name,
               tableLabel: sample.tableLabel,
@@ -2549,44 +2530,49 @@
               printOpts: savedOpts,
             })}
             </div>
+            <div id="qr-preview-size-pill" style="margin-top:10px;font-size:11px;font-weight:700;color:var(--text-soft);background:rgba(255,255,255,.75);border:1px solid var(--stroke-2);border-radius:999px;padding:4px 10px">${esc(
+              (QR_PRINT_SIZES[savedSize] || {}).label || 'Medium'
+            )} · updates live</div>
           </div>`
-        : '';
-
-      if (!window.RSModal) {
-        openQrPrintWindow('Table QR cards', buildCardsHtml(tableQrs, meta, savedSize, savedOpts), {
-          outlet: meta.name,
-          count: tableQrs.length,
-          sizeId: savedSize,
-          autoPrint: false,
-        });
-        return;
-      }
+        : '<div></div>';
 
       RSModal.open({
         title: 'Print premium QR cards',
-        sub: meta.name + ' · ' + tableQrs.length + ' tables',
+        sub: meta.name + ' · ' + tableQrs.length + ' tables · left = preview · right = options',
         icon: 'fa-print',
-        size: 'md',
+        size: 'lg',
         body: `
-          <div id="qr-print-opts-scroll" style="display:flex;flex-direction:column;gap:0">
-            ${livePreview}
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:4px 0 8px">Card size <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--text-soft)">(scroll if needed)</span></div>
-            <div id="qr-size-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              ${sizeRadios}
+          <div class="qr-print-split" style="display:grid;grid-template-columns:minmax(220px,280px) 1fr;gap:16px;align-items:start">
+            <div class="qr-print-split-left">${previewCol}</div>
+            <div class="qr-print-split-right" style="min-width:0;display:flex;flex-direction:column;gap:10px">
+              <div>
+                <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:0 0 6px">Card size</div>
+                <div id="qr-size-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                  ${sizeRadios}
+                </div>
+              </div>
+              <div>${buildQrPrintOptsHtml(meta, savedOpts, true)}</div>
             </div>
-            ${buildQrPrintOptsHtml(meta, savedOpts)}
-          </div>`,
+          </div>
+          <style>
+            @media (max-width: 720px) {
+              .qr-print-split { grid-template-columns: 1fr !important; }
+              .qr-print-split-left { order: -1; max-width: 260px; margin: 0 auto; width: 100%; }
+            }
+          </style>`,
         foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
                <button class="btn btn-primary" style="flex:1" id="btn-print-all-qrs-go"><i class="fa-solid fa-print"></i> Print ${tableQrs.length} cards</button>`,
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
-          // Ensure body can scroll when content is tall
           const mbody = modal.querySelector('.rs-mbody');
           if (mbody) {
             mbody.style.flex = '1 1 auto';
             mbody.style.minHeight = '0';
             mbody.style.overflowY = 'auto';
-            mbody.style.maxHeight = 'min(62vh, 560px)';
+            // Wide split: allow a bit more height; usually no scroll needed
+            mbody.style.maxHeight = 'min(70vh, 640px)';
+            mbody.style.paddingTop = '16px';
+            mbody.style.paddingBottom = '16px';
           }
           const syncSel = () => {
             const v = (modal.querySelector('input[name="qr-print-size"]:checked') || {}).value || 'medium';
@@ -2594,6 +2580,7 @@
               const on = lab.getAttribute('data-size') === v;
               lab.style.borderColor = on ? '#c4a35a' : 'var(--stroke-2)';
               lab.style.boxShadow = on ? '0 0 0 1px #c4a35a' : 'none';
+              lab.style.background = on ? 'rgba(196,163,90,0.12)' : 'var(--panel)';
             });
           };
           const refreshPreview = () => {
@@ -2616,11 +2603,13 @@
                 printOpts: opts,
               });
             }
-            const cap = modal.querySelector('#qr-preview-caption');
-            if (cap) {
+            const pill = modal.querySelector('#qr-preview-size-pill');
+            if (pill) {
               const lab = (QR_PRINT_SIZES[sizeId] || {}).label || sizeId;
-              cap.textContent = 'Live preview · print size: ' + lab;
+              pill.textContent = lab + ' · updates live';
             }
+            const cap = modal.querySelector('#qr-preview-caption');
+            if (cap) cap.textContent = 'Live preview';
             syncSel();
           };
           modal.addEventListener('change', (e) => {
@@ -2638,21 +2627,9 @@
             }
           });
           modal.querySelectorAll('.qr-size-opt').forEach((lab) => {
-            lab.addEventListener('click', () => {
-              setTimeout(refreshPreview, 0);
-            });
+            lab.addEventListener('click', () => setTimeout(refreshPreview, 0));
           });
           syncSel();
-          // After open, scroll options into view if preview pushed them off
-          setTimeout(() => {
-            const sizeList = modal.querySelector('#qr-size-list');
-            if (sizeList && mbody) {
-              // keep preview + start of options visible
-              try {
-                mbody.scrollTop = 0;
-              } catch (_) {}
-            }
-          }, 50);
           const go = modal.querySelector('#btn-print-all-qrs-go');
           if (go)
             go.onclick = () => {
