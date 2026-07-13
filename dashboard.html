@@ -81,7 +81,7 @@
   // (never marketing labels like "Systempatch"). Dirty URLs are rewritten so
   // the address bar always matches the version chip.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v153-20260713-bills-10';
+    var builtin = 'v154-20260713-export-xlsx';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -838,7 +838,8 @@
             <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…" autocomplete="off" aria-label="Search bills"></div>
             <span id="bills-result-meta" class="bills-result-meta" hidden></span>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills" title="Download real Excel (.xlsx) with Summary, Bills, and Line items"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills-csv" title="CSV for scripts / older tools"><i class="fa-solid fa-file-csv"></i> CSV</button>
             <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print report</button>
           </div>
           <div id="bills-filter-hint" class="bills-filter-hint" hidden aria-hidden="true">
@@ -1681,6 +1682,7 @@
 <script src="assets/escpos-encoder.js"></script>
 <script src="assets/modules/bill-identity.js"></script>
 <script src="assets/modules/inventory-ledger.js"></script>
+<script src="assets/modules/xlsx-lite.js"></script>
 <script src="assets/modules/bills-history.js"></script>
 <script src="assets/modules/inventory-ui.js"></script>
 <script src="assets/modules/reports-ui.js"></script>

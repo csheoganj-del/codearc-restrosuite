@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260713-bell-wa";
+const CACHE_NAME = "restrosuite-shell-v20260713-export-xlsx";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -53,6 +53,7 @@ const APP_SHELL = [
   "/assets/escpos-encoder.js",
   "/assets/modules/bill-identity.js",
   "/assets/modules/inventory-ledger.js",
+  "/assets/modules/xlsx-lite.js",
   "/assets/modules/bills-history.js",
   "/assets/modules/inventory-ui.js",
   "/assets/modules/reports-ui.js",

@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v153-20260713-bills-10';
+    return 'v154-20260713-export-xlsx';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -1605,7 +1605,12 @@
     getCurrencySymbol,
     dbMode:()=> (window.RS_DB && window.RS_DB.mode) || 'local',
     downloadFile(content, mimeType, filename) {
-      const blob = new Blob([content], { type: mimeType });
+      const blob =
+        content instanceof Blob
+          ? content
+          : content instanceof ArrayBuffer || ArrayBuffer.isView(content)
+            ? new Blob([content], { type: mimeType || 'application/octet-stream' })
+            : new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -2600,32 +2605,22 @@
       };
     }
 
-    // 5. Bills Export Excel-friendly CSV (delegates to bills-history — no ProgressOverlay stub)
+    // 5. Bills Export Excel (.xlsx) / CSV — primary wiring lives in bills-history.js
+    // (dashboard only fills a last-resort fallback if the module is missing).
     const btnExportBills = document.getElementById('btn-export-bills');
     if (btnExportBills && !btnExportBills.dataset.rsExportDashBound) {
       btnExportBills.dataset.rsExportDashBound = '1';
       btnExportBills.addEventListener('click', (e) => {
         e.preventDefault();
+        if (window.RSBillsHistory && typeof RSBillsHistory.exportBillsXlsx === 'function') {
+          RSBillsHistory.exportBillsXlsx();
+          return;
+        }
         if (window.RSBillsHistory && typeof RSBillsHistory.exportBillsCsv === 'function') {
           RSBillsHistory.exportBillsCsv();
           return;
         }
-        if (window.RS && typeof RS.exportBillsCsv === 'function') {
-          RS.exportBillsCsv();
-          return;
-        }
-        // Fallback if module not loaded
-        const list = (window.RS && RS.BILLS) || BILLS || [];
-        if (!list.length) return toast('No bills to export', 'fa-circle-exclamation');
-        const headers = ['Bill No', 'Date', 'Table', 'Total', 'Payment', 'Status'];
-        const rows = list.map((b) =>
-          [b.no || '', b.dateTime || b.time || '', b.table || '', b.amount || b.total || '', b.pay || '', b.status || '']
-            .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
-            .join(',')
-        );
-        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-        RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
-        toast('Exported ' + list.length + ' bills', 'fa-file-csv');
+        toast('Bills export module not loaded', 'fa-circle-exclamation');
       });
     }
 

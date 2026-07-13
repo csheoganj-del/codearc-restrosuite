@@ -736,19 +736,279 @@
     return s;
   }
 
-  /**
-   * Export bills as Excel-friendly CSV (UTF-8 BOM).
-   * Respects current search / payment / status filters when present.
-   */
-  function exportBillsCsv() {
+  function collectExportList() {
     const q = ($('#bills-search') && $('#bills-search').value) || '';
     const payFilter = ($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All';
     const statusFilter = ($('#bills-status-filter') && $('#bills-status-filter').value) || 'All';
     const all = getBills();
     const localFiltered = filterBills(all, q, payFilter, statusFilter);
-    const list = mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
+    return mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
+  }
+
+  function exportRangeLabel() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return 'Yesterday';
+      case '7d':
+        return '7-days';
+      case 'all':
+        return 'All';
+      case 'custom': {
+        const a = billsCustomFrom || 'start';
+        const b = billsCustomTo || 'end';
+        return a + '_to_' + b;
+      }
+      default:
+        return 'Today';
+    }
+  }
+
+  function exportOutletSlug() {
+    const settings = global.RS_SETTINGS || {};
+    const sess = global.RS_API && RS_API.session ? RS_API.session() : null;
+    let name =
+      settings.set_restaurant_name ||
+      settings.set_outlet_name ||
+      (sess && (sess.tenant_name || sess.business_name)) ||
+      'RestroSuite';
+    return (
+      String(name)
+        .replace(/[^\w\-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40) || 'RestroSuite'
+    );
+  }
+
+  function exportStamp() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+  }
+
+  function numOrBlank(v) {
+    if (v == null || v === '') return '';
+    const n = Number(v);
+    return Number.isFinite(n) ? n : '';
+  }
+
+  function paymentBreakdown(list) {
+    const map = {};
+    (list || []).forEach((b) => {
+      if (String(b.status || '').toLowerCase() === 'refunded') return;
+      if (Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach((t) => {
+          const method = t.method || b.pay || 'Cash';
+          map[method] = (map[method] || 0) + (Number(t.amount) || 0);
+        });
+      } else {
+        const method = b.pay || b.paymentMethod || 'Cash';
+        map[method] = (map[method] || 0) + (Number(b.amount) || Number(b.total) || 0);
+      }
+    });
+    return map;
+  }
+
+  /**
+   * Real Excel .xlsx — Summary + Bills + Line items sheets.
+   * Respects date range, search, payment, and status filters.
+   */
+  function exportBillsXlsx() {
+    const list = collectExportList();
     if (!list.length) {
-      toast('No bills to export', 'fa-circle-exclamation');
+      toast('No bills to export for this range', 'fa-circle-exclamation');
+      return false;
+    }
+    if (!global.RSXlsxLite || typeof RSXlsxLite.buildXlsx !== 'function') {
+      toast('Excel engine missing — exporting CSV instead', 'fa-circle-exclamation');
+      return exportBillsCsv();
+    }
+
+    const settings = global.RS_SETTINGS || {};
+    const taxLabel = settings.set_tax_label || 'GST';
+    const rangeLabel = exportRangeLabel();
+    const outlet = exportOutletSlug();
+    const paid = list.filter((b) => String(b.status || '').toLowerCase() === 'paid');
+    const refunded = list.filter((b) => String(b.status || '').toLowerCase() === 'refunded');
+    const sales = paid.reduce((s, b) => s + (Number(b.amount) || Number(b.total) || 0), 0);
+    const aov = paid.length ? Math.round(sales / paid.length) : 0;
+    const gstTotal = paid.reduce((s, b) => s + (Number(b.gst) || 0), 0);
+    const payMap = paymentBreakdown(list);
+    const now = new Date();
+
+    const summaryRows = [
+      ['RestroSuite Bill Export'],
+      ['Outlet', outlet.replace(/-/g, ' ')],
+      ['Range', rangeLabel.replace(/_/g, ' ')],
+      ['Exported at', now.toLocaleString('en-IN')],
+      [],
+      ['Metric', 'Value'],
+      ['Bills in export', list.length],
+      ['Paid bills', paid.length],
+      ['Refunded bills', refunded.length],
+      ['Sales (paid)', sales],
+      ['Avg order value', aov],
+      [taxLabel + ' (from bills)', gstTotal],
+      [],
+      ['Payment breakdown', 'Amount'],
+    ];
+    Object.keys(payMap)
+      .sort()
+      .forEach((k) => summaryRows.push([k, payMap[k]]));
+    if (!Object.keys(payMap).length) summaryRows.push(['—', 0]);
+    summaryRows.push([]);
+    summaryRows.push(['Notes']);
+    summaryRows.push(['Stats match the active Bills date range and filters.']);
+    summaryRows.push(['Open the Bills sheet for one row per bill; Line items for pivots.']);
+
+    const billHeaders = [
+      'Bill No',
+      'Date',
+      'Date Display',
+      'Table',
+      'Customer',
+      'Phone',
+      'Item Count',
+      'Line Items',
+      'Subtotal',
+      taxLabel,
+      'Discount',
+      'Total',
+      'Payment',
+      'Tenders',
+      'Status',
+      'Channel',
+      'Station',
+      'Shift',
+      'Cashier',
+      'Order Type',
+    ];
+    const billRows = [billHeaders];
+    list.forEach((b) => {
+      const tenders = Array.isArray(b.tenders)
+        ? b.tenders.map((t) => (t.method || '') + ':' + (Number(t.amount) || 0)).join(' | ')
+        : '';
+      const itemCount =
+        Array.isArray(b._items) && b._items.length
+          ? b._items.reduce((acc, i) => acc + (Number(i.qty) || 1), 0)
+          : numOrBlank(b.items);
+      billRows.push([
+        b.no || b.orderId || b.id || '',
+        formatBillTimeIsoExcel(b),
+        formatBillTime(b),
+        b.table || '',
+        b.customerName || b.customer || '',
+        b.customerPhone || '',
+        itemCount,
+        lineItemsSummary(b),
+        numOrBlank(b.subtotal),
+        numOrBlank(b.gst),
+        numOrBlank(b.discount != null ? b.discount : b.disc),
+        numOrBlank(b.amount != null ? b.amount : b.total),
+        b.pay || b.paymentMethod || '',
+        tenders,
+        b.status || '',
+        b.channel || b.channelCode || '',
+        b.stationLabel || b.stationId || '',
+        b.shiftId || '',
+        b.cashier || '',
+        b.orderType || '',
+      ]);
+    });
+
+    const lineHeaders = [
+      'Bill No',
+      'Date',
+      'Table',
+      'Customer',
+      'Payment',
+      'Status',
+      'Item',
+      'Qty',
+      'Unit Price',
+      'Line Total',
+      'Note',
+    ];
+    const lineRows = [lineHeaders];
+    list.forEach((b) => {
+      const billNo = b.no || b.orderId || b.id || '';
+      const date = formatBillTimeIsoExcel(b);
+      const table = b.table || '';
+      const cust = b.customerName || b.customer || '';
+      const pay = b.pay || b.paymentMethod || '';
+      const status = b.status || '';
+      const items = Array.isArray(b._items) ? b._items : [];
+      if (items.length) {
+        items.forEach((it) => {
+          const qty = Number(it.qty) || 1;
+          const price = Number(it.price) || 0;
+          lineRows.push([
+            billNo,
+            date,
+            table,
+            cust,
+            pay,
+            status,
+            it.name || 'Item',
+            qty,
+            price,
+            Math.round(qty * price * 100) / 100,
+            it.note || it.notes || '',
+          ]);
+        });
+      } else {
+        lineRows.push([
+          billNo,
+          date,
+          table,
+          cust,
+          pay,
+          status,
+          lineItemsSummary(b) || 'Bill total',
+          1,
+          numOrBlank(b.amount != null ? b.amount : b.total) || 0,
+          numOrBlank(b.amount != null ? b.amount : b.total) || 0,
+          '',
+        ]);
+      }
+    });
+
+    try {
+      const bytes = RSXlsxLite.buildXlsx([
+        { name: 'Summary', cols: [28, 22], rows: summaryRows },
+        {
+          name: 'Bills',
+          cols: [16, 18, 18, 14, 16, 14, 10, 28, 10, 10, 10, 10, 10, 16, 10, 10, 12, 12, 12, 12],
+          rows: billRows,
+        },
+        {
+          name: 'Line items',
+          cols: [16, 18, 14, 16, 10, 10, 24, 8, 10, 10, 16],
+          rows: lineRows,
+        },
+      ]);
+      const fname = outlet + '-Bills-' + rangeLabel + '-' + exportStamp() + '.xlsx';
+      RSXlsxLite.downloadXlsx(bytes, fname);
+      toast(
+        'Exported ' + list.length + ' bills · ' + rangeLabel.replace(/_/g, ' ') + ' · Excel',
+        'fa-file-excel'
+      );
+      return true;
+    } catch (e) {
+      console.warn('[BillsHistory] xlsx export failed', e);
+      toast('Excel export failed — try CSV', 'fa-circle-exclamation');
+      return false;
+    }
+  }
+
+  /**
+   * Export bills as Excel-friendly CSV (UTF-8 BOM).
+   * Respects current search / payment / status / date filters.
+   */
+  function exportBillsCsv() {
+    const list = collectExportList();
+    if (!list.length) {
+      toast('No bills to export for this range', 'fa-circle-exclamation');
       return false;
     }
 
@@ -783,7 +1043,7 @@
         : '';
       const itemCount =
         Array.isArray(b._items) && b._items.length
-          ? b._items.reduce((s, i) => s + (Number(i.qty) || 1), 0)
+          ? b._items.reduce((acc, i) => acc + (Number(i.qty) || 1), 0)
           : b.items != null
             ? b.items
             : '';
@@ -813,15 +1073,8 @@
         .join(',');
     });
 
-    // BOM so Excel opens UTF-8 (₹, names) correctly
     const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-    const day = new Date();
-    const fname =
-      'bills-' +
-      day.getFullYear() +
-      String(day.getMonth() + 1).padStart(2, '0') +
-      String(day.getDate()).padStart(2, '0') +
-      '.csv';
+    const fname = exportOutletSlug() + '-Bills-' + exportRangeLabel() + '-' + exportStamp() + '.csv';
 
     try {
       if (global.RS && typeof RS.downloadFile === 'function') {
@@ -837,7 +1090,7 @@
         a.remove();
         URL.revokeObjectURL(url);
       }
-      toast('Exported ' + list.length + ' bills · Excel CSV', 'fa-file-csv');
+      toast('Exported ' + list.length + ' bills · CSV', 'fa-file-csv');
       return true;
     } catch (e) {
       console.warn('[BillsHistory] export failed', e);
@@ -848,13 +1101,23 @@
 
   function wireExportButton() {
     const btn = document.getElementById('btn-export-bills');
-    if (!btn || btn.dataset.rsExportBound === '1') return;
-    btn.dataset.rsExportBound = '1';
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      exportBillsCsv();
-    });
+    if (btn && btn.dataset.rsExportBound !== '1') {
+      btn.dataset.rsExportBound = '1';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        exportBillsXlsx();
+      });
+    }
+    const csvBtn = document.getElementById('btn-export-bills-csv');
+    if (csvBtn && csvBtn.dataset.rsExportBound !== '1') {
+      csvBtn.dataset.rsExportBound = '1';
+      csvBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        exportBillsCsv();
+      });
+    }
   }
 
   /** Filter button focuses the inline Payment / Status selects (no dead control). */
@@ -1237,6 +1500,7 @@
     showRefundModal,
     showDeleteConfirm,
     exportBillsCsv,
+    exportBillsXlsx,
     formatBillTime,
     wireExportButton,
     wireFilterButton,
@@ -1251,6 +1515,7 @@
     global.RS.renderBills = renderBills;
     global.RS.receiptPayloadFromBill = receiptPayloadFromBill;
     global.RS.exportBillsCsv = exportBillsCsv;
+    global.RS.exportBillsXlsx = exportBillsXlsx;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);
