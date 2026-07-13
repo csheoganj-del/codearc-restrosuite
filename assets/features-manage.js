@@ -494,16 +494,25 @@
               <span style="flex:1;min-width:120px;font-weight:600;font-size:14px">${esc(g.name)}</span>
               <label style="font-size:11px;color:var(--text-mute)">Qty</label>
               <input class="form-input" type="number" step="any" min="0" value="${g.qty}" data-qty-i="${i}" style="width:88px;padding:5px 8px;font-size:13px;text-align:right">
-              <select class="form-input" data-unit-i="${i}" style="width:88px;padding:5px 6px;font-size:12.5px" title="Unit (should match stock)">
-                ${['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'unit']
-                  .concat(g.unit && !['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'unit'].includes(g.unit) ? [g.unit] : [])
-                  .map(
-                    (u) =>
-                      `<option value="${esc(u)}" ${String(g.unit || invUnit) === u ? 'selected' : ''}>${esc(u)}</option>`
-                  )
-                  .join('')}
+              <select class="form-input" data-unit-i="${i}" style="width:88px;padding:5px 6px;font-size:12.5px" title="Unit: kg, gm, ltr, ml">
+                ${(() => {
+                  const units = (RU && RU.STOCK_UNITS) || ['kg', 'gm', 'ltr', 'ml'];
+                  const cur = RU && RU.displayUnit ? RU.displayUnit(g.unit || invUnit) : g.unit || invUnit || 'kg';
+                  let html = units
+                    .map(
+                      (u) =>
+                        `<option value="${esc(u)}" ${String(cur) === u || String(g.unit) === u ? 'selected' : ''}>${esc(u)}</option>`
+                    )
+                    .join('');
+                  if (g.unit && units.indexOf(String(cur)) === -1 && units.indexOf(String(g.unit)) === -1) {
+                    html += `<option value="${esc(g.unit)}" selected>${esc(g.unit)} (old)</option>`;
+                  }
+                  return html;
+                })()}
               </select>
-              <span style="font-size:11px;color:var(--text-mute);min-width:70px">stock: ${esc(invUnit)}</span>
+              <span style="font-size:11px;color:var(--text-mute);min-width:70px">stock: ${esc(
+                RU && RU.displayUnit ? RU.displayUnit(invUnit) : invUnit
+              )}</span>
               ${
                 unitMismatch
                   ? '<span style="font-size:11px;color:var(--amber);font-weight:700">unit ≠ stock</span>'
@@ -707,7 +716,7 @@
             </div>
             <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
               <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
-              <div><strong style="color:var(--text)">In plain words:</strong> each recipe is for a number of <b>servings</b> (e.g. 1 plate). When a bill is paid, stock goes down by (recipe qty ÷ servings) × quantity sold — food <b>and</b> packaging. Units (kg, ml, pcs) come from stock and stay on the recipe. Near-expiry packs are used first.</div>
+              <div><strong style="color:var(--text)">In plain words:</strong> each recipe is for a number of <b>servings</b> (e.g. 1 plate). When a bill is paid, stock goes down by (recipe qty ÷ servings) × quantity sold. Units are only <b>kg, gm, ltr, ml</b> (auto: kg↔gm, ltr↔ml). Near-expiry packs are used first.</div>
             </div>
             <div class="table-scroll"><table class="data-table recipe-table">
               <thead><tr><th>Menu Item</th><th>Category</th><th>Serve</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Uses from stock</th><th>Actions</th></tr></thead>

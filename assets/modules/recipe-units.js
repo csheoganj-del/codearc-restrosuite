@@ -14,25 +14,47 @@
     { id: 'serve', label: 'Serve' },
   ];
 
-  var STOCK_UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'roll', 'bottle', 'unit'];
+  /** Canonical stock / recipe units (display labels). */
+  var STOCK_UNITS = ['kg', 'gm', 'ltr', 'ml'];
 
+  /**
+   * Normalize to internal keys for math: kg | g | l | ml
+   * Accepts aliases: gm/g, ltr/L/litre, etc.
+   */
   function normUnit(u) {
-    var s = String(u || 'unit')
+    var s = String(u == null ? '' : u)
       .trim()
       .toLowerCase()
       .replace(/\./g, '');
-    if (s === 'l' || s === 'ltr' || s === 'liter' || s === 'litre' || s === 'liters' || s === 'litres') return 'l';
-    if (s === 'ml' || s === 'milliliter' || s === 'millilitre') return 'ml';
+    if (!s) return 'kg';
+    if (s === 'l' || s === 'ltr' || s === 'lt' || s === 'liter' || s === 'litre' || s === 'liters' || s === 'litres')
+      return 'l';
+    if (s === 'ml' || s === 'milliliter' || s === 'millilitre' || s === 'milliliters' || s === 'millilitres')
+      return 'ml';
     if (s === 'kg' || s === 'kgs' || s === 'kilogram' || s === 'kilograms') return 'kg';
     if (s === 'g' || s === 'gm' || s === 'gms' || s === 'gram' || s === 'grams') return 'g';
-    if (s === 'pc' || s === 'pcs' || s === 'piece' || s === 'pieces' || s === 'nos' || s === 'no') return 'pcs';
-    if (s === 'pkt' || s === 'packet' || s === 'pack') return 'pack';
-    return s || 'unit';
+    // legacy count units — no mass/volume conversion
+    if (s === 'pc' || s === 'pcs' || s === 'piece' || s === 'pieces' || s === 'unit' || s === 'pack' || s === 'box')
+      return s === 'pc' || s === 'piece' || s === 'pieces' ? 'pcs' : s;
+    return s;
+  }
+
+  /** Display label: always kg | gm | ltr | ml when possible */
+  function displayUnit(u) {
+    var n = normUnit(u);
+    if (n === 'kg') return 'kg';
+    if (n === 'g') return 'gm';
+    if (n === 'l') return 'ltr';
+    if (n === 'ml') return 'ml';
+    // legacy leftover
+    if (n === 'pcs' || n === 'pack' || n === 'box' || n === 'unit') return n;
+    return String(u || 'kg');
   }
 
   /**
    * Convert qty from one unit to another when same dimension (mass / volume).
    * Returns null if conversion is not possible (caller should use raw qty).
+   * Supports kg ↔ gm and ltr ↔ ml.
    */
   function convertQty(qty, fromUnit, toUnit) {
     var q = Number(qty);
@@ -41,17 +63,50 @@
     var t = normUnit(toUnit);
     if (f === t) return q;
 
-    // mass → kg base
+    // mass → kg base (gm stored as g)
     var mass = { kg: 1, g: 0.001 };
     if (mass[f] != null && mass[t] != null) {
       return (q * mass[f]) / mass[t];
     }
-    // volume → L base
+    // volume → ltr base (ltr stored as l)
     var vol = { l: 1, ml: 0.001 };
     if (vol[f] != null && vol[t] != null) {
       return (q * vol[f]) / vol[t];
     }
     return null;
+  }
+
+  function unitSelectHtml(selected, id, attrs) {
+    var cur = displayUnit(selected || 'kg');
+    var opts = STOCK_UNITS.map(function (u) {
+      return (
+        '<option value="' +
+        u +
+        '"' +
+        (u === cur || normUnit(u) === normUnit(selected) ? ' selected' : '') +
+        '>' +
+        u +
+        '</option>'
+      );
+    }).join('');
+    // Keep rare legacy value visible if still stored
+    if (selected && STOCK_UNITS.indexOf(cur) === -1 && STOCK_UNITS.indexOf(String(selected)) === -1) {
+      opts +=
+        '<option value="' +
+        String(selected).replace(/"/g, '') +
+        '" selected>' +
+        String(selected) +
+        ' (old)</option>';
+    }
+    return (
+      '<select class="form-input" id="' +
+      (id || '') +
+      '" ' +
+      (attrs || '') +
+      '>' +
+      opts +
+      '</select>'
+    );
   }
 
   function recipeServingsOf(m) {
@@ -243,7 +298,9 @@
     SERVE_UNITS: SERVE_UNITS,
     STOCK_UNITS: STOCK_UNITS,
     normUnit: normUnit,
+    displayUnit: displayUnit,
     convertQty: convertQty,
+    unitSelectHtml: unitSelectHtml,
     recipeServingsOf: recipeServingsOf,
     serveUnitOf: serveUnitOf,
     serveUnitLabel: serveUnitLabel,

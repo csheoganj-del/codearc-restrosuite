@@ -663,7 +663,7 @@
         return `
           <div class="klc-wiz">
             <div class="klc-wiz-step">Step 2 of 3 · What goes into <b>${esc(chosen.name)}</b></div>
-            <p class="klc-p">Add from store room: <b>food</b> and packaging. Quantities use the stock <b>unit</b> (kg, ml, pcs). Default is for <b>1 serving</b> — change servings under Recipes if needed.</p>
+            <p class="klc-p">Add from store room: <b>food</b> and packaging. Quantities use stock units only: <b>kg, gm, ltr, ml</b>. Default is <b>1 serving</b> — change under Recipes if needed.</p>
             ${suggestionsHtml()}
             ${copyBarHtml()}
             <div id="klc-draft">${draftHtml()}</div>

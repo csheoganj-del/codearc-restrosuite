@@ -1,14 +1,12 @@
 {
-  "version": "v169-20260713-recipe-servings",
+  "version": "v170-20260713-units-kg-gm-ltr-ml",
   "date": "2026-07-13",
-  "title": "Recipe servings + units across Menu · Recipe · Stock",
-  "summary": "Recipes now have serving size (e.g. 1 plate / 4 servings). Stock deduction = (ingredient qty ÷ recipe servings) × sold qty. Units (kg, ml, pcs) stay on stock and recipe lines; plate cost is per serving.",
+  "title": "Standard units: kg, gm, ltr, ml",
+  "summary": "Stock and recipe units are standardized to kg, gm, ltr, and ml only. Conversions work between kg↔gm and ltr↔ml when deducting stock.",
   "highlights": [
-    "Recipe: Sold as (plate/bowl/glass…) + Recipe written for N servings",
-    "Each stock line keeps unit (kg/ml/pcs) on the recipe",
-    "POS sale deducts by servings (family pack recipes supported)",
-    "g↔kg and ml↔L auto-convert when units differ",
-    "Menu Editor: serve unit + servings; plate cost per order",
-    "Export recipes includes servings and units"
+    "Unit dropdowns: kg · gm · ltr · ml",
+    "Aliases accepted: g→gm, L/litre→ltr",
+    "Auto convert kg↔gm and ltr↔ml on sale deduction",
+    "Same units on inventory, recipe lines, and plate cost"
   ]
 }

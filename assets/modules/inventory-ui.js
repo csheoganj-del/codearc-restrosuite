@@ -1099,7 +1099,21 @@
                   <select class="form-input" id="edit-ing-cat">${catSelect}</select>
                   <input class="form-input" id="edit-ing-cat-custom" placeholder="Custom category" style="display:none;margin-top:6px">
                 </div>
-                <div><label class="fl">Unit</label><input class="form-input" id="edit-ing-unit" value="${_e(inv.unit || '')}" placeholder="kg / pcs / pack"></div>
+                <div>
+                  <label class="fl">Unit</label>
+                  ${
+                    global.RSRecipeUnits && RSRecipeUnits.unitSelectHtml
+                      ? RSRecipeUnits.unitSelectHtml(inv.unit || 'kg', 'edit-ing-unit')
+                      : `<select class="form-input" id="edit-ing-unit">
+                          ${['kg', 'gm', 'ltr', 'ml']
+                            .map(
+                              (u) =>
+                                `<option value="${u}" ${String(inv.unit || 'kg').toLowerCase() === u || (inv.unit === 'g' && u === 'gm') || ((inv.unit === 'L' || inv.unit === 'l') && u === 'ltr') ? 'selected' : ''}>${u}</option>`
+                            )
+                            .join('')}
+                        </select>`
+                  }
+                </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div><label class="fl">Current stock</label><input class="form-input" id="edit-ing-stock" type="number" min="0" value="${inv.stock}"></div>
@@ -1384,10 +1398,10 @@
     // Stock types: food + packaging + disposables + cleaning + other (all reduce on recipe link)
     const STOCK_TYPE_PRESETS = [
       { id: 'food', label: 'Food / raw', icon: 'fa-carrot', cat: 'Food', unit: 'kg', ph: 'e.g. Paneer, Basmati rice' },
-      { id: 'packaging', label: 'Packaging', icon: 'fa-box', cat: 'Packaging', unit: 'pcs', ph: 'e.g. Takeaway box, foil' },
-      { id: 'disposables', label: 'Disposables', icon: 'fa-spoon', cat: 'Disposables', unit: 'pcs', ph: 'e.g. Napkin, spoon set' },
-      { id: 'cleaning', label: 'Cleaning', icon: 'fa-spray-can-sparkles', cat: 'Cleaning', unit: 'L', ph: 'e.g. Dishwash liquid' },
-      { id: 'other', label: 'Other', icon: 'fa-cube', cat: 'Other', unit: 'pcs', ph: 'e.g. Gas cylinder, charcoal' },
+      { id: 'packaging', label: 'Packaging', icon: 'fa-box', cat: 'Packaging', unit: 'gm', ph: 'e.g. Foil sheet weight / pack weight' },
+      { id: 'disposables', label: 'Disposables', icon: 'fa-spoon', cat: 'Disposables', unit: 'gm', ph: 'e.g. Napkin pack weight' },
+      { id: 'cleaning', label: 'Cleaning', icon: 'fa-spray-can-sparkles', cat: 'Cleaning', unit: 'ltr', ph: 'e.g. Dishwash liquid' },
+      { id: 'other', label: 'Other', icon: 'fa-cube', cat: 'Other', unit: 'kg', ph: 'e.g. Charcoal, dry goods' },
     ];
     const STOCK_CAT_OPTIONS = [
       'Food',
@@ -1404,18 +1418,20 @@
       'General',
     ];
     const PACKAGING_QUICK = [
-      { name: 'Takeaway box', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
-      { name: 'Paper bag', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
-      { name: 'Plastic container', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
-      { name: 'Aluminium foil sheet', cat: 'Packaging', unit: 'pcs', min: 100, cost: 0 },
-      { name: 'Butter paper', cat: 'Packaging', unit: 'pcs', min: 100, cost: 0 },
-      { name: 'Carry bag', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
-      { name: 'Napkin', cat: 'Disposables', unit: 'pcs', min: 200, cost: 0 },
-      { name: 'Spoon / fork set', cat: 'Disposables', unit: 'pcs', min: 100, cost: 0 },
-      { name: 'Straw', cat: 'Disposables', unit: 'pcs', min: 100, cost: 0 },
-      { name: 'Tissue roll', cat: 'Disposables', unit: 'pcs', min: 20, cost: 0 },
+      { name: 'Takeaway box', cat: 'Packaging', unit: 'gm', min: 50, cost: 0 },
+      { name: 'Paper bag', cat: 'Packaging', unit: 'gm', min: 50, cost: 0 },
+      { name: 'Plastic container', cat: 'Packaging', unit: 'gm', min: 50, cost: 0 },
+      { name: 'Aluminium foil', cat: 'Packaging', unit: 'gm', min: 100, cost: 0 },
+      { name: 'Butter paper', cat: 'Packaging', unit: 'gm', min: 100, cost: 0 },
+      { name: 'Carry bag', cat: 'Packaging', unit: 'gm', min: 50, cost: 0 },
+      { name: 'Napkin', cat: 'Disposables', unit: 'gm', min: 200, cost: 0 },
+      { name: 'Spoon / fork set', cat: 'Disposables', unit: 'gm', min: 100, cost: 0 },
+      { name: 'Straw', cat: 'Disposables', unit: 'gm', min: 100, cost: 0 },
+      { name: 'Tissue', cat: 'Disposables', unit: 'gm', min: 20, cost: 0 },
     ];
-    const UNIT_OPTIONS = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'roll', 'bottle', 'unit'];
+    // Standard kitchen units only (as used in recipes + stock)
+    const UNIT_OPTIONS =
+      (global.RSRecipeUnits && RSRecipeUnits.STOCK_UNITS) || ['kg', 'gm', 'ltr', 'ml'];
 
     async function saveStockItem(item) {
       INVENTORY.push(item);
