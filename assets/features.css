@@ -156,7 +156,13 @@
   flex: 0 0 42px;
   grid-column: auto !important;
   grid-row: auto !important;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto !important;
 }
+.rc-icon-btn i { pointer-events: none; } /* clicks always hit the button */
+.rc-foot-actions { pointer-events: auto; position: relative; z-index: 3; }
+.rs-mfoot:has(.rc-foot-actions) { pointer-events: auto; position: relative; z-index: 3; }
 .rc-icon-btn:hover {
   color: var(--text);
   border-color: var(--stroke-hi, var(--stroke-2));

@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v187-20260713-scroll-unlock';
+    return 'v188-20260713-plus-new-order';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

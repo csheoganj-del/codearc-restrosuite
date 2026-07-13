@@ -1,11 +1,11 @@
 {
-  "version": "v187-20260713-scroll-unlock",
+  "version": "v188-20260713-plus-new-order",
   "date": "2026-07-13",
-  "title": "Bill settled scroll no longer freezes",
-  "summary": "Scroll stuck because PDF capture (html2canvas) ran while the preview was open and blocked the main thread. PDF warm is disabled during Bill settled; QR inject no longer rewrites the whole receipt.",
+  "title": "Plus button starts a new order again",
+  "summary": "Plus on Bill settled could fail silently (timer clear before init). It now always closes the modal, clears cart, and opens POS for a new order.",
   "highlights": [
-    "No PDF/html2canvas while Bill settled is open",
-    "Soft QR append preserves scroll position",
-    "Modal body forced as the only scroll surface"
+    "Plus closes Bill settled reliably",
+    "Opens Point of Sale ready for next order",
+    "Clears cart and shows a short toast"
   ]
 }

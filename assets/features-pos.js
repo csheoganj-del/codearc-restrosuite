@@ -1207,8 +1207,9 @@
               </button>
             </div>`,
         onMount(modal, close) {
+          let syncTimer = null;
+          let closed = false;
           const mbody = modal.querySelector('.rs-mbody');
-          // Ensure body is the only scroll surface and starts unlocked
           if (mbody) {
             mbody.style.overflowY = 'auto';
             mbody.style.webkitOverflowScrolling = 'touch';
@@ -1216,21 +1217,40 @@
             mbody.style.overscrollBehavior = 'contain';
           }
 
-          const wrappedClose = () => {
+          const finishSettle = (opts) => {
+            if (closed) return;
+            closed = true;
             window.__rsSettleModalOpen = false;
-            clearInterval(syncTimer);
-            close();
+            try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+            syncTimer = null;
+            try { close(); } catch (_) {}
+            const goPos = !opts || opts.goPos !== false;
+            if (goPos) {
+              try {
+                if (window.RS && typeof RS.clearCart === 'function') RS.clearCart();
+              } catch (_) {}
+              try {
+                if (window.RS && typeof RS.activateTab === 'function') RS.activateTab('pos-tab');
+              } catch (_) {}
+              try {
+                if (window.RS && typeof RS.toast === 'function') RS.toast('Ready for new order', 'fa-plus');
+              } catch (_) {}
+            }
           };
 
           const printBtn = modal.querySelector('#rc-print');
           if (printBtn) {
-            printBtn.onclick = () => {
+            printBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
               RSPrint(printHtml, 'Receipt ' + bill.no);
             };
           }
           const thEl = modal.querySelector('#rc-thermal');
           if (thEl) {
-            thEl.onclick = () => {
+            thEl.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
                 RSOps.printBillThermal(bill);
               } else {
@@ -1239,19 +1259,42 @@
             };
           }
           const waEl = modal.querySelector('#rc-wa');
-          if (waEl) waEl.onclick = () => openManualWhatsAppBill(bill);
+          if (waEl) {
+            waEl.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openManualWhatsAppBill(bill);
+            };
+          }
           const cta = modal.querySelector('#rc-wa-cta');
-          if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
+          if (cta) {
+            cta.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
+            };
+          }
+          // Plus = close + new order (POS). Must never throw before close().
           const newBtn = modal.querySelector('#rc-new');
-          if (newBtn) newBtn.onclick = wrappedClose;
+          if (newBtn) {
+            newBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              finishSettle({ goPos: true });
+            };
+          }
           const xBtn = modal.querySelector('.rs-mclose');
           if (xBtn) {
-            xBtn.addEventListener('click', () => { window.__rsSettleModalOpen = false; clearInterval(syncTimer); }, { once: true });
+            xBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              finishSettle({ goPos: false });
+            }, { once: true });
           }
 
-          // Soft QR inject: append only QR block — never rewrite whole paper (preserves scroll)
+          // Soft QR inject: append only QR block — never rewrite whole paper
           const injectQr = (qr) => {
-            if (!qr || !modal.isConnected) return;
+            if (!qr || !modal.isConnected || closed) return;
             liveQr = qr;
             printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qr)}</div>`;
             const paper = modal.querySelector('#rc-paper');
@@ -1262,24 +1305,23 @@
             wrap.innerHTML =
               '<img src="' + qr + '" width="100" height="100" alt="Digital bill QR" crossorigin="anonymous" />' +
               '<div class="rcp-qr-label">Scan to view digital bill</div>';
-            const foot = paper.querySelector('.rcp-foot');
-            if (foot) paper.insertBefore(wrap, foot);
+            const footEl = paper.querySelector('.rcp-foot');
+            if (footEl) paper.insertBefore(wrap, footEl);
             else paper.appendChild(wrap);
             if (mbody) mbody.scrollTop = y;
           };
-          // Delay QR until after user can scroll freely
           setTimeout(() => {
-            if (!modal.isConnected) return;
+            if (!modal.isConnected || closed) return;
             generateReceiptQrDataUri(bill).then(injectQr).catch(() => {});
           }, 600);
 
-          // Live orange -> green when cloud save completes (DOM-only, no layout thrash)
           paintBillSettledSync(modal, st0);
           let ticks = 0;
-          const syncTimer = setInterval(() => {
+          syncTimer = setInterval(() => {
             ticks += 1;
-            if (ticks > 40 || !modal.isConnected) {
-              clearInterval(syncTimer);
+            if (closed || ticks > 40 || !modal.isConnected) {
+              try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+              syncTimer = null;
               return;
             }
             let st = bill.syncStatus || 'synced';
@@ -1292,25 +1334,28 @@
             if (!isBillSyncPending(st)) {
               bill.syncStatus = 'synced';
               paintBillSettledSync(modal, 'synced');
-              clearInterval(syncTimer);
+              try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+              syncTimer = null;
             } else if (ticks % 2 === 0) {
               paintBillSettledSync(modal, st);
             }
           }, 700);
-
-          // NO PDF warm while this modal is open — that was freezing scroll (html2canvas).
-          // PDF builds on first WhatsApp send instead.
         }
       });
-      // If overlay dismissed by backdrop/Escape, clear flag
+      // Backdrop / Escape close — clear flag (do not force POS)
       if (settle && settle.el) {
+        const ov = settle.el;
+        const markClosed = () => { window.__rsSettleModalOpen = false; };
+        ov.addEventListener('click', (e) => {
+          if (e.target === ov) markClosed();
+        });
         const obs = new MutationObserver(() => {
-          if (!settle.el.isConnected || !settle.el.classList.contains('show')) {
-            window.__rsSettleModalOpen = false;
+          if (!ov.isConnected || !ov.classList.contains('show')) {
+            markClosed();
             obs.disconnect();
           }
         });
-        obs.observe(settle.el, { attributes: true, attributeFilter: ['class'], childList: true });
+        obs.observe(ov, { attributes: true, attributeFilter: ['class'], childList: true });
       }
     }
 
