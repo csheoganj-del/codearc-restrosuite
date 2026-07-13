@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v136 (2026-07-13) — Official CODEARC RestroSuite logo on QR cards
+
+- Powered-by strip uses the **real mark** (plate · fork/knife · gold `</>` · orange slash)
+- Wordmark: **CODEARC** + **Restro**Suite (Suite in brand orange `#FF4F00`)
+- White lockup badge so the logo matches the app/login branding on every tent card
+
 ## v135 (2026-07-13) — Restore forest/gold QR card colors
 
 - Reverted orange brand restyle; tent cards use **forest + gold** palette again (as before v134)

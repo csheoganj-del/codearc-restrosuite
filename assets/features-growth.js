@@ -1806,44 +1806,54 @@
       },
     };
 
-    /** Inline mark so Blob print tabs always show logo (no broken external img). */
+    /**
+     * Official RestroSuite mark (same art as assets/restrosuite-mark.svg):
+     * plate + fork/knife + gold </> + orange slash. Inlined so Blob print always works.
+     */
     function restroSuiteMarkSvg(sizePx) {
-      const s = Math.max(12, Number(sizePx) || 22);
-      // Gold ring + cream plate so mark pops on dark "Powered by" footer and light cards
+      const s = Math.max(14, Number(sizePx) || 28);
       return (
-        `<svg class="rs-mark" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 192 192" fill="none" aria-hidden="true" focusable="false" style="display:block;flex-shrink:0;width:${s}px;height:${s}px;border-radius:22%;box-shadow:0 0 0 1px rgba(232,213,163,.45)">` +
-        `<circle cx="96" cy="96" r="96" fill="#c4a35a"/>` +
-        `<circle cx="96" cy="96" r="82" fill="#0c1f1a"/>` +
-        `<circle cx="96" cy="96" r="68" fill="#fffcf7"/>` +
-        `<circle cx="96" cy="96" r="54" fill="#0c1f1a"/>` +
-        `<path d="M66 82 L80 96 L66 110" stroke="#e8d5a3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-        `<path d="M126 82 L112 96 L126 110" stroke="#e8d5a3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-        `<line x1="106" y1="78" x2="86" y2="114" stroke="#c4a35a" stroke-width="8" stroke-linecap="round"/>` +
+        `<svg class="rs-mark" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 192 192" fill="none" role="img" aria-label="RestroSuite" style="display:block;flex-shrink:0;width:${s}px;height:${s}px">` +
+        // Fork
+        `<g fill="#1a1a1a">` +
+        `<rect x="28" y="28" width="5" height="38" rx="2.5"/>` +
+        `<rect x="38" y="28" width="5" height="38" rx="2.5"/>` +
+        `<rect x="48" y="28" width="5" height="38" rx="2.5"/>` +
+        `<path d="M28 62 C28 62 29 80 40.5 80 C52 80 53 62 53 62 L53 162 L28 162 Z"/>` +
+        `</g>` +
+        // Knife
+        `<g fill="#1a1a1a">` +
+        `<path d="M152 28 C152 28 168 44 168 72 L152 72 Z" opacity="0.9"/>` +
+        `<rect x="152" y="72" width="6" height="90" rx="3"/>` +
+        `</g>` +
+        // Plate
+        `<circle cx="96" cy="96" r="66" fill="#1a1a1a"/>` +
+        `<circle cx="96" cy="96" r="58" fill="#ffffff"/>` +
+        `<circle cx="96" cy="96" r="50" fill="#1a1a1a"/>` +
+        // Code brackets + orange slash (brand)
+        `<path d="M66 82 L80 96 L66 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+        `<path d="M126 82 L112 96 L126 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+        `<line x1="106" y1="78" x2="86" y2="114" stroke="#FF4F00" stroke-width="6" stroke-linecap="round"/>` +
         `</svg>`
       );
     }
 
-    function buildPoweredByAdHtml(sizeId) {
+    /** Official lockup: mark + CODEARC + RestroSuite (Suite in brand orange) */
+    function restroSuiteBrandLockupHtml(sizeId) {
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
-      const logoPx = sz.logoPx || 22;
-      const brandPx = sz.brandPx || 13;
-      const poweredPx = sz.poweredPx || 8;
-      const gap = Math.max(5, Math.round(logoPx * 0.28));
-      const padTop = Math.max(6, Math.round(logoPx * 0.32));
-      const mt = Math.max(6, Math.round(logoPx * 0.35));
+      const logoPx = Math.max(22, (sz.logoPx || 22) + 4);
+      const brandPx = Math.max(12, sz.brandPx || 13);
+      const codePx = Math.max(7, Math.round(brandPx * 0.55));
+      const gap = Math.max(6, Math.round(logoPx * 0.22));
       const logo = restroSuiteMarkSvg(logoPx);
-      // Inline styles so live modal preview matches print sheet
       return (
-        `<div class="qr-powered" aria-label="Powered by RestroSuite" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.max(
-          2,
-          Math.round(logoPx * 0.12)
-        )}px;margin-top:${mt}px;padding-top:${padTop}px;border-top:1px dashed #e8d5a3">` +
-        `<span class="qr-powered-label" style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5c6b66;line-height:1;opacity:.92">Powered by</span>` +
-        `<span class="qr-powered-brand" style="display:inline-flex;align-items:center;justify-content:center;gap:${gap}px;line-height:1">` +
+        `<span class="rs-brand-lockup" style="display:inline-flex;align-items:center;gap:${gap}px;background:#ffffff;border-radius:10px;padding:5px 10px 5px 5px;box-shadow:0 1px 0 rgba(0,0,0,.06);line-height:1.05;max-width:100%">` +
         logo +
-        `<span class="qr-powered-name" style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#0c1f1a;line-height:1">Restro<span style="color:#1a3d34;font-weight:700">Suite</span></span>` +
+        `<span style="display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;text-align:left">` +
+        `<span style="font-size:${codePx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8a8880;line-height:1;margin-bottom:2px">CODEARC</span>` +
+        `<span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.03em;color:#1a1a1a;line-height:1;white-space:nowrap">Restro<span style="color:#FF4F00;font-weight:800">Suite</span></span>` +
         `</span>` +
-        `</div>`
+        `</span>`
       );
     }
 
@@ -2072,24 +2082,17 @@
         }
       }
 
-      // —— Powered by (full-width dark footer ad) ——
+      // —— Powered by: official CODEARC RestroSuite lockup (same as app logo) ——
       let poweredHtml = '';
       if (showPoweredBy) {
-        const logo = restroSuiteMarkSvg(logoPx);
-        poweredHtml = `<div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:${Math.max(
-          6,
-          Math.round(logoPx * 0.3)
-        )}px ${Math.max(8, Math.round(logoPx * 0.4))}px;padding:${
-          isMini ? '7px 8px' : '10px 12px'
-        };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);box-sizing:border-box;border-top:1px solid rgba(196,163,90,.35)" aria-label="Powered by RestroSuite">
-          <span style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7);line-height:1;white-space:nowrap">Powered by</span>
-          <span style="display:inline-flex;align-items:center;gap:${Math.max(
-            5,
-            Math.round(logoPx * 0.28)
-          )}px;line-height:1">
-            ${logo}
-            <span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1">Restro<span style="color:${B.goldSoft};font-weight:700">Suite</span></span>
-          </span>
+        const lockup = restroSuiteBrandLockupHtml(sz.id);
+        poweredHtml = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${
+          isMini ? 4 : 6
+        }px;padding:${
+          isMini ? '8px 8px' : '10px 12px'
+        };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);box-sizing:border-box;border-top:1px solid rgba(196,163,90,.35)" aria-label="Powered by CODEARC RestroSuite">
+          <span style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.72);line-height:1">Powered by</span>
+          ${lockup}
         </div>`;
       }
 
