@@ -1,5 +1,9 @@
 # RestroSuite release notes
 
+## v119 (2026-07-13) — Edit Tables works without visiting POS first
+
+- Floor loads its own **RSModal** if POS has not been opened yet (was silent no-op on Edit Tables)
+
 ## v118 (2026-07-13) — Edit Tables save to database (fixed)
 
 - Settings save no longer embeds `_raw` business profile into `feature_flags` (broke cloud upserts)

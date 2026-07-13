@@ -11,6 +11,45 @@
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
+    // Floor can load before POS — ensure RSModal exists (Edit Tables / table detail depend on it)
+    if (!window.RSModal || typeof window.RSModal.open !== 'function') {
+      window.RSModal = {
+        open(opts) {
+          const root =
+            (RS && typeof RS.getModalRoot === 'function' && RS.getModalRoot()) ||
+            document.body;
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay';
+          const head =
+            opts.title != null
+              ? `<div class="rs-mhead">${opts.icon ? `<div class="mh-ic"><i class="fa-solid ${opts.icon}"></i></div>` : ''}<div><h3>${opts.title}</h3>${opts.sub ? `<div class="sub">${opts.sub}</div>` : ''}</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>`
+              : '';
+          const body = opts.bare
+            ? opts.body || ''
+            : `<div class="rs-mbody ${opts.bodyClass || ''}">${opts.body || ''}</div>`;
+          const foot = opts.foot ? `<div class="rs-mfoot">${opts.foot}</div>` : '';
+          ov.innerHTML = `<div class="rs-modal ${opts.size || 'md'}">${head}${body}${foot}</div>`;
+          root.appendChild(ov);
+          const close = () => {
+            ov.classList.remove('show');
+            setTimeout(() => ov.remove(), 300);
+            document.removeEventListener('keydown', esc);
+          };
+          const esc = (e) => {
+            if (e.key === 'Escape') close();
+          };
+          ov.querySelector('.rs-mclose')?.addEventListener('click', close);
+          ov.addEventListener('click', (e) => {
+            if (e.target === ov && opts.dismissable !== false) close();
+          });
+          document.addEventListener('keydown', esc);
+          setTimeout(() => ov.classList.add('show'), 20);
+          if (opts.onMount) opts.onMount(ov.querySelector('.rs-modal'), close);
+          return { el: ov, modal: ov.querySelector('.rs-modal'), close };
+        },
+      };
+    }
+
     // Send a WhatsApp reservation confirmation to the guest. Uses the connected
     // gateway when it's ready (server-side, no staff action), otherwise falls
     // back to opening a pre-filled wa.me message the staff taps to send.
