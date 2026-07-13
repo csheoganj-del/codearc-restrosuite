@@ -1806,52 +1806,47 @@
       },
     };
 
-    /**
-     * Official RestroSuite mark (same art as assets/restrosuite-mark.svg):
-     * plate + fork/knife + gold </> + orange slash. Inlined so Blob print always works.
-     */
-    function restroSuiteMarkSvg(sizePx) {
-      const s = Math.max(14, Number(sizePx) || 28);
-      return (
-        `<svg class="rs-mark" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 192 192" fill="none" role="img" aria-label="RestroSuite" style="display:block;flex-shrink:0;width:${s}px;height:${s}px">` +
-        // Fork
-        `<g fill="#1a1a1a">` +
-        `<rect x="28" y="28" width="5" height="38" rx="2.5"/>` +
-        `<rect x="38" y="28" width="5" height="38" rx="2.5"/>` +
-        `<rect x="48" y="28" width="5" height="38" rx="2.5"/>` +
-        `<path d="M28 62 C28 62 29 80 40.5 80 C52 80 53 62 53 62 L53 162 L28 162 Z"/>` +
-        `</g>` +
-        // Knife
-        `<g fill="#1a1a1a">` +
-        `<path d="M152 28 C152 28 168 44 168 72 L152 72 Z" opacity="0.9"/>` +
-        `<rect x="152" y="72" width="6" height="90" rx="3"/>` +
-        `</g>` +
-        // Plate
-        `<circle cx="96" cy="96" r="66" fill="#1a1a1a"/>` +
-        `<circle cx="96" cy="96" r="58" fill="#ffffff"/>` +
-        `<circle cx="96" cy="96" r="50" fill="#1a1a1a"/>` +
-        // Code brackets + orange slash (brand)
-        `<path d="M66 82 L80 96 L66 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-        `<path d="M126 82 L112 96 L126 110" stroke="#E8D5B0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-        `<line x1="106" y1="78" x2="86" y2="114" stroke="#FF4F00" stroke-width="6" stroke-linecap="round"/>` +
-        `</svg>`
-      );
+    /** Absolute URL to assets/restrosuite-mark.png (works in Blob print tabs). */
+    function restroSuiteMarkAssetUrl() {
+      try {
+        const base = String(location.href || '').split('#')[0].split('?')[0];
+        // dashboard.html → assets/restrosuite-mark.png
+        if (/\/[^/]+\.html?$/i.test(base)) {
+          return new URL('assets/restrosuite-mark.png', base.replace(/\/[^/]+\.html?$/i, '/')).href;
+        }
+        return new URL('assets/restrosuite-mark.png', base.endsWith('/') ? base : base + '/').href;
+      } catch (_) {
+        try {
+          return (location.origin || '') + '/assets/restrosuite-mark.png';
+        } catch (e2) {
+          return 'assets/restrosuite-mark.png';
+        }
+      }
     }
 
-    /** Official lockup: mark + CODEARC + RestroSuite (Suite in brand orange) */
-    function restroSuiteBrandLockupHtml(sizeId) {
+    /**
+     * Brand lockup: existing mark file + CODEARC / RestroSuite text.
+     * No white box — logo + type only (matches app logo treatment).
+     * @param {string} sizeId
+     * @param {'dark'|'light'} onBg  dark footer → light text; light strip → dark text
+     */
+    function restroSuiteBrandLockupHtml(sizeId, onBg) {
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
-      const logoPx = Math.max(22, (sz.logoPx || 22) + 4);
-      const brandPx = Math.max(12, sz.brandPx || 13);
-      const codePx = Math.max(7, Math.round(brandPx * 0.55));
-      const gap = Math.max(6, Math.round(logoPx * 0.22));
-      const logo = restroSuiteMarkSvg(logoPx);
+      const logoPx = Math.max(24, (sz.logoPx || 22) + 6);
+      const brandPx = Math.max(13, sz.brandPx || 13);
+      const codePx = Math.max(8, Math.round(brandPx * 0.58));
+      const gap = Math.max(8, Math.round(logoPx * 0.28));
+      const dark = onBg !== 'light';
+      const codeColor = dark ? 'rgba(255,255,255,0.65)' : '#8a8880';
+      const restroColor = dark ? '#ffffff' : '#1a1a1a';
+      const suiteColor = '#FF4F00';
+      const src = restroSuiteMarkAssetUrl();
       return (
-        `<span class="rs-brand-lockup" style="display:inline-flex;align-items:center;gap:${gap}px;background:#ffffff;border-radius:10px;padding:5px 10px 5px 5px;box-shadow:0 1px 0 rgba(0,0,0,.06);line-height:1.05;max-width:100%">` +
-        logo +
+        `<span class="rs-brand-lockup" style="display:inline-flex;align-items:center;gap:${gap}px;background:transparent;padding:0;line-height:1.05;max-width:100%">` +
+        `<img class="rs-mark" src="${esc(src)}" width="${logoPx}" height="${logoPx}" alt="RestroSuite" style="display:block;flex-shrink:0;width:${logoPx}px;height:${logoPx}px;object-fit:contain;background:transparent;border:0"/>` +
         `<span style="display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;text-align:left">` +
-        `<span style="font-size:${codePx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#8a8880;line-height:1;margin-bottom:2px">CODEARC</span>` +
-        `<span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.03em;color:#1a1a1a;line-height:1;white-space:nowrap">Restro<span style="color:#FF4F00;font-weight:800">Suite</span></span>` +
+        `<span style="font-size:${codePx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${codeColor};line-height:1;margin-bottom:3px">CODEARC</span>` +
+        `<span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.03em;color:${restroColor};line-height:1;white-space:nowrap">Restro<span style="color:${suiteColor};font-weight:800">Suite</span></span>` +
         `</span>` +
         `</span>`
       );
