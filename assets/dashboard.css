@@ -1535,6 +1535,30 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 
 /* Bills filters + 10/10 history chrome */
 .bills-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
+.bills-export-group {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid var(--stroke-2); border-radius: 999px;
+  overflow: hidden; background: var(--glass);
+}
+.bills-export-group .btn {
+  border: 0 !important; border-radius: 0 !important;
+  margin: 0; background: transparent;
+  box-shadow: none;
+}
+.bills-export-group .btn + .btn {
+  border-left: 1px solid var(--stroke-2) !important;
+}
+.bills-export-group .btn:hover {
+  background: var(--glass-2, var(--glass));
+}
+.bills-export-group #btn-export-bills {
+  font-weight: 700;
+  color: var(--text);
+}
+.bills-csv-btn {
+  color: var(--text-mute) !important;
+  font-size: 12px !important;
+}
 .bills-date-chips {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
 }

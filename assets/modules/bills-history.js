@@ -1120,6 +1120,382 @@
     }
   }
 
+  function rangeDisplayLabel() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return 'Yesterday';
+      case '7d':
+        return 'Last 7 days';
+      case 'all':
+        return 'All history';
+      case 'custom': {
+        const a = billsCustomFrom || '…';
+        const b = billsCustomTo || '…';
+        return a + ' → ' + b;
+      }
+      default:
+        return 'Today';
+    }
+  }
+
+  function reportTitleForRange() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return 'YESTERDAY SALES SUMMARY';
+      case '7d':
+        return '7-DAY SALES SUMMARY';
+      case 'all':
+        return 'FULL HISTORY SALES SUMMARY';
+      case 'custom':
+        return 'CUSTOM RANGE SALES SUMMARY';
+      default:
+        return 'DAILY SALES SUMMARY';
+    }
+  }
+
+  function formatShortDate(d) {
+    if (!d || Number.isNaN(d.getTime())) return '—';
+    try {
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch (_) {
+      return d.toLocaleDateString();
+    }
+  }
+
+  function periodFromBills(list) {
+    let min = null;
+    let max = null;
+    (list || []).forEach((b) => {
+      const d = parseBillDate(b);
+      if (!d) return;
+      if (!min || d < min) min = d;
+      if (!max || d > max) max = d;
+    });
+    if (min && max) {
+      const a = formatShortDate(min);
+      const b = formatShortDate(max);
+      return a === b ? a : a + ' – ' + b;
+    }
+    return rangeDisplayLabel();
+  }
+
+  function money(n) {
+    return rs(Number(n) || 0);
+  }
+
+  /**
+   * 10/10 printable / PDF sales report for the active Bills range + filters.
+   * A4 layout with clean margins (no thermal-on-A4 empty page look).
+   */
+  function printSalesReport() {
+    const list = collectExportList();
+    if (!list.length) {
+      toast('No bills in this range to report', 'fa-circle-exclamation');
+      return false;
+    }
+
+    const settings = global.RS_SETTINGS || {};
+    const sess = global.RS_API && RS_API.session ? RS_API.session() : null;
+    let outletName =
+      settings.set_restaurant_name ||
+      settings.set_outlet_name ||
+      (sess && (sess.tenant_name || sess.business_name)) ||
+      'RestroSuite Outlet';
+    if (!outletName || /outlet name/i.test(outletName)) outletName = 'RestroSuite Outlet';
+
+    const taxLabel = settings.set_tax_label || 'GST';
+    const taxPct =
+      settings.set_tax_rate != null && settings.set_tax_rate !== ''
+        ? Number(settings.set_tax_rate)
+        : settings.set_gst_rate != null
+          ? Number(settings.set_gst_rate)
+          : null;
+
+    const paidBills = list.filter((b) => String(b.status || 'paid').toLowerCase() === 'paid');
+    const refundBills = list.filter((b) => {
+      const st = String(b.status || '').toLowerCase();
+      return st === 'refunded' || st === 'voided' || st === 'void';
+    });
+    const totalRevenue = paidBills.reduce(
+      (sum, b) => sum + (Number(b.amount) || Number(b.total) || 0),
+      0
+    );
+    const refundTotal = refundBills.reduce(
+      (sum, b) => sum + (Number(b.amount) || Number(b.total) || 0),
+      0
+    );
+    const totalOrders = paidBills.length;
+    const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    const gstFromBills = paidBills.reduce((sum, b) => sum + (Number(b.gst) || 0), 0);
+    const divisor = taxPct && taxPct > 0 ? 1 + taxPct / 100 : 1.05;
+    const gstCollected =
+      gstFromBills > 0
+        ? Math.round(gstFromBills * 100) / 100
+        : Math.round((totalRevenue - totalRevenue / divisor) * 100) / 100;
+    const netTaxableSales = Math.round((totalRevenue - gstCollected) * 100) / 100;
+    const taxPctLabel =
+      taxPct != null && Number.isFinite(taxPct) ? String(taxPct) + '%' : gstFromBills > 0 ? 'as billed' : 'est. 5%';
+
+    const paymentMethods = {};
+    paidBills.forEach((b) => {
+      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach((t) => {
+          const method = t.method || 'Cash';
+          paymentMethods[method] = (paymentMethods[method] || 0) + Number(t.amount || 0);
+        });
+      } else {
+        const method = b.pay || b.paymentMethod || 'Cash';
+        paymentMethods[method] =
+          (paymentMethods[method] || 0) + (Number(b.amount) || Number(b.total) || 0);
+      }
+    });
+
+    const payRows = Object.keys(paymentMethods)
+      .sort()
+      .map(
+        (method) =>
+          `<tr><td>${_e(method)}</td><td class="num">${_e(money(paymentMethods[method]))}</td></tr>`
+      )
+      .join('');
+
+    // Compact bill list (latest first-ish — keep list order)
+    const billListRows = list
+      .slice(0, 25)
+      .map((b) => {
+        const st = String(b.status || 'paid');
+        return `<tr>
+          <td>${_e(b.no || b.orderId || b.id || '—')}</td>
+          <td>${_e(formatBillTime(b) || '—')}</td>
+          <td>${_e(b.pay || b.paymentMethod || '—')}</td>
+          <td class="num">${_e(money(b.amount != null ? b.amount : b.total))}</td>
+          <td>${_e(st)}</td>
+        </tr>`;
+      })
+      .join('');
+    const moreNote =
+      list.length > 25
+        ? `<p class="note">Showing 25 of ${list.length} bills. Use Export Excel for the full list.</p>`
+        : '';
+
+    const now = new Date();
+    const printedAt = now.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const period = periodFromBills(list);
+    const rangeLabel = rangeDisplayLabel();
+    const title = reportTitleForRange();
+    const docTitle = 'Sales Report · ' + rangeLabel + ' · ' + outletName;
+
+    const staff =
+      (sess && (sess.display_name || sess.username || sess.email)) ||
+      sessionStorage.getItem('logged_in_user') ||
+      'Staff';
+
+    const html = `
+<div class="rs-sales-report">
+  <header class="sr-head">
+    <div class="sr-brand">
+      <div class="sr-outlet">${_e(outletName)}</div>
+      <div class="sr-title">${_e(title)}</div>
+    </div>
+    <div class="sr-meta">
+      <div><span>Period</span><strong>${_e(period)}</strong></div>
+      <div><span>Filter</span><strong>${_e(rangeLabel)}</strong></div>
+      <div><span>Printed</span><strong>${_e(printedAt)}</strong></div>
+      <div><span>By</span><strong>${_e(String(staff))}</strong></div>
+    </div>
+  </header>
+
+  <section class="sr-kpis">
+    <div class="kpi"><div class="k-l">Paid bills</div><div class="k-v">${totalOrders}</div></div>
+    <div class="kpi"><div class="k-l">Gross sales</div><div class="k-v">${_e(money(totalRevenue))}</div></div>
+    <div class="kpi"><div class="k-l">Avg order</div><div class="k-v">${_e(money(aov))}</div></div>
+    <div class="kpi"><div class="k-l">Refunds</div><div class="k-v">${refundBills.length} · ${_e(money(refundTotal))}</div></div>
+  </section>
+
+  <div class="sr-grid">
+    <section class="sr-card">
+      <h3>Payment breakdown</h3>
+      <table class="sr-table">
+        <thead><tr><th>Method</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          ${payRows || '<tr><td colspan="2">No paid tenders</td></tr>'}
+        </tbody>
+        <tfoot><tr><td>Total paid</td><td class="num">${_e(money(totalRevenue))}</td></tr></tfoot>
+      </table>
+    </section>
+    <section class="sr-card">
+      <h3>Tax &amp; totals</h3>
+      <table class="sr-table">
+        <tbody>
+          <tr><td>Net taxable sales</td><td class="num">${_e(money(netTaxableSales))}</td></tr>
+          <tr><td>${_e(taxLabel)} (${_e(taxPctLabel)})</td><td class="num">${_e(money(gstCollected))}</td></tr>
+          <tr><td>Refunds / voids</td><td class="num">${_e(money(refundTotal))}</td></tr>
+          <tr class="em"><td>Gross revenue (paid)</td><td class="num">${_e(money(totalRevenue))}</td></tr>
+          <tr><td>Net after refunds</td><td class="num">${_e(money(totalRevenue - refundTotal))}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <section class="sr-card">
+    <h3>Bills in this report (${list.length})</h3>
+    <table class="sr-table sr-bills">
+      <thead>
+        <tr>
+          <th>Bill No.</th>
+          <th>Time</th>
+          <th>Pay</th>
+          <th class="num">Amount</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${billListRows}</tbody>
+    </table>
+    ${moreNote}
+  </section>
+
+  <footer class="sr-foot">
+    <div>RestroSuite · Sales report · ${_e(rangeLabel)}</div>
+    <div>*** End of report ***</div>
+  </footer>
+</div>`;
+
+    const style = `
+      @page { size: A4; margin: 14mm 12mm; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        color: #111;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 12px;
+        background: #fff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .rs-sales-report { max-width: 720px; margin: 0 auto; }
+      .sr-head {
+        display: flex; justify-content: space-between; gap: 16px;
+        border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 14px;
+      }
+      .sr-outlet { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+      .sr-title { font-size: 11px; font-weight: 700; color: #555; margin-top: 4px; letter-spacing: 0.06em; }
+      .sr-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 11px; min-width: 220px; }
+      .sr-meta span { display: block; color: #777; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .sr-meta strong { font-weight: 700; }
+      .sr-kpis {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px;
+      }
+      .kpi {
+        border: 1px solid #ddd; border-radius: 8px; padding: 10px 10px 8px;
+        background: #fafafa;
+      }
+      .k-l { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+      .k-v { font-size: 15px; font-weight: 800; margin-top: 4px; }
+      .sr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+      .sr-card {
+        border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;
+      }
+      .sr-card h3 {
+        margin: 0 0 8px; font-size: 12px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 0.05em; color: #333;
+      }
+      .sr-table { width: 100%; border-collapse: collapse; }
+      .sr-table th, .sr-table td {
+        text-align: left; padding: 5px 4px; border-bottom: 1px solid #eee; font-size: 11.5px;
+      }
+      .sr-table th { color: #666; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .sr-table .num, .sr-table td.num, .sr-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .sr-table tfoot td { font-weight: 800; border-top: 1px solid #ccc; border-bottom: 0; }
+      .sr-table tr.em td { font-weight: 800; font-size: 13px; border-top: 1px dashed #bbb; }
+      .sr-bills td { font-size: 11px; }
+      .note { margin: 8px 0 0; font-size: 10.5px; color: #777; }
+      .sr-foot {
+        margin-top: 16px; padding-top: 10px; border-top: 1px dashed #bbb;
+        display: flex; justify-content: space-between; font-size: 10px; color: #777;
+      }
+      @media print {
+        body { padding: 0; }
+        .sr-card, .kpi { break-inside: avoid; }
+      }
+      @media screen {
+        body { padding: 18px; background: #f3f3f3; }
+        .rs-sales-report {
+          background: #fff; padding: 22px 24px; border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,.08);
+        }
+      }
+      @media (max-width: 640px) {
+        .sr-kpis, .sr-grid, .sr-head { grid-template-columns: 1fr 1fr; display: grid; }
+        .sr-head { display: block; }
+        .sr-meta { margin-top: 10px; }
+      }
+    `;
+
+    const fullHtml =
+      '<!doctype html><html><head><meta charset="utf-8"><title>' +
+      _e(docTitle) +
+      '</title><style>' +
+      style +
+      '</style></head><body>' +
+      html +
+      '</body></html>';
+
+    try {
+      // Prefer iframe with our A4 styles (RSPrint forces thermal width)
+      const f = document.createElement('iframe');
+      f.setAttribute('title', docTitle);
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+      document.body.appendChild(f);
+      const w = f.contentWindow;
+      const d = w.document;
+      d.open();
+      d.write(fullHtml);
+      d.close();
+      const trigger = () => {
+        try {
+          w.focus();
+          w.print();
+        } catch (e) {
+          console.warn('[BillsHistory] print failed', e);
+        }
+        setTimeout(() => {
+          try {
+            f.remove();
+          } catch (_) {}
+        }, 1500);
+      };
+      // Wait for layout
+      setTimeout(trigger, 250);
+      toast('Opening sales report · ' + rangeLabel, 'fa-print');
+      return true;
+    } catch (e) {
+      console.warn('[BillsHistory] printSalesReport failed', e);
+      toast('Could not open print report', 'fa-circle-exclamation');
+      return false;
+    }
+  }
+
+  function wirePrintReportButton() {
+    const btn = document.getElementById('btn-print-day-report');
+    if (!btn || btn.dataset.rsPrintBound === '1') return;
+    btn.dataset.rsPrintBound = '1';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      printSalesReport();
+    });
+  }
+
   /** Filter button focuses the inline Payment / Status selects (no dead control). */
   function wireFilterButton() {
     const btn = document.getElementById('btn-bills-filter');
@@ -1464,6 +1840,7 @@
     wireFilterHint();
     renderBills();
     wireExportButton();
+    wirePrintReportButton();
     wireFilterButton();
     const search = $('#bills-search');
     if (search && !search._rsListenerBound) {
@@ -1501,10 +1878,13 @@
     showDeleteConfirm,
     exportBillsCsv,
     exportBillsXlsx,
+    printSalesReport,
     formatBillTime,
     wireExportButton,
+    wirePrintReportButton,
     wireFilterButton,
     getDateRange: () => billsDateRange,
+    rangeDisplayLabel,
   };
 
   global.RSBillsHistory = api;
@@ -1516,6 +1896,7 @@
     global.RS.receiptPayloadFromBill = receiptPayloadFromBill;
     global.RS.exportBillsCsv = exportBillsCsv;
     global.RS.exportBillsXlsx = exportBillsXlsx;
+    global.RS.printSalesReport = printSalesReport;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);

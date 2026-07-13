@@ -1,13 +1,12 @@
 {
-  "version": "v154-20260713-export-xlsx",
+  "version": "v155-20260713-print-10",
   "date": "2026-07-13",
-  "title": "True Excel bill export",
-  "summary": "Bills Export Excel downloads a real .xlsx workbook with Summary, Bills, and Line items sheets. Filters and date range are respected. CSV remains available as a secondary button.",
+  "title": "Bills print report & exports 10/10",
+  "summary": "Print report is now a proper A4/PDF sales summary for the selected date range (not a tiny thermal slip). Excel remains the full data export; CSV is grouped as a secondary option.",
   "highlights": [
-    "Real .xlsx file (opens in Excel / Google Sheets / LibreOffice).",
-    "Sheet 1 Summary: sales, AOV, refunds, payment breakdown for the active range.",
-    "Sheet 2 Bills: one row per bill with numeric totals.",
-    "Sheet 3 Line items: one row per item for pivots.",
-    "Filename includes outlet + range + date. CSV still available for scripts."
+    "Print report: A4 layout, period + filter label, KPIs, payment breakdown, tax, refunds, bill list.",
+    "Title matches range (Today / Yesterday / 7 days / All / Custom) — no more always-Daily.",
+    "Export group: Excel (recommended) + CSV side by side; Print report for paper/PDF close.",
+    "Report uses active Bills filters and tax label from settings when available."
   ]
 }

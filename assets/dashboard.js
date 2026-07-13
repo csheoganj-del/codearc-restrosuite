@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v154-20260713-export-xlsx';
+    return 'v155-20260713-print-10';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -2624,144 +2624,8 @@
       });
     }
 
-    // 5b. Print Day Report (respects Bills date range when available)
-    const btnPrintDayReport = document.getElementById('btn-print-day-report');
-    if (btnPrintDayReport) {
-      btnPrintDayReport.onclick = () => {
-        let source = BILLS;
-        if (window.RSBillsHistory) {
-          if (typeof RSBillsHistory.getFilteredBills === 'function') {
-            // Range + search/pay/status currently on screen
-            source = RSBillsHistory.getFilteredBills() || [];
-          } else if (typeof RSBillsHistory.billInDateRange === 'function') {
-            source = BILLS.filter((b) => RSBillsHistory.billInDateRange(b));
-          }
-        }
-        const paidBills = source.filter((b) => String(b.status || 'paid').toLowerCase() === 'paid');
-        if (!paidBills.length) return toast('No sales data for this range', 'fa-circle-exclamation');
-
-        const settings = window.RS_SETTINGS || {};
-        const sess = window.RS_API && RS_API.session ? RS_API.session() : null;
-        let outletName =
-          settings.set_restaurant_name ||
-          settings.set_outlet_name ||
-          (sess && (sess.tenant_name || sess.business_name)) ||
-          document.querySelector('.user-pill .ur')?.textContent?.split('·')[0]?.trim() ||
-          document.getElementById('manage-tenant-name')?.textContent ||
-          '';
-        if (!outletName || /outlet name/i.test(outletName)) outletName = 'RestroSuite Outlet';
-        
-        // Calculate stats
-        const totalRevenue = paidBills.reduce((sum, b) => sum + (Number(b.amount) || Number(b.total) || 0), 0);
-        const totalOrders = paidBills.length;
-        const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-        
-        // Prefer stored GST; fall back to 5% inclusive estimate
-        const gstFromBills = paidBills.reduce((sum, b) => sum + (Number(b.gst) || 0), 0);
-        const gstCollected = gstFromBills > 0 ? Math.round(gstFromBills) : Math.round(totalRevenue - totalRevenue / 1.05);
-        const netTaxableSales = Math.round(totalRevenue - gstCollected);
-
-        // Payment Breakdown
-        const paymentMethods = {};
-        paidBills.forEach(b => {
-          if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
-            b.tenders.forEach(t => {
-              const method = t.method || 'Cash';
-              paymentMethods[method] = (paymentMethods[method] || 0) + Number(t.amount || 0);
-            });
-          } else {
-            const method = b.pay || b.paymentMethod || 'Cash';
-            paymentMethods[method] = (paymentMethods[method] || 0) + (b.amount || 0);
-          }
-        });
-
-        const paymentBreakdownHtml = Object.entries(paymentMethods).map(([method, amount]) => `
-          <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-            <span>${method}:</span>
-            <span>${rs(amount)}</span>
-          </div>
-        `).join('');
-
-        const now = new Date();
-        const formattedDate = now.toLocaleDateString('en-IN');
-        const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-        const html = `
-          <div style="font-family: 'DM Sans', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
-            <div style="text-align: center; margin-bottom: 10px;">
-              <h2 style="font-family: var(--font-body), system-ui, sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
-              <p style="font-size: 11px; color: #555; margin-top: 2px;">DAILY SALES SUMMARY</p>
-            </div>
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #555; margin-bottom: 8px;">
-              <span>Date: ${formattedDate}</span>
-              <span>Time: ${formattedTime}</span>
-            </div>
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Total Bills:</span>
-                <strong>${totalOrders}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Avg Order Value (AOV):</span>
-                <strong>${rs(aov)}</strong>
-              </div>
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-weight: 600;">
-                <span>PAYMENT BREAKDOWN</span>
-                <span>AMOUNT</span>
-              </div>
-              ${paymentBreakdownHtml}
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Net Taxable Sales:</span>
-                <span>${rs(netTaxableSales)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Total GST (5%):</span>
-                <span>${rs(gstCollected)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: var(--font-body), system-ui, sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
-                <span>GROSS REVENUE:</span>
-                <span>${rs(totalRevenue)}</span>
-              </div>
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="text-align: center; font-size: 11px; color: #777; margin-top: 15px;">
-              *** End of Report ***
-            </div>
-          </div>
-        `;
-
-        if (typeof window.RSPrint === 'function') {
-          window.RSPrint(html, 'Daily Sales Report');
-        } else {
-          const f = document.createElement('iframe');
-          f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-          document.body.appendChild(f);
-          const d = f.contentWindow.document;
-          d.open();
-          d.write(`<!doctype html><html><head><title>Daily Sales Report</title></head><body>${html}</body></html>`);
-          d.close();
-          f.contentWindow.focus();
-          f.contentWindow.print();
-          setTimeout(() => f.remove(), 800);
-        }
-        toast('Day report sent to printer', 'fa-print');
-      };
-    }
+    // 5b. Print sales report is wired in assets/modules/bills-history.js
+    // (printSalesReport — A4/PDF, range-aware). Do not double-bind here.
 
     // 6. GSTR Download
     const btnGSTR = document.getElementById('btn-download-gstr');
