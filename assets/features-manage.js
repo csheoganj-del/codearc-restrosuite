@@ -506,14 +506,38 @@
                       <div id="ing-pick" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto"></div>`,
                 onMount(subModal, subClose) {
                   const q = subModal.querySelector('#ing-q'), box = subModal.querySelector('#ing-pick');
+                  function pretty(n) {
+                    const s = String(n || '');
+                    return /[_-]/.test(s)
+                      ? s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                      : s;
+                  }
                   function draw() {
                     const t = (q.value || '').toLowerCase();
-                    box.innerHTML = list.filter(i => i.name.toLowerCase().includes(t)).map(i => `<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(i.unit)}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(i.name)}</div><div class="si-s">${esc(i.cat)} · ${rs(i.cost)}/${esc(i.unit)}</div></div><span class="si-meta">+ add</span></div>`).join('') || '<div class="sr-empty">No match</div>';
-                    box.querySelectorAll('[data-n]').forEach(el => {
+                    const filtered = list.filter(
+                      (i) =>
+                        String(i.name || '')
+                          .toLowerCase()
+                          .includes(t) ||
+                        pretty(i.name).toLowerCase().includes(t) ||
+                        String(i.cat || '')
+                          .toLowerCase()
+                          .includes(t)
+                    );
+                    box.innerHTML =
+                      filtered
+                        .map((i) => {
+                          const cost = Number(i.cost) || 0;
+                          const costLabel = cost > 0 ? rs(cost) + '/' + esc(i.unit || '') : '₹0 · set cost';
+                          return `<div class="sr-item" data-n="${esc(i.name)}" data-u="${esc(i.unit || 'unit')}"><span class="si-ic"><i class="fa-solid fa-cube"></i></span><div><div class="si-t">${esc(pretty(i.name))}</div><div class="si-s">${esc(i.cat || '—')} · ${costLabel} · stock ${Number(i.stock) || 0}</div></div><span class="si-meta">+ add</span></div>`;
+                        })
+                        .join('') ||
+                      '<div class="sr-empty">No match — add the ingredient under Stock levels first</div>';
+                    box.querySelectorAll('[data-n]').forEach((el) => {
                       el.onclick = () => {
-                        const exists = draft.find(g => g.name === el.dataset.n);
+                        const exists = draft.find((g) => g.name === el.dataset.n);
                         if (!exists) {
-                          draft.push({ name: el.dataset.n, qty: 0.1, unit: el.dataset.u });
+                          draft.push({ name: el.dataset.n, qty: 1, unit: el.dataset.u || 'unit' });
                         }
                         subClose();
                         drawDraft(modal);
@@ -544,18 +568,30 @@
         panes.innerHTML = `
           <div class="panel panel-pad subtab-pane" data-pane="recipes">
             <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-              <h3>Menu Recipes</h3>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div style="font-size:12.5px;color:var(--text-soft)">Link raw ingredients to menu items for stock deduction</div>
-                <button class="btn btn-primary btn-sm" id="bulk-recipe-import"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
+              <div>
+                <h3 style="margin:0">Menu Recipes</h3>
+                <div style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Link stock ingredients so sales auto-deduct (FEFO batches first)</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-all">All</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-linked">Linked</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="recipe-filter-missing">Needs recipe</button>
+                <button type="button" class="btn btn-primary btn-sm" id="bulk-recipe-import"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import</button>
+              </div>
+            </div>
+            <div id="recipe-coverage-bar" class="recipe-coverage-bar" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+              <div class="pos-search" style="max-width:280px;padding:8px 12px;flex:1">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="recipe-search" placeholder="Search menu item or category…" autocomplete="off" aria-label="Search recipes">
               </div>
             </div>
             <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
               <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
-              <div><strong style="color:var(--text)">How deduction works:</strong> when a bill is paid at the POS, every sold item's linked ingredients are automatically deducted from stock (recipe qty &times; items sold). Items without a linked recipe do not deduct anything.</div>
+              <div><strong style="color:var(--text)">How deduction works:</strong> when a bill is paid, each linked ingredient is deducted (recipe qty × sold). Stock uses <b>FEFO</b> — soonest-expiring batch first. Items with no recipe skip deduction.</div>
             </div>
-            <div class="table-scroll"><table class="data-table">
-              <thead><tr><th>Menu Item</th><th>Category</th><th>Plate Cost</th><th>Linked Ingredients</th><th>Actions</th></tr></thead>
+            <div class="table-scroll"><table class="data-table recipe-table">
+              <thead><tr><th>Menu Item</th><th>Category</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Linked ingredients</th><th>Actions</th></tr></thead>
               <tbody id="recipe-list-body"></tbody>
             </table></div>
           </div>
@@ -759,39 +795,236 @@
           };
         }
 
+        function findInvForRecipeLine(g) {
+          const invList = RS.INVENTORY || [];
+          const name = String((g && g.name) || '').toLowerCase();
+          const key = String((g && (g.key || g.name)) || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_|_$/g, '');
+          return (
+            invList.find((i) => i.name && String(i.name).toLowerCase() === name) ||
+            invList.find((i) => i.key && String(i.key).toLowerCase() === key) ||
+            invList.find(
+              (i) =>
+                i.name &&
+                String(i.name)
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '_') === key
+            ) ||
+            null
+          );
+        }
+
+        function plateCost(m) {
+          const ings = (m && m.ingredients) || [];
+          return ings.reduce((sum, g) => {
+            const inv = findInvForRecipeLine(g);
+            const unitCost = inv ? Number(inv.cost) || 0 : 0;
+            return sum + (Number(g.qty) || 0) * unitCost;
+          }, 0);
+        }
+
+        function prettyInvName(raw) {
+          const s = String(raw || '');
+          if (!/[_-]/.test(s)) return s;
+          return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+
+        if (!sec._recipeFilter) sec._recipeFilter = 'all'; // all | linked | missing
+        if (sec._recipeSearch == null) sec._recipeSearch = '';
+
         const recipeListBody = $('#recipe-list-body', panes);
         if (recipeListBody) {
-          recipeListBody.innerHTML = (RS.MENU || []).map(m => {
-            const ings = m.ingredients || [];
-            const cost = ings.reduce((sum, g) => {
-              const inv = (RS.INVENTORY || []).find(i => i.name === g.name);
-              return sum + (g.qty * (inv ? inv.cost : 0));
-            }, 0);
-            return `
-              <tr data-id="${m.id}">
-                <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><b>${esc(m.name)}</b></div></td>
-                <td>${esc(m.cat)}</td>
-                <td class="td-strong">${rs(cost)}</td>
-                <td>
-                  ${ings.length 
-                    ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${ings.map(g => `<span class="pill" style="font-size:11.5px;padding:2px 7px;background:var(--hover);border-color:var(--border)">${esc(g.name)} (${esc(g.qty)} ${esc(g.unit)})</span>`).join('')}</div>`
-                    : `<span style="color:var(--text-mute);font-style:italic">No ingredients linked</span>`
+          const menu = (RS.MENU || []).slice();
+          const linkedN = menu.filter((m) => Array.isArray(m.ingredients) && m.ingredients.length).length;
+          const missingN = menu.length - linkedN;
+          const coverage = menu.length ? Math.round((linkedN / menu.length) * 100) : 0;
+
+          const cov = $('#recipe-coverage-bar', panes);
+          if (cov) {
+            cov.innerHTML = `
+              <span class="pill pill-green" style="padding:4px 10px">${linkedN} linked</span>
+              <span class="pill pill-amber" style="padding:4px 10px">${missingN} need recipe</span>
+              <span class="pill" style="padding:4px 10px">${coverage}% coverage</span>
+              <span class="pill" style="padding:4px 10px">${menu.length} menu items</span>
+              ${
+                missingN
+                  ? `<span style="font-size:12.5px;color:var(--text-soft);align-self:center">Link recipes so POS sales deduct stock automatically.</span>`
+                  : `<span style="font-size:12.5px;color:var(--green);align-self:center;font-weight:600">All menu items have recipes.</span>`
+              }`;
+          }
+
+          const q = String(sec._recipeSearch || '').toLowerCase().trim();
+          let rows = menu;
+          if (sec._recipeFilter === 'linked') {
+            rows = rows.filter((m) => Array.isArray(m.ingredients) && m.ingredients.length);
+          } else if (sec._recipeFilter === 'missing') {
+            rows = rows.filter((m) => !Array.isArray(m.ingredients) || !m.ingredients.length);
+          }
+          if (q) {
+            rows = rows.filter((m) => {
+              const hay = [m.name, m.cat, m.category]
+                .map((x) => String(x || '').toLowerCase())
+                .join(' ');
+              return hay.includes(q);
+            });
+          }
+          // Needs-recipe first when showing all
+          if (sec._recipeFilter === 'all') {
+            rows = rows.slice().sort((a, b) => {
+              const al = Array.isArray(a.ingredients) && a.ingredients.length ? 1 : 0;
+              const bl = Array.isArray(b.ingredients) && b.ingredients.length ? 1 : 0;
+              if (al !== bl) return al - bl;
+              return String(a.name || '').localeCompare(String(b.name || ''));
+            });
+          }
+
+          // Filter chip active styles
+          [
+            ['recipe-filter-all', 'all'],
+            ['recipe-filter-linked', 'linked'],
+            ['recipe-filter-missing', 'missing'],
+          ].forEach(([id, key]) => {
+            const el = $('#' + id, panes);
+            if (el) {
+              el.classList.toggle('active', sec._recipeFilter === key);
+              if (sec._recipeFilter === key) {
+                el.style.borderColor = 'var(--orange)';
+                el.style.color = 'var(--orange)';
+                el.style.fontWeight = '700';
+              } else {
+                el.style.borderColor = '';
+                el.style.color = '';
+                el.style.fontWeight = '';
+              }
+            }
+          });
+
+          const searchEl = $('#recipe-search', panes);
+          if (searchEl && searchEl.value !== sec._recipeSearch) searchEl.value = sec._recipeSearch || '';
+
+          if (!rows.length) {
+            recipeListBody.innerHTML = `<tr><td colspan="7" style="padding:0;border:none">
+              <div class="sr-empty" style="padding:36px 16px">
+                <div style="font-weight:700;margin-bottom:6px">${
+                  q || sec._recipeFilter !== 'all' ? 'No menu items match' : 'No menu items yet'
+                }</div>
+                <div style="font-size:13px;color:var(--text-soft);max-width:380px;margin:0 auto 12px">
+                  ${
+                    !menu.length
+                      ? 'Add dishes in Menu Editor first, then link ingredients here.'
+                      : sec._recipeFilter === 'missing'
+                        ? 'All items already have recipes — switch to All or Linked.'
+                        : 'Try another search or filter.'
                   }
-                </td>
+                </div>
+                ${
+                  !menu.length
+                    ? '<button type="button" class="btn btn-primary btn-sm" id="recipe-go-menu"><i class="fa-solid fa-utensils"></i> Open Menu Editor</button>'
+                    : ''
+                }
+              </div>
+            </td></tr>`;
+            const go = $('#recipe-go-menu', panes);
+            if (go)
+              go.onclick = () => {
+                if (RS.activateTab) RS.activateTab('editor-tab');
+              };
+          } else {
+            recipeListBody.innerHTML = rows
+              .map((m) => {
+                const ings = Array.isArray(m.ingredients) ? m.ingredients : [];
+                const cost = plateCost(m);
+                const sell = Number(m.price || m.salePrice || 0) || 0;
+                const margin =
+                  sell > 0 && cost > 0 ? Math.round((1 - cost / sell) * 100) : sell > 0 && !ings.length ? null : sell > 0 ? 100 : null;
+                const marginHtml =
+                  margin == null
+                    ? `<span style="color:var(--text-mute)">—</span>`
+                    : `<span class="stock-dot ${margin >= 50 ? 'stock-ok' : margin >= 25 ? 'stock-low' : 'stock-out'}">${margin}%</span>`;
+                const missingCost = ings.some((g) => {
+                  const inv = findInvForRecipeLine(g);
+                  return !inv || !(Number(inv.cost) > 0);
+                });
+                const ingsHtml = ings.length
+                  ? `<div style="display:flex;flex-wrap:wrap;gap:4px">${ings
+                      .map((g) => {
+                        const inv = findInvForRecipeLine(g);
+                        const missing = !inv;
+                        const zeroCost = inv && !(Number(inv.cost) > 0);
+                        const tip = missing
+                          ? 'Not in stock list'
+                          : zeroCost
+                            ? 'In stock but unit cost is ₹0'
+                            : 'Linked';
+                        return `<span class="pill" title="${esc(tip)}" style="font-size:11.5px;padding:2px 7px;${
+                          missing
+                            ? 'border-color:var(--red);color:var(--red)'
+                            : zeroCost
+                              ? 'border-color:var(--amber);color:var(--amber)'
+                              : 'background:var(--hover);border-color:var(--border)'
+                        }">${esc(prettyInvName(g.name))} (${esc(g.qty)} ${esc(g.unit || '')})</span>`;
+                      })
+                      .join('')}</div>`
+                  : `<span class="recipe-missing-label">No ingredients linked</span>`;
+                return `
+              <tr data-id="${esc(m.id)}" class="${ings.length ? 'recipe-row-linked' : 'recipe-row-missing'}">
+                <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg ? '' : 'nonveg'}"></span><b>${esc(m.name)}</b></div></td>
+                <td style="font-size:12px;color:var(--text-soft)">${esc(m.cat || '—')}</td>
+                <td class="td-strong">${sell ? rs(sell) : '—'}</td>
+                <td class="td-strong">${
+                  ings.length
+                    ? cost
+                      ? rs(Math.round(cost * 100) / 100)
+                      : missingCost
+                        ? `<span style="color:var(--amber)" title="Set unit costs on ingredients">₹0 · set costs</span>`
+                        : rs(0)
+                    : `<span style="color:var(--text-mute)">—</span>`
+                }</td>
+                <td>${marginHtml}</td>
+                <td style="max-width:280px">${ingsHtml}</td>
                 <td>
-                  <button class="btn btn-ghost btn-sm" data-edit-rec="${m.id}" style="padding:4px 10px;font-size:12px;gap:4px;"><i class="fa-solid fa-flask"></i> Edit Recipe</button>
+                  <button type="button" class="btn ${ings.length ? 'btn-ghost' : 'btn-primary'} btn-sm" data-edit-rec="${esc(m.id)}" style="padding:4px 10px;font-size:12px;gap:4px;">
+                    <i class="fa-solid fa-flask"></i> ${ings.length ? 'Edit recipe' : 'Add recipe'}
+                  </button>
                 </td>
               </tr>`;
-          }).join('');
+              })
+              .join('');
+          }
 
-          recipeListBody.querySelectorAll('[data-edit-rec]').forEach(b => {
+          recipeListBody.querySelectorAll('[data-edit-rec]').forEach((b) => {
             b.onclick = () => {
-              const m = RS.MENU.find(x => String(x.id) === String(b.dataset.editRec));
-              if (m) {
-                openRecipeEditModal(m);
-              }
+              const m = (RS.MENU || []).find((x) => String(x.id) === String(b.dataset.editRec));
+              if (m) openRecipeEditModal(m);
             };
           });
+
+          const wireFilter = (id, key) => {
+            const el = $('#' + id, panes);
+            if (!el || el._rsWired) return;
+            el._rsWired = true;
+            el.onclick = () => {
+              sec._recipeFilter = key;
+              drawPanes();
+            };
+          };
+          wireFilter('recipe-filter-all', 'all');
+          wireFilter('recipe-filter-linked', 'linked');
+          wireFilter('recipe-filter-missing', 'missing');
+
+          if (searchEl && !searchEl._rsWired) {
+            searchEl._rsWired = true;
+            let t;
+            searchEl.addEventListener('input', () => {
+              clearTimeout(t);
+              t = setTimeout(() => {
+                sec._recipeSearch = searchEl.value || '';
+                drawPanes();
+              }, 140);
+            });
+          }
         }
 
         // ── Bulk recipe import: paste CSV lines, link many recipes at once ──

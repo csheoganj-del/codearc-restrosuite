@@ -1565,6 +1565,24 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .inv-expiry-banner {
   margin-bottom: 12px;
 }
+.recipe-coverage-bar .pill { font-weight: 700; }
+.recipe-missing-label {
+  color: var(--amber);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.recipe-row-missing {
+  background: color-mix(in srgb, var(--amber) 4%, transparent);
+}
+.recipe-table td { vertical-align: middle; }
+#recipe-filter-all.active,
+#recipe-filter-linked.active,
+#recipe-filter-missing.active {
+  border-color: var(--orange) !important;
+  color: var(--orange) !important;
+  font-weight: 700 !important;
+}
 
 /* Bills filters + 10/10 history chrome */
 .bills-toolbar { flex-wrap: wrap; gap: 10px; align-items: center; }
