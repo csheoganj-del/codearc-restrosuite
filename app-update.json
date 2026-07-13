@@ -1,12 +1,12 @@
 {
-  "version": "v179-20260713-receipt-text-font",
+  "version": "v180-20260713-receipt-stable",
   "date": "2026-07-13",
-  "title": "Fix Bill settled garbled text and font flash",
-  "summary": "Corrupted Unicode (arrow/dash) from file restore showed as fA etc. Receipt fonts now match system stack immediately so Inter/monospace no longer swaps after a second. Cleaner date/time on receipt.",
+  "title": "Bill settled text + font flash fixed for good",
+  "summary": "Garbled Open Gateway / Bill synced text came from Unicode symbols misread as Latin-1. Font swap after ~1s was PDF warm injecting global CSS over the live receipt. Export styles are now scoped; banners use plain ASCII only.",
   "highlights": [
-    "Fixed Open Gateway and bill synced text encoding",
-    "Receipt uses system-ui + Georgia (no late web-font swap)",
-    "Readable local date/time instead of raw ISO",
-    "Deferred PDF warm to avoid jank on open"
+    "Bill synced / Open Gateway use plain ASCII (no mojibake)",
+    "PDF export CSS scoped so live preview fonts never jump",
+    "Receipt body uses stable system-ui + Georgia from first paint",
+    "Hard refresh once so service worker picks up v180"
   ]
 }

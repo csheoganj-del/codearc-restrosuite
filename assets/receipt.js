@@ -10,24 +10,26 @@
   const PDF_SCALE = 2; // balanced quality vs CPU/RAM
   let libsPreloaded = false;
 
+  // MUST be scoped under [data-rs-receipt-export] — unscoped rules injected during
+  // PDF warm would restyle the LIVE Bill settled preview (font flash after ~1s).
   const EXPORT_CSS = `
-    .receipt-paper {
+    [data-rs-receipt-export] .receipt-paper {
       background: #fbfaf7; color: #16151c; border-radius: 10px;
       padding: 22px 22px 26px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       max-width: 320px; margin: 0 auto; position: relative; box-sizing: border-box;
     }
-    .rcp-center { text-align: center; }
-    .rcp-logo { font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 20px; letter-spacing: -.02em; color: #16151c; }
-    .rcp-sub { font-size: 11px; color: #6b6960; margin-top: 2px; }
-    .rcp-hr { border: 0; border-top: 1px dashed #c9c6bd; margin: 13px 0; }
-    .rcp-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; gap: 8px; }
-    .rcp-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; color: #16151c; gap: 8px; }
-    .rcp-line .q { color: #6b6960; }
-    .rcp-tot { display: flex; justify-content: space-between; font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c; }
-    .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
-    .rcp-foot b { color: #16151c; }
-    .rcp-qr-wrap { margin-top:10px;padding-top:10px;border-top:1px dashed #c9c6bd;display:flex;flex-direction:column;align-items:center; }
-    .rcp-qr-wrap img { width:100px;height:100px;display:block; }
+    [data-rs-receipt-export] .rcp-center { text-align: center; }
+    [data-rs-receipt-export] .rcp-logo { font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 20px; letter-spacing: -.02em; color: #16151c; }
+    [data-rs-receipt-export] .rcp-sub { font-size: 11px; color: #6b6960; margin-top: 2px; }
+    [data-rs-receipt-export] .rcp-hr { border: 0; border-top: 1px dashed #c9c6bd; margin: 13px 0; }
+    [data-rs-receipt-export] .rcp-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; gap: 8px; }
+    [data-rs-receipt-export] .rcp-line { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; color: #16151c; gap: 8px; }
+    [data-rs-receipt-export] .rcp-line .q { color: #6b6960; }
+    [data-rs-receipt-export] .rcp-tot { display: flex; justify-content: space-between; font-family: Georgia, 'Times New Roman', serif; font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c; }
+    [data-rs-receipt-export] .rcp-foot { text-align: center; font-size: 11px; color: #6b6960; margin-top: 14px; }
+    [data-rs-receipt-export] .rcp-foot b { color: #16151c; }
+    [data-rs-receipt-export] .rcp-qr-wrap { margin-top:10px;padding-top:10px;border-top:1px dashed #c9c6bd;display:flex;flex-direction:column;align-items:center; }
+    [data-rs-receipt-export] .rcp-qr-wrap img { width:100px;height:100px;display:block; }
   `;
 
   function esc(v) {
@@ -169,7 +171,7 @@
     const itemsHTML = m.items.map((i) => {
       const rateLabel = isIreland ? (i.taxCategory === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
       const note = i.note || '';
-      return `<div class="rcp-line"><span><span class="q">${i.qty}× </span>${esc(i.name)}${isIreland ? ` <small style="font-size:10px;color:#6b6960">(${rateLabel})</small>` : ''}${note ? `<div style="font-size:10.5px;color:#6b6960;margin-top:1px">※ ${esc(note)}</div>` : ''}</span><span>${$(i.price * i.qty)}</span></div>`;
+      return `<div class="rcp-line"><span><span class="q">${i.qty}x </span>${esc(i.name)}${isIreland ? ` <small style="font-size:10px;color:#6b6960">(${rateLabel})</small>` : ''}${note ? `<div style="font-size:10.5px;color:#6b6960;margin-top:1px">* ${esc(note)}</div>` : ''}</span><span>${$(i.price * i.qty)}</span></div>`;
     }).join('');
 
     let taxBreakdownHTML = '';
@@ -302,7 +304,7 @@
     const rsFn = getRs();
     const $ = (n) => money(n, rsFn);
     return [outlet.name || 'RestroSuite', m.no ? `Bill ${m.no}` : '', m.grand != null ? `Total ${$(m.grand)}` : '']
-      .filter(Boolean).join(' · ');
+      .filter(Boolean).join(' | ');
   }
 
   function loadScript(src) {
