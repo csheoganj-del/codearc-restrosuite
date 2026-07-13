@@ -75,7 +75,54 @@
     { keys: ['curry', 'gravy', 'masala'], stock: ['onion', 'tomato', 'oil', 'masala', 'cream', 'butter'], qty: 0.05, unit: 'kg' },
     { keys: ['egg', 'omelette', 'omlette'], stock: ['egg'], qty: 2, unit: 'pcs' },
     { keys: ['fries', 'french fry', 'chips'], stock: ['potato', 'oil'], qty: 0.15, unit: 'kg' },
+    // Packaging & service items sold/used with food
+    { keys: ['parcel', 'takeaway', 'take away', 'delivery', 'online', 'swiggy', 'zomato'], stock: ['box', 'container', 'bag', 'carry bag', 'foil', 'napkin'], qty: 1, unit: 'pcs' },
+    { keys: ['thali', 'combo', 'meal box', 'family pack', 'party pack'], stock: ['box', 'container', 'bag', 'napkin', 'spoon'], qty: 1, unit: 'pcs' },
+    { keys: ['burger', 'wrap', 'roll', 'sandwich'], stock: ['paper', 'foil', 'butter paper', 'bag', 'wrapper'], qty: 1, unit: 'pcs' },
+    { keys: ['pizza'], stock: ['box', 'pizza box'], qty: 1, unit: 'pcs' },
+    { keys: ['juice', 'shake', 'lassi', 'mocktail', 'cold drink', 'beverage'], stock: ['cup', 'straw', 'lid', 'glass'], qty: 1, unit: 'pcs' },
+    { keys: ['ice cream', 'dessert cup'], stock: ['cup', 'spoon', 'lid'], qty: 1, unit: 'pcs' },
   ];
+
+  function isPackagingLike(item) {
+    const hay = norm((item && item.cat) + ' ' + (item && item.name));
+    return /packag|dispos|box|bag|foil|napkin|tissue|container|straw|spoon|fork|lid|cup|wrapper|paper|carry|plastic|aluminium|aluminum/.test(
+      hay
+    );
+  }
+
+  function packagingSuggestions(dishName) {
+    const name = norm(dishName);
+    const pack = inventory().filter(isPackagingLike);
+    if (!pack.length) return [];
+    // Prefer rule-based matches first
+    const fromRules = suggestIngredients(dishName).filter((s) => {
+      const inv = inventory().find((i) => i.name === s.name);
+      return inv && isPackagingLike(inv);
+    });
+    if (fromRules.length) return fromRules;
+    // For any dish, lightly suggest common packaging if stock has them (qty 1)
+    const common = ['box', 'bag', 'napkin', 'container', 'foil', 'spoon'];
+    const out = [];
+    const seen = {};
+    common.forEach((frag) => {
+      const hit = pack.find((p) => norm(p.name).includes(frag) || norm(p.cat).includes(frag));
+      if (hit && !seen[hit.name]) {
+        seen[hit.name] = true;
+        out.push({ name: hit.name, qty: 1, unit: hit.unit || 'pcs', why: 'packaging' });
+      }
+    });
+    // If dish name hints takeaway, surface more packaging
+    if (/parcel|take|deliver|combo|thali|box/.test(name)) {
+      pack.slice(0, 6).forEach((p) => {
+        if (!seen[p.name]) {
+          seen[p.name] = true;
+          out.push({ name: p.name, qty: 1, unit: p.unit || 'pcs', why: 'packaging' });
+        }
+      });
+    }
+    return out.slice(0, 6);
+  }
 
   function norm(s) {
     return String(s || '')
@@ -254,12 +301,12 @@
           </div>
           <div class="klc-example">
             <div class="klc-ex-title">Example</div>
-            <p>Customer buys <b>1× Basmati Rice</b> → Recipe says “uses 150 g rice” → Stock of rice goes down by 150 g automatically.</p>
-            <p class="klc-warn"><i class="fa-solid fa-triangle-exclamation"></i> If a dish has <b>no recipe</b>, selling it does <b>not</b> change stock. That is why the list showed “Not linked to stock yet”.</p>
+            <p>Customer buys <b>1× Biryani parcel</b> → Recipe says “150 g rice + 1 takeaway box + 1 napkin” → those stock lines go down automatically.</p>
+            <p class="klc-warn"><i class="fa-solid fa-triangle-exclamation"></i> If a dish has <b>no recipe</b>, selling it does <b>not</b> change stock — food or packaging.</p>
           </div>
           <ol class="klc-steps">
-            <li><b>Stock</b> — add kitchen items (rice, chicken, rolls…)</li>
-            <li><b>Recipe</b> — for each dish, say which stock items it uses</li>
+            <li><b>Stock</b> — food (rice, chicken) <b>and</b> packing (boxes, bags, spoons…)</li>
+            <li><b>Recipe</b> — for each dish, say which stock items it uses (including packaging)</li>
             <li><b>Sell</b> — POS bill payment then reduces stock for you</li>
           </ol>
         </div>`,
@@ -311,8 +358,8 @@
             'Add your store room (Stock)',
             s.hasStock,
             s.hasStock
-              ? `<b>${s.invN}</b> items in stock — rice, oil, chicken…`
-              : 'List what you keep in the kitchen. Without this, recipes have nothing to use.',
+              ? `<b>${s.invN}</b> items — food, packaging, disposables…`
+              : 'List what you keep: food (rice, oil) <b>and</b> packing (boxes, bags, napkins). Without this, recipes have nothing to use.',
             'Add stock',
             'stock'
           )}
@@ -360,8 +407,12 @@
           if (!s.hasStock) {
             goInventoryTab('stock');
             setTimeout(() => {
-              const b = document.getElementById('btn-add-ingredient');
-              if (b) b.click();
+              if (global.RSInventoryUI && RSInventoryUI.openAddStockModal) {
+                RSInventoryUI.openAddStockModal({ typeId: 'food' });
+              } else {
+                const b = document.getElementById('btn-add-ingredient');
+                if (b) b.click();
+              }
             }, 220);
           } else if (!s.hasMenu) {
             goMenuEditor();
@@ -503,22 +554,46 @@
 
     function suggestionsHtml() {
       if (!chosen) return '';
-      const sug = suggestIngredients(chosen.name).filter((s) => !draft.find((d) => d.name === s.name));
-      if (!sug.length) return '';
+      const foodSug = suggestIngredients(chosen.name).filter((s) => {
+        if (draft.find((d) => d.name === s.name)) return false;
+        const inv = inventory().find((i) => i.name === s.name);
+        return !inv || !isPackagingLike(inv);
+      });
+      const packSug = packagingSuggestions(chosen.name).filter((s) => !draft.find((d) => d.name === s.name));
+      if (!foodSug.length && !packSug.length) {
+        return `<div class="klc-suggest klc-suggest-muted">
+          <div class="klc-suggest-title"><i class="fa-solid fa-box"></i> Tip</div>
+          <p class="klc-p" style="margin:0">You can also add <b>packaging</b> (boxes, bags, foil) and <b>disposables</b> (napkins, spoons) from the store room — same as food.</p>
+        </div>`;
+      }
+      function chips(list) {
+        return list
+          .map(
+            (s) =>
+              `<button type="button" class="klc-chip" data-sug-n="${esc(s.name)}" data-sug-q="${esc(s.qty)}" data-sug-u="${esc(s.unit || '')}" title="${esc(s.why || '')}">
+                <i class="fa-solid fa-plus"></i> ${esc(pretty(s.name))}
+                <span class="klc-chip-meta">${esc(s.qty)} ${esc(s.unit || '')}</span>
+              </button>`
+          )
+          .join('');
+      }
       return `<div class="klc-suggest" id="klc-suggest">
-        <div class="klc-suggest-title"><i class="fa-solid fa-lightbulb"></i> Suggested for “${esc(chosen.name)}”</div>
-        <div class="klc-suggest-chips">
-          ${sug
-            .map(
-              (s) =>
-                `<button type="button" class="klc-chip" data-sug-n="${esc(s.name)}" data-sug-q="${esc(s.qty)}" data-sug-u="${esc(s.unit || '')}" title="${esc(s.why || '')}">
-                  <i class="fa-solid fa-plus"></i> ${esc(pretty(s.name))}
-                  <span class="klc-chip-meta">${esc(s.qty)} ${esc(s.unit || '')}</span>
-                </button>`
-            )
-            .join('')}
-          <button type="button" class="btn btn-ghost btn-sm" id="klc-add-all-sug" style="margin-left:2px">Add all</button>
-        </div>
+        ${
+          foodSug.length
+            ? `<div class="klc-suggest-title"><i class="fa-solid fa-carrot"></i> Food suggested for “${esc(chosen.name)}”</div>
+        <div class="klc-suggest-chips">${chips(foodSug)}
+          <button type="button" class="btn btn-ghost btn-sm" id="klc-add-all-sug">Add all food</button>
+        </div>`
+            : ''
+        }
+        ${
+          packSug.length
+            ? `<div class="klc-suggest-title" style="margin-top:${foodSug.length ? '10' : '0'}px"><i class="fa-solid fa-box"></i> Packaging &amp; disposables</div>
+        <div class="klc-suggest-chips">${chips(packSug)}
+          <button type="button" class="btn btn-ghost btn-sm" id="klc-add-all-pack">Add all pack</button>
+        </div>`
+            : ''
+        }
       </div>`;
     }
 
@@ -553,7 +628,7 @@
         return `
           <div class="klc-wiz">
             <div class="klc-wiz-step">Step 2 of 3 · What goes into <b>${esc(chosen.name)}</b></div>
-            <p class="klc-p">Add items from your <b>store room (stock)</b>. We suggest matches — adjust quantities for 1 plate.</p>
+            <p class="klc-p">Add from store room: <b>food</b> and also <b>boxes, bags, napkins</b> if this dish uses them. Adjust qty for <b>1 plate / 1 order</b>.</p>
             ${suggestionsHtml()}
             ${copyBarHtml()}
             <div id="klc-draft">${draftHtml()}</div>
@@ -590,37 +665,66 @@
 
     function openPicker(onPick) {
       const list = inventory();
+      let filterMode = 'all'; // all | food | pack
       global.RSModal.open({
         title: 'Pick from store room',
-        sub: 'These are your Stock level items',
+        sub: 'Food · packaging · disposables · anything in stock',
         icon: 'fa-boxes-stacked',
         size: 'sm',
-        body: `<input class="form-input" id="klc-ing-q" placeholder="Search stock…" style="margin-bottom:10px">
+        body: `
+          <div class="klc-pick-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            <button type="button" class="btn btn-ghost btn-sm active" data-pf="all">All</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-pf="food">Food</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-pf="pack">Packaging</button>
+          </div>
+          <input class="form-input" id="klc-ing-q" placeholder="Search stock…" style="margin-bottom:10px">
           <div id="klc-ing-box" class="klc-pick-list"></div>`,
         foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>`,
         onMount(sm, sc) {
           sm.querySelector('[data-x]').onclick = sc;
           const q = sm.querySelector('#klc-ing-q');
           const box = sm.querySelector('#klc-ing-box');
+          sm.querySelectorAll('[data-pf]').forEach((btn) => {
+            btn.onclick = () => {
+              filterMode = btn.getAttribute('data-pf') || 'all';
+              sm.querySelectorAll('[data-pf]').forEach((b) => {
+                b.classList.toggle('active', b === btn);
+                if (b === btn) {
+                  b.style.borderColor = 'var(--orange)';
+                  b.style.color = 'var(--orange)';
+                } else {
+                  b.style.borderColor = '';
+                  b.style.color = '';
+                }
+              });
+              draw();
+            };
+          });
           function draw() {
             const t = (q.value || '').toLowerCase();
-            const f = list.filter(
+            let f = list.filter(
               (i) =>
                 pretty(i.name).toLowerCase().includes(t) ||
                 String(i.name || '')
                   .toLowerCase()
+                  .includes(t) ||
+                String(i.cat || '')
+                  .toLowerCase()
                   .includes(t)
             );
+            if (filterMode === 'pack') f = f.filter(isPackagingLike);
+            else if (filterMode === 'food') f = f.filter((i) => !isPackagingLike(i));
             box.innerHTML =
               f
                 .map(
                   (i) =>
                     `<button type="button" class="klc-pick" data-n="${esc(i.name)}" data-u="${esc(i.unit || 'unit')}">
                   <span class="klc-pick-t">${esc(pretty(i.name))}</span>
-                  <span class="klc-pick-s">stock ${Number(i.stock) || 0} ${esc(i.unit || '')}</span>
+                  <span class="klc-pick-s">${esc(i.cat || 'Stock')} · ${Number(i.stock) || 0} ${esc(i.unit || '')}</span>
                 </button>`
                 )
-                .join('') || '<div class="sr-empty" style="padding:16px">No stock items — add under Stock levels</div>';
+                .join('') ||
+              '<div class="sr-empty" style="padding:16px">No stock items — add food or packaging under Stock levels</div>';
             box.querySelectorAll('[data-n]').forEach((el) => {
               el.onclick = () => {
                 onPick({ name: el.getAttribute('data-n'), unit: el.getAttribute('data-u') || 'unit', qty: 1 });
@@ -773,15 +877,34 @@
             const addAll = modal.querySelector('#klc-add-all-sug');
             if (addAll)
               addAll.onclick = () => {
-                const sug = suggestIngredients(chosen.name);
+                const sug = suggestIngredients(chosen.name).filter((s) => {
+                  const inv = inventory().find((i) => i.name === s.name);
+                  return !inv || !isPackagingLike(inv);
+                });
                 sug.forEach((s) => {
                   if (!draft.find((g) => g.name === s.name)) {
                     draft.push({ name: s.name, qty: s.qty, unit: s.unit });
                   }
                 });
-                if (!sug.length) toast('No suggestions match your stock yet', 'fa-circle-info');
+                if (!sug.length) toast('No food suggestions match your stock yet', 'fa-circle-info');
                 else {
-                  toast('Added ' + sug.length + ' suggestion(s) — check quantities', 'fa-lightbulb');
+                  toast('Added ' + sug.length + ' food item(s) — check quantities', 'fa-lightbulb');
+                  close();
+                  remount();
+                }
+              };
+            const addAllPack = modal.querySelector('#klc-add-all-pack');
+            if (addAllPack)
+              addAllPack.onclick = () => {
+                const sug = packagingSuggestions(chosen.name);
+                sug.forEach((s) => {
+                  if (!draft.find((g) => g.name === s.name)) {
+                    draft.push({ name: s.name, qty: s.qty, unit: s.unit });
+                  }
+                });
+                if (!sug.length) toast('Add packaging items under Stock first', 'fa-box');
+                else {
+                  toast('Added packaging — each sale will use these', 'fa-box');
                   close();
                   remount();
                 }

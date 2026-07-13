@@ -621,12 +621,12 @@
           <div class="sr-empty" style="padding:40px 20px">
             <i class="fa-solid fa-boxes-stacked" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i>
             <div style="font-weight:700;color:var(--text);margin-bottom:4px">${
-              hasFilters ? 'No ingredients match filters' : 'No stock items yet'
+              hasFilters ? 'No stock items match filters' : 'No stock items yet'
             }</div>
-            <div style="color:var(--text-soft);font-size:13px;max-width:360px;margin:0 auto 14px;line-height:1.45">${
+            <div style="color:var(--text-soft);font-size:13px;max-width:380px;margin:0 auto 14px;line-height:1.45">${
               hasFilters
                 ? 'Clear search / category / status filters to see full stock.'
-                : 'Add ingredients to track min levels, reorders, and plate costing. Import CSV or cloud sync fills this list.'
+                : 'Add food, packaging (boxes, bags), disposables (napkins, spoons), and other kitchen supplies. Link them on recipes so sales reduce stock.'
             }</div>
             <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
               ${
@@ -634,7 +634,8 @@
                   ? '<button type="button" class="btn btn-ghost btn-sm" id="inv-clear-filters"><i class="fa-solid fa-filter-circle-xmark"></i> Clear filters</button>'
                   : ''
               }
-              <button type="button" class="btn btn-primary btn-sm" id="inv-empty-add"><i class="fa-solid fa-plus"></i> Add ingredient</button>
+              <button type="button" class="btn btn-primary btn-sm" id="inv-empty-add"><i class="fa-solid fa-plus"></i> Add stock item</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="inv-empty-pack"><i class="fa-solid fa-box"></i> Add packaging</button>
             </div>
           </div>
         </td></tr>`;
@@ -652,9 +653,12 @@
         const add = document.getElementById('inv-empty-add');
         if (add)
           add.onclick = () => {
-            const btn = document.getElementById('btn-add-ingredient');
-            if (btn) btn.click();
-            else toast('Use Add ingredient in the toolbar', 'fa-plus');
+            openAddStockModal({ typeId: 'food' });
+          };
+        const addPack = document.getElementById('inv-empty-pack');
+        if (addPack)
+          addPack.onclick = () => {
+            openAddStockModal({ typeId: 'packaging' });
           };
       } else {
       invBody.innerHTML = filtered
@@ -697,7 +701,7 @@
           <td>${i.min} ${_e(i.unit)}</td>
           <td>${costHtml}</td>
           <td><span class="stock-dot ${statusCls}">${_e(statusLabel)}</span></td>
-          <td><div class="row-actions"><button type="button" class="icon-act go" title="Raise purchase order / restock with expiry" aria-label="Restock ${_e(pretty)}"><i class="fa-solid fa-truck"></i></button><button type="button" class="icon-act inv-edit" title="Edit ingredient" aria-label="Edit ${_e(pretty)}"><i class="fa-solid fa-pen"></i></button></div></td>
+          <td><div class="row-actions"><button type="button" class="icon-act go" title="Raise purchase order / restock with expiry" aria-label="Restock ${_e(pretty)}"><i class="fa-solid fa-truck"></i></button><button type="button" class="icon-act inv-edit" title="Edit stock item" aria-label="Edit ${_e(pretty)}"><i class="fa-solid fa-pen"></i></button></div></td>
         </tr>`;
         })
         .join('');
@@ -857,12 +861,40 @@
             return;
           }
 
+          const catOpts = [
+            'Food',
+            'Dairy',
+            'Meat & seafood',
+            'Produce',
+            'Spices & dry',
+            'Beverages',
+            'Packaging',
+            'Disposables',
+            'Cleaning',
+            'Fuel & utilities',
+            'Other',
+            'General',
+          ];
+          const curCat = inv.cat || 'General';
+          const catSelect =
+            catOpts
+              .map((c) => `<option value="${_e(c)}" ${c === curCat ? 'selected' : ''}>${_e(c)}</option>`)
+              .join('') +
+            (!catOpts.includes(curCat)
+              ? `<option value="${_e(curCat)}" selected>${_e(curCat)}</option>`
+              : '') +
+            '<option value="__custom__">+ Custom…</option>';
+
           const body = `
             <div style="display:flex;flex-direction:column;gap:14px">
-              <div><label class="fl">Ingredient name</label><input class="form-input" id="edit-ing-name" value="${_e(inv.name)}"></div>
+              <div><label class="fl">Item name</label><input class="form-input" id="edit-ing-name" value="${_e(inv.name)}"></div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Category</label><input class="form-input" id="edit-ing-cat" value="${_e(inv.cat || '')}"></div>
-                <div><label class="fl">Unit</label><input class="form-input" id="edit-ing-unit" value="${_e(inv.unit || '')}"></div>
+                <div>
+                  <label class="fl">Category</label>
+                  <select class="form-input" id="edit-ing-cat">${catSelect}</select>
+                  <input class="form-input" id="edit-ing-cat-custom" placeholder="Custom category" style="display:none;margin-top:6px">
+                </div>
+                <div><label class="fl">Unit</label><input class="form-input" id="edit-ing-unit" value="${_e(inv.unit || '')}" placeholder="kg / pcs / pack"></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div><label class="fl">Current stock</label><input class="form-input" id="edit-ing-stock" type="number" min="0" value="${inv.stock}"></div>
@@ -872,38 +904,50 @@
                 <div><label class="fl">Unit cost (${rs(1).replace(/[\d.,]/g, '').trim() || '₹'})</label><input class="form-input" id="edit-ing-cost" type="number" min="0" step="any" value="${inv.cost}"></div>
                 <div><label class="fl">Supplier</label><input class="form-input" id="edit-ing-supplier" value="${_e(inv.supplier || inv.vendor || '')}" placeholder="Optional"></div>
               </div>
+              <p style="margin:0;font-size:12px;color:var(--text-soft);line-height:1.45">Tip: packaging &amp; disposables work like food — link them on a dish recipe so each sale reduces box/bag/napkin stock.</p>
             </div>`;
 
           RSModal.open({
-            title: 'Edit ingredient',
-            sub: 'Update ' + inv.name,
+            title: 'Edit stock item',
+            sub: 'Food, packaging, or any kitchen supply',
             icon: 'fa-pen',
             size: 'sm',
             body,
-            foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-danger" style="flex:0" data-delete title="Remove ingredient"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-circle-check"></i> Save changes</button>`,
+            foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-danger" style="flex:0" data-delete title="Remove from stock"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-circle-check"></i> Save changes</button>`,
             onMount(modal, close) {
+              const catSel = modal.querySelector('#edit-ing-cat');
+              const catCustom = modal.querySelector('#edit-ing-cat-custom');
+              if (catSel)
+                catSel.onchange = () => {
+                  if (catSel.value === '__custom__') {
+                    catCustom.style.display = '';
+                    catCustom.focus();
+                  } else catCustom.style.display = 'none';
+                };
               modal.querySelector('[data-cancel]').onclick = close;
               modal.querySelector('[data-delete]').onclick = async () => {
                 close();
-                setOperationStatus('Removing ingredient...');
+                setOperationStatus('Removing stock item...');
                 try {
                   const idx = INVENTORY.findIndex((x) => x.id === inv.id);
                   if (idx > -1) INVENTORY.splice(idx, 1);
                   if (global.RS_DB) await RS_DB.del('inventory', inv.id);
-                  finishOperationStatus('Ingredient removed');
+                  finishOperationStatus('Stock item removed');
                   toast(`${inv.name} removed from inventory`, 'fa-circle-check');
                   renderInventory();
                 } catch (e) {
-                  console.warn('Failed to remove ingredient', e);
-                  finishOperationStatus('Failed to remove ingredient', 'error');
-                  toast('Could not remove ingredient -- try again', 'fa-circle-exclamation');
+                  console.warn('Failed to remove stock item', e);
+                  finishOperationStatus('Failed to remove item', 'error');
+                  toast('Could not remove item -- try again', 'fa-circle-exclamation');
                 }
               };
               modal.querySelector('[data-confirm]').onclick = async () => {
                 const newName = modal.querySelector('#edit-ing-name').value.trim();
-                if (!newName) return toast('Enter ingredient name', 'fa-circle-exclamation');
+                if (!newName) return toast('Enter item name', 'fa-circle-exclamation');
                 inv.name = newName;
-                inv.cat = modal.querySelector('#edit-ing-cat').value.trim() || 'General';
+                let cat = modal.querySelector('#edit-ing-cat').value;
+                if (cat === '__custom__') cat = (catCustom.value || '').trim() || 'Other';
+                inv.cat = cat || 'General';
                 inv.unit = modal.querySelector('#edit-ing-unit').value.trim() || 'unit';
                 inv.stock = +modal.querySelector('#edit-ing-stock').value || 0;
                 inv.min = +modal.querySelector('#edit-ing-min').value || 0;
@@ -913,7 +957,7 @@
                 setOperationStatus('Saving changes...');
                 try {
                   if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
-                  finishOperationStatus('Ingredient updated');
+                  finishOperationStatus('Stock item updated');
                   toast(`${displayInvName(inv.name)} updated · synced`, 'fa-circle-check');
                   renderInventory();
                 } catch (e) {
@@ -1110,70 +1154,228 @@
       });
     }
 
-    const addIngBtn = $('#btn-add-ingredient');
-    if (addIngBtn && !addIngBtn.dataset.wired) {
-      addIngBtn.dataset.wired = '1';
-      addIngBtn.onclick = () => {
-        if (!global.RSModal) return;
-        RSModal.open({
-          title: 'Add ingredient',
-          sub: 'Add a raw material to inventory',
-          icon: 'fa-cube',
-          size: 'sm',
-          body: `
-            <div style="display:flex;flex-direction:column;gap:14px">
-              <div><label class="fl">Ingredient name</label><input class="form-input" id="add-ing-name" placeholder="e.g. Paneer"></div>
+    // Stock types: food + packaging + disposables + cleaning + other (all reduce on recipe link)
+    const STOCK_TYPE_PRESETS = [
+      { id: 'food', label: 'Food / raw', icon: 'fa-carrot', cat: 'Food', unit: 'kg', ph: 'e.g. Paneer, Basmati rice' },
+      { id: 'packaging', label: 'Packaging', icon: 'fa-box', cat: 'Packaging', unit: 'pcs', ph: 'e.g. Takeaway box, foil' },
+      { id: 'disposables', label: 'Disposables', icon: 'fa-spoon', cat: 'Disposables', unit: 'pcs', ph: 'e.g. Napkin, spoon set' },
+      { id: 'cleaning', label: 'Cleaning', icon: 'fa-spray-can-sparkles', cat: 'Cleaning', unit: 'L', ph: 'e.g. Dishwash liquid' },
+      { id: 'other', label: 'Other', icon: 'fa-cube', cat: 'Other', unit: 'pcs', ph: 'e.g. Gas cylinder, charcoal' },
+    ];
+    const STOCK_CAT_OPTIONS = [
+      'Food',
+      'Dairy',
+      'Meat & seafood',
+      'Produce',
+      'Spices & dry',
+      'Beverages',
+      'Packaging',
+      'Disposables',
+      'Cleaning',
+      'Fuel & utilities',
+      'Other',
+      'General',
+    ];
+    const PACKAGING_QUICK = [
+      { name: 'Takeaway box', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
+      { name: 'Paper bag', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
+      { name: 'Plastic container', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
+      { name: 'Aluminium foil sheet', cat: 'Packaging', unit: 'pcs', min: 100, cost: 0 },
+      { name: 'Butter paper', cat: 'Packaging', unit: 'pcs', min: 100, cost: 0 },
+      { name: 'Carry bag', cat: 'Packaging', unit: 'pcs', min: 50, cost: 0 },
+      { name: 'Napkin', cat: 'Disposables', unit: 'pcs', min: 200, cost: 0 },
+      { name: 'Spoon / fork set', cat: 'Disposables', unit: 'pcs', min: 100, cost: 0 },
+      { name: 'Straw', cat: 'Disposables', unit: 'pcs', min: 100, cost: 0 },
+      { name: 'Tissue roll', cat: 'Disposables', unit: 'pcs', min: 20, cost: 0 },
+    ];
+    const UNIT_OPTIONS = ['kg', 'g', 'L', 'ml', 'pcs', 'pack', 'box', 'roll', 'bottle', 'unit'];
+
+    async function saveStockItem(item) {
+      INVENTORY.push(item);
+      try {
+        if (global.RS_DB) await RS_DB.put('inventory', item.id, item);
+        toast(item.name + ' added · synced', 'fa-circle-check');
+      } catch (e) {
+        console.warn('add stock save', e);
+        toast(item.name + ' added locally · cloud pending', 'fa-circle-exclamation');
+      }
+      renderInventory();
+      try {
+        if (global.RSKitchenLinkCoach && RSKitchenLinkCoach.refreshSetupNav) {
+          RSKitchenLinkCoach.refreshSetupNav();
+        }
+      } catch (_) {}
+    }
+
+    function openAddStockModal(opts) {
+      opts = opts || {};
+      if (!global.RSModal) return;
+      let typeId = opts.typeId || 'food';
+      const preset0 = STOCK_TYPE_PRESETS.find((t) => t.id === typeId) || STOCK_TYPE_PRESETS[0];
+
+      RSModal.open({
+        title: 'Add stock item',
+        sub: 'Food, packaging, disposables — anything the kitchen uses',
+        icon: 'fa-boxes-stacked',
+        size: 'md',
+        body: `
+          <div class="inv-add-stock">
+            <div class="klc-p" style="margin-bottom:10px">Not only food. Add boxes, bags, napkins, foil — link them on a recipe so sales reduce them too.</div>
+            <div class="inv-type-chips" id="add-ing-types">
+              ${STOCK_TYPE_PRESETS.map(
+                (t) =>
+                  `<button type="button" class="inv-type-chip ${t.id === typeId ? 'active' : ''}" data-type="${t.id}">
+                    <i class="fa-solid ${t.icon}"></i> ${t.label}
+                  </button>`
+              ).join('')}
+            </div>
+            <div class="inv-quick-pack" id="add-ing-quick">
+              <div class="inv-quick-title"><i class="fa-solid fa-bolt"></i> Quick add common packaging</div>
+              <div class="inv-quick-chips">
+                ${PACKAGING_QUICK.map(
+                  (q, i) =>
+                    `<button type="button" class="klc-chip" data-quick="${i}" title="${esc(q.cat)}">
+                      <i class="fa-solid fa-plus"></i> ${esc(q.name)}
+                    </button>`
+                ).join('')}
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px">
+              <div><label class="fl">Item name</label><input class="form-input" id="add-ing-name" placeholder="${esc(preset0.ph)}"></div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div><label class="fl">Category</label><input class="form-input" id="add-ing-cat" placeholder="e.g. dairy"></div>
-                <div><label class="fl">Unit</label><input class="form-input" id="add-ing-unit" placeholder="kg / L / g"></div>
+                <div>
+                  <label class="fl">Category</label>
+                  <select class="form-input" id="add-ing-cat">
+                    ${STOCK_CAT_OPTIONS.map((c) => `<option value="${esc(c)}" ${c === preset0.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+                    <option value="__custom__">+ Custom…</option>
+                  </select>
+                  <input class="form-input" id="add-ing-cat-custom" placeholder="Custom category" style="display:none;margin-top:6px">
+                </div>
+                <div>
+                  <label class="fl">Unit</label>
+                  <select class="form-input" id="add-ing-unit">
+                    ${UNIT_OPTIONS.map((u) => `<option value="${esc(u)}" ${u === preset0.unit ? 'selected' : ''}>${esc(u)}</option>`).join('')}
+                  </select>
+                </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div><label class="fl">Current stock</label><input class="form-input" id="add-ing-stock" type="number" min="0" placeholder="0"></div>
-                <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="add-ing-min" type="number" min="0" placeholder="10"></div>
+                <div><label class="fl">Min level (reorder at)</label><input class="form-input" id="add-ing-min" type="number" min="0" placeholder="10" value="10"></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div><label class="fl">Unit cost (₹)</label><input class="form-input" id="add-ing-cost" type="number" min="0" step="any" placeholder="0"></div>
                 <div><label class="fl">Supplier (optional)</label><input class="form-input" id="add-ing-supplier" placeholder="e.g. Metro Cash"></div>
               </div>
-            </div>`,
-          foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-circle-check"></i> Add ingredient</button>`,
-          onMount(modal, close) {
-            modal.querySelector('[data-x]').onclick = close;
-            modal.querySelector('[data-ok]').onclick = async () => {
-              const name = modal.querySelector('#add-ing-name').value.trim();
-              if (!name) return toast('Enter ingredient name', 'fa-circle-exclamation');
-              const item = {
-                id: 'inv_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now(),
-                name,
-                cat: modal.querySelector('#add-ing-cat').value.trim() || 'General',
-                unit: modal.querySelector('#add-ing-unit').value.trim() || 'unit',
-                stock: +modal.querySelector('#add-ing-stock').value || 0,
-                min: +modal.querySelector('#add-ing-min').value || 10,
-                cost: +modal.querySelector('#add-ing-cost').value || 0,
-                supplier: (modal.querySelector('#add-ing-supplier').value || '').trim(),
-              };
-              INVENTORY.push(item);
-              try {
-                if (global.RS_DB) await RS_DB.put('inventory', item.id, item);
-                toast(`${name} added · synced`, 'fa-circle-check');
-              } catch (e) {
-                console.warn('add ingredient save', e);
-                toast(`${name} added locally · cloud pending`, 'fa-circle-exclamation');
+            </div>
+          </div>`,
+        foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-circle-check"></i> Add to stock</button>`,
+        onMount(modal, close) {
+          modal.querySelector('[data-x]').onclick = close;
+          const nameEl = modal.querySelector('#add-ing-name');
+          const catEl = modal.querySelector('#add-ing-cat');
+          const catCustom = modal.querySelector('#add-ing-cat-custom');
+          const unitEl = modal.querySelector('#add-ing-unit');
+          const minEl = modal.querySelector('#add-ing-min');
+
+          function applyType(id) {
+            typeId = id;
+            const p = STOCK_TYPE_PRESETS.find((t) => t.id === id) || STOCK_TYPE_PRESETS[0];
+            modal.querySelectorAll('.inv-type-chip').forEach((b) => b.classList.toggle('active', b.getAttribute('data-type') === id));
+            if (catEl && !catCustom.value) {
+              if ([...catEl.options].some((o) => o.value === p.cat)) catEl.value = p.cat;
+            }
+            if (unitEl && UNIT_OPTIONS.includes(p.unit)) unitEl.value = p.unit;
+            if (nameEl && !nameEl.value) nameEl.placeholder = p.ph;
+            // Higher default min for packaging/disposables
+            if (minEl && (id === 'packaging' || id === 'disposables') && (!minEl.value || minEl.value === '10')) {
+              minEl.value = '50';
+            }
+          }
+
+          modal.querySelectorAll('[data-type]').forEach((btn) => {
+            btn.onclick = () => applyType(btn.getAttribute('data-type'));
+          });
+          if (catEl)
+            catEl.onchange = () => {
+              if (catEl.value === '__custom__') {
+                catCustom.style.display = '';
+                catCustom.focus();
+              } else {
+                catCustom.style.display = 'none';
               }
-              close();
-              renderInventory();
             };
-          },
-        });
-      };
+
+          modal.querySelectorAll('[data-quick]').forEach((chip) => {
+            chip.onclick = async () => {
+              const q = PACKAGING_QUICK[+chip.getAttribute('data-quick')];
+              if (!q) return;
+              const exists = INVENTORY.find((x) => String(x.name).toLowerCase() === q.name.toLowerCase());
+              if (exists) {
+                toast(q.name + ' is already in stock', 'fa-circle-info');
+                return;
+              }
+              const item = {
+                id: 'inv_' + q.name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now(),
+                name: q.name,
+                cat: q.cat,
+                unit: q.unit,
+                stock: 0,
+                min: q.min || 50,
+                cost: q.cost || 0,
+                supplier: '',
+              };
+              await saveStockItem(item);
+              chip.disabled = true;
+              chip.style.opacity = '0.5';
+              toast('Added “' + q.name + '” — set stock qty anytime', 'fa-box');
+            };
+          });
+
+          modal.querySelector('[data-ok]').onclick = async () => {
+            const name = nameEl.value.trim();
+            if (!name) return toast('Enter item name', 'fa-circle-exclamation');
+            let cat = catEl.value;
+            if (cat === '__custom__') cat = (catCustom.value || '').trim() || 'Other';
+            if (!cat) cat = 'General';
+            const item = {
+              id: 'inv_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + Date.now(),
+              name,
+              cat,
+              unit: (unitEl.value || 'unit').trim(),
+              stock: +modal.querySelector('#add-ing-stock').value || 0,
+              min: +modal.querySelector('#add-ing-min').value || 10,
+              cost: +modal.querySelector('#add-ing-cost').value || 0,
+              supplier: (modal.querySelector('#add-ing-supplier').value || '').trim(),
+            };
+            await saveStockItem(item);
+            close();
+          };
+          if (nameEl) nameEl.focus();
+        },
+      });
     }
 
+    const addIngBtn = $('#btn-add-ingredient');
+    if (addIngBtn && !addIngBtn.dataset.wired) {
+      addIngBtn.dataset.wired = '1';
+      addIngBtn.onclick = () => openAddStockModal();
+    }
+    if (global.RSInventoryUI) global.RSInventoryUI._openAddStockModal = openAddStockModal;
     document.dispatchEvent(new CustomEvent('rs:render-inventory'));
     try {
       if (global.RS && typeof RS.updateTabAttentionBlinking === 'function') {
         RS.updateTabAttentionBlinking();
       }
     } catch (e) {}
+  }
+
+  // Keep a stable openAdd entry that uses latest modal builder after first render
+  function openAddStockModalPublic(opts) {
+    if (global.RSInventoryUI && typeof global.RSInventoryUI._openAddStockModal === 'function') {
+      return global.RSInventoryUI._openAddStockModal(opts);
+    }
+    const btn = document.getElementById('btn-add-ingredient');
+    if (btn) btn.click();
   }
 
   global.RSInventoryUI = {
@@ -1184,6 +1386,7 @@
     printPurchaseOrder,
     reorderQty,
     paintInventoryBadge,
+    openAddStockModal: openAddStockModalPublic,
   };
 
   function attachToRS() {
@@ -1191,6 +1394,7 @@
     global.RS.renderInventory = renderInventory;
     global.RS.exportLowStockCsv = exportLowStockCsv;
     global.RS.autoDraftPurchaseOrders = confirmAndDraftPos;
+    global.RS.openAddStockModal = openAddStockModalPublic;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);

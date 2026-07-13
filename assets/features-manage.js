@@ -594,7 +594,7 @@
             </div>
             <div style="display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin-bottom:12px;border:1px solid var(--stroke);border-radius:var(--r-sm);background:var(--glass-2);font-size:12px;color:var(--text-soft);line-height:1.5">
               <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-top:2px"></i>
-              <div><strong style="color:var(--text)">In plain words:</strong> when a bill is paid, stock goes down by the recipe amounts (× how many sold). Near-expiry packs are used first. Dishes with no recipe do not change stock.</div>
+              <div><strong style="color:var(--text)">In plain words:</strong> when a bill is paid, stock goes down by the recipe amounts (× how many sold) — food <b>and</b> packaging (boxes, bags, napkins). Near-expiry packs are used first. Dishes with no recipe do not change stock.</div>
             </div>
             <div class="table-scroll"><table class="data-table recipe-table">
               <thead><tr><th>Menu Item</th><th>Category</th><th>Sell</th><th>Plate cost</th><th>Margin</th><th>Uses from stock</th><th>Actions</th></tr></thead>

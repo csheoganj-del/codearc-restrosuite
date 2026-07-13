@@ -1,13 +1,13 @@
 {
-  "version": "v163-20260713-smart-setup",
+  "version": "v164-20260713-stock-packaging",
   "date": "2026-07-13",
-  "title": "Smart Kitchen Setup — suggest, copy, one-tap",
-  "summary": "Kitchen Setup in the sidebar. Wizard suggests stock from dish names, copy recipe from similar dishes, badge shows how many dishes still need linking.",
+  "title": "Stock = food + packaging + disposables",
+  "summary": "Inventory is not food-only. Add packaging (boxes, bags, foil), disposables (napkins, spoons), cleaning and other supplies. Link them on recipes so sales reduce packing stock too.",
   "highlights": [
-    "Sidebar + mobile More: Kitchen Setup (3-step checklist)",
-    "Badge shows dishes still missing a recipe",
-    "Smart suggestions: Biryani → rice from your stock list",
-    "Copy recipe from a similar linked dish",
-    "Recipes table: Help me + Copy on unlinked rows"
+    "Add stock item: Food / Packaging / Disposables / Cleaning / Other",
+    "Quick-add common packaging (takeaway box, bag, napkin…)",
+    "Recipe wizard: packaging suggestions + Food/Packaging picker filter",
+    "Categories include Packaging, Disposables, Cleaning",
+    "Plain language: stock items not only ingredients"
   ]
 }

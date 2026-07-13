@@ -81,7 +81,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v163-20260713-smart-setup';
+    var builtin = 'v164-20260713-stock-packaging';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -893,7 +893,7 @@
       <section class="tab-content" id="inventory-tab" data-screen-label="Inventory">
         <div class="banner warn" id="inv-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <div><b><span id="inv-low-count">0</span> ingredients</b> are below their minimum stock level and need reordering.</div>
+          <div><b><span id="inv-low-count">0</span> stock items</b> are below their minimum level and need reordering (food, packaging, etc.).</div>
           <button class="btn btn-ghost btn-sm banner-cta" id="btn-export-low-stock" style="margin-right:6px"><i class="fa-solid fa-file-csv"></i> Low-stock CSV</button>
           <button class="btn btn-primary btn-sm banner-cta" id="btn-auto-draft-pos"><i class="fa-solid fa-truck"></i> Auto-draft POs</button>
         </div>
@@ -908,19 +908,19 @@
           <div class="grow"></div>
           <div class="pos-search inv-search-wrap" style="max-width:220px;padding:8px 12px">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="inv-stock-search" placeholder="Search stock…" autocomplete="off" aria-label="Search inventory">
+            <input id="inv-stock-search" placeholder="Search food, boxes, bags…" autocomplete="off" aria-label="Search inventory">
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-download-inventory-template" title="CSV template for bulk import"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-import-inventory" title="Import ingredients from CSV"><i class="fa-solid fa-file-import"></i> Import</button>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-import-inventory" title="Import stock from CSV"><i class="fa-solid fa-file-import"></i> Import</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add stock item</button>
         </div>
         <div id="inv-link-tip" class="banner warn" style="display:none;margin-bottom:12px" role="status"></div>
         <!-- Stock panel -->
         <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table inv-stock-table">
           <thead>
             <tr>
-              <th>Ingredient</th>
+              <th>Stock item</th>
               <th>
                 Category
                 <select id="inv-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
