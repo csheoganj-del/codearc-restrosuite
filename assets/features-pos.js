@@ -776,7 +776,11 @@
     /** When gateway send fails: queue / retry / wa.me / download PDF / connect */
     function openWaOfflineFallback(bill, phone, errMsg, alreadyQueued) {
       const cleanPhone = String(phone || '').replace(/\D/g, '');
-      const why = String(errMsg || window.__rsLastWaError || 'Gateway unavailable').slice(0, 100);
+      const rawWhy = String(errMsg || window.__rsLastWaError || '').slice(0, 100);
+      const why =
+        !rawWhy || /gateway|disconnected|offline|econn|timeout|not ready|unavailable/i.test(rawWhy)
+          ? 'WhatsApp is not connected right now.'
+          : rawWhy;
       const goSettings = () => {
         if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
         setTimeout(() => {
@@ -799,7 +803,7 @@
       }
       if (!window.RSModal) {
         RS.toast(
-          queued ? 'Queued — will auto-send when WhatsApp is Ready' : 'WhatsApp offline — opening chat link',
+          queued ? 'Saved — will send when WhatsApp is connected' : 'WhatsApp offline — opening chat to send manually',
           'fa-whatsapp'
         );
         if (!queued) {
@@ -811,24 +815,24 @@
         return;
       }
       RSModal.open({
-        title: 'WhatsApp unavailable',
-        sub: queued ? 'Queued for auto-send when Ready' : 'Bill is saved — customer can still get it',
+        title: 'Could not send on WhatsApp',
+        sub: queued ? 'We saved it — will send when connected' : 'Bill is saved — you can still share it',
         icon: 'fa-brands fa-whatsapp',
         size: 'sm',
         body: `<div style="font-size:13.5px;line-height:1.5;color:var(--text-soft)">
-          <p style="margin:0 0 10px;color:var(--text)">Could not send via your linked WhatsApp right now.</p>
+          <p style="margin:0 0 10px;color:var(--text)">Your bill is safe. WhatsApp could not send it automatically right now.</p>
           <p style="margin:0 0 8px;font-size:12.5px;padding:8px 10px;background:var(--glass);border-radius:8px">${esc(why)}</p>
           ${
             queued
-              ? `<p style="margin:0 0 8px;font-size:12.5px;color:var(--green);font-weight:700"><i class="fa-solid fa-clock"></i> This bill is in the send queue — it will go automatically when status is Ready (green pill).</p>`
+              ? `<p style="margin:0 0 8px;font-size:12.5px;color:var(--green);font-weight:700"><i class="fa-solid fa-clock"></i> This bill is waiting — it will send automatically when WhatsApp is connected again.</p>`
               : ''
           }
-          <p style="margin:0;font-size:12.5px">Or share now: open chat, download PDF, or fix Gateway settings.</p>
+          <p style="margin:0;font-size:12.5px">You can also open chat, download the PDF, or reconnect WhatsApp in Settings.</p>
         </div>`,
-        foot: `<button type="button" class="btn btn-ghost btn-sm" id="wa-fb-retry"><i class="fa-solid fa-rotate"></i> Retry</button>
+        foot: `<button type="button" class="btn btn-ghost btn-sm" id="wa-fb-retry"><i class="fa-solid fa-rotate"></i> Try again</button>
                <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-web"><i class="fa-brands fa-whatsapp"></i> Open chat</button>
                <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-               <button type="button" class="btn btn-primary btn-sm" id="wa-fb-connect">Connect</button>`,
+               <button type="button" class="btn btn-primary btn-sm" id="wa-fb-connect">Reconnect</button>`,
         onMount(modal, close) {
           modal.querySelector('#wa-fb-retry').onclick = () => {
             close();

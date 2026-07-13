@@ -1,5 +1,12 @@
 # RestroSuite release notes
 
+## v108 (2026-07-13) — Client-friendly WhatsApp copy
+
+- Settings → **WhatsApp** (not “gateway”): plain language for restaurant owners
+- Status shows **Not connected / Connected** instead of raw “DISCONNECTED”
+- Softened tips, activity list, test/reconnect wording; no ban-risk jargon in UI
+- POS offline send modal uses clearer customer-facing language
+
 ## v107 (2026-07-13) — WhatsApp failed-send queue + auto-retry
 
 - Local **send queue** when gateway PDF/text send fails (per outlet, localStorage)
