@@ -1,5 +1,35 @@
 # RestroSuite release notes
 
+## v128 (2026-07-13) — QR tent cards redesign (10/10)
+
+- **Fully inline-styled cards** — modal preview matches the print sheet (no broken unstyled preview)
+- Clear dual purpose blocks: **1 Order food** | **2 Call waiter**
+- Gold QR frame, dark header + **Scan me**, steps: Camera → Scan → Order / Waiter
+- Full-width dark footer: **Powered by** + logo mark + **RestroSuite** (size-scaled)
+- Service worker cache bump so production picks up new assets after deploy
+
+## v127 (2026-07-13) — QR cards: Powered by RestroSuite ad
+
+- Bottom of each tent card: **Powered by** + mark logo + **RestroSuite** wordmark
+- Logo/name scale with card size (mini → full page) so print stays balanced
+- Inline SVG mark (prints reliably in Blob print tabs — no broken images)
+- Print toggle “Powered by RestroSuite” (on by default)
+
+## v126 (2026-07-13) — QR cards: Order food + Call waiter
+
+- Every tent card states the two main guest uses: **1 Order food** · **2 Call waiter**
+- Badge “Order · Waiter”, footer “Order food · Call waiter · No app needed”
+- Steps end with “Order or call waiter”; default welcome line matches
+- Print toggle for the dual-use line (on by default)
+
+## v125 (2026-07-13) — QR print toggles + Wi‑Fi in Settings
+
+- **Settings → Outlet profile → Guest QR cards**: Wi‑Fi name, Wi‑Fi password, guest welcome line
+- **Print Table QRs / single table QR**: toggles for Wi‑Fi name, password, call phone, scan steps, welcome line
+- **Table number** always on every card (not optional — needed for guest ordering)
+- Choices remembered in `localStorage`; live preview updates when you toggle
+- Empty fields stay off (disabled) until you fill them in Settings
+
 ## v124 (2026-07-13) — Premium QR tent cards
 
 - Brand-tinted scannable QR (deep forest ink, cream card, gold accents)

@@ -1680,7 +1680,7 @@
       const tagline =
         s.set_tagline ||
         s.set_guest_welcome ||
-        'Scan · Browse menu · Order from your table';
+        'Scan to order food or call your waiter';
       return {
         name: formatOutletTitle(name),
         phone: String(phone || '').trim(),
@@ -1704,6 +1704,9 @@
         scanPx: 9,
         outletPx: 10,
         metaPx: 8,
+        logoPx: 14,
+        brandPx: 9,
+        poweredPx: 6,
         pad: '0',
         gap: '7px',
         margin: '8mm',
@@ -1720,6 +1723,9 @@
         scanPx: 11,
         outletPx: 12,
         metaPx: 9,
+        logoPx: 18,
+        brandPx: 11,
+        poweredPx: 7,
         pad: '0',
         gap: '9px',
         margin: '10mm',
@@ -1736,6 +1742,9 @@
         scanPx: 13,
         outletPx: 14,
         metaPx: 11,
+        logoPx: 22,
+        brandPx: 13,
+        poweredPx: 8,
         pad: '0',
         gap: '12px',
         margin: '12mm',
@@ -1752,6 +1761,9 @@
         scanPx: 14,
         outletPx: 15,
         metaPx: 12,
+        logoPx: 26,
+        brandPx: 15,
+        poweredPx: 9,
         pad: '0',
         gap: '14px',
         margin: '12mm',
@@ -1768,6 +1780,9 @@
         scanPx: 18,
         outletPx: 20,
         metaPx: 14,
+        logoPx: 36,
+        brandPx: 18,
+        poweredPx: 10,
         pad: '0',
         gap: '0',
         margin: '14mm',
@@ -1775,6 +1790,47 @@
         showMeta: true,
       },
     };
+
+    /** Inline mark so Blob print tabs always show logo (no broken external img). */
+    function restroSuiteMarkSvg(sizePx) {
+      const s = Math.max(12, Number(sizePx) || 22);
+      // Gold ring + cream plate so mark pops on dark "Powered by" footer and light cards
+      return (
+        `<svg class="rs-mark" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 192 192" fill="none" aria-hidden="true" focusable="false" style="display:block;flex-shrink:0;width:${s}px;height:${s}px;border-radius:22%;box-shadow:0 0 0 1px rgba(232,213,163,.45)">` +
+        `<circle cx="96" cy="96" r="96" fill="#c4a35a"/>` +
+        `<circle cx="96" cy="96" r="82" fill="#0c1f1a"/>` +
+        `<circle cx="96" cy="96" r="68" fill="#fffcf7"/>` +
+        `<circle cx="96" cy="96" r="54" fill="#0c1f1a"/>` +
+        `<path d="M66 82 L80 96 L66 110" stroke="#e8d5a3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+        `<path d="M126 82 L112 96 L126 110" stroke="#e8d5a3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+        `<line x1="106" y1="78" x2="86" y2="114" stroke="#c4a35a" stroke-width="8" stroke-linecap="round"/>` +
+        `</svg>`
+      );
+    }
+
+    function buildPoweredByAdHtml(sizeId) {
+      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
+      const logoPx = sz.logoPx || 22;
+      const brandPx = sz.brandPx || 13;
+      const poweredPx = sz.poweredPx || 8;
+      const gap = Math.max(5, Math.round(logoPx * 0.28));
+      const padTop = Math.max(6, Math.round(logoPx * 0.32));
+      const mt = Math.max(6, Math.round(logoPx * 0.35));
+      const logo = restroSuiteMarkSvg(logoPx);
+      // Inline styles so live modal preview matches print sheet
+      return (
+        `<div class="qr-powered" aria-label="Powered by RestroSuite" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.max(
+          2,
+          Math.round(logoPx * 0.12)
+        )}px;margin-top:${mt}px;padding-top:${padTop}px;border-top:1px dashed #e8d5a3">` +
+        `<span class="qr-powered-label" style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#5c6b66;line-height:1;opacity:.92">Powered by</span>` +
+        `<span class="qr-powered-brand" style="display:inline-flex;align-items:center;justify-content:center;gap:${gap}px;line-height:1">` +
+        logo +
+        `<span class="qr-powered-name" style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#0c1f1a;line-height:1">Restro<span style="color:#1a3d34;font-weight:700">Suite</span></span>` +
+        `</span>` +
+        `</div>`
+      );
+    }
 
     function getSavedQrPrintSizeId() {
       try {
@@ -1789,72 +1845,329 @@
       } catch (_) {}
     }
 
+    /** Per-print content toggles (remembered). Table number is always on the card. */
+    const QR_PRINT_OPTS_DEFAULT = {
+      showWifi: true,
+      showWifiPass: true,
+      showPhone: true,
+      showSteps: true,
+      showTagline: true,
+      showUses: true, // Order food + Call waiter (always recommended)
+      showPoweredBy: true, // RestroSuite ad strip
+    };
+    function getQrPrintOpts() {
+      try {
+        const raw = localStorage.getItem('rs:qr_print_opts');
+        if (!raw) return { ...QR_PRINT_OPTS_DEFAULT };
+        const o = JSON.parse(raw);
+        return {
+          showWifi: o.showWifi !== false,
+          showWifiPass: o.showWifiPass !== false,
+          showPhone: o.showPhone !== false,
+          showSteps: o.showSteps !== false,
+          showTagline: o.showTagline !== false,
+          showUses: o.showUses !== false,
+          showPoweredBy: o.showPoweredBy !== false,
+        };
+      } catch (_) {
+        return { ...QR_PRINT_OPTS_DEFAULT };
+      }
+    }
+    function saveQrPrintOpts(opts) {
+      try {
+        localStorage.setItem('rs:qr_print_opts', JSON.stringify({ ...getQrPrintOpts(), ...opts }));
+      } catch (_) {}
+    }
+    function readQrPrintOptsFromModal(modal) {
+      if (!modal) return getQrPrintOpts();
+      const chk = (id, fallback) => {
+        const el = modal.querySelector('#' + id);
+        if (!el) return fallback;
+        return !!el.checked;
+      };
+      const cur = getQrPrintOpts();
+      return {
+        showWifi: chk('qr-opt-wifi', cur.showWifi),
+        showWifiPass: chk('qr-opt-wifi-pass', cur.showWifiPass),
+        showPhone: chk('qr-opt-phone', cur.showPhone),
+        showSteps: chk('qr-opt-steps', cur.showSteps),
+        showTagline: chk('qr-opt-tagline', cur.showTagline),
+        showUses: chk('qr-opt-uses', cur.showUses),
+        showPoweredBy: chk('qr-opt-powered', cur.showPoweredBy),
+      };
+    }
+    function buildQrPrintOptsHtml(meta, opts) {
+      const o = opts || getQrPrintOpts();
+      const m = meta || {};
+      const hasWifi = !!(m.wifi && String(m.wifi).trim());
+      const hasPass = !!(m.wifiPass && String(m.wifiPass).trim());
+      const hasPhone = !!(m.phone && String(m.phone).trim());
+      const row = (id, label, checked, hint, disabled) =>
+        `<label style="display:flex;align-items:flex-start;gap:10px;padding:9px 11px;border:1px solid var(--stroke-2);border-radius:10px;cursor:${
+          disabled ? 'not-allowed' : 'pointer'
+        };background:var(--panel);opacity:${disabled ? '0.55' : '1'}">
+          <input type="checkbox" id="${id}" ${checked && !disabled ? 'checked' : ''} ${
+            disabled ? 'disabled' : ''
+          } style="margin-top:2px;accent-color:#c4a35a">
+          <span style="min-width:0">
+            <b style="font-size:12.5px;color:var(--text)">${label}</b>
+            ${hint ? `<div style="font-size:11px;color:var(--text-soft);margin-top:2px;line-height:1.35">${hint}</div>` : ''}
+          </span>
+        </label>`;
+      return `
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:14px 0 8px">On each card</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+          ${row(
+            'qr-opt-table',
+            'Table number',
+            true,
+            'Always shown (required for guest order)',
+            true
+          )}
+          ${row(
+            'qr-opt-uses',
+            'Order + Call waiter',
+            o.showUses,
+            'Two main guest actions written on the card',
+            false
+          )}
+          ${row(
+            'qr-opt-tagline',
+            'Welcome line',
+            o.showTagline,
+            m.tagline ? esc(m.tagline) : 'Set in Settings → Guest welcome',
+            false
+          )}
+          ${row(
+            'qr-opt-wifi',
+            'Wi‑Fi name',
+            o.showWifi && hasWifi,
+            hasWifi ? esc(m.wifi) : 'Add in Settings → Outlet profile',
+            !hasWifi
+          )}
+          ${row(
+            'qr-opt-wifi-pass',
+            'Wi‑Fi password',
+            o.showWifiPass && hasPass,
+            hasPass ? '••••••••' : 'Add in Settings (optional)',
+            !hasPass
+          )}
+          ${row(
+            'qr-opt-phone',
+            'Outlet phone',
+            o.showPhone && hasPhone,
+            hasPhone ? esc(m.phone) : 'Add outlet phone in Settings',
+            !hasPhone
+          )}
+          ${row('qr-opt-steps', 'How to scan (1·2·3)', o.showSteps, 'Open camera → Scan → Use menu', false)}
+          ${row(
+            'qr-opt-powered',
+            'Powered by RestroSuite',
+            o.showPoweredBy,
+            'Logo + name ad strip at bottom of each card',
+            false
+          )}
+        </div>
+        <p style="font-size:11px;color:var(--text-soft);margin:8px 0 0;line-height:1.4">
+          Tip: edit Wi‑Fi / phone under <b>Settings → Outlet profile → Guest QR cards</b>, then print again.
+        </p>`;
+    }
+
     /**
-     * Premium tent card: brand chrome + colored QR + useful guest info.
+     * Premium tent card — FULLY INLINE STYLES so modal preview === print sheet.
+     * Guests see two jobs clearly: Order food + Call waiter + Powered by RestroSuite.
      * @param {object} p
      */
     function buildGuestQrCardHtml(p) {
+      const B = QR_BRAND;
       const outletName = esc(formatOutletTitle((p && p.outletName) || 'Restaurant'));
       const tbl = esc((p && p.tableLabel) || '—');
       const qrCodeUrl = (p && p.qrCodeUrl) || '';
       const sizeId = (p && p.sizeId) || 'medium';
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
-      const phone = esc((p && p.phone) || '');
-      const wifi = esc((p && p.wifi) || '');
-      const wifiPass = esc((p && p.wifiPass) || '');
-      const tagline = esc((p && p.tagline) || 'Scan · Browse menu · Order from your table');
-      const showSteps = sz.showSteps !== false;
-      const showMeta = sz.showMeta !== false && !!(phone || wifi);
+      const phoneRaw = String((p && p.phone) || '').trim();
+      const wifiRaw = String((p && p.wifi) || '').trim();
+      const wifiPassRaw = String((p && p.wifiPass) || '').trim();
+      const phone = esc(phoneRaw);
+      const wifi = esc(wifiRaw);
+      const wifiPass = esc(wifiPassRaw);
+      const taglineRaw = String((p && p.tagline) || 'Scan to order food or call your waiter').trim();
+      const tagline = esc(taglineRaw);
+      const opts = (p && p.printOpts) || getQrPrintOpts();
 
-      const metaBits = [];
-      if (showMeta && wifi) {
-        metaBits.push(
-          `<span class="qr-meta-item"><span class="qr-meta-k">Wi‑Fi</span> ${wifi}${
-            wifiPass ? ' · ' + wifiPass : ''
-          }</span>`
-        );
+      const showSteps = sz.showSteps !== false && opts.showSteps !== false;
+      const showTagline = opts.showTagline !== false;
+      const showUses = opts.showUses !== false;
+      const showPoweredBy = opts.showPoweredBy !== false;
+      const wantWifi = opts.showWifi !== false && !!wifiRaw;
+      const wantPass = opts.showWifiPass !== false && !!wifiPassRaw && wantWifi;
+      const wantPhone = opts.showPhone !== false && !!phoneRaw;
+      const showMeta = sz.showMeta !== false && (wantWifi || wantPhone);
+
+      const titlePx = sz.titlePx;
+      const scanPx = sz.scanPx;
+      const metaPx = sz.metaPx;
+      const outletPx = Math.max(9, sz.outletPx - 1);
+      const badgePx = Math.max(8, metaPx);
+      const usePx = Math.max(10, metaPx + 2);
+      const qr = sz.qrCss;
+      const logoPx = sz.logoPx || 22;
+      const brandPx = sz.brandPx || 13;
+      const poweredPx = sz.poweredPx || 8;
+      const isMini = sizeId === 'mini';
+      const padX = isMini ? 8 : 14;
+      const padY = isMini ? 8 : 12;
+
+      // —— Dual purpose strip (hero message) ——
+      let usesHtml = '';
+      if (showUses) {
+        const cell = (num, label, gold) =>
+          `<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:${
+            isMini ? '5px 4px' : '8px 6px'
+          };background:${gold ? 'linear-gradient(180deg,#fff9ec 0%,#fff 100%)' : '#fff'};border:1.5px solid ${
+            gold ? B.gold : B.ink
+          };border-radius:10px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:${
+              isMini ? 14 : 18
+            }px;height:${isMini ? 14 : 18}px;border-radius:50%;font-size:${
+              isMini ? 8 : 10
+            }px;font-weight:900;background:${gold ? 'linear-gradient(135deg,' + B.gold + ',' + B.goldSoft + ')' : B.ink};color:${
+              gold ? B.ink : B.goldSoft
+            }">${num}</span>
+            <span style="font-size:${usePx}px;font-weight:800;color:${B.ink};line-height:1.15;letter-spacing:-.01em">${label}</span>
+          </div>`;
+        usesHtml = `<div style="display:flex;align-items:stretch;gap:6px;margin:0 0 ${
+          isMini ? 6 : 10
+        }px;width:100%;box-sizing:border-box" aria-label="Order food or call waiter">
+          ${cell('1', isMini ? 'Order' : 'Order food', false)}
+          ${cell('2', isMini ? 'Waiter' : 'Call waiter', true)}
+        </div>`;
       }
-      if (showMeta && phone) {
-        metaBits.push(
-          `<span class="qr-meta-item"><span class="qr-meta-k">Call</span> ${phone}</span>`
-        );
+
+      // —— Steps ——
+      let stepsHtml = '';
+      if (showSteps) {
+        const step = (n, t) =>
+          `<span style="display:inline-flex;align-items:center;gap:4px;font-size:${Math.max(
+            8,
+            metaPx
+          )}px;font-weight:700;color:${B.mute}">
+            <i style="font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:${B.ink};color:${B.goldSoft};font-size:9px;font-weight:800">${n}</i>${t}
+          </span>`;
+        stepsHtml = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 10px;margin:0 0 2px">
+          ${step(1, 'Camera')}
+          ${step(2, 'Scan')}
+          ${step(3, 'Order / Waiter')}
+        </div>`;
       }
+
+      // —— Meta wifi/phone ——
+      let metaHtml = '';
+      if (showMeta) {
+        const bits = [];
+        if (wantWifi) {
+          bits.push(
+            `<span style="font-size:${metaPx}px;font-weight:600;color:${B.inkSoft}"><span style="font-size:${Math.max(
+              7,
+              metaPx - 1
+            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.gold};margin-right:3px">Wi‑Fi</span>${wifi}${
+              wantPass ? ' · ' + wifiPass : ''
+            }</span>`
+          );
+        }
+        if (wantPhone) {
+          bits.push(
+            `<span style="font-size:${metaPx}px;font-weight:600;color:${B.inkSoft}"><span style="font-size:${Math.max(
+              7,
+              metaPx - 1
+            )}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.gold};margin-right:3px">Phone</span>${phone}</span>`
+          );
+        }
+        if (bits.length) {
+          metaHtml = `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 12px;margin-bottom:6px">${bits.join(
+            ''
+          )}</div>`;
+        }
+      }
+
+      // —— Powered by (full-width dark footer ad) ——
+      let poweredHtml = '';
+      if (showPoweredBy) {
+        const logo = restroSuiteMarkSvg(logoPx);
+        poweredHtml = `<div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:${Math.max(
+          6,
+          Math.round(logoPx * 0.3)
+        )}px ${Math.max(8, Math.round(logoPx * 0.4))}px;padding:${
+          isMini ? '7px 8px' : '10px 12px'
+        };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);box-sizing:border-box;border-top:1px solid rgba(196,163,90,.35)" aria-label="Powered by RestroSuite">
+          <span style="font-size:${poweredPx}px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7);line-height:1;white-space:nowrap">Powered by</span>
+          <span style="display:inline-flex;align-items:center;gap:${Math.max(
+            5,
+            Math.round(logoPx * 0.28)
+          )}px;line-height:1">
+            ${logo}
+            <span style="font-size:${brandPx}px;font-weight:800;letter-spacing:-.02em;color:#fff;line-height:1">Restro<span style="color:${B.goldSoft};font-weight:700">Suite</span></span>
+          </span>
+        </div>`;
+      }
+
+      const cardStyle = [
+        'box-sizing:border-box',
+        'background:linear-gradient(165deg,' + B.cream + ' 0%,#fff 45%,' + B.creamDeep + ' 100%)',
+        'border:2px solid ' + B.ink,
+        'border-radius:16px',
+        'overflow:hidden',
+        'page-break-inside:avoid',
+        'break-inside:avoid',
+        'display:flex',
+        'flex-direction:column',
+        'min-height:100%',
+        'font-family:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif',
+        'color:' + B.ink,
+        '-webkit-print-color-adjust:exact',
+        'print-color-adjust:exact',
+        'box-shadow:0 2px 0 rgba(12,31,26,.06)',
+      ].join(';');
 
       return `
-        <div class="qr-print-card" data-size="${esc(sz.id)}">
-          <div class="qr-card-top">
-            <div class="qr-card-brand">${outletName}</div>
-            <div class="qr-card-badge">Order here</div>
+        <div class="qr-print-card" data-size="${esc(sz.id)}" style="${cardStyle}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:${
+            isMini ? '7px 8px' : '10px 12px'
+          };background:linear-gradient(90deg,${B.ink} 0%,${B.inkSoft} 100%);color:#fff">
+            <div style="font-size:${outletPx}px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1.2;max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.96">${outletName}</div>
+            <div style="flex-shrink:0;font-size:${badgePx}px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${B.ink};background:linear-gradient(135deg,${B.goldSoft},${B.gold});padding:3px 9px;border-radius:999px;white-space:nowrap">Scan me</div>
           </div>
-          <div class="qr-card-body">
-            <div class="qr-card-table">Table ${tbl}</div>
-            <div class="qr-card-tagline">${tagline}</div>
-            <div class="qr-card-frame">
-              <div class="qr-card-frame-inner">
-                <img src="${qrCodeUrl}" alt="Table ${tbl} menu QR" />
-              </div>
-            </div>
-            <div class="qr-card-scan">Point your camera at the code</div>
+          <div style="flex:1;padding:${padY}px ${padX}px ${padY}px;text-align:center;box-sizing:border-box">
+            <div style="font-weight:900;font-size:${titlePx}px;letter-spacing:-.03em;color:${B.ink};line-height:1.05;margin:0 0 2px">Table ${tbl}</div>
             ${
-              showSteps
-                ? `<div class="qr-card-steps">
-              <span><i>1</i> Open camera</span>
-              <span><i>2</i> Scan QR</span>
-              <span><i>3</i> Place order</span>
-            </div>`
+              showTagline
+                ? `<div style="font-size:${scanPx}px;font-weight:600;color:${B.mute};margin:0 0 ${
+                    isMini ? 4 : 8
+                  }px;line-height:1.3">${tagline}</div>`
                 : ''
             }
+            ${usesHtml}
+            <div style="display:inline-block;padding:3px;border-radius:14px;background:linear-gradient(145deg,${B.gold},${B.inkSoft} 55%,${B.goldSoft});margin:0 0 ${
+              isMini ? 6 : 8
+            }px;box-shadow:0 4px 14px rgba(12,31,26,.12)">
+              <div style="padding:${isMini ? 5 : 8}px;background:#fff;border-radius:11px">
+                <img src="${qrCodeUrl}" alt="Table ${tbl} — order or call waiter" width="${qr}" height="${qr}" style="display:block;width:${qr}px;height:${qr}px;max-width:100%" />
+              </div>
+            </div>
+            <div style="font-size:${scanPx}px;font-weight:700;color:${B.inkSoft};margin:0 0 ${
+              showSteps ? 6 : 2
+            }px">Point camera at the code</div>
+            ${stepsHtml}
+            ${metaHtml}
           </div>
-          <div class="qr-card-foot">
-            ${metaBits.length ? `<div class="qr-card-meta">${metaBits.join('')}</div>` : ''}
-            <div class="qr-card-foot-note">No app · Free to scan · Ask staff for help</div>
-          </div>
+          ${poweredHtml}
         </div>`;
     }
 
     function qrPrintDocumentStyles(sizeId) {
       const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
       const B = QR_BRAND;
+      // Cards are self-styled (inline). Sheet only needs page chrome + grid.
       return `
         <style>
           @page { margin: ${sz.margin}; size: A4; }
@@ -1895,152 +2208,9 @@
             max-width: 980px;
             margin: 0 auto;
             padding: 0 8px 24px;
+            align-items: stretch;
           }
-          .qr-print-card {
-            background: linear-gradient(165deg, ${B.cream} 0%, #fff 48%, ${B.creamDeep} 100%);
-            border: 1.5px solid ${B.ink};
-            border-radius: 16px;
-            overflow: hidden;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            display: flex;
-            flex-direction: column;
-            min-height: 100%;
-            box-shadow: 0 1px 0 rgba(12,31,26,0.06);
-          }
-          .qr-card-top {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 8px;
-            padding: 10px 12px;
-            background: linear-gradient(90deg, ${B.ink} 0%, ${B.inkSoft} 100%);
-            color: #fff;
-          }
-          .qr-card-brand {
-            font-size: ${Math.max(9, sz.outletPx - 1)}px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            opacity: 0.95;
-            line-height: 1.2;
-            max-width: 70%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-          .qr-card-badge {
-            flex-shrink: 0;
-            font-size: ${Math.max(8, sz.metaPx)}px;
-            font-weight: 800;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: ${B.ink};
-            background: linear-gradient(135deg, ${B.goldSoft}, ${B.gold});
-            padding: 3px 8px;
-            border-radius: 999px;
-          }
-          .qr-card-body {
-            flex: 1;
-            padding: 14px 12px 10px;
-            text-align: center;
-          }
-          .qr-card-table {
-            font-weight: 900;
-            font-size: ${sz.titlePx}px;
-            letter-spacing: -0.03em;
-            color: ${B.ink};
-            line-height: 1.05;
-            margin-bottom: 4px;
-          }
-          .qr-card-tagline {
-            font-size: ${sz.scanPx}px;
-            font-weight: 600;
-            color: ${B.mute};
-            margin-bottom: 10px;
-            line-height: 1.3;
-          }
-          .qr-card-frame {
-            display: inline-block;
-            padding: 3px;
-            border-radius: 14px;
-            background: linear-gradient(145deg, ${B.gold}, ${B.inkSoft} 55%, ${B.goldSoft});
-            margin-bottom: 10px;
-          }
-          .qr-card-frame-inner {
-            padding: 8px;
-            background: #fff;
-            border-radius: 11px;
-          }
-          .qr-card-frame img {
-            display: block;
-            width: ${sz.qrCss}px;
-            height: ${sz.qrCss}px;
-          }
-          .qr-card-scan {
-            font-size: ${sz.scanPx}px;
-            font-weight: 700;
-            color: ${B.inkSoft};
-            margin-bottom: 8px;
-          }
-          .qr-card-steps {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 6px 10px;
-            margin-bottom: 4px;
-          }
-          .qr-card-steps span {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: ${Math.max(8, sz.metaPx)}px;
-            font-weight: 700;
-            color: ${B.mute};
-          }
-          .qr-card-steps i {
-            font-style: normal;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 14px; height: 14px;
-            border-radius: 50%;
-            background: ${B.ink};
-            color: ${B.goldSoft};
-            font-size: 9px;
-            font-weight: 800;
-          }
-          .qr-card-foot {
-            border-top: 1px solid ${B.goldSoft};
-            background: rgba(255,255,255,0.65);
-            padding: 8px 10px 10px;
-            text-align: center;
-          }
-          .qr-card-meta {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 6px 12px;
-            margin-bottom: 4px;
-          }
-          .qr-meta-item {
-            font-size: ${sz.metaPx}px;
-            font-weight: 600;
-            color: ${B.inkSoft};
-          }
-          .qr-meta-k {
-            display: inline-block;
-            font-size: ${Math.max(7, sz.metaPx - 1)}px;
-            font-weight: 800;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            color: ${B.gold};
-            margin-right: 3px;
-          }
-          .qr-card-foot-note {
-            font-size: ${Math.max(7, sz.metaPx - 1)}px;
-            font-weight: 600;
-            color: ${B.mute};
-            letter-spacing: 0.02em;
-          }
+          .qr-print-card { width: 100%; }
           .qr-print-single {
             max-width: 440px;
             margin: 24px auto;
@@ -2171,8 +2341,9 @@
       }
     }
 
-    function buildCardsHtml(tableQrs, meta, sizeId) {
+    function buildCardsHtml(tableQrs, meta, sizeId, printOpts) {
       const m = meta || {};
+      const opts = printOpts || getQrPrintOpts();
       return (
         '<div class="qr-print-grid">' +
         tableQrs
@@ -2186,6 +2357,7 @@
               wifi: m.wifi,
               wifiPass: m.wifiPass,
               tagline: m.tagline,
+              printOpts: opts,
             })
           )
           .join('') +
@@ -2203,6 +2375,7 @@
         getOutletPrintMeta(),
       ]);
       const savedSize = getSavedQrPrintSizeId();
+      const savedOpts = getQrPrintOpts();
 
       const sizeOptions = Object.keys(QR_PRINT_SIZES)
         .map((id) => {
@@ -2214,28 +2387,34 @@
         })
         .join('');
 
+      const cardProps = (sizeId, opts) => ({
+        outletName: meta.name,
+        tableLabel,
+        qrCodeUrl,
+        sizeId: sizeId || 'small',
+        phone: meta.phone,
+        wifi: meta.wifi,
+        wifiPass: meta.wifiPass,
+        tagline: meta.tagline,
+        printOpts: opts || savedOpts,
+      });
+
       const body = `
         <div style="text-align:center;padding:4px 0 2px">
-          <div style="display:inline-block;max-width:220px;margin-bottom:12px;border-radius:14px;overflow:hidden;border:1px solid var(--stroke-2);box-shadow:0 8px 24px rgba(12,31,26,.12);text-align:left">
-            ${buildGuestQrCardHtml({
-              outletName: meta.name,
-              tableLabel,
-              qrCodeUrl,
-              sizeId: 'small',
-              phone: meta.phone,
-              wifi: meta.wifi,
-              wifiPass: meta.wifiPass,
-              tagline: meta.tagline,
-            })}
+          <div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:14px;padding:12px;margin-bottom:12px;border:1px solid var(--stroke-2)">
+            <div id="qr-single-preview" style="max-width:260px;margin:0 auto;filter:drop-shadow(0 8px 20px rgba(12,31,26,.14));text-align:left">
+            ${buildGuestQrCardHtml(cardProps('small', savedOpts))}
+            </div>
           </div>
           <div style="font-size:12px;font-weight:700;text-align:left;margin:4px 0 6px;color:var(--text)">Print size</div>
           <div id="qr-size-one-list" style="text-align:left">${sizeOptions}</div>
+          <div style="text-align:left">${buildQrPrintOptsHtml(meta, savedOpts)}</div>
         </div>
       `;
 
       RSModal.open({
         title: 'Table QR',
-        sub: 'Premium tent card · pick size',
+        sub: 'Table ' + tableLabel + ' · size & details',
         icon: 'fa-qrcode',
         size: 'sm',
         body,
@@ -2243,20 +2422,35 @@
                <button class="btn btn-primary" style="flex:1" id="btn-print-single-qr"><i class="fa-solid fa-print"></i> Print card</button>`,
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
+          const refreshPreview = () => {
+            const opts = readQrPrintOptsFromModal(modal);
+            const box = modal.querySelector('#qr-single-preview');
+            if (box) box.innerHTML = buildGuestQrCardHtml(cardProps('small', opts));
+          };
+          modal.querySelectorAll('input[type="checkbox"][id^="qr-opt-"]').forEach((el) => {
+            el.addEventListener('change', refreshPreview);
+          });
+          // Password only meaningful when Wi‑Fi name is on
+          const wifiCb = modal.querySelector('#qr-opt-wifi');
+          const passCb = modal.querySelector('#qr-opt-wifi-pass');
+          if (wifiCb && passCb && !passCb.disabled) {
+            const syncPass = () => {
+              if (!wifiCb.checked) {
+                passCb.checked = false;
+              }
+            };
+            wifiCb.addEventListener('change', () => {
+              syncPass();
+              refreshPreview();
+            });
+          }
           modal.querySelector('#btn-print-single-qr').onclick = () => {
             const picked =
               (modal.querySelector('input[name="qr-size-one"]:checked') || {}).value || 'medium';
+            const opts = readQrPrintOptsFromModal(modal);
             saveQrPrintSizeId(picked);
-            const card = buildGuestQrCardHtml({
-              outletName: meta.name,
-              tableLabel,
-              qrCodeUrl,
-              sizeId: picked,
-              phone: meta.phone,
-              wifi: meta.wifi,
-              wifiPass: meta.wifiPass,
-              tagline: meta.tagline,
-            });
+            saveQrPrintOpts(opts);
+            const card = buildGuestQrCardHtml(cardProps(picked, opts));
             openQrPrintWindow(
               'Table ' + tableLabel + ' QR',
               '<div class="qr-print-single"><div class="qr-print-grid">' + card + '</div></div>',
@@ -2295,6 +2489,7 @@
       }
 
       const savedSize = getSavedQrPrintSizeId();
+      const savedOpts = getQrPrintOpts();
       const sizeRadios = Object.keys(QR_PRINT_SIZES)
         .map((id) => {
           const s = QR_PRINT_SIZES[id];
@@ -2311,7 +2506,9 @@
 
       const sample = tableQrs[0];
       const livePreview = sample
-        ? `<div id="qr-live-preview" style="max-width:240px;margin:0 auto 12px;border-radius:16px;overflow:hidden;box-shadow:0 10px 28px rgba(12,31,26,.14);border:1px solid var(--stroke-2)">
+        ? `<div style="background:linear-gradient(180deg,#eef1ef 0%,#e4e8e6 100%);border-radius:14px;padding:14px 12px 12px;margin:0 0 14px;border:1px solid var(--stroke-2)">
+            <div style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-mute);text-align:center;margin-bottom:8px">Live preview · matches print</div>
+            <div id="qr-live-preview" style="max-width:280px;margin:0 auto;filter:drop-shadow(0 10px 22px rgba(12,31,26,.16))">
             ${buildGuestQrCardHtml({
               outletName: meta.name,
               tableLabel: sample.tableLabel,
@@ -2321,12 +2518,14 @@
               wifi: meta.wifi,
               wifiPass: meta.wifiPass,
               tagline: meta.tagline,
+              printOpts: savedOpts,
             })}
+            </div>
           </div>`
         : '';
 
       if (!window.RSModal) {
-        openQrPrintWindow('Table QR cards', buildCardsHtml(tableQrs, meta, savedSize), {
+        openQrPrintWindow('Table QR cards', buildCardsHtml(tableQrs, meta, savedSize, savedOpts), {
           outlet: meta.name,
           count: tableQrs.length,
           sizeId: savedSize,
@@ -2342,13 +2541,14 @@
         size: 'md',
         body: `
           <p style="margin:0 0 12px;font-size:13px;color:var(--text-soft);line-height:1.5">
-            Forest &amp; gold tent cards with table number, scan guide, and outlet info (phone / Wi‑Fi if set in Settings).
+            Each card: <b>Table #</b> · <b>Order food</b> · <b>Call waiter</b> · QR · <b>Powered by RestroSuite</b>.
           </p>
           ${livePreview}
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin-bottom:8px">Card size</div>
           <div id="qr-size-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             ${sizeRadios}
-          </div>`,
+          </div>
+          ${buildQrPrintOptsHtml(meta, savedOpts)}`,
         foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
                <button class="btn btn-primary" style="flex:1" id="btn-print-all-qrs-go"><i class="fa-solid fa-print"></i> Print ${tableQrs.length} cards</button>`,
         onMount(modal, close) {
@@ -2365,15 +2565,45 @@
             r.addEventListener('change', syncSel);
           });
           syncSel();
+          const refreshPreview = () => {
+            if (!sample) return;
+            const opts = readQrPrintOptsFromModal(modal);
+            const box = modal.querySelector('#qr-live-preview');
+            if (box)
+              box.innerHTML = buildGuestQrCardHtml({
+                outletName: meta.name,
+                tableLabel: sample.tableLabel,
+                qrCodeUrl: sample.qrCodeUrl,
+                sizeId: 'small',
+                phone: meta.phone,
+                wifi: meta.wifi,
+                wifiPass: meta.wifiPass,
+                tagline: meta.tagline,
+                printOpts: opts,
+              });
+          };
+          modal.querySelectorAll('input[type="checkbox"][id^="qr-opt-"]').forEach((el) => {
+            el.addEventListener('change', refreshPreview);
+          });
+          const wifiCb = modal.querySelector('#qr-opt-wifi');
+          const passCb = modal.querySelector('#qr-opt-wifi-pass');
+          if (wifiCb && passCb && !passCb.disabled) {
+            wifiCb.addEventListener('change', () => {
+              if (!wifiCb.checked) passCb.checked = false;
+              refreshPreview();
+            });
+          }
           const go = modal.querySelector('#btn-print-all-qrs-go');
           if (go)
             go.onclick = () => {
               const sizeId =
                 (modal.querySelector('input[name="qr-print-size"]:checked') || {}).value || 'medium';
+              const opts = readQrPrintOptsFromModal(modal);
               saveQrPrintSizeId(sizeId);
+              saveQrPrintOpts(opts);
               openQrPrintWindow(
                 'Table QR cards',
-                buildCardsHtml(tableQrs, meta, sizeId),
+                buildCardsHtml(tableQrs, meta, sizeId, opts),
                 {
                   outlet: meta.name,
                   count: tableQrs.length,

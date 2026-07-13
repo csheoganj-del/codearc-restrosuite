@@ -198,7 +198,13 @@
         <div class="set-section">${field('Address','','Outlet address')}</div>
         <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
         <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
-        <div class="set-section form-grid-2" id="set-country-currency-row"></div>`,
+        <div class="set-section form-grid-2" id="set-country-currency-row"></div>
+        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-bottom:8px">Guest QR cards</div>
+          <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">Cards already say <b>Order food</b> + <b>Call waiter</b>. Optional extras below — turn on/off when you print.</p>
+          <div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
+          <div style="margin-top:10px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>
+        </div>`
       tax:`<div class="set-section form-grid-2">
           ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
           ${field('Invoice prefix','INV-')}
