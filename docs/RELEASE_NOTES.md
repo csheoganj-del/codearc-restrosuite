@@ -1,5 +1,14 @@
 # RestroSuite release notes
 
+## v115 (2026-07-13) — Floor & Tables 10/10 ops
+
+- **Honest occupancy**: Seat & order creates a live `DineIn Active` ticket immediately (card turns Dining)
+- **Held resume**: Floor loads held draft carts with amounts; Resume hold on POS
+- **Clear / free table**: broom action removes open tickets + holds + closes QR
+- **Multi-ticket**: sums all open orders per table; transfer moves every ticket
+- **Print bill** from table modal; cannot delete occupied tables in Edit Tables
+- Live refresh on `rs:tables-updated`
+
 ## v114 (2026-07-13) — Support menu: Call + WhatsApp
 
 - Top-bar headset button opens a small menu with **Call support** and **WhatsApp support** (same as before)
