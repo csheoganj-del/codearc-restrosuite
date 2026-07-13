@@ -1,5 +1,11 @@
 # RestroSuite release notes
 
+## v145 (2026-07-13) — Custom table QR size
+
+- New **Custom** print size: set **card width (mm)**, **QR size (mm)**, **columns**, **cards per page**
+- Live preview updates as you type; values remembered in localStorage
+- Defaults match standard tent: 82 mm · QR 35 mm · 2 col · 4 / A4
+
 ## v144 (2026-07-13) — Restore pre-v143 QR cards
 
 - Restored QR tent design and print options from **v142** (before the clean redesign)

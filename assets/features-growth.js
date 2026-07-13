@@ -1801,12 +1801,108 @@
       },
     };
 
+    /** Defaults for Custom size (aligned with Medium / industry standard) */
+    const QR_CUSTOM_SIZE_DEFAULT = {
+      widthMm: 82,
+      qrMm: 35,
+      cols: 2,
+      perPage: 4,
+    };
+
+    function clampNum(n, min, max, fallback) {
+      const v = Number(n);
+      if (!Number.isFinite(v)) return fallback;
+      return Math.min(max, Math.max(min, v));
+    }
+
+    function getSavedCustomQrSize() {
+      try {
+        const raw = localStorage.getItem('rs:qr_print_custom');
+        if (!raw) return { ...QR_CUSTOM_SIZE_DEFAULT };
+        const o = JSON.parse(raw) || {};
+        return {
+          widthMm: clampNum(o.widthMm, 35, 120, QR_CUSTOM_SIZE_DEFAULT.widthMm),
+          qrMm: clampNum(o.qrMm, 18, 60, QR_CUSTOM_SIZE_DEFAULT.qrMm),
+          cols: clampNum(o.cols, 1, 4, QR_CUSTOM_SIZE_DEFAULT.cols),
+          perPage: clampNum(o.perPage, 1, 16, QR_CUSTOM_SIZE_DEFAULT.perPage),
+        };
+      } catch (_) {
+        return { ...QR_CUSTOM_SIZE_DEFAULT };
+      }
+    }
+    function saveCustomQrSize(c) {
+      try {
+        const next = {
+          widthMm: clampNum(c && c.widthMm, 35, 120, QR_CUSTOM_SIZE_DEFAULT.widthMm),
+          qrMm: clampNum(c && c.qrMm, 18, 60, QR_CUSTOM_SIZE_DEFAULT.qrMm),
+          cols: clampNum(c && c.cols, 1, 4, QR_CUSTOM_SIZE_DEFAULT.cols),
+          perPage: clampNum(c && c.perPage, 1, 16, QR_CUSTOM_SIZE_DEFAULT.perPage),
+        };
+        // QR must fit inside card with padding
+        if (next.qrMm > next.widthMm - 12) next.qrMm = Math.max(18, next.widthMm - 12);
+        localStorage.setItem('rs:qr_print_custom', JSON.stringify(next));
+        return next;
+      } catch (_) {
+        return getSavedCustomQrSize();
+      }
+    }
+
+    /** Build a full size spec from custom mm/cols settings. */
+    function buildCustomSizeSpec(c) {
+      const cfg = c || getSavedCustomQrSize();
+      const widthMm = clampNum(cfg.widthMm, 35, 120, 82);
+      let qrMm = clampNum(cfg.qrMm, 18, 60, 35);
+      if (qrMm > widthMm - 12) qrMm = Math.max(18, widthMm - 12);
+      const cols = clampNum(cfg.cols, 1, 4, 2);
+      const perPage = clampNum(cfg.perPage, 1, 16, cols * cols);
+      // Scale type from Medium (82mm) baseline
+      const sc = widthMm / 82;
+      const qrCss = Math.round(qrMm * 3.78); // ~96dpi mm→px for screen/print CSS
+      return {
+        id: 'custom',
+        label: 'Custom',
+        hint: widthMm + ' mm wide · ' + cols + ' col · QR ' + qrMm + ' mm',
+        cols,
+        perPage,
+        qrCss: Math.min(280, Math.max(48, qrCss)),
+        titlePx: Math.round(Math.min(36, Math.max(12, 22 * sc))),
+        scanPx: Math.round(Math.min(16, Math.max(8, 12 * sc))),
+        outletPx: Math.round(Math.min(16, Math.max(8, 12 * sc))),
+        metaPx: Math.round(Math.min(14, Math.max(7, 10 * sc))),
+        logoPx: Math.round(Math.min(28, Math.max(12, 18 * sc))),
+        brandPx: Math.round(Math.min(16, Math.max(9, 12 * sc))),
+        poweredPx: Math.round(Math.min(10, Math.max(6, 8 * sc))),
+        gap: cols >= 3 ? '4mm' : cols === 2 ? '6mm' : '0',
+        margin: '12mm',
+        cardMaxW: widthMm + 'mm',
+        pageCenter: cols === 1,
+        showSteps: true,
+        showMeta: true,
+        widthMm,
+        qrMm,
+      };
+    }
+
+    /** Resolve size id including custom. */
+    function resolveQrPrintSizeId(sizeId) {
+      const id = String(sizeId || '').trim();
+      if (id === 'custom') return 'custom';
+      return QR_PRINT_SIZES[id] ? id : 'medium';
+    }
+
+    /** Size object for presets or Custom (from localStorage). */
+    function getQrPrintSize(sizeId) {
+      const id = resolveQrPrintSizeId(sizeId);
+      if (id === 'custom') return buildCustomSizeSpec(getSavedCustomQrSize());
+      return QR_PRINT_SIZES[id] || QR_PRINT_SIZES.medium;
+    }
+
     /**
      * Simple text-only Powered by footer (no logo image).
      * Single line: Powered by CODEARC RestroSuite
      */
     function restroSuitePoweredByFooterHtml(sizeId) {
-      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
+      const sz = getQrPrintSize(sizeId);
       const isMini = sizeId === 'mini';
       const B = QR_BRAND;
       const labelPx = isMini ? 7 : Math.max(8, sz.poweredPx || 8);
@@ -1826,14 +1922,61 @@
     function getSavedQrPrintSizeId() {
       try {
         const v = localStorage.getItem('rs:qr_print_size');
-        if (v && QR_PRINT_SIZES[v]) return v;
+        if (v === 'custom' || (v && QR_PRINT_SIZES[v])) return v;
       } catch (_) {}
       return 'medium';
     }
     function saveQrPrintSizeId(id) {
       try {
-        localStorage.setItem('rs:qr_print_size', id);
+        localStorage.setItem('rs:qr_print_size', resolveQrPrintSizeId(id));
       } catch (_) {}
+    }
+
+    /** Custom size fields for print modal (shown when Custom selected). */
+    function buildQrCustomSizePanelHtml(c) {
+      const cfg = c || getSavedCustomQrSize();
+      const field = (id, label, val, min, max, step, unit) =>
+        `<div style="min-width:0">
+          <label class="fl" style="font-size:11px;margin-bottom:3px" for="${id}">${label}</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="${id}" class="form-input" value="${val}" min="${min}" max="${max}" step="${step || 1}"
+              style="width:100%;padding:7px 8px;font-size:13px">
+            <span style="font-size:11px;color:var(--text-soft);flex-shrink:0">${unit || ''}</span>
+          </div>
+        </div>`;
+      return `
+        <div id="qr-custom-panel" style="display:none;margin-top:8px;padding:10px;border:1px solid var(--stroke-2);border-radius:12px;background:var(--panel)">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-mute);margin:0 0 8px">Custom size</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${field('qr-custom-width', 'Card width', cfg.widthMm, 35, 120, 1, 'mm')}
+            ${field('qr-custom-qr', 'QR size', cfg.qrMm, 18, 60, 1, 'mm')}
+            ${field('qr-custom-cols', 'Columns', cfg.cols, 1, 4, 1, '')}
+            ${field('qr-custom-perpage', 'Cards / page', cfg.perPage, 1, 16, 1, '')}
+          </div>
+          <p style="font-size:10.5px;color:var(--text-soft);margin:8px 0 0;line-height:1.35">
+            Standard table tent ≈ <b>82 mm</b> wide · QR ≈ <b>35 mm</b> · 2 columns · 4 / A4.
+            Height follows content (same as preview).
+          </p>
+        </div>`;
+    }
+    function readCustomQrSizeFromModal(modal) {
+      if (!modal) return getSavedCustomQrSize();
+      const num = (id, fb) => {
+        const el = modal.querySelector('#' + id);
+        return el ? el.value : fb;
+      };
+      const d = QR_CUSTOM_SIZE_DEFAULT;
+      return saveCustomQrSize({
+        widthMm: num('qr-custom-width', d.widthMm),
+        qrMm: num('qr-custom-qr', d.qrMm),
+        cols: num('qr-custom-cols', d.cols),
+        perPage: num('qr-custom-perpage', d.perPage),
+      });
+    }
+    function syncCustomPanelVisibility(modal, sizeId) {
+      const panel = modal && modal.querySelector('#qr-custom-panel');
+      if (!panel) return;
+      panel.style.display = sizeId === 'custom' ? 'block' : 'none';
     }
 
     /** Per-print content toggles (remembered). Table number is always on the card. */
@@ -1942,7 +2085,7 @@
       const tbl = esc((p && p.tableLabel) || '—');
       const qrCodeUrl = (p && p.qrCodeUrl) || '';
       const sizeId = (p && p.sizeId) || 'medium';
-      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
+      const sz = getQrPrintSize(sizeId);
       const phoneRaw = String((p && p.phone) || '').trim();
       const wifiRaw = String((p && p.wifi) || '').trim();
       const wifiPassRaw = String((p && p.wifiPass) || '').trim();
@@ -2113,7 +2256,7 @@
     }
 
     function qrPrintDocumentStyles(sizeId) {
-      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
+      const sz = getQrPrintSize(sizeId);
       const B = QR_BRAND;
       const perPage = Math.max(1, Number(sz.perPage) || 4);
       const maxW = sz.cardMaxW || '';
@@ -2209,7 +2352,7 @@
       const outlet = (meta && meta.outlet) || 'Restaurant';
       const count = (meta && meta.count) || 0;
       const sizeId = resolveQrPrintSizeId((meta && meta.sizeId) || getSavedQrPrintSizeId());
-      const sz = QR_PRINT_SIZES[sizeId] || QR_PRINT_SIZES.medium;
+      const sz = getQrPrintSize(sizeId);
       const sizeLabel = sz.label;
       const autoPrint = !!(meta && meta.autoPrint);
 
@@ -2325,16 +2468,11 @@
       }
     }
 
-    function resolveQrPrintSizeId(sizeId) {
-      const id = String(sizeId || '').trim();
-      return QR_PRINT_SIZES[id] ? id : 'medium';
-    }
-
     function buildCardsHtml(tableQrs, meta, sizeId, printOpts) {
       const m = meta || {};
       const opts = printOpts || getQrPrintOpts();
       const sid = resolveQrPrintSizeId(sizeId);
-      const sz = QR_PRINT_SIZES[sid] || QR_PRINT_SIZES.medium;
+      const sz = getQrPrintSize(sid);
       // Inline grid styles so print sheet always matches selected size
       // (even if stylesheet sizeId is wrong / cached)
       const maxW = sz.cardMaxW || '';
@@ -2387,10 +2525,12 @@
       ]);
       const savedSize = getSavedQrPrintSizeId();
       const savedOpts = getQrPrintOpts();
+      const savedCustom = getSavedCustomQrSize();
 
       const sizeOptions = Object.keys(QR_PRINT_SIZES)
+        .concat(['custom'])
         .map((id) => {
-          const s = QR_PRINT_SIZES[id];
+          const s = id === 'custom' ? buildCustomSizeSpec(savedCustom) : QR_PRINT_SIZES[id];
           return `<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--stroke-2);border-radius:10px;cursor:pointer;margin-bottom:6px;text-align:left">
             <input type="radio" name="qr-size-one" value="${esc(id)}" ${id === savedSize ? 'checked' : ''} style="margin-top:3px">
             <span><b style="font-size:13px">${esc(s.label)}</b><br><span style="font-size:11px;color:var(--text-soft)">${esc(s.hint)}</span></span>
@@ -2413,11 +2553,11 @@
       let selectedSizeId = resolveQrPrintSizeId(savedSize);
       let selectedOpts = { ...savedOpts };
       const scaleOne = (id) => {
-        const s = resolveQrPrintSizeId(id);
-        if (s === 'full') return 0.42;
-        if (s === 'large') return 0.52;
-        if (s === 'medium') return 0.68;
-        if (s === 'small') return 0.82;
+        const w = parseFloat(String((getQrPrintSize(id).cardMaxW || '82').replace('mm', ''))) || 82;
+        if (w >= 95) return 0.5;
+        if (w >= 88) return 0.58;
+        if (w >= 80) return 0.7;
+        if (w >= 55) return 0.85;
         return 1;
       };
 
@@ -2433,6 +2573,7 @@
           </div>
           <div style="font-size:12px;font-weight:700;text-align:left;margin:4px 0 6px;color:var(--text)">Print size</div>
           <div id="qr-size-one-list" style="text-align:left">${sizeOptions}</div>
+          <div style="text-align:left">${buildQrCustomSizePanelHtml(savedCustom)}</div>
           <div style="text-align:left">${buildQrPrintOptsHtml(meta, savedOpts)}</div>
         </div>
       `;
@@ -2457,6 +2598,7 @@
           const refreshPreview = () => {
             const checked = modal.querySelector('input[name="qr-size-one"]:checked');
             selectedSizeId = resolveQrPrintSizeId((checked && checked.value) || selectedSizeId);
+            if (selectedSizeId === 'custom') readCustomQrSizeFromModal(modal);
             selectedOpts = readQrPrintOptsFromModal(modal);
             if (!selectedOpts.showWifi) selectedOpts.showWifiPass = false;
             const box = modal.querySelector('#qr-single-preview');
@@ -2466,17 +2608,27 @@
             }
             const cap = modal.querySelector('#qr-preview-caption');
             if (cap) {
-              const lab = (QR_PRINT_SIZES[selectedSizeId] || {}).label || selectedSizeId;
+              const lab = getQrPrintSize(selectedSizeId).label || selectedSizeId;
               cap.textContent = 'Live preview = ' + lab;
             }
+            syncCustomPanelVisibility(modal, selectedSizeId);
           };
           modal.addEventListener('change', (e) => {
             const t = e.target;
             if (!t || !t.matches) return;
-            if (
-              t.matches('input[name="qr-size-one"]') ||
-              t.matches('input[id^="qr-opt-"]')
-            ) {
+            if (t.matches('input[name="qr-size-one"]')) {
+              refreshPreview();
+              return;
+            }
+            if (t.matches('#qr-custom-width, #qr-custom-qr, #qr-custom-cols, #qr-custom-perpage')) {
+              const cr = modal.querySelector('input[name="qr-size-one"][value="custom"]');
+              if (cr) cr.checked = true;
+              selectedSizeId = 'custom';
+              readCustomQrSizeFromModal(modal);
+              refreshPreview();
+              return;
+            }
+            if (t.matches('input[id^="qr-opt-"]')) {
               if (t.id === 'qr-opt-wifi' && !t.checked) {
                 const pass = modal.querySelector('#qr-opt-wifi-pass');
                 if (pass && !pass.disabled) pass.checked = false;
@@ -2484,9 +2636,22 @@
               refreshPreview();
             }
           });
+          ['qr-custom-width', 'qr-custom-qr', 'qr-custom-cols', 'qr-custom-perpage'].forEach((id) => {
+            const el = modal.querySelector('#' + id);
+            if (el)
+              el.addEventListener('input', () => {
+                const cr = modal.querySelector('input[name="qr-size-one"][value="custom"]');
+                if (cr) cr.checked = true;
+                selectedSizeId = 'custom';
+                readCustomQrSizeFromModal(modal);
+                refreshPreview();
+              });
+          });
+          syncCustomPanelVisibility(modal, selectedSizeId);
           modal.querySelector('#btn-print-single-qr').onclick = () => {
             const checked = modal.querySelector('input[name="qr-size-one"]:checked');
             selectedSizeId = resolveQrPrintSizeId((checked && checked.value) || selectedSizeId);
+            if (selectedSizeId === 'custom') readCustomQrSizeFromModal(modal);
             selectedOpts = readQrPrintOptsFromModal(modal);
             if (!selectedOpts.showWifi) selectedOpts.showWifiPass = false;
             saveQrPrintSizeId(selectedSizeId);
@@ -2535,18 +2700,18 @@
 
       const savedSize = getSavedQrPrintSizeId();
       const savedOpts = getQrPrintOpts();
-      // Compact size chips (fit right column without scrolling)
-      const sizeRadios = Object.keys(QR_PRINT_SIZES)
+      const savedCustom = getSavedCustomQrSize();
+      // Size chips + Custom
+      const sizeIds = Object.keys(QR_PRINT_SIZES).concat(['custom']);
+      const sizeRadios = sizeIds
         .map((id) => {
-          const s = QR_PRINT_SIZES[id];
+          const s = id === 'custom' ? buildCustomSizeSpec(savedCustom) : QR_PRINT_SIZES[id];
           const checked = id === savedSize ? 'checked' : '';
           return `<label class="qr-size-opt" data-size="${esc(id)}" style="display:flex;align-items:center;gap:6px;padding:7px 8px;border:1px solid var(--stroke-2);border-radius:9px;cursor:pointer;background:var(--panel);min-width:0">
             <input type="radio" name="qr-print-size" value="${esc(id)}" ${checked} style="margin:0;flex-shrink:0;accent-color:#c4a35a">
             <span style="min-width:0">
               <b style="font-size:12px;color:var(--text);display:block;line-height:1.2">${esc(s.label)}</b>
-              <span style="font-size:10px;color:var(--text-soft);line-height:1.2">${esc(
-                (s.hint || '').split('·')[0].trim()
-              )}</span>
+              <span style="font-size:10px;color:var(--text-soft);line-height:1.2">${esc(s.hint || '')}</span>
             </span>
           </label>`;
         })
@@ -2556,10 +2721,11 @@
       // Preview uses REAL print size (scaled to fit left column) so WYSIWYG matches sheet
       const previewScaleFor = (id) => {
         const sid = resolveQrPrintSizeId(id);
-        if (sid === 'full') return 0.48;
-        if (sid === 'large') return 0.58;
-        if (sid === 'medium') return 0.72;
-        if (sid === 'small') return 0.85;
+        const w = parseFloat(String((getQrPrintSize(sid).cardMaxW || '82').replace('mm', ''))) || 82;
+        if (w >= 95) return 0.55;
+        if (w >= 88) return 0.62;
+        if (w >= 80) return 0.72;
+        if (w >= 55) return 0.85;
         return 1;
       };
 
@@ -2598,7 +2764,7 @@
               </div>
             </div>
             <div id="qr-preview-size-pill" style="margin-top:10px;font-size:11px;font-weight:700;color:var(--text-soft);background:rgba(255,255,255,.75);border:1px solid var(--stroke-2);border-radius:999px;padding:4px 10px">${esc(
-              (QR_PRINT_SIZES[resolveQrPrintSizeId(savedSize)] || {}).label || 'Medium'
+              getQrPrintSize(savedSize).label || 'Medium'
             )} · same as print</div>
           </div>`
         : '<div></div>';
@@ -2617,6 +2783,7 @@
                 <div id="qr-size-list" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
                   ${sizeRadios}
                 </div>
+                ${buildQrCustomSizePanelHtml(savedCustom)}
               </div>
               <div>${buildQrPrintOptsHtml(meta, savedOpts, true)}</div>
             </div>
@@ -2672,8 +2839,10 @@
           const refreshPreview = () => {
             if (!sample) return;
             selectedSizeId = readSizeFromUi();
+            if (selectedSizeId === 'custom') readCustomQrSizeFromModal(modal);
             selectedOpts = readQrPrintOptsFromModal(modal);
             if (!selectedOpts.showWifi) selectedOpts.showWifiPass = false;
+            const sz = getQrPrintSize(selectedSizeId);
             const box = modal.querySelector('#qr-live-preview');
             if (box) {
               box.style.transform = 'scale(' + previewScaleFor(selectedSizeId) + ')';
@@ -2692,15 +2861,21 @@
             }
             const pill = modal.querySelector('#qr-preview-size-pill');
             if (pill) {
-              const lab = (QR_PRINT_SIZES[selectedSizeId] || {}).label || selectedSizeId;
-              const sz = QR_PRINT_SIZES[selectedSizeId] || {};
-              pill.textContent = lab + ' · ' + (sz.cols || 2) + ' per row · QR ' + (sz.qrCss || '') + 'px';
+              pill.textContent =
+                (sz.label || selectedSizeId) +
+                ' · ' +
+                (sz.cols || 2) +
+                ' col · ' +
+                (sz.cardMaxW || '') +
+                (sz.qrMm ? ' · QR ' + sz.qrMm + 'mm' : '');
             }
+            syncCustomPanelVisibility(modal, selectedSizeId);
             syncSel();
           };
 
           const pickSize = (id) => {
             selectedSizeId = resolveQrPrintSizeId(id);
+            syncCustomPanelVisibility(modal, selectedSizeId);
             syncSel();
             refreshPreview();
           };
@@ -2710,6 +2885,15 @@
             if (!t || !t.matches) return;
             if (t.matches('input[name="qr-print-size"]')) {
               pickSize(t.value);
+              return;
+            }
+            if (t.matches('#qr-custom-width, #qr-custom-qr, #qr-custom-cols, #qr-custom-perpage')) {
+              selectedSizeId = 'custom';
+              readCustomQrSizeFromModal(modal);
+              // keep custom radio selected
+              const cr = modal.querySelector('input[name="qr-print-size"][value="custom"]');
+              if (cr) cr.checked = true;
+              refreshPreview();
               return;
             }
             if (t.matches('input[id^="qr-opt-"]')) {
@@ -2729,6 +2913,18 @@
               pickSize(id);
             });
           });
+          // live type for custom mm fields
+          ['qr-custom-width', 'qr-custom-qr', 'qr-custom-cols', 'qr-custom-perpage'].forEach((id) => {
+            const el = modal.querySelector('#' + id);
+            if (el) el.addEventListener('input', () => {
+              selectedSizeId = 'custom';
+              const cr = modal.querySelector('input[name="qr-print-size"][value="custom"]');
+              if (cr) cr.checked = true;
+              readCustomQrSizeFromModal(modal);
+              refreshPreview();
+            });
+          });
+          syncCustomPanelVisibility(modal, selectedSizeId);
           syncSel();
 
           const go = modal.querySelector('#btn-print-all-qrs-go');
@@ -2736,6 +2932,7 @@
             go.onclick = () => {
               // Prefer tracked selection; re-read UI as safety
               selectedSizeId = readSizeFromUi();
+              if (selectedSizeId === 'custom') readCustomQrSizeFromModal(modal);
               selectedOpts = readQrPrintOptsFromModal(modal);
               if (!selectedOpts.showWifi) selectedOpts.showWifiPass = false;
               const sizeId = resolveQrPrintSizeId(selectedSizeId);
