@@ -1,5 +1,10 @@
 # RestroSuite release notes
 
+## v114 (2026-07-13) — Support menu: Call + WhatsApp
+
+- Top-bar headset button opens a small menu with **Call support** and **WhatsApp support** (same as before)
+- Bill WhatsApp status stays a separate green/red icon (not mixed with support chat)
+
 ## v113 (2026-07-13) — Clean top bar (no ⋯ dump)
 
 - Removed ⋯ menu that duplicated WhatsApp + Cloud status

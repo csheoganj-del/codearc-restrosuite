@@ -167,15 +167,92 @@
 .tb-right {
   display: flex; align-items: center; gap: 6px; flex: none;
 }
-/* Call support — always on the bar */
-a.tb-call-btn.tb-icon-btn {
-  text-decoration: none;
+/* Support popover (Call + WhatsApp support) */
+.tb-support-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.tb-call-btn.tb-icon-btn {
   color: var(--text-soft);
 }
-a.tb-call-btn.tb-icon-btn:hover {
+.tb-call-btn.tb-icon-btn:hover,
+.tb-support-wrap.open .tb-call-btn {
   color: var(--text);
   background: var(--glass-3);
   border-color: var(--stroke-hi);
+}
+.tb-support-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 90;
+  width: min(260px, 92vw);
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tb-support-menu[hidden] { display: none !important; }
+.tb-support-menu-title {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  padding: 6px 10px 4px;
+}
+.tb-support-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s ease;
+}
+.tb-support-item:hover {
+  background: var(--glass-2);
+}
+.tb-support-ico {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.tb-support-ico.call {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+.tb-support-ico.wa {
+  background: rgba(37, 211, 102, 0.14);
+  color: #128C7E;
+}
+.tb-support-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.tb-support-copy strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+.tb-support-copy span {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-soft);
+  line-height: 1.3;
 }
 /* Quiet version chip (not a dropdown dump) */
 .tb-version,

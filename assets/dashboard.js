@@ -316,7 +316,43 @@
   $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
   document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
-  /* Support is a direct top-bar call button (no ⋯ menu) */
+  /* ---------- SUPPORT (Call + WhatsApp) ---------- */
+  (function wireSupportMenu() {
+    const wrap = document.getElementById('tb-support-wrap');
+    const btn = document.getElementById('tb-call-support');
+    const menu = document.getElementById('tb-support-menu');
+    if (!wrap || !btn || !menu) return;
+
+    function close() {
+      menu.hidden = true;
+      wrap.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    function open() {
+      menu.hidden = false;
+      wrap.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    function toggle(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (menu.hidden) open();
+      else close();
+    }
+
+    btn.addEventListener('click', toggle);
+    menu.addEventListener('click', (e) => {
+      // Let links navigate; close after choosing
+      const a = e.target && e.target.closest && e.target.closest('a');
+      if (a) setTimeout(close, 80);
+    });
+    document.addEventListener('click', (e) => {
+      if (!wrap.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  })();
 
   /* ---------- TOAST ---------- */
   let toastT;
