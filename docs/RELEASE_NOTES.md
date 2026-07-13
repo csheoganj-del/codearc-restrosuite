@@ -1,10 +1,10 @@
 # RestroSuite release notes
 
-## v138 (2026-07-13) — Professional single-line Powered by footer
+## v139 (2026-07-13) — Powered by text only (no logo)
 
-- One line: **Powered by · [mark] · CODEARC RestroSuite**
-- Mark is **assets/restrosuite-mark.svg** art inlined (never a broken image in print Blob tabs)
-- No stacked layout, no white badge, no missing logo icon
+- Footer is a single line: **Powered by RestroSuite** (no logo mark / image)
+
+## v138 (2026-07-13) — Professional single-line Powered by footer
 
 ## v137 (2026-07-13) — QR Powered by uses assets logo (no white box)
 
