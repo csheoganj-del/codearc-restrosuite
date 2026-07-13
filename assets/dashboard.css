@@ -1597,6 +1597,54 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .recipe-next-urgent > i { color: var(--amber); }
 .recipe-plain-tip { font-size: 12.5px; }
 
+/* Bill settled modal — post-pay 10/10 */
+.rc-settled-body { padding-top: 4px !important; }
+.rc-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+  font-size: 12.5px; line-height: 1.45; color: var(--text-soft);
+  border: 1px solid var(--stroke); background: var(--glass);
+  width: 100%; font: inherit; text-align: left; cursor: default;
+}
+.rc-banner b { color: var(--text); }
+.rc-banner-ok { border-color: rgba(34,197,94,.28); background: rgba(34,197,94,.08); }
+.rc-banner-ok > i { color: #16a34a; }
+.rc-banner-warn { border-color: rgba(234,179,8,.35); background: rgba(234,179,8,.1); }
+.rc-banner-warn > i { color: #ca8a04; }
+.rc-banner-wa {
+  border-color: rgba(37,211,102,.3); background: rgba(37,211,102,.08);
+  cursor: pointer;
+}
+.rc-banner-wa:hover { border-color: #25d366; }
+.rc-banner-wa > i { color: #25d366; font-size: 18px; }
+.rc-banner-wa-ok {
+  border-color: rgba(37,211,102,.28); background: rgba(37,211,102,.08);
+}
+.rc-banner-wa-ok > i { color: #25d366; font-size: 16px; }
+.rc-actions-top {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px;
+}
+.btn-wa {
+  background: #25d366 !important; color: #fff !important; border: none !important;
+  font-weight: 700 !important;
+}
+.btn-wa:hover { filter: brightness(1.05); }
+.btn-wa i { color: #fff !important; }
+.rc-receipt-preview {
+  max-height: min(48vh, 420px); overflow: auto;
+  border: 1px solid var(--stroke); border-radius: 12px;
+  background: #fff; color: #111;
+  padding: 12px 14px; margin-bottom: 8px;
+}
+.rc-hint {
+  margin: 0; font-size: 11.5px; color: var(--text-mute); line-height: 1.4; text-align: center;
+}
+.rs-modal.md .rs-mfoot { flex-wrap: wrap; gap: 8px; }
+@media (max-width: 520px) {
+  .rc-actions-top { flex-direction: column; }
+  .rc-actions-top .btn { width: 100%; }
+}
+
 /* POS cart portion size (half / full / double) */
 .cart-portion {
   display: inline-flex; gap: 4px; margin-top: 4px;

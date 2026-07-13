@@ -1,12 +1,13 @@
 {
-  "version": "v173-20260713-takeaway-pack",
+  "version": "v174-20260713-bill-settled",
   "date": "2026-07-13",
-  "title": "Takeaway packaging pack (not cart)",
-  "summary": "Takeaway/Delivery packaging is deducted automatically once per bill — not added as POS cart lines. Configure under Inventory → Takeaway pack (bag, napkin, etc.). Per-dish boxes still go on the dish recipe.",
+  "title": "Bill settled modal 10/10 — WhatsApp + print",
+  "summary": "WhatsApp on Bill settled was effectively dead for walk-in (phone prompt overlay never got .show). Fixed phone prompt via RSModal, green Send WhatsApp primary, clearer actions, improved browser print CSS so receipts are not blank/sparse.",
   "highlights": [
-    "Industry rule: pack is order-level, not a menu line (unless bag fee)",
-    "Inventory → Takeaway pack: enable + pick stock items + qty per order",
-    "Applies on Takeaway and optional Delivery",
-    "Food recipes still deduct food; pack adds bag/napkin once per bill"
+    "WhatsApp always clickable — asks for number if walk-in",
+    "Phone prompt uses visible RSModal (not invisible overlay)",
+    "Send WhatsApp primary green button above receipt",
+    "Print: better CSS, wait for QR, black text on white",
+    "Copy bill text + Thermal + New order"
   ]
 }
