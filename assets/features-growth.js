@@ -3010,8 +3010,13 @@
     /* ===================== ONLINE / AGGREGATOR ORDERS ===================== */
     const ONLINE = [];
     const platName = { zomato: 'Zomato', swiggy: 'Swiggy', ondc: 'ONDC' };
+    const platIcon = { zomato: 'fa-bowl-food', swiggy: 'fa-motorcycle', ondc: 'fa-network-wired' };
     let aggAlertBooted = false;
     const seenOnlineIds = new Set();
+    let aggFilterPlat = 'all';
+    let aggFilterStatus = 'all';
+    let aggLastRefreshAt = 0;
+    let aggRefreshing = false;
 
     function detectPlatform(order) {
       const raw = `${order.platform || ''} ${order.orderId || ''} ${order.tableNumber || ''} ${order.orderType || ''} ${order.channel || ''}`.toLowerCase();
@@ -3296,100 +3301,316 @@
       }
     }
 
+    function pickDemoPlatform() {
+      return new Promise((resolve) => {
+        if (!window.RSModal) {
+          resolve(['swiggy', 'zomato', 'ondc'][Math.floor(Math.random() * 3)]);
+          return;
+        }
+        RSModal.open({
+          title: 'Seed demo order',
+          sub: 'Practice Accept → KOT → POS without a real aggregator',
+          icon: 'fa-seedling',
+          size: 'sm',
+          body: `<div class="agg-demo-picks">
+            ${['swiggy', 'zomato', 'ondc']
+              .map(
+                (p) =>
+                  `<button type="button" class="agg-demo-pick ${p}" data-plat="${p}">
+                    <i class="fa-solid ${platIcon[p]}"></i>
+                    <strong>${platName[p]}</strong>
+                    <span>Demo guest + sample items</span>
+                  </button>`
+              )
+              .join('')}
+          </div>`,
+          foot: '<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>',
+          onMount(m, close) {
+            m.querySelector('[data-x]').onclick = () => {
+              close();
+              resolve(null);
+            };
+            m.querySelectorAll('[data-plat]').forEach((btn) => {
+              btn.onclick = () => {
+                const p = btn.getAttribute('data-plat');
+                close();
+                resolve(p);
+              };
+            });
+          },
+        });
+      });
+    }
+
+    function openAggWebhookModal() {
+      const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const tid = sess.tenant_id || sessionStorage.getItem('tenant_id') || '';
+      const base =
+        (window.RS_API && RS_API.functionsBase) ||
+        (window.__SUPABASE_URL__
+          ? String(window.__SUPABASE_URL__).replace(/\/+$/, '') + '/functions/v1'
+          : 'https://YOUR_PROJECT.supabase.co/functions/v1');
+      const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid || 'YOUR_TENANT_ID')}`;
+      const sample = `{
+  "platform": "swiggy",
+  "order_id": "SWI-100234",
+  "customer_name": "Asha",
+  "customer_phone": "9876501234",
+  "total_amount": 420,
+  "items": [{ "name": "Paneer Butter Masala", "qty": 1, "price": 280 }]
+}`;
+      const body = `<div class="agg-wh-body">
+        <ol class="agg-wh-steps">
+          <li>Copy the webhook URL below into your aggregator / middleware.</li>
+          <li>Send <b>POST</b> with header <code>Authorization: Bearer AGGREGATOR_WEBHOOK_SECRET</code>.</li>
+          <li>New orders land here for <b>Accept + KOT</b>, then settle in POS.</li>
+        </ol>
+        <div class="agg-wh-label">Webhook URL ${tid ? '' : '<span class="agg-wh-warn">· set tenant first</span>'}</div>
+        <div class="agg-wh-url" id="agg-wh-url">${esc(url)}</div>
+        <div class="agg-wh-label" style="margin-top:12px">Sample JSON body</div>
+        <pre class="agg-wh-sample">${esc(sample)}</pre>
+        <p class="agg-wh-note">Fields: <code>platform</code>, <code>order_id</code>, <code>customer_name</code>, <code>customer_phone</code>, <code>items[]</code>, <code>total_amount</code>.</p>
+      </div>`;
+      const copyUrl = async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(url);
+          else {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+          }
+          RS.toast('Webhook URL copied', 'fa-copy');
+        } catch (_) {
+          window.prompt('Copy webhook URL', url);
+        }
+      };
+      if (window.RSModal) {
+        RSModal.open({
+          title: 'Aggregator webhook',
+          sub: 'Zomato · Swiggy · ONDC intake',
+          icon: 'fa-link',
+          size: 'md',
+          body,
+          foot: `<button type="button" class="btn btn-ghost" style="flex:1" id="agg-wh-copy"><i class="fa-solid fa-copy"></i> Copy URL</button>
+                 <button type="button" class="btn btn-primary" style="flex:1" id="agg-wh-close">Done</button>`,
+          onMount(m, close) {
+            const c = m.querySelector('#agg-wh-close');
+            const copy = m.querySelector('#agg-wh-copy');
+            if (c) c.onclick = close;
+            if (copy) copy.onclick = copyUrl;
+          },
+        });
+      } else {
+        window.prompt('Webhook URL', url);
+      }
+    }
+
+    function aggRelativeRefresh(ts) {
+      if (!ts) return 'Not refreshed yet';
+      const sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+      if (sec < 5) return 'Just now';
+      if (sec < 60) return sec + 's ago';
+      const m = Math.floor(sec / 60);
+      if (m < 60) return m + 'm ago';
+      return Math.floor(m / 60) + 'h ago';
+    }
+
     async function renderAgg() {
       const sec = $('#aggregator-tab');
       if (!sec) return;
-      sec.innerHTML = '<div class="sr-empty">Loading online orders...</div>';
+      if (!sec.dataset.aggShell) {
+        sec.dataset.aggShell = '1';
+        sec.innerHTML = `<div class="agg-shell">
+          <div class="agg-loading"><i class="fa-solid fa-motorcycle"></i><span>Loading online orders…</span></div>
+        </div>`;
+      } else {
+        const refreshIco = sec.querySelector('#agg-refresh i');
+        if (refreshIco) refreshIco.classList.add('fa-spin');
+      }
+      aggRefreshing = true;
       await refreshOnlineOrders();
+      aggLastRefreshAt = Date.now();
+      aggRefreshing = false;
+
       const newN = ONLINE.filter((o) => o.status === 'new').length;
       const prepN = ONLINE.filter((o) => o.status === 'preparing').length;
       const readyN = ONLINE.filter((o) => o.status === 'ready').length;
+      const openValue = ONLINE.reduce((a, o) => a + o.total, 0);
       const showDemo =
         !!(window.RS_API && RS_API.enableDemoTools) ||
         localStorage.getItem('rs_demo_tools') === '1' ||
-        /owner|manager|admin/i.test(sessionStorage.getItem('logged_in_role') || '');
-      const feedLive = ONLINE.length > 0 || navigator.onLine !== false;
-      sec.innerHTML = `
-        <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-motorcycle"></i></div><div><div class="sv">${newN}</div><div class="sl">New orders</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-fire-burner"></i></div><div><div class="sv">${prepN}</div><div class="sl">Preparing</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-bell-concierge"></i></div><div><div class="sv">${readyN}</div><div class="sl">Ready for pickup</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-coins"></i></div><div><div class="sv">${rs(ONLINE.reduce((a, o) => a + o.total, 0))}</div><div class="sl">Open online value</div></div></div>
-        </div>
-        <div class="toolbar-row" style="flex-wrap:wrap;gap:8px">
-          <span class="eyebrow">Zomato · Swiggy · ONDC</span>
-          <div class="grow"></div>
-          ${showDemo ? '<button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
-          <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
-          <span class="pill ${feedLive ? 'pill-green' : 'pill-amber'}"><span class="dot ${feedLive ? 'dot-live' : ''}"></span>${feedLive ? 'Online' : 'Offline'}</span>
-        </div>
-        <div class="agg-grid">${ONLINE.map(
-          (o, i) => `
-          <div class="agg-card${o.status === 'new' ? ' needs-attention' : ''}" data-i="${i}">
-            <div class="agg-top ${o.plat}"><i class="fa-solid ${o.plat === 'ondc' ? 'fa-network-wired' : o.plat === 'swiggy' ? 'fa-motorcycle' : 'fa-bowl-food'}"></i><span class="plat">${platName[o.plat]}</span><span class="oid">${esc(o.oid)}</span></div>
+        /owner|manager|admin|superadmin/i.test(sessionStorage.getItem('logged_in_role') || '');
+      const feedLive = navigator.onLine !== false;
+      const filtered = ONLINE.filter((o) => {
+        if (aggFilterPlat !== 'all' && o.plat !== aggFilterPlat) return false;
+        if (aggFilterStatus !== 'all' && o.status !== aggFilterStatus) return false;
+        return true;
+      });
+      const statusLabel = { new: 'New', preparing: 'Preparing', ready: 'Ready' };
+
+      const cardsHtml = filtered
+        .map((o) => {
+          const i = ONLINE.indexOf(o);
+          const phoneHtml = o.phone
+            ? ` · <a class="agg-phone" href="tel:${esc(String(o.phone).replace(/[^\d+]/g, ''))}">${esc(o.phone)}</a>`
+            : '';
+          const itemsHtml = (o.items || [])
+            .map((line) => `<li>${esc(line)}</li>`)
+            .join('');
+          const actions =
+            o.status === 'new'
+              ? `<button type="button" class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button>
+                 <button type="button" class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept + KOT</button>`
+              : o.status === 'preparing'
+                ? `<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${esc(String(o.prep))}m prep</span>
+                   <button type="button" class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
+                : `<button type="button" class="btn btn-ghost btn-sm" data-rider="${i}"><i class="fa-solid fa-motorcycle"></i> Rider out</button>`;
+          return `<article class="agg-card${o.status === 'new' ? ' needs-attention' : ''}" data-i="${i}" data-status="${esc(o.status)}" data-plat="${esc(o.plat)}">
+            <div class="agg-top ${o.plat}">
+              <i class="fa-solid ${platIcon[o.plat] || 'fa-motorcycle'}"></i>
+              <span class="plat">${platName[o.plat] || 'Online'}</span>
+              <span class="oid">${esc(o.oid)}</span>
+            </div>
             <div class="agg-body">
-              <div class="agg-cust"><div><div class="cn">${esc(o.cust)}</div><div class="ct">${esc(o.area)}${o.phone ? ' · ' + esc(o.phone) : ''}${o.since ? ' · ' + esc(o.since) : ''}</div></div><span class="pill ${o.status === 'new' ? 'pill-amber' : o.status === 'preparing' ? 'pill-orange' : 'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(o.status)}</span></div>
-              <div class="agg-items">${o.items.map(esc).join('<br>')}</div>
-              <div class="agg-foot"><span class="at">${rs(o.total)}</span>
-                <button type="button" class="btn btn-ghost btn-sm" data-pos="${i}" title="Open in POS"><i class="fa-solid fa-cash-register"></i></button>
-                ${
-                  o.status === 'new'
-                    ? `<button type="button" class="btn btn-ghost btn-sm" data-rej="${i}">Reject</button><button type="button" class="btn btn-primary btn-sm" data-acc="${i}"><i class="fa-solid fa-check"></i> Accept + KOT</button>`
-                    : o.status === 'preparing'
-                      ? `<span class="agg-prep"><i class="fa-solid fa-clock"></i> ${esc(o.prep)}m</span><button type="button" class="btn btn-primary btn-sm" data-ready="${i}">Mark ready</button>`
-                      : `<button type="button" class="btn btn-ghost btn-sm" data-rider="${i}"><i class="fa-solid fa-motorcycle"></i> Rider out</button>`
-                }
+              <div class="agg-cust">
+                <div>
+                  <div class="cn">${esc(o.cust)}</div>
+                  <div class="ct">${esc(o.area)}${phoneHtml}${o.since ? ' · <span class="agg-since">' + esc(o.since) + '</span>' : ''}</div>
+                </div>
+                <span class="pill ${o.status === 'new' ? 'pill-amber' : o.status === 'preparing' ? 'pill-orange' : 'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(statusLabel[o.status] || o.status)}</span>
+              </div>
+              <ul class="agg-items">${itemsHtml || '<li class="agg-items-empty">No items listed</li>'}</ul>
+              <div class="agg-foot">
+                <span class="at">${rs(o.total)}</span>
+                <button type="button" class="btn btn-ghost btn-sm" data-pos="${i}" title="Open in POS"><i class="fa-solid fa-cash-register"></i> POS</button>
+                ${actions}
               </div>
             </div>
-          </div>`
-        ).join('')}</div>`;
+          </article>`;
+        })
+        .join('');
+
+      let gridBody = cardsHtml;
       if (!ONLINE.length) {
-        const grid = $('.agg-grid', sec);
-        if (grid)
-          grid.innerHTML = `<div class="sr-empty" style="padding:40px 20px;grid-column:1/-1">
-          <i class="fa-solid fa-motorcycle" style="font-size:28px;opacity:.4;display:block;margin-bottom:10px"></i>
-          <div style="font-weight:700;margin-bottom:6px;font-size:15px">Kitchen is clear for delivery</div>
-          <div style="font-size:13px;color:var(--text-soft);max-width:400px;margin:0 auto 14px;line-height:1.5">
-            New Zomato / Swiggy / ONDC orders appear here for <b>Accept + KOT</b>, then settle in POS.
-            ${showDemo ? ' Use <b>Demo order</b> to practice the full flow.' : ' Connect webhooks under Webhook when your aggregator is ready.'}
+        gridBody = `<div class="agg-empty">
+          <div class="agg-empty-visual">
+            <span class="agg-empty-orb"></span>
+            <i class="fa-solid fa-motorcycle"></i>
           </div>
-          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-            <button type="button" class="btn btn-ghost btn-sm" id="agg-empty-webhook"><i class="fa-solid fa-link"></i> Webhook setup</button>
-            ${showDemo ? '<button type="button" class="btn btn-primary btn-sm" id="agg-empty-demo"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
+          <div class="agg-plat-row" aria-hidden="true">
+            <span class="agg-plat-chip swiggy">Swiggy</span>
+            <span class="agg-plat-chip zomato">Zomato</span>
+            <span class="agg-plat-chip ondc">ONDC</span>
+          </div>
+          <h3 class="agg-empty-title">Kitchen is clear for delivery</h3>
+          <p class="agg-empty-copy">
+            New aggregator orders land here for <b>Accept + KOT</b>, then settle in POS.
+            ${showDemo ? 'Try a demo order to practice the full flow in under a minute.' : 'Connect your webhook when the aggregator integration is ready.'}
+          </p>
+          <ol class="agg-empty-steps">
+            <li><span>1</span> Connect webhook</li>
+            <li><span>2</span> Accept + print KOT</li>
+            <li><span>3</span> Settle in POS</li>
+          </ol>
+          <div class="agg-empty-actions">
+            <button type="button" class="btn btn-ghost" id="agg-empty-webhook"><i class="fa-solid fa-link"></i> Webhook setup</button>
+            ${showDemo ? '<button type="button" class="btn btn-primary" id="agg-empty-demo"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
           </div>
         </div>`;
+      } else if (!filtered.length) {
+        gridBody = `<div class="agg-empty agg-empty-filter">
+          <i class="fa-solid fa-filter-circle-xmark"></i>
+          <h3 class="agg-empty-title">No orders match this filter</h3>
+          <p class="agg-empty-copy">Try All platforms or clear the status filter.</p>
+          <button type="button" class="btn btn-ghost btn-sm" id="agg-clear-filters">Clear filters</button>
+        </div>`;
       }
+
+      sec.innerHTML = `
+        <div class="agg-shell">
+          <div class="stat-row agg-stats">
+            <button type="button" class="stat-card agg-stat${aggFilterStatus === 'new' ? ' is-active' : ''}" data-status-filter="new" title="Show new orders">
+              <div class="stat-ic bg-o"><i class="fa-solid fa-motorcycle"></i></div>
+              <div><div class="sv">${newN}</div><div class="sl">New orders</div></div>
+            </button>
+            <button type="button" class="stat-card agg-stat${aggFilterStatus === 'preparing' ? ' is-active' : ''}" data-status-filter="preparing" title="Show preparing">
+              <div class="stat-ic bg-a"><i class="fa-solid fa-fire-burner"></i></div>
+              <div><div class="sv">${prepN}</div><div class="sl">Preparing</div></div>
+            </button>
+            <button type="button" class="stat-card agg-stat${aggFilterStatus === 'ready' ? ' is-active' : ''}" data-status-filter="ready" title="Show ready for pickup">
+              <div class="stat-ic bg-g"><i class="fa-solid fa-bell-concierge"></i></div>
+              <div><div class="sv">${readyN}</div><div class="sl">Ready for pickup</div></div>
+            </button>
+            <div class="stat-card" title="Open online value">
+              <div class="stat-ic bg-v"><i class="fa-solid fa-coins"></i></div>
+              <div><div class="sv">${rs(openValue)}</div><div class="sl">Open online value</div></div>
+            </div>
+          </div>
+
+          <div class="toolbar-row agg-toolbar">
+            <div class="agg-filters" role="group" aria-label="Platform filter">
+              <button type="button" class="agg-filter-chip${aggFilterPlat === 'all' ? ' is-active' : ''}" data-plat-filter="all">All</button>
+              <button type="button" class="agg-filter-chip swiggy${aggFilterPlat === 'swiggy' ? ' is-active' : ''}" data-plat-filter="swiggy">Swiggy</button>
+              <button type="button" class="agg-filter-chip zomato${aggFilterPlat === 'zomato' ? ' is-active' : ''}" data-plat-filter="zomato">Zomato</button>
+              <button type="button" class="agg-filter-chip ondc${aggFilterPlat === 'ondc' ? ' is-active' : ''}" data-plat-filter="ondc">ONDC</button>
+            </div>
+            <div class="grow"></div>
+            <span class="agg-refreshed" id="agg-refreshed" title="Last refreshed">${esc(aggRelativeRefresh(aggLastRefreshAt))}</span>
+            ${showDemo ? '<button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
+            <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh" title="Refresh now"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
+            <span class="pill ${feedLive ? 'pill-green' : 'pill-amber'}" title="${feedLive ? 'Browser online — listening for sync' : 'Browser offline'}">
+              <span class="dot ${feedLive ? 'dot-live' : ''}"></span>${feedLive ? 'Listening' : 'Offline'}
+            </span>
+          </div>
+
+          <div class="agg-grid${ONLINE.length ? '' : ' is-empty'}">${gridBody}</div>
+        </div>`;
+
       $$('[data-pos]', sec).forEach((b) => {
         b.onclick = () => openOnlineOrderInPos(ONLINE[+b.dataset.pos]);
       });
       $$('[data-acc]', sec).forEach((b) => {
         b.onclick = async () => {
+          if (b.disabled) return;
+          b.disabled = true;
           const i = +b.dataset.acc;
           if (ONLINE[i]) ONLINE[i].prep = 15;
-          await persistOnlineStatus(i, 'preparing', 'Accepted · KOT printed', 'fa-check', {
-            printKot: true,
-            prepMinutes: 15,
-          });
+          try {
+            await persistOnlineStatus(i, 'preparing', 'Accepted · KOT printed', 'fa-check', {
+              printKot: true,
+              prepMinutes: 15,
+            });
+          } catch (_) {
+            b.disabled = false;
+          }
         };
       });
-      $$('[data-ready]', sec).forEach((b) =>
-        b.onclick = () => persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup', 'fa-bell-concierge')
+      $$('[data-ready]', sec).forEach(
+        (b) =>
+          (b.onclick = () =>
+            persistOnlineStatus(+b.dataset.ready, 'Ready', 'Marked ready for pickup', 'fa-bell-concierge'))
       );
-      $$('[data-rej]', sec).forEach((b) =>
-        b.onclick = async () => {
-          const i = +b.dataset.rej;
-          const order = ONLINE[i];
-          if (!order) return;
-          let reason = 'Rejected by outlet';
-          if (window.RSModal) {
-            await new Promise((resolve) => {
-              RSModal.open({
-                title: 'Reject online order',
-                sub: (platName[order.plat] || 'Online') + ' · ' + order.oid,
-                icon: 'fa-xmark',
-                size: 'sm',
-                body: `<label class="fl">Reason (shared internally)</label>
+      $$('[data-rej]', sec).forEach(
+        (b) =>
+          (b.onclick = async () => {
+            const i = +b.dataset.rej;
+            const order = ONLINE[i];
+            if (!order) return;
+            let reason = 'Rejected by outlet';
+            if (window.RSModal) {
+              await new Promise((resolve) => {
+                RSModal.open({
+                  title: 'Reject online order',
+                  sub: (platName[order.plat] || 'Online') + ' · ' + order.oid,
+                  icon: 'fa-xmark',
+                  size: 'sm',
+                  body: `<label class="fl">Reason (shared internally)</label>
                   <select class="form-input" id="agg-rej-reason">
                     <option>Item unavailable</option>
                     <option>Outlet closed / too busy</option>
@@ -3398,93 +3619,85 @@
                     <option value="other">Other…</option>
                   </select>
                   <input class="form-input" id="agg-rej-other" placeholder="Details (optional)" style="margin-top:8px;display:none">`,
-                foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+                  foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
                        <button type="button" class="btn btn-primary" style="flex:1" data-ok>Reject order</button>`,
-                onMount(m, close) {
-                  const sel = m.querySelector('#agg-rej-reason');
-                  const other = m.querySelector('#agg-rej-other');
-                  sel.onchange = () => {
-                    other.style.display = sel.value === 'other' ? '' : 'none';
-                  };
-                  m.querySelector('[data-x]').onclick = () => {
-                    close();
-                    resolve(false);
-                  };
-                  m.querySelector('[data-ok]').onclick = () => {
-                    reason =
-                      sel.value === 'other'
-                        ? (other.value || '').trim() || 'Rejected by outlet'
-                        : sel.value;
-                    close();
-                    resolve(true);
-                  };
-                },
+                  onMount(m, close) {
+                    const sel = m.querySelector('#agg-rej-reason');
+                    const other = m.querySelector('#agg-rej-other');
+                    sel.onchange = () => {
+                      other.style.display = sel.value === 'other' ? '' : 'none';
+                    };
+                    m.querySelector('[data-x]').onclick = () => {
+                      close();
+                      resolve(false);
+                    };
+                    m.querySelector('[data-ok]').onclick = () => {
+                      reason =
+                        sel.value === 'other'
+                          ? (other.value || '').trim() || 'Rejected by outlet'
+                          : sel.value;
+                      close();
+                      resolve(true);
+                    };
+                  },
+                });
+              }).then(async (ok) => {
+                if (!ok) return;
+                order.row.rejectReason = reason;
+                await persistOnlineStatus(i, 'Rejected', 'Rejected · ' + reason.slice(0, 40), 'fa-xmark');
               });
-            }).then(async (ok) => {
-              if (!ok) return;
-              order.row.rejectReason = reason;
-              await persistOnlineStatus(i, 'Rejected', 'Rejected · ' + reason.slice(0, 40), 'fa-xmark');
-            });
-          } else {
-            const r = window.prompt('Reject reason?', reason);
-            if (r == null) return;
-            order.row.rejectReason = r || reason;
-            await persistOnlineStatus(i, 'Rejected', 'Order rejected', 'fa-xmark');
-          }
-        }
+            } else {
+              const r = window.prompt('Reject reason?', reason);
+              if (r == null) return;
+              order.row.rejectReason = r || reason;
+              await persistOnlineStatus(i, 'Rejected', 'Order rejected', 'fa-xmark');
+            }
+          })
       );
-      $$('[data-rider]', sec).forEach((b) =>
-        b.onclick = () => persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded', 'fa-motorcycle')
+      $$('[data-rider]', sec).forEach(
+        (b) =>
+          (b.onclick = () =>
+            persistOnlineStatus(+b.dataset.rider, 'Picked Up', 'Rider pickup recorded', 'fa-motorcycle'))
       );
 
       const refreshBtn = sec.querySelector('#agg-refresh');
-      if (refreshBtn) refreshBtn.onclick = () => renderAgg();
-      const seedDemo = () => {
-        const plats = ['swiggy', 'zomato', 'ondc'];
-        const pick = plats[Math.floor(Math.random() * plats.length)];
-        seedDemoOnlineOrder(pick);
+      if (refreshBtn)
+        refreshBtn.onclick = () => {
+          if (!aggRefreshing) renderAgg();
+        };
+
+      const seedDemo = async () => {
+        const pick = await pickDemoPlatform();
+        if (pick) seedDemoOnlineOrder(pick);
       };
       const seedBtn = sec.querySelector('#agg-seed');
       if (seedBtn) seedBtn.onclick = seedDemo;
       const emptyDemo = sec.querySelector('#agg-empty-demo');
       if (emptyDemo) emptyDemo.onclick = seedDemo;
-      const openWebhook = () => {
-        const wh = sec.querySelector('#agg-webhook-info');
-        if (wh) wh.click();
-      };
       const emptyWh = sec.querySelector('#agg-empty-webhook');
-      if (emptyWh) emptyWh.onclick = openWebhook;
+      if (emptyWh) emptyWh.onclick = openAggWebhookModal;
       const whBtn = sec.querySelector('#agg-webhook-info');
-      if (whBtn)
-        whBtn.onclick = () => {
-          const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
-          const tid = sess.tenant_id || '';
-          const base =
-            (window.RS_API && RS_API.functionsBase) ||
-            (window.__SUPABASE_URL__
-              ? String(window.__SUPABASE_URL__).replace(/\/+$/, '') + '/functions/v1'
-              : 'https://YOUR_PROJECT.supabase.co/functions/v1');
-          const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid)}`;
-          const body = `<div style="font-size:13px;line-height:1.55;color:var(--text-soft)">
-          <p style="margin:0 0 10px;color:var(--text)"><b>Webhook URL</b> (POST JSON, Authorization: Bearer AGGREGATOR_WEBHOOK_SECRET)</p>
-          <code style="display:block;padding:10px;border-radius:8px;background:var(--glass);border:1px solid var(--stroke);word-break:break-all;font-size:11.5px">${esc(url)}</code>
-          <p style="margin:12px 0 0">Body fields: <code>platform</code>, <code>order_id</code>, <code>customer_name</code>, <code>customer_phone</code>, <code>items[]</code>, <code>total_amount</code>.</p>
-        </div>`;
-          if (window.RSModal) {
-            RSModal.open({
-              title: 'Aggregator webhook',
-              icon: 'fa-link',
-              size: 'sm',
-              body,
-              foot: '<button class="btn btn-primary" id="agg-wh-close">Close</button>',
-              onMount(m, close) {
-                const c = m.querySelector('#agg-wh-close');
-                if (c) c.onclick = close;
-              },
-            });
-          } else {
-            window.prompt('Webhook URL', url);
-          }
+      if (whBtn) whBtn.onclick = openAggWebhookModal;
+
+      sec.querySelectorAll('[data-plat-filter]').forEach((btn) => {
+        btn.onclick = () => {
+          aggFilterPlat = btn.getAttribute('data-plat-filter') || 'all';
+          renderAgg();
+        };
+      });
+      sec.querySelectorAll('[data-status-filter]').forEach((btn) => {
+        btn.onclick = () => {
+          const s = btn.getAttribute('data-status-filter') || 'all';
+          aggFilterStatus = aggFilterStatus === s ? 'all' : s;
+          renderAgg();
+        };
+      });
+      const clearFilters = sec.querySelector('#agg-clear-filters');
+      if (clearFilters)
+        clearFilters.onclick = () => {
+          aggFilterPlat = 'all';
+          aggFilterStatus = 'all';
+          renderAgg();
         };
 
       // Auto-refresh while tab is active

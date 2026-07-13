@@ -402,7 +402,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v151-20260713-version-10';
+    return 'v152-20260713-online-orders';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

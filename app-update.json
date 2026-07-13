@@ -1,12 +1,13 @@
 {
-  "version": "v151-20260713-version-10",
+  "version": "v152-20260713-online-orders",
   "date": "2026-07-13",
-  "title": "Clean version label & URL hygiene",
-  "summary": "The top-bar build chip always shows the real RestroSuite version (e.g. v151). Legacy ?appv=Systempatch URLs are rewritten automatically, and updates never write marketing labels into the address bar.",
+  "title": "Online Orders 10/10 hub",
+  "summary": "The Online Orders screen gets a polished empty state, platform and status filters, one-click webhook copy, platform-picker demos, and clearer order cards for Zomato, Swiggy, and ONDC.",
   "highlights": [
-    "Address bar auto-cleans ?appv=Systempatch to the real short build tag without a hard reload.",
-    "Version chip shows v151 with a live indicator; click copies the full build id.",
-    "Save & Update only writes clean tags like v151 — never Systempatch.",
-    "WhatsApp reconnect, notification panel, and top-bar click fixes from v147–v149 remain included."
+    "Empty state: platform chips, 3-step flow (webhook → Accept+KOT → POS), clearer CTAs.",
+    "Clickable New / Preparing / Ready stats plus All · Swiggy · Zomato · ONDC filters.",
+    "Webhook modal with copy URL, setup steps, and sample JSON payload.",
+    "Demo order lets you pick Swiggy, Zomato, or ONDC instead of a random platform.",
+    "Order cards: item bullets, tappable phone, POS label, double-click guard on Accept, Listening status + last refreshed."
   ]
 }
