@@ -398,19 +398,39 @@ function bindMobileCartBar(){
     if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
   });
 }
-function addToCart(id){
+function addToCart(id, opts){
+  opts = opts || {};
   const m=getMenu().find(x=>String(x.id)===String(id));
   if (!m) return;
-  // Wave 3: soft stock/recipe warning before add
+  const portion = opts.portion != null ? Number(opts.portion) : 1; // 0.5 half · 1 full · 2 double
+  const pFactor = portion > 0 ? portion : 1;
+  // Harder recipe/cost/stock checks
   try {
+    const health =
+      global.RSRecipeUnits && RSRecipeUnits.recipeHealth
+        ? RSRecipeUnits.recipeHealth(m, INVENTORY)
+        : null;
+    if (health && !health.ok) {
+      if (health.code === 'no_recipe') {
+        if (global.RSKitchenLinkCoach && typeof RSKitchenLinkCoach.posUnlinkedHint === 'function') {
+          RSKitchenLinkCoach.posUnlinkedHint(m.name);
+        } else {
+          toast('“' + m.name + '” has no recipe — stock will not reduce', 'fa-link');
+        }
+      } else if (health.code === 'no_cost') {
+        toast('Recipe cost incomplete — set unit costs on stock', 'fa-indian-rupee-sign');
+      } else if (health.code === 'missing_stock') {
+        toast('Recipe stock missing: ' + (health.missing || []).slice(0, 2).join(', '), 'fa-triangle-exclamation');
+      }
+    }
     if (Array.isArray(m.ingredients) && m.ingredients.length && INVENTORY.length) {
       const short = m.ingredients.filter(ing => {
         let need = Number(ing.qty) || 0;
         if (global.RSRecipeUnits && RSRecipeUnits.deductQtyForIngredient) {
-          need = RSRecipeUnits.deductQtyForIngredient(ing, m, 1, 1, INVENTORY);
+          need = RSRecipeUnits.deductQtyForIngredient(ing, m, 1, pFactor, INVENTORY);
         } else {
           const base = Math.max(1, Number(m.recipeServings) || 1);
-          need = need / base;
+          need = (need / base) * pFactor;
         }
         const inv = INVENTORY.find(i => i.name === ing.name);
         return inv && (Number(inv.stock) || 0) < need;
@@ -418,31 +438,70 @@ function addToCart(id){
       if (short.length) {
         toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');
       }
-    } else if (!m.ingredients || !m.ingredients.length) {
-      // Soft plain-language hint (max 2 per session) so staff know stock won't move
-      if (global.RSKitchenLinkCoach && typeof RSKitchenLinkCoach.posUnlinkedHint === 'function') {
-        RSKitchenLinkCoach.posUnlinkedHint(m.name);
-      }
     }
   } catch (_) {}
-  const basePrice = Number(m.price) || 0;
-  const price = effectiveMenuPrice(m);
-  const hh = isHappyHourActive() && price < basePrice;
-  const line=cart.find(c=>String(c.id)===String(id) && Number(c.price)===price);
-  if(line) line.qty++;
+  const listPrice = Number(m.price) || 0;
+  const effFull = effectiveMenuPrice(m);
+  const basePrice = listPrice;
+  const price = Math.round(effFull * pFactor * 100) / 100;
+  const hh = isHappyHourActive() && effFull < listPrice;
+  // Match same dish + same portion + same unit price
+  const line = cart.find(
+    (c) =>
+      String(c.id) === String(id) &&
+      Number(c.portion || 1) === pFactor &&
+      Number(c.price) === price
+  );
+  if (line) line.qty++;
   else {
     cart.push({
       ...m,
       qty: 1,
       price,
       basePrice,
+      fullPrice: effFull,
+      portion: pFactor,
+      servings: pFactor, // inventory deduction multiplier
       happyHour: hh,
     });
   }
   renderCart();
-  toast(hh ? `${m.name} · Happy Hour ${rs(price)}` : `${m.name} added`, hh ? 'fa-bolt' : 'fa-plus');
+  const pLab = pFactor === 0.5 ? '½' : pFactor === 2 ? '×2' : '';
+  toast(
+    hh
+      ? `${m.name} · Happy Hour ${rs(price)}`
+      : `${m.name}${pLab ? ' ' + pLab : ''} added`,
+    hh ? 'fa-bolt' : 'fa-plus'
+  );
 }
-function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
+function changeQty(id,d){
+  // Prefer line matching data-line-key if present via event — fallback first match by id
+  const line = cart.find((c) => String(c.id) === String(id));
+  if (!line) return;
+  line.qty += d;
+  if (line.qty <= 0) cart = cart.filter((c) => c !== line);
+  renderCart();
+}
+function setLinePortion(lineKey, portion) {
+  const p = Number(portion);
+  if (!(p > 0)) return;
+  const line =
+    cart.find((c) => cartLineKey(c) === String(lineKey)) ||
+    cart.find((c) => String(c.id) === String(lineKey));
+  if (!line) return;
+  const full = Number(line.fullPrice != null ? line.fullPrice : line.basePrice != null ? line.basePrice : line.price) || 0;
+  line.portion = p;
+  line.servings = p;
+  line.price = Math.round(full * p * 100) / 100;
+  renderCart();
+  toast(
+    (line.name || 'Item') + (p === 0.5 ? ' · half' : p === 2 ? ' · double' : ' · full'),
+    'fa-utensils'
+  );
+}
+function cartLineKey(c) {
+  return String(c.id) + '|' + String(c.portion || 1) + '|' + String(c.price);
+}
 function setLineNote(id, note) {
   const line = cart.find((c) => String(c.id) === String(id));
   if (!line) return false;
@@ -578,20 +637,45 @@ function renderCart(){
   updateMobileCartBar(count, totals);
 
   if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
-  else { wrap.innerHTML = cart.map(c=>`
-    <div class="cart-line${c.note ? ' has-note' : ''}" data-line-id="${_e(c.id)}" title="Long-press for kitchen note">
+  else { wrap.innerHTML = cart.map(c=>{
+    const p = Number(c.portion || 1);
+    const lk = cartLineKey(c);
+    const noRec = !Array.isArray(c.ingredients) || !c.ingredients.length;
+    return `
+    <div class="cart-line${c.note ? ' has-note' : ''}${noRec ? ' cart-line-norecipe' : ''}" data-line-id="${_e(c.id)}" data-line-key="${_e(lk)}" title="Long-press for kitchen note">
       <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
       <div class="cinfo">
         <div class="cn-row">
-          <span class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}</span>
+          <span class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}${noRec ? ' <span class="cart-nr" title="No recipe — stock won\'t move">⚠</span>' : ''}</span>
           <span class="cp" title="Unit price">${rs(c.price)}${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' <s class="cp-was">' + rs(c.basePrice) + '</s>' : ''}</span>
+        </div>
+        <div class="cart-portion" role="group" aria-label="Portion size">
+          <button type="button" class="cart-p-btn${p===0.5?' active':''}" data-portion="0.5" data-lk="${_e(lk)}" title="Half portion · half stock">½</button>
+          <button type="button" class="cart-p-btn${p===1?' active':''}" data-portion="1" data-lk="${_e(lk)}" title="Full">Full</button>
+          <button type="button" class="cart-p-btn${p===2?' active':''}" data-portion="2" data-lk="${_e(lk)}" title="Double · 2× stock">×2</button>
         </div>
         ${c.note ? `<button type="button" class="cnote cart-line-note" data-note-id="${_e(c.id)}" title="Edit kitchen note"><i class="fa-solid fa-comment" aria-hidden="true"></i> ${_e(c.note)}</button>` : ''}
       </div>
-      <div class="qty"><button type="button" data-d="-1" data-id="${_e(c.id)}" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button type="button" data-d="1" data-id="${_e(c.id)}" aria-label="Increase"><i class="fa-solid fa-plus"></i></button></div>
+      <div class="qty"><button type="button" data-d="-1" data-id="${_e(c.id)}" data-lk="${_e(lk)}" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button type="button" data-d="1" data-id="${_e(c.id)}" data-lk="${_e(lk)}" aria-label="Increase"><i class="fa-solid fa-plus"></i></button></div>
       <div class="cline-total">${rs(c.price*c.qty)}</div>
-    </div>`).join('');
-    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',(e)=>{ e.stopPropagation(); changeQty(b.dataset.id,+b.dataset.d); }));
+    </div>`;
+  }).join('');
+    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      const lk = b.getAttribute('data-lk');
+      const line = lk ? cart.find((c) => cartLineKey(c) === lk) : cart.find((c) => String(c.id) === String(b.dataset.id));
+      if (!line) return;
+      line.qty += +b.dataset.d;
+      if (line.qty <= 0) cart = cart.filter((c) => c !== line);
+      renderCart();
+    }));
+    $$('#cart-items .cart-p-btn').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setLinePortion(b.getAttribute('data-lk'), b.getAttribute('data-portion'));
+      })
+    );
     $$('#cart-items .cart-line-note').forEach((b) =>
       b.addEventListener('click', (e) => {
         e.preventDefault();

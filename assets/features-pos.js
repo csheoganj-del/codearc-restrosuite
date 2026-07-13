@@ -2029,10 +2029,14 @@
           pax: custSnap.covers || 0,
           subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst || 0) - gstHalf,
           _items: itemsSnap.map(i => ({
+            id: i.id,
             name: i.name, qty: i.qty, price: i.price,
             cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category,
             note: i.note || i.notes || '',
             notes: i.note || i.notes || '',
+            // Portion size for stock: half=0.5, full=1, double=2
+            portion: i.portion != null ? i.portion : 1,
+            servings: i.servings != null ? i.servings : (i.portion != null ? i.portion : 1),
           })),
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile,
           liquorTaxAmount: totals.liquorTax,

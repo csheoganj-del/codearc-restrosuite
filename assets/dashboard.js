@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v170-20260713-units-kg-gm-ltr-ml';
+    return 'v171-20260713-inv-10of10';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

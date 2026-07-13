@@ -1579,6 +1579,23 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   background: color-mix(in srgb, var(--green) 8%, var(--panel)) !important;
 }
 .inv-cost-banner { margin-bottom: 12px; }
+
+/* POS cart portion size (half / full / double) */
+.cart-portion {
+  display: inline-flex; gap: 4px; margin-top: 4px;
+}
+.cart-p-btn {
+  appearance: none; border: 1px solid var(--stroke-2); background: var(--glass);
+  border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 11px; font-weight: 700;
+  color: var(--text-soft); cursor: pointer; min-width: 32px;
+}
+.cart-p-btn:hover { border-color: var(--orange); color: var(--text); }
+.cart-p-btn.active {
+  border-color: var(--orange); color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 12%, transparent);
+}
+.cart-nr { color: var(--amber); font-size: 12px; }
+.cart-line-norecipe { opacity: 0.95; }
 .inv-name-btn {
   appearance: none; border: 0; background: transparent; padding: 0;
   text-align: left; cursor: pointer; font: inherit; color: inherit;

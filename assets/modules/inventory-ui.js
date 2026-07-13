@@ -1020,10 +1020,20 @@
                 close();
                 setOperationStatus('Receiving stock...');
                 try {
-                  inv.stock = Math.max(0, Number(inv.stock) || 0) + qty;
+                  const oldQty = Math.max(0, Number(inv.stock) || 0);
+                  const oldCost = unitCostOf(inv);
+                  inv.stock = oldQty + qty;
+                  // Industry standard: weighted average unit cost on receive
                   if (unitCost > 0) {
-                    inv.cost = unitCost;
-                    inv.unit_cost = unitCost;
+                    const avg =
+                      global.RSRecipeUnits && RSRecipeUnits.weightedAverageCost
+                        ? RSRecipeUnits.weightedAverageCost(oldQty, oldCost, qty, unitCost)
+                        : oldQty > 0 && oldCost > 0
+                          ? (oldQty * oldCost + qty * unitCost) / (oldQty + qty)
+                          : unitCost;
+                    inv.cost = Math.round(avg * 10000) / 10000;
+                    inv.unit_cost = inv.cost;
+                    inv.lastBuyCost = unitCost;
                   }
                   if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
                   if (global.RSInventoryBatches && RSInventoryBatches.receiveBatch) {
@@ -1039,7 +1049,14 @@
                   finishOperationStatus('Stock received');
                   toast(
                     `+${qty} ${inv.unit || ''} ${displayInvName(inv.name)}` +
-                      (unitCost > 0 ? ' · cost ' + rs(unitCost) + '/' + (inv.unit || '') : '') +
+                      (unitCost > 0
+                        ? ' · buy ' +
+                          rs(unitCost) +
+                          ' · avg cost ' +
+                          rs(inv.cost) +
+                          '/' +
+                          (inv.unit || '')
+                        : '') +
                       (expiryDate ? ' · use by ' + expiryDate : ''),
                     'fa-box-open'
                   );
@@ -1379,6 +1396,8 @@
             'btn-download-inventory-template',
             'btn-export-inventory',
             'btn-export-low-stock-toolbar',
+            'btn-inv-variance',
+            'btn-inv-prep',
             'inv-stock-search',
           ];
           stockOnly.forEach((id) => {
@@ -1609,10 +1628,351 @@
       });
     }
 
+    function openVarianceReport() {
+      if (!global.RSModal) return;
+      const bills = (global.RS && RS.BILLS) || [];
+      const menu = (global.RS && RS.MENU) || [];
+      const now = Date.now();
+      const dayMs = 86400000;
+      function inRange(b, days) {
+        const t = b.dateTime || b.created_at || b.time;
+        const ms = t ? new Date(t).getTime() : 0;
+        if (!ms) return days >= 30; // include undated in long window
+        return now - ms <= days * dayMs;
+      }
+      const periods = [
+        { key: '1', label: 'Today', days: 1 },
+        { key: '7', label: '7 days', days: 7 },
+        { key: '30', label: '30 days', days: 30 },
+      ];
+      let period = periods[1];
+      function rowsFor() {
+        const subset = bills.filter((b) => inRange(b, period.days));
+        const usage =
+          global.RSRecipeUnits && RSRecipeUnits.theoreticalUsageFromBills
+            ? RSRecipeUnits.theoreticalUsageFromBills(subset, menu, INVENTORY)
+            : [];
+        usage.sort((a, b) => b.qty - a.qty);
+        return { usage, billN: subset.length };
+      }
+      function bodyHtml() {
+        const { usage, billN } = rowsFor();
+        const tabs = periods
+          .map(
+            (p) =>
+              `<button type="button" class="btn btn-ghost btn-sm${p.key === period.key ? ' active' : ''}" data-per="${p.key}" style="${
+                p.key === period.key ? 'border-color:var(--orange);color:var(--orange);font-weight:700' : ''
+              }">${p.label}</button>`
+          )
+          .join('');
+        if (!usage.length) {
+          return `<div class="klc-p">${tabs}</div>
+            <div class="sr-empty" style="padding:28px">No recipe-based usage in this period (${billN} bills). Link recipes and sell dishes to see variance.</div>`;
+        }
+        const lines = usage
+          .slice(0, 40)
+          .map((u) => {
+            const inv = INVENTORY.find(
+              (i) => String(i.name).toLowerCase() === String(u.name).toLowerCase()
+            );
+            const stock = inv ? Number(inv.stock) || 0 : '—';
+            const unit = (global.RSRecipeUnits && RSRecipeUnits.displayUnit
+              ? RSRecipeUnits.displayUnit(u.unit || (inv && inv.unit) || 'kg')
+              : u.unit) || '';
+            const cost = inv ? unitCostOf(inv) : 0;
+            const used = Math.round(u.qty * 1000) / 1000;
+            const val = cost > 0 ? rs(Math.round(used * cost * 100) / 100) : '—';
+            return `<tr>
+              <td><b>${esc(displayInvName(u.name))}</b></td>
+              <td class="td-strong">${used} ${esc(unit)}</td>
+              <td>${stock === '—' ? '—' : stock + ' ' + esc(unit)}</td>
+              <td>${val}</td>
+            </tr>`;
+          })
+          .join('');
+        return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${tabs}</div>
+          <p class="klc-p" style="margin-bottom:8px"><b>${billN}</b> paid bills · theoretical use from recipes (industry variance base). Compare to physical count.</p>
+          <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>Stock item</th><th>Used (theory)</th><th>On hand now</th><th>Est. cost used</th></tr></thead>
+            <tbody>${lines}</tbody>
+          </table></div>`;
+      }
+      function remount() {
+        global.RSModal.open({
+          title: 'Stock variance',
+          sub: 'Recipe theory from sales · PetPooja-style usage view',
+          icon: 'fa-chart-column',
+          size: 'md',
+          body: bodyHtml(),
+          foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>
+            <button type="button" class="btn btn-primary" style="flex:1" data-csv><i class="fa-solid fa-file-csv"></i> Export CSV</button>`,
+          onMount(m, close) {
+            m.querySelector('[data-x]').onclick = close;
+            m.querySelectorAll('[data-per]').forEach((btn) => {
+              btn.onclick = () => {
+                period = periods.find((p) => p.key === btn.getAttribute('data-per')) || period;
+                close();
+                remount();
+              };
+            });
+            const csvBtn = m.querySelector('[data-csv]');
+            if (csvBtn)
+              csvBtn.onclick = () => {
+                const { usage } = rowsFor();
+                if (!usage.length) return toast('Nothing to export', 'fa-circle-info');
+                const escC = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+                const csv =
+                  '\uFEFF' +
+                  ['item', 'theory_used', 'unit', 'on_hand', 'est_cost']
+                    .map(escC)
+                    .join(',') +
+                  '\r\n' +
+                  usage
+                    .map((u) => {
+                      const inv = INVENTORY.find(
+                        (i) => String(i.name).toLowerCase() === String(u.name).toLowerCase()
+                      );
+                      const used = Math.round(u.qty * 1000) / 1000;
+                      const cost = inv ? unitCostOf(inv) : 0;
+                      return [
+                        u.name,
+                        used,
+                        u.unit || '',
+                        inv ? inv.stock : '',
+                        cost > 0 ? Math.round(used * cost * 100) / 100 : '',
+                      ]
+                        .map(escC)
+                        .join(',');
+                    })
+                    .join('\r\n');
+                if (global.RS && RS.downloadFile)
+                  RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'stock-variance.csv');
+                toast('Variance CSV exported', 'fa-file-csv');
+              };
+          },
+        });
+      }
+      remount();
+    }
+
+    function openPrepBatchModal() {
+      if (!global.RSModal) return;
+      if (!INVENTORY.length) {
+        toast('Add stock items first', 'fa-boxes-stacked');
+        return;
+      }
+      let inputs = [];
+      RSModal.open({
+        title: 'Run prep batch',
+        sub: 'Use stock to make more stock (gravy, batter, sauce…) — industry prep recipe',
+        icon: 'fa-blender',
+        size: 'md',
+        body: `
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <p class="klc-p" style="margin:0">Example: onion + oil + spices → <b>curry gravy</b>. Inputs leave stock; output is added. Output cost is calculated from inputs.</p>
+            <div style="display:grid;grid-template-columns:1.2fr 0.8fr 0.6fr;gap:8px">
+              <div>
+                <label class="fl">Output (what you make)</label>
+                <select class="form-input" id="prep-out">
+                  ${INVENTORY.map(
+                    (i) =>
+                      `<option value="${esc(i.id)}">${esc(displayInvName(i.name))} (${esc(
+                        (global.RSRecipeUnits && RSRecipeUnits.displayUnit
+                          ? RSRecipeUnits.displayUnit(i.unit)
+                          : i.unit) || 'kg'
+                      )})</option>`
+                  ).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="fl">Qty produced</label>
+                <input class="form-input" id="prep-out-qty" type="number" min="0" step="any" value="1">
+              </div>
+              <div>
+                <label class="fl">Unit</label>
+                <input class="form-input" id="prep-out-unit" readonly value="">
+              </div>
+            </div>
+            <div>
+              <label class="fl">Inputs used</label>
+              <div id="prep-inputs"></div>
+              <button type="button" class="btn btn-ghost btn-block" id="prep-add-in" style="border-style:dashed;margin-top:8px"><i class="fa-solid fa-plus"></i> Add input from stock</button>
+            </div>
+            <div id="prep-cost-line" style="font-size:13px;color:var(--text-soft)"></div>
+          </div>`,
+        foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+          <button type="button" class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-blender"></i> Run prep</button>`,
+        onMount(modal, close) {
+          const outSel = modal.querySelector('#prep-out');
+          const outQty = modal.querySelector('#prep-out-qty');
+          const outUnit = modal.querySelector('#prep-out-unit');
+          const box = modal.querySelector('#prep-inputs');
+          const costLine = modal.querySelector('#prep-cost-line');
+          function syncOutUnit() {
+            const inv = INVENTORY.find((i) => String(i.id) === String(outSel.value));
+            outUnit.value =
+              inv && global.RSRecipeUnits && RSRecipeUnits.displayUnit
+                ? RSRecipeUnits.displayUnit(inv.unit)
+                : (inv && inv.unit) || 'kg';
+            refreshCost();
+          }
+          function refreshCost() {
+            let total = 0;
+            inputs.forEach((g) => {
+              const inv = INVENTORY.find((i) => i.name === g.name);
+              total += (Number(g.qty) || 0) * unitCostOf(inv || {});
+            });
+            const pq = Math.max(0, Number(outQty.value) || 0);
+            const unitC = pq > 0 ? total / pq : 0;
+            costLine.innerHTML =
+              'Input cost <b>' +
+              rs(Math.round(total * 100) / 100) +
+              '</b>' +
+              (pq > 0
+                ? ' · output unit cost <b>' + rs(Math.round(unitC * 10000) / 10000) + '</b>/' + esc(outUnit.value)
+                : '');
+          }
+          function drawInputs() {
+            box.innerHTML =
+              inputs
+                .map(
+                  (g, i) =>
+                    `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+                  <span style="flex:1;font-weight:600">${esc(displayInvName(g.name))}</span>
+                  <input type="number" class="form-input" data-pi="${i}" min="0" step="any" value="${esc(g.qty)}" style="width:90px">
+                  <span style="width:40px;font-size:12px;color:var(--text-mute)">${esc(g.unit || '')}</span>
+                  <button type="button" class="icon-act danger" data-pd="${i}"><i class="fa-solid fa-trash"></i></button>
+                </div>`
+                )
+                .join('') ||
+              '<div class="sr-empty" style="padding:12px;font-size:13px">Add what you consume from the store room.</div>';
+            box.querySelectorAll('[data-pi]').forEach((inp) => {
+              inp.oninput = () => {
+                inputs[+inp.getAttribute('data-pi')].qty = Number(inp.value) || 0;
+                refreshCost();
+              };
+            });
+            box.querySelectorAll('[data-pd]').forEach((btn) => {
+              btn.onclick = () => {
+                inputs.splice(+btn.getAttribute('data-pd'), 1);
+                drawInputs();
+                refreshCost();
+              };
+            });
+          }
+          outSel.onchange = syncOutUnit;
+          outQty.oninput = refreshCost;
+          syncOutUnit();
+          drawInputs();
+          modal.querySelector('[data-x]').onclick = close;
+          modal.querySelector('#prep-add-in').onclick = () => {
+            global.RSModal.open({
+              title: 'Add prep input',
+              sub: 'Stock consumed to make the batch',
+              icon: 'fa-cube',
+              size: 'sm',
+              body: `<input class="form-input" id="prep-q" placeholder="Search…" style="margin-bottom:10px"><div id="prep-pick" class="klc-pick-list"></div>`,
+              foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>`,
+              onMount(sm, sc) {
+                sm.querySelector('[data-x]').onclick = sc;
+                const q = sm.querySelector('#prep-q');
+                const pick = sm.querySelector('#prep-pick');
+                function draw() {
+                  const t = (q.value || '').toLowerCase();
+                  pick.innerHTML = INVENTORY.filter((i) =>
+                    displayInvName(i.name).toLowerCase().includes(t)
+                  )
+                    .map(
+                      (i) =>
+                        `<button type="button" class="klc-pick" data-n="${esc(i.name)}" data-u="${esc(i.unit || 'kg')}">
+                      <span class="klc-pick-t">${esc(displayInvName(i.name))}</span>
+                      <span class="klc-pick-s">${Number(i.stock) || 0} ${esc(
+                          global.RSRecipeUnits && RSRecipeUnits.displayUnit
+                            ? RSRecipeUnits.displayUnit(i.unit)
+                            : i.unit || ''
+                        )}</span>
+                    </button>`
+                    )
+                    .join('');
+                  pick.querySelectorAll('[data-n]').forEach((el) => {
+                    el.onclick = () => {
+                      if (!inputs.find((g) => g.name === el.getAttribute('data-n'))) {
+                        inputs.push({
+                          name: el.getAttribute('data-n'),
+                          qty: 1,
+                          unit: el.getAttribute('data-u') || 'kg',
+                        });
+                      }
+                      sc();
+                      drawInputs();
+                      refreshCost();
+                    };
+                  });
+                }
+                q.oninput = draw;
+                draw();
+              },
+            });
+          };
+          modal.querySelector('[data-ok]').onclick = async () => {
+            const out = INVENTORY.find((i) => String(i.id) === String(outSel.value));
+            const pq = Math.max(0, Number(outQty.value) || 0);
+            if (!out || pq <= 0) return toast('Enter output quantity', 'fa-circle-exclamation');
+            if (!inputs.length) return toast('Add at least one input', 'fa-circle-exclamation');
+            for (const g of inputs) {
+              const inv = INVENTORY.find((i) => i.name === g.name);
+              if (!inv || (Number(inv.stock) || 0) < (Number(g.qty) || 0)) {
+                return toast('Not enough ' + (g.name || 'input') + ' in stock', 'fa-triangle-exclamation');
+              }
+            }
+            let inputCost = 0;
+            for (const g of inputs) {
+              const inv = INVENTORY.find((i) => i.name === g.name);
+              const q = Number(g.qty) || 0;
+              inputCost += q * unitCostOf(inv);
+              inv.stock = Math.max(0, (Number(inv.stock) || 0) - q);
+              if (global.RSInventoryBatches && RSInventoryBatches.deductFefo) {
+                try {
+                  await RSInventoryBatches.deductFefo(inv, q);
+                } catch (_) {}
+              }
+              if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
+            }
+            const oldQty = Math.max(0, Number(out.stock) || 0);
+            const oldCost = unitCostOf(out);
+            const unitC = inputCost / pq;
+            out.stock = oldQty + pq;
+            out.cost =
+              global.RSRecipeUnits && RSRecipeUnits.weightedAverageCost
+                ? RSRecipeUnits.weightedAverageCost(oldQty, oldCost, pq, unitC)
+                : unitC;
+            out.unit_cost = out.cost;
+            if (global.RS_DB) await RS_DB.put('inventory', out.id, out);
+            close();
+            toast(
+              'Prep done · +' + pq + ' ' + (out.unit || '') + ' ' + displayInvName(out.name) + ' · avg ' + rs(out.cost),
+              'fa-blender'
+            );
+            renderInventory();
+          };
+        },
+      });
+    }
+
     const addIngBtn = $('#btn-add-ingredient');
     if (addIngBtn && !addIngBtn.dataset.wired) {
       addIngBtn.dataset.wired = '1';
       addIngBtn.onclick = () => openAddStockModal();
+    }
+    const varBtn = $('#btn-inv-variance');
+    if (varBtn && !varBtn.dataset.wired) {
+      varBtn.dataset.wired = '1';
+      varBtn.onclick = () => openVarianceReport();
+    }
+    const prepBtn = $('#btn-inv-prep');
+    if (prepBtn && !prepBtn.dataset.wired) {
+      prepBtn.dataset.wired = '1';
+      prepBtn.onclick = () => openPrepBatchModal();
     }
     if (global.RSInventoryUI) global.RSInventoryUI._openAddStockModal = openAddStockModal;
     document.dispatchEvent(new CustomEvent('rs:render-inventory'));

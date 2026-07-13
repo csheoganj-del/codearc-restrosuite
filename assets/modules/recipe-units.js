@@ -294,6 +294,64 @@
     );
   }
 
+  /**
+   * Weighted average unit cost after receiving stock.
+   * newAvg = (oldQty * oldCost + addQty * buyCost) / (oldQty + addQty)
+   */
+  function weightedAverageCost(oldQty, oldCost, addQty, buyCost) {
+    var oq = Math.max(0, Number(oldQty) || 0);
+    var oc = Math.max(0, Number(oldCost) || 0);
+    var aq = Math.max(0, Number(addQty) || 0);
+    var bc = Math.max(0, Number(buyCost) || 0);
+    if (aq <= 0) return oc;
+    if (bc <= 0) return oc;
+    if (oq <= 0 || oc <= 0) return bc;
+    return Math.round(((oq * oc + aq * bc) / (oq + aq)) * 10000) / 10000;
+  }
+
+  /**
+   * Theoretical stock used from paid bills (recipe-based), for variance.
+   */
+  function theoreticalUsageFromBills(bills, menuList, inventory) {
+    var map = {};
+    (bills || []).forEach(function (b) {
+      var st = String(b.status || 'paid').toLowerCase();
+      if (st === 'refunded' || st === 'void' || st === 'cancelled') return;
+      var items = b._items || b.items;
+      if (!Array.isArray(items)) return;
+      // bills sometimes store count as number
+      if (typeof items === 'number') return;
+      var built = buildDeductLines(items, menuList, inventory);
+      (built.lines || []).forEach(function (l) {
+        var k = String(l.name || l.key || '').toLowerCase();
+        if (!k) return;
+        if (!map[k]) map[k] = { name: l.name || l.key, qty: 0, unit: l.unit || 'kg' };
+        map[k].qty += Number(l.qty) || 0;
+        if (l.unit) map[k].unit = l.unit;
+      });
+    });
+    return Object.keys(map).map(function (k) {
+      return map[k];
+    });
+  }
+
+  /** Recipe health for a menu item */
+  function recipeHealth(menuItem, inventory) {
+    var m = menuItem || {};
+    var ings = Array.isArray(m.ingredients) ? m.ingredients : [];
+    if (!ings.length) return { ok: false, code: 'no_recipe', label: 'No recipe' };
+    var missing = [];
+    var noCost = [];
+    ings.forEach(function (g) {
+      var inv = findInventory(g, inventory);
+      if (!inv) missing.push(g.name);
+      else if (!(Number(inv.cost) > 0)) noCost.push(g.name);
+    });
+    if (missing.length) return { ok: false, code: 'missing_stock', label: 'Stock missing', missing: missing };
+    if (noCost.length) return { ok: false, code: 'no_cost', label: 'Cost missing', noCost: noCost };
+    return { ok: true, code: 'ok', label: 'Ready' };
+  }
+
   global.RSRecipeUnits = {
     SERVE_UNITS: SERVE_UNITS,
     STOCK_UNITS: STOCK_UNITS,
@@ -311,5 +369,8 @@
     buildDeductLines: buildDeductLines,
     servingsSelectHtml: servingsSelectHtml,
     serveUnitSelectHtml: serveUnitSelectHtml,
+    weightedAverageCost: weightedAverageCost,
+    theoreticalUsageFromBills: theoreticalUsageFromBills,
+    recipeHealth: recipeHealth,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

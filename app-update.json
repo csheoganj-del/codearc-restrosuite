@@ -1,12 +1,13 @@
 {
-  "version": "v170-20260713-units-kg-gm-ltr-ml",
+  "version": "v171-20260713-inv-10of10",
   "date": "2026-07-13",
-  "title": "Standard units: kg, gm, ltr, ml",
-  "summary": "Stock and recipe units are standardized to kg, gm, ltr, and ml only. Conversions work between kg↔gm and ltr↔ml when deducting stock.",
+  "title": "Menu · Recipe · Stock toward industry 10/10",
+  "summary": "Half/full/double portions on POS (stock scales), weighted-average cost on receive, prep batch (inputs → output stock), variance report from sales recipes, stronger no-recipe warnings.",
   "highlights": [
-    "Unit dropdowns: kg · gm · ltr · ml",
-    "Aliases accepted: g→gm, L/litre→ltr",
-    "Auto convert kg↔gm and ltr↔ml on sale deduction",
-    "Same units on inventory, recipe lines, and plate cost"
+    "POS cart: ½ · Full · ×2 portion (price + stock deduction)",
+    "Restock: weighted average unit cost (industry standard)",
+    "Inventory → Prep: make gravy/batter from stock",
+    "Inventory → Variance: theoretical usage from bills",
+    "Cart warns when dish has no recipe"
   ]
 }
