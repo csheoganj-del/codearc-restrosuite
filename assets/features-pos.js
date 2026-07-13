@@ -773,8 +773,8 @@
       });
     }
 
-    /** When gateway send fails: retry / wa.me / download PDF / connect */
-    function openWaOfflineFallback(bill, phone, errMsg) {
+    /** When gateway send fails: queue / retry / wa.me / download PDF / connect */
+    function openWaOfflineFallback(bill, phone, errMsg, alreadyQueued) {
       const cleanPhone = String(phone || '').replace(/\D/g, '');
       const why = String(errMsg || window.__rsLastWaError || 'Gateway unavailable').slice(0, 100);
       const goSettings = () => {
@@ -784,23 +784,46 @@
           if (gatewayBtn) gatewayBtn.click();
         }, 180);
       };
-      if (!window.RSModal) {
-        RS.toast('WhatsApp offline — opening chat link', 'fa-whatsapp');
+      // Ensure queued for auto-send when Ready
+      let queued = !!alreadyQueued;
+      if (!queued && window.RSWaSendQueue && RSWaSendQueue.enqueue) {
         try {
-          const text = receiptText(bill);
-          window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+          const q = RSWaSendQueue.enqueue({
+            phone: cleanPhone,
+            bill,
+            message: typeof receiptText === 'function' ? receiptText(bill) : '',
+            lastError: why,
+          });
+          queued = !!(q && q.ok);
         } catch (_) {}
+      }
+      if (!window.RSModal) {
+        RS.toast(
+          queued ? 'Queued — will auto-send when WhatsApp is Ready' : 'WhatsApp offline — opening chat link',
+          'fa-whatsapp'
+        );
+        if (!queued) {
+          try {
+            const text = receiptText(bill);
+            window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+          } catch (_) {}
+        }
         return;
       }
       RSModal.open({
         title: 'WhatsApp unavailable',
-        sub: 'Bill is saved — customer can still get it',
+        sub: queued ? 'Queued for auto-send when Ready' : 'Bill is saved — customer can still get it',
         icon: 'fa-brands fa-whatsapp',
         size: 'sm',
         body: `<div style="font-size:13.5px;line-height:1.5;color:var(--text-soft)">
-          <p style="margin:0 0 10px;color:var(--text)">Could not send via your linked WhatsApp.</p>
+          <p style="margin:0 0 10px;color:var(--text)">Could not send via your linked WhatsApp right now.</p>
           <p style="margin:0 0 8px;font-size:12.5px;padding:8px 10px;background:var(--glass);border-radius:8px">${esc(why)}</p>
-          <p style="margin:0;font-size:12.5px">Choose a fallback. Fix the link in Settings when free (PC awake · QR if needed).</p>
+          ${
+            queued
+              ? `<p style="margin:0 0 8px;font-size:12.5px;color:var(--green);font-weight:700"><i class="fa-solid fa-clock"></i> This bill is in the send queue — it will go automatically when status is Ready (green pill).</p>`
+              : ''
+          }
+          <p style="margin:0;font-size:12.5px">Or share now: open chat, download PDF, or fix Gateway settings.</p>
         </div>`,
         foot: `<button type="button" class="btn btn-ghost btn-sm" id="wa-fb-retry"><i class="fa-solid fa-rotate"></i> Retry</button>
                <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-web"><i class="fa-brands fa-whatsapp"></i> Open chat</button>
@@ -951,7 +974,7 @@
             return;
           }
           if (result.mode === 'wa.me') {
-            // Gateway path failed — offer structured fallback (don't only toast)
+            // Gateway path failed — queue + structured fallback
             openWaOfflineFallback(
               normalized,
               cleanPhone,
@@ -960,7 +983,8 @@
                   ? st === 'qr'
                     ? 'Scan QR in Settings → Gateway'
                     : 'WhatsApp not linked / offline'
-                  : 'Gateway send failed')
+                  : 'Gateway send failed'),
+              !!result.queued
             );
             return;
           }

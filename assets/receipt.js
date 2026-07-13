@@ -476,15 +476,17 @@
     const cap = caption(bill);
     global.__rsLastWaError = null;
 
-    // Refresh gateway status when possible
-    try {
-      if (typeof global.updateTopbarWhatsAppStatus === 'function') {
-        await Promise.race([
-          global.updateTopbarWhatsAppStatus(),
-          new Promise((r) => setTimeout(r, 2000)),
-        ]);
-      }
-    } catch (_) {}
+    // Refresh gateway status when possible (skip when queue retry already knows Ready)
+    if (!opts.skipStatusRefresh) {
+      try {
+        if (typeof global.updateTopbarWhatsAppStatus === 'function') {
+          await Promise.race([
+            global.updateTopbarWhatsAppStatus(),
+            new Promise((r) => setTimeout(r, 2000)),
+          ]);
+        }
+      } catch (_) {}
+    }
 
     const gatewayReady = global.__rsGatewayReady === true
       || (global.RS_API && !global.RS_API.zeroCostLaunchMode);
@@ -545,11 +547,34 @@
       }
     }
 
-    // Last resort: WhatsApp Web with same text content
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
-    global.open(waUrl, '_blank', 'noopener,noreferrer');
+    // Queue for auto-retry when gateway is Ready (unless caller disables)
+    let queued = false;
+    if (!opts.skipQueue && global.RSWaSendQueue && typeof RSWaSendQueue.enqueue === 'function') {
+      try {
+        const q = RSWaSendQueue.enqueue({
+          phone: cleanPhone,
+          bill,
+          message: text,
+          caption: cap,
+          lastError: global.__rsLastWaError || 'gateway unavailable',
+        });
+        queued = !!(q && q.ok);
+      } catch (_) {}
+    }
+
+    // Last resort: WhatsApp Web with same text content (unless queue-only silent)
+    if (!opts.skipWaMe) {
+      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+      global.open(waUrl, '_blank', 'noopener,noreferrer');
+    }
     global.__rsLastWaMode = 'wa.me';
-    return { mode: 'wa.me', phone: cleanPhone, gatewayReady, warning: global.__rsLastWaError };
+    return {
+      mode: 'wa.me',
+      phone: cleanPhone,
+      gatewayReady,
+      warning: global.__rsLastWaError,
+      queued,
+    };
   }
 
   // Warm PDF cache as soon as a bill is paid (faster WhatsApp tap)

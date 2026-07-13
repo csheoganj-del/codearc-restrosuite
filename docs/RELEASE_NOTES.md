@@ -1,5 +1,13 @@
 # RestroSuite release notes
 
+## v107 (2026-07-13) — WhatsApp failed-send queue + auto-retry
+
+- Local **send queue** when gateway PDF/text send fails (per outlet, localStorage)
+- **Auto-retry** when top-bar status becomes Ready (no huge PDF stored — recompiled on retry)
+- Floating pill: “N bills waiting for WhatsApp” → queue panel (retry / remove / clear)
+- Offline fallback modal notes when bill is queued
+- Status panel shows queue count + open Queue
+
 ## v106 (2026-07-13) — WhatsApp UX P0 (status · cockpit · offline fallback)
 
 - **Top bar**: always-visible WA status pill (Ready last-4 / Offline / Scan QR); click opens status panel

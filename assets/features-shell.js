@@ -1624,6 +1624,13 @@
             <li>Phone online · WhatsApp → Linked devices</li>
             <li>If Offline: open Settings → Gateway and scan QR</li>
           </ul>
+          ${
+            window.RSWaSendQueue && RSWaSendQueue.count && RSWaSendQueue.count() > 0
+              ? `<div style="margin-top:4px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,#25d366 12%,var(--panel));border:1px solid color-mix(in srgb,#25d366 30%,var(--stroke));font-size:12.5px;color:var(--text)">
+                  <b>${RSWaSendQueue.count()}</b> bill(s) waiting in the send queue — auto-send when Ready.
+                </div>`
+              : ''
+          }
         </div>`;
       if (!window.RSModal) {
         if (confirm((tip || 'WhatsApp status: ' + st) + '\n\nOpen Settings → Gateway?')) {
@@ -1642,13 +1649,27 @@
         size: 'sm',
         body,
         foot: `<button type="button" class="btn btn-ghost" id="wa-panel-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+               ${
+                 window.RSWaSendQueue && RSWaSendQueue.count && RSWaSendQueue.count() > 0
+                   ? '<button type="button" class="btn btn-ghost" id="wa-panel-queue"><i class="fa-solid fa-clock"></i> Queue</button>'
+                   : ''
+               }
                <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1"><i class="fa-solid fa-gear"></i> Open Gateway</button>`,
         onMount(modal, close) {
           modal.querySelector('#wa-panel-refresh').onclick = async () => {
             if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
+            if (window.RSWaSendQueue && RSWaSendQueue.processQueue) {
+              await RSWaSendQueue.processQueue({ force: false });
+            }
             close();
             setTimeout(openWhatsAppStatusPanel, 120);
           };
+          const qBtn = modal.querySelector('#wa-panel-queue');
+          if (qBtn)
+            qBtn.onclick = () => {
+              close();
+              if (window.RSWaSendQueue && RSWaSendQueue.openQueuePanel) RSWaSendQueue.openQueuePanel();
+            };
           modal.querySelector('#wa-panel-settings').onclick = () => {
             close();
             if (RS.activateTab) RS.activateTab('settings-tab');

@@ -40,6 +40,7 @@ async function main() {
     // employees-ui / super-admin / growth-hub stay out of critical POS bundle
     'assets/print-bridge.js',
     'assets/receipt.js',
+    'assets/modules/wa-send-queue.js',
     'assets/competitive-ops.js',
   ];
   const body = sources
