@@ -24,55 +24,65 @@
 .rs-mclose:hover { color: var(--text); background: var(--glass-3); }
 /* flex:1 + min-height:0 is required so long modal bodies scroll instead of clipping under overflow:hidden */
 .rs-mbody { padding: 22px 24px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
-.rs-mfoot { padding: 16px 24px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; flex: none; flex-wrap: wrap; min-width: 0; }
+.rs-mfoot { padding: 12px 20px; border-top: 1px solid var(--stroke); display: flex; gap: 12px; align-items: center; justify-content: center; flex: none; flex-wrap: wrap; min-width: 0; }
 
-/* Bill settled action bar — 2x2 so labels never clip */
+/* Bill settled — slim icon-only toolbar (no heavy color blocks) */
 .rc-foot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.rc-icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke-2);
+  background: var(--glass-2, var(--glass));
+  color: var(--text-soft);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
+  place-items: center;
+  cursor: pointer;
+  font-size: 17px;
+  padding: 0;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+  flex: none;
 }
-.rc-foot-actions .btn {
-  min-width: 0;
-  width: 100%;
-  padding: 11px 10px;
-  font-size: 13px;
-  font-weight: 700;
-  border-radius: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.rc-icon-btn:hover {
+  color: var(--text);
+  border-color: var(--stroke-hi, var(--stroke-2));
+  background: var(--glass-3, var(--glass));
+  transform: translateY(-1px);
 }
-.rc-foot-actions .btn span { overflow: hidden; text-overflow: ellipsis; }
-.rc-btn-wa {
-  background: #25d366 !important;
-  color: #fff !important;
-  border-color: #1ebe57 !important;
-  box-shadow: 0 4px 14px rgba(37, 211, 102, 0.28);
+.rc-icon-btn:active { transform: translateY(0); }
+/* WhatsApp: only the icon is green — quiet chrome */
+.rc-icon-btn.rc-wa {
+  color: #25d366;
+  border-color: rgba(37, 211, 102, 0.35);
+  background: rgba(37, 211, 102, 0.08);
 }
-.rc-btn-wa:hover { background: #1ebe57 !important; filter: brightness(1.03); }
-.rc-btn-thermal {
-  background: #1e293b !important;
-  color: #f8fafc !important;
-  border-color: #0f172a !important;
+.rc-icon-btn.rc-wa:hover {
+  color: #1ebe57;
+  background: rgba(37, 211, 102, 0.14);
+  border-color: rgba(37, 211, 102, 0.5);
 }
-.rc-btn-thermal:hover { background: #334155 !important; }
-.rc-btn-print {
-  background: #2563eb !important;
-  color: #fff !important;
-  border-color: #1d4ed8 !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22);
+/* Thermal roll: distinct icon tone (slate) */
+.rc-icon-btn.rc-thermal { color: #64748b; }
+.rc-icon-btn.rc-thermal:hover { color: #334155; }
+/* Print: neutral default */
+.rc-icon-btn.rc-print { color: var(--text-soft); }
+/* New order (+): soft orange accent */
+.rc-icon-btn.rc-new {
+  color: var(--orange);
+  border-color: rgba(255, 79, 0, 0.28);
+  background: var(--orange-tint, rgba(255, 79, 0, 0.08));
 }
-.rc-btn-print:hover { background: #1d4ed8 !important; }
-.rc-btn-done {
-  background: var(--orange) !important;
-  color: #fff !important;
-  border-color: transparent !important;
-  box-shadow: 0 4px 12px rgba(232, 93, 4, 0.22);
+.rc-icon-btn.rc-new:hover {
+  color: var(--orange-deep, #c2410c);
+  border-color: rgba(255, 79, 0, 0.45);
 }
-.rc-btn-done:hover { background: var(--orange-deep, #c2410c) !important; }
 
 /* ---------------- PAYMENT MODAL ---------------- */
 .pay-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0; flex: 1; min-height: 0; overflow-y: auto; }
@@ -166,8 +176,8 @@
   .rs-mbody { padding: 16px; }
   .rs-mfoot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); gap: 8px; }
   .rs-mfoot .btn { min-width: 0; padding: 11px 8px; font-size: 12.5px; }
-  .rc-foot-actions { gap: 7px; }
-  .rc-foot-actions .btn { padding: 12px 8px; font-size: 12.5px; }
+  .rc-foot-actions { gap: 8px; }
+  .rc-icon-btn { width: 44px; height: 44px; font-size: 18px; }
   .receipt-paper { max-width: min(300px, calc(100vw - 64px)); padding: 20px 20px 24px; box-shadow: 0 12px 34px rgba(0,0,0,.28); }
   .rcp-logo { font-size: 18px; }
   .rcp-line { font-size: 12px; }

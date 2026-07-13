@@ -1145,7 +1145,7 @@
         ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
             <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
             <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
-              <b style="color:var(--text)">Connect WhatsApp</b> for automatic PDF send. Green button below is the manual backup.
+              <b style="color:var(--text)">Connect WhatsApp</b> for automatic PDF send. Green icon below opens manual chat backup.
               <span style="color:var(--orange);font-weight:600"> Open Gateway -&gt;</span>
             </div>
           </div>`
@@ -1156,18 +1156,18 @@
         icon: 'fa-circle-check',
         size: 'sm',
         body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
-        foot: `<div class="rc-foot-actions">
-              <button type="button" class="btn rc-btn-wa" id="rc-wa" title="Open WhatsApp to send this bill manually (backup if auto-send fails)">
-                <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
+        foot: `<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">
+              <button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i>
               </button>
-              <button type="button" class="btn rc-btn-thermal" id="rc-thermal" title="Print this same receipt layout on the thermal roll printer (58/80mm). Matches the preview above.">
-                <i class="fa-solid fa-receipt"></i><span>Thermal</span>
+              <button type="button" class="rc-icon-btn rc-thermal" id="rc-thermal" title="Thermal roll printer (same layout as preview)" aria-label="Thermal print">
+                <i class="fa-solid fa-ticket"></i>
               </button>
-              <button type="button" class="btn rc-btn-print" id="rc-print" title="Browser / A4 print of this bill">
-                <i class="fa-solid fa-print"></i><span>Print</span>
+              <button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print" aria-label="Print">
+                <i class="fa-solid fa-print"></i>
               </button>
-              <button type="button" class="btn rc-btn-done" id="rc-new" title="Close and start a new order">
-                <i class="fa-solid fa-check"></i><span>Done</span>
+              <button type="button" class="rc-icon-btn rc-new" id="rc-new" title="New order" aria-label="New order">
+                <i class="fa-solid fa-plus"></i>
               </button>
             </div>`,
         onMount(modal, close) {
