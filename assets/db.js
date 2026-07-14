@@ -169,6 +169,8 @@
           orderCount: num(specs.orderCount) || 0,
           recipePending: !!specs.recipePending,
           description: r.description || specs.description || '',
+          nameHi: specs.nameHi || specs.name_hi || '',
+          descriptionHi: specs.descriptionHi || specs.description_hi || '',
         };
       },
       to: o => ({
@@ -197,6 +199,8 @@
           orderCount: num(o.orderCount) || 0,
           recipePending: !!o.recipePending,
           description: o.description || '',
+          nameHi: o.nameHi || o.name_hi || '',
+          descriptionHi: o.descriptionHi || o.description_hi || '',
         },
         tax_category: o.taxCategory || 'IN_REST_5',
       })

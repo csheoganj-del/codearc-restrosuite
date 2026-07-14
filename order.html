@@ -1295,12 +1295,119 @@
     var st = String(item.stock || item.status || '').toLowerCase();
     return st === 'out' || st === 'sold_out' || st === 'soldout' || st === 'unavailable';
   }
+  /* ── Hindi dish names (UI only; cart still uses English name key) ── */
+  var DISH_HI = {
+    'basmati boiled rice':'बासमती उबला चावल','basmati pilau rice':'बासमती पुलाव','basmati pulao':'बासमती पुलाव',
+    'chapati':'चपाती','roti':'रोटी','butter roti':'बटर रोटी','tandoori roti':'तंदूरी रोटी',
+    'plain naan':'सादा नान','butter naan':'बटर नान','garlic naan':'गार्लिक नान','cheese naan':'चीज़ नान',
+    'laccha paratha':'लच्छा पराठा','aloo paratha':'आलू पराठा','paneer paratha':'पनीर पराठा',
+    'dal tadka':'दाल तड़का','dal fry':'दाल फ्राई','dal makhani':'दाल मखनी','yellow dal':'पीली दाल',
+    'paneer butter masala':'पनीर बटर मसाला','butter paneer':'बटर पनीर','kadai paneer':'कड़ाई पनीर',
+    'palak paneer':'पालक पनीर','shahi paneer':'शाही पनीर','paneer tikka':'पनीर टिक्का','paneer tikka masala':'पनीर टिक्का मसाला',
+    'malai kofta':'मलाई कोफ्ता','veg kolhapuri':'वेज कोल्हापुरी','mix veg':'मिक्स वेज','aloo gobi':'आलू गोभी',
+    'chana masala':'चना मसाला','chole':'छोले','rajma':'राजमा','bhindi masala':'भिंडी मसाला',
+    'jeera rice':'जीरा राइस','veg biryani':'वेज बिरयानी','chicken biryani':'चिकन बिरयानी','mutton biryani':'मटन बिरयानी',
+    'chicken curry':'चिकन करी','butter chicken':'बटर चिकन','chicken tikka':'चिकन टिक्का','chicken tikka masala':'चिकन टिक्का मसाला',
+    'tandoori chicken':'तंदूरी चिकन','fish curry':'मछली करी','egg curry':'अंडा करी',
+    'saag paneer':'साग पनीर','saag paneer(side)':'साग पनीर (साइड)','saag paneer (side)':'साग पनीर (साइड)',
+    'masala dosa':'मसाला डोसा','plain dosa':'सादा डोसा','idli':'इडली','vada':'वड़ा','sambar':'सांबर',
+    'samosa':'समोसा','pakora':'पकोड़ा','spring roll':'स्प्रिंग रोल','french fries':'फ्रेंच फ्राइज़',
+    'fries peri peri':'पेरी पेरी फ्राइज़','fries loaded':'लोडेड फ्राइज़',
+    'veg manchurian':'वेज मंचूरियन','chicken manchurian':'चिकन मंचूरियन','hakka noodles':'हक्का नूडल्स',
+    'fried rice':'फ्राइड राइस','chilli paneer':'चिली पनीर','chilli chicken':'चिली चिकन',
+    'gulab jamun':'गुलाब जामुन','rasmalai':'रसमलाई','ice cream':'आइसक्रीम','brownie':'ब्राउनी',
+    'masala chai':'मसाला चाय','filter coffee':'फिल्टर कॉफी','lassi':'लस्सी','sweet lassi':'मीठी लस्सी',
+    'mango lassi':'आम लस्सी','buttermilk':'छाछ','jaljeera':'जलजीरा','nimbu pani':'नींबू पानी',
+    'bottled water':'बॉटल पानी','normal water':'सादा पानी','mineral water':'मिनरल वॉटर',
+    'thali':'थाली','veg thali':'वेज थाली','non veg thali':'नॉनवेज थाली','special thali':'स्पेशल थाली',
+    'soup':'सूप','tomato soup':'टमाटर सूप','sweet corn soup':'स्वीट कॉर्न सूप',
+    'papad':'पापड़','raita':'रायता','onion salad':'प्याज सलाद','green salad':'ग्रीन सलाद',
+    'extra ghee':'एक्स्ट्रा घी','extra butter':'एक्स्ट्रा मक्खन','extra cheese':'एक्स्ट्रा चीज़'
+  };
+  var WORD_HI = {
+    basmati:'बासमती', boiled:'उबला', rice:'चावल', pilau:'पुलाव', pulao:'पुलाव', biryani:'बिरयानी',
+    chicken:'चिकन', mutton:'मटन', fish:'फिश', egg:'अंडा', paneer:'पनीर', veg:'वेज', vegetable:'सब्ज़ी',
+    butter:'बटर', garlic:'गार्लिक', cheese:'चीज़', plain:'सादा', special:'स्पेशल', spicy:'स्पाइसी',
+    masala:'मसाला', curry:'करी', tikka:'टिक्का', tandoori:'तंदूरी', fry:'फ्राई', fried:'फ्राइड',
+    dal:'दाल', roti:'रोटी', chapati:'चपाती', naan:'नान', paratha:'पराठा', bread:'ब्रेड',
+    soup:'सूप', salad:'सलाद', raita:'रायता', papad:'पापड़', thali:'थाली', combo:'कॉम्बो',
+    half:'हाफ', full:'फुल', plate:'प्लेट', bowl:'बाउल', side:'साइड', extra:'एक्स्ट्रा',
+    ghee:'घी', cream:'क्रीम', onion:'प्याज', tomato:'टमाटर', potato:'आलू', aloo:'आलू',
+    palak:'पालक', saag:'साग', chana:'चना', chole:'छोले', rajma:'राजमा', mushroom:'मशरूम',
+    sweet:'मीठा', cold:'कोल्ड', hot:'हॉट', iced:'आइस', shake:'शेक', lassi:'लस्सी', water:'पानी',
+    drinks:'ड्रिंक्स', drink:'ड्रिंक', dessert:'डेज़र्ट', starter:'स्टार्टर', appetiser:'ऐपेटाइज़र',
+    appetizers:'ऐपेटाइज़र', indian:'इंडियन', chinese:'चाइनीज़', italian:'इटालियन'
+  };
+  var CAT_HI = {
+    'all':'सभी','specials':'स्पेशल','staples':'स्टेपल','drinks':'ड्रिंक्स','chicken':'चिकन',
+    'indian - appetisers':'इंडियन स्टार्टर','indian appetisers':'इंडियन स्टार्टर',
+    'rice':'चावल','breads':'रोटी-नान','dessert':'डेज़र्ट','desserts':'डेज़र्ट',
+    'main course':'मेन कोर्स','starters':'स्टार्टर','soups':'सूप','beverages':'पेय',
+    'other':'अन्य','uncategorized':'अन्य'
+  };
+
+  function titleCaseHiGuess(en){
+    var key = String(en || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!key) return en;
+    if (DISH_HI[key]) return DISH_HI[key];
+    // strip trailing (side) etc for lookup
+    var bare = key.replace(/\s*[\(\[][^)\]]*[\)\]]\s*/g, ' ').replace(/\s+/g,' ').trim();
+    if (DISH_HI[bare]) {
+      var suffix = '';
+      var m = String(en).match(/(\s*[\(\[][^)\]]*[\)\]]\s*)$/);
+      if (m) {
+        var s = m[1].toLowerCase();
+        if (/side/.test(s)) suffix = ' (साइड)';
+        else if (/half/.test(s)) suffix = ' (हाफ)';
+        else if (/full/.test(s)) suffix = ' (फुल)';
+        else suffix = m[1];
+      }
+      return DISH_HI[bare] + suffix;
+    }
+    // Word-by-word for multi-word dishes
+    var words = bare.split(/[\s\-_/]+/).filter(Boolean);
+    if (!words.length) return en;
+    var out = words.map(function(w){
+      if (WORD_HI[w]) return WORD_HI[w];
+      // keep unknown English words as-is (brand names etc.)
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    });
+    // If nothing translated, keep English
+    var translated = out.some(function(w, i){ return WORD_HI[words[i]]; });
+    return translated ? out.join(' ') : en;
+  }
+
+  function dishDisplayName(item){
+    if (!item) return '';
+    if (uiLang === 'hi') {
+      var custom = item.nameHi || item.name_hi || item.hindiName || item.hindi_name;
+      if (custom) return String(custom);
+      return titleCaseHiGuess(item.name);
+    }
+    return item.name || '';
+  }
+  function catDisplayName(c){
+    if (uiLang !== 'hi') {
+      if (c === 'ALL') return 'All';
+      if (c === 'SPECIALS') return '★ Specials';
+      if (c === 'STAPLES') return 'Staples';
+      return c.charAt(0).toUpperCase() + c.slice(1).toLowerCase().replace(/-/g, ' ');
+    }
+    if (c === 'ALL') return 'सभी';
+    if (c === 'SPECIALS') return '★ स्पेशल';
+    if (c === 'STAPLES') return 'स्टेपल';
+    var k = String(c || '').toLowerCase();
+    return CAT_HI[k] || titleCaseHiGuess(c);
+  }
+
   function normalizePublicMenuItem(i){
     var row = {
       name: String(i.name || '').trim(),
+      nameHi: String(i.nameHi || i.name_hi || i.hindiName || i.hindi_name || '').trim(),
       price: parseFloat(i.price) || 0,
       category: i.category || i.cat || 'Other',
       description: i.description || i.desc || '',
+      descriptionHi: String(i.descriptionHi || i.description_hi || i.desc_hi || '').trim(),
       image: i.image || i.image_url || i.photo || '',
       bestseller: !!i.bestseller,
       isSpecial: !!(i.isSpecial || i.special),
@@ -1315,6 +1422,7 @@
       diet: i.diet
     };
     if (!row.isStaple && /roti|chapati|naan|rice|paratha/i.test(row.name)) row.isStaple = true;
+    if (!row.nameHi) row.nameHi = titleCaseHiGuess(row.name);
     row.dietKind = inferDiet(row);
     row.soldOut = isSoldOut(row);
     return row;
@@ -1451,8 +1559,7 @@
     if (hasStaples) cats.push('STAPLES');
     items.forEach(function(i){ if(cats.indexOf(i.category)===-1) cats.push(i.category); });
     var chipsHtml = cats.map(function(c){
-      var label = c==='ALL' ? 'All' : c==='SPECIALS' ? '★ Specials' : c==='STAPLES' ? 'Staples' : (c.charAt(0).toUpperCase()+c.slice(1).toLowerCase().replace(/-/g, ' '));
-      return '<button type="button" class="chip'+(c==='ALL'?' on':'')+'" onclick="setC(\''+c+'\',this)">'+label+'</button>';
+      return '<button type="button" class="chip'+(c==='ALL'?' on':'')+'" onclick="setC(\''+c+'\',this)">'+escHtml(catDisplayName(c))+'</button>';
     }).join('');
     document.getElementById('main').innerHTML =
       (waiterMode ? '<div class="mode-banner"><i class="fa-solid fa-user-tie"></i><span>Waiter mode: orders go to KOT/KDS. Payment stays in POS.</span></div>' : '') +
@@ -1543,9 +1650,9 @@
       var dietCls = item.dietKind === 'veg' ? 'veg' : (item.dietKind === 'nv' ? 'nv' : '');
       var tags = [];
       if (!sold) {
-        if (item.isSpecial) tags.push('<span class="tag tag-special">Special</span>');
-        if (item.bestseller) tags.push('<span class="tag tag-best">Popular</span>');
-        if (item.isStaple) tags.push('<span class="tag tag-staple">Staple</span>');
+        if (item.isSpecial) tags.push('<span class="tag tag-special">'+(uiLang==='hi'?'स्पेशल':'Special')+'</span>');
+        if (item.bestseller) tags.push('<span class="tag tag-best">'+(uiLang==='hi'?'पॉपुलर':'Popular')+'</span>');
+        if (item.isStaple) tags.push('<span class="tag tag-staple">'+(uiLang==='hi'?'स्टेपल':'Staple')+'</span>');
       }
       var media = item.image
         ? '<img class="card-img show" src="'+escHtml(item.image)+'" alt="" loading="lazy" onerror="this.classList.remove(\'show\');this.nextElementSibling&&(this.nextElementSibling.style.display=\'block\')"><span class="emoji" style="display:none">'+dishEmoji(item)+'</span>'
@@ -1554,8 +1661,9 @@
         '<div class="card-media">'+media+'</div>'+
         '<div class="card-body">'+
           (tags.length ? '<div class="card-tags">'+tags.join('')+'</div>' : '')+
-          '<div class="card-name">'+(dietCls?'<span class="diet-mark '+dietCls+'" title="'+(dietCls==='veg'?'Veg':'Non-veg')+'"></span>':'')+escHtml(item.name)+'</div>'+
-          (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : '')+
+          '<div class="card-name">'+(dietCls?'<span class="diet-mark '+dietCls+'" title="'+(dietCls==='veg'?'Veg':'Non-veg')+'"></span>':'')+escHtml(dishDisplayName(item))+'</div>'+
+          ((uiLang==='hi' && item.descriptionHi) ? '<div class="card-desc">'+escHtml(item.descriptionHi)+'</div>'
+            : (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : ''))+
           '<div class="card-footer">'+
             '<span class="card-price">'+(window.currencySymbol || '\u20b9')+fmt(item.price)+'</span>'+
             (sold
@@ -1623,7 +1731,9 @@
     var btn = document.getElementById('float-btn');
     if(tq>0){
       btn.classList.add('show');
-      document.getElementById('float-lbl').textContent = tq+' item'+(tq>1?'s':'');
+      document.getElementById('float-lbl').textContent = uiLang==='hi'
+        ? (tq + ' आइटम')
+        : (tq+' item'+(tq>1?'s':''));
       document.getElementById('float-tot').textContent = (window.currencySymbol || '\u20b9')+fmt(tt);
     } else {
       btn.classList.remove('show');
@@ -1661,14 +1771,19 @@
 
   function renderCartList(){
     var el = document.getElementById('cart-list');
-    if(!cart.length){ el.innerHTML='<div class="cart-empty"><i class="fa-solid fa-basket-shopping"></i><p>Cart is empty</p></div>'; return; }
+    if(!cart.length){
+      el.innerHTML='<div class="cart-empty"><i class="fa-solid fa-basket-shopping"></i><p>'+(uiLang==='hi'?'कार्ट खाली है':'Cart is empty')+'</p></div>';
+      return;
+    }
     el.innerHTML = cart.map(function(item){
       var sn = escHtml(item.name);
+      var menuHit = items.find(function(m){ return m.name === item.name; });
+      var showName = menuHit ? dishDisplayName(menuHit) : (uiLang==='hi' ? titleCaseHiGuess(item.name) : item.name);
       var note = item.note ? '<div class="cart-note-txt"><i class="fa-solid fa-comment"></i> '+escHtml(item.note)+'</div>' : '';
       return '<div class="cart-row" style="flex-wrap:wrap">'+
         '<div class="cart-info" style="flex:1;min-width:40%">'+
-          '<div class="cart-name">'+escHtml(item.name)+'</div>'+
-          '<div class="cart-unit">'+(window.currencySymbol || '\u20b9')+fmt(item.price)+' each</div>'+
+          '<div class="cart-name">'+escHtml(showName)+'</div>'+
+          '<div class="cart-unit">'+(window.currencySymbol || '\u20b9')+fmt(item.price)+(uiLang==='hi'?' प्रति':' each')+'</div>'+
           note+
           '<button type="button" class="cart-note-btn" onclick="editLineNote(\''+sn+'\')"><i class="fa-solid fa-comment"></i> '+escHtml(t('note'))+'</button>'+
         '</div>'+
