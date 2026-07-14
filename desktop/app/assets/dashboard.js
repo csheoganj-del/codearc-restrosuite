@@ -1798,9 +1798,11 @@
       const payload = {
         menu: MENU.filter(m => m.stock !== 'out').map(m => ({
           name: m.name,
+          nameHi: m.nameHi || m.name_hi || '',
           price: Number(m.price) || 0,
           category: (m.cat || '').trim() || 'Uncategorized',
           description: m.description || '',
+          descriptionHi: m.descriptionHi || m.description_hi || '',
           image: m.image || '',
           bestseller: !!m.bestseller,
           isSpecial: !!(m.isSpecial || m.special),

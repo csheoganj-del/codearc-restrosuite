@@ -1,6 +1,6 @@
-// Bump this version on every deploy to force clients to update.
+﻿// Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260714-qr-home-info-v4";
+const CACHE_NAME = "restrosuite-shell-v20260714-brand-icons-v13";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -14,6 +14,10 @@ const APP_SHELL = [
   "/order.html",
   "/qr-order",
   "/qr-order.html",
+  "/feedback",
+  "/feedback.html",
+  "/bill",
+  "/bill.html",
   "/tokens",
   "/tokens.html",
   "/404",
@@ -43,7 +47,7 @@ const APP_SHELL = [
   
   // Missing Feature Scripts Loaded Dynamically by dashboard.html
   "/assets/dashboard.js",
-  // Offline-lease guard — MUST be cached so enforcement survives offline.
+  // Offline-lease guard â€” MUST be cached so enforcement survives offline.
   "/assets/license-config.js",
   "/assets/license-guard.js",
   "/assets/features-pos.js",
@@ -64,6 +68,7 @@ const APP_SHELL = [
   "/assets/modules/super-admin.js",
   "/assets/modules/kds-ui.js",
   "/assets/modules/qr-orders-ui.js",
+  "/assets/modules/view-mode.js",
   "/assets/modules/employees-ui.js",
   "/assets/modules/progress-ops.js",
   "/assets/modules/report-pdf.js",

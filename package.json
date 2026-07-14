@@ -17,6 +17,7 @@
     "check:launch": "node scripts/check-launch.cjs",
     "check:prod-assets": "node scripts/check-prod-assets.cjs",
     "check:pwa": "node scripts/ensure-pwa-assets.cjs",
+    "sync:icons": "node scripts/sync-brand-icons.cjs",
     "hash:superadmin": "node scripts/hash-superadmin-password.cjs",
     "backup": "node scripts/backup-db.js",
     "restore": "node scripts/restore-db.js",

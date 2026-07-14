@@ -6,6 +6,11 @@
 build/
 app/build/
 **/build/
+# Keep desktop brand icons tracked (electron-builder + splash)
+!desktop/build/
+!desktop/build/icon.ico
+!desktop/build/icon.png
+!desktop/build/splash-mark.png
 *.apk
 *.aar
 dashboard-phase2-restore.zip
@@ -84,7 +89,7 @@ scripts/.license-signing-key.dev.b64
 *.license-key
 LICENSE_PRIVATE_KEY_KEEP_SECRET.txt
 
-# Secrets / private keys — never commit
+# Secrets / private keys ï¿½ never commit
 *PRIVATE_KEY*
 *private*key*
 *.pem

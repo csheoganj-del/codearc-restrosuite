@@ -273,7 +273,28 @@
     const grid = $('#qr-grid');
     if (!grid) return;
 
+    var qrView =
+      global.RSViewMode && RSViewMode.get ? RSViewMode.get('qr-orders', 'cards') : 'cards';
+    (function ensureQrViewBar() {
+      const tab = document.getElementById('qr-orders-tab');
+      if (!tab || !global.RSViewMode) return;
+      let bar = tab.querySelector('.qr-view-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'qr-view-bar';
+        bar.style.cssText = 'display:flex;justify-content:flex-end;margin:0 0 10px;';
+        const host = grid.parentElement;
+        if (host) host.insertBefore(bar, grid);
+      }
+      bar.innerHTML = RSViewMode.toggleHtml('qr-orders', qrView);
+      qrView = RSViewMode.wire(bar, 'qr-orders', function (m) {
+        qrView = m;
+        renderQR();
+      }, 'cards');
+    })();
+
     if (!QR_ORDERS.length) {
+      grid.classList.remove('is-list');
       grid.innerHTML = emptyQrHtml();
       const floorBtn = grid.querySelector('[data-qr-goto-floor]');
       if (floorBtn)
@@ -298,7 +319,42 @@
       return ageMinutes(b.o) - ageMinutes(a.o); // older first within bucket
     });
 
-    grid.innerHTML = sortedIdx
+    if (qrView === 'list') {
+      grid.classList.add('is-list');
+      grid.innerHTML = `
+        <div class="rs-line-list">
+          <div class="rs-line-head qr-line-head">
+            <span>Table</span><span>Guest</span><span>Items</span><span>Age</span><span class="rl-num">Total</span><span class="rl-acts">Actions</span>
+          </div>
+          ${sortedIdx
+            .map(({ o, i }) => {
+              const mins = ageMinutes(o);
+              const itemSummary = (o.items || [])
+                .slice(0, 3)
+                .map((it) => qrItemLabel(it))
+                .join(', ');
+              const more = (o.items || []).length > 3 ? '…' : '';
+              return `
+            <div class="rs-line-row qr-line-row s-${_e(o.status)}" data-order-id="${_e(o.id || '')}">
+              <span class="rl-name">T ${_e(qrTableShort(o.table))}</span>
+              <span class="rl-mute">${_e(o.customerName || '—')}</span>
+              <span class="rl-mute" title="${_e(itemSummary + more)}">${_e((itemSummary || '—') + more)}</span>
+              <span class="rl-mute qtime" data-qr-start="${_e(o.start || parseTs(o.dateTime) || '')}">${_e(relativeAge(o))}</span>
+              <span class="rl-num">${rs(o.total)}</span>
+              <span class="rl-acts">
+                <span class="pill ${statusPill[o.status] || 'pill-amber'}" style="padding:2px 8px;font-size:10px">${statusTxt[o.status] || o.status}</span>
+                ${o.status === 'pending' || o.status === 'preparing' ? `<button class="btn btn-ghost btn-sm" data-pos="${i}" title="POS"><i class="fa-solid fa-cash-register"></i></button>` : ''}
+                ${o.status !== 'served'
+                  ? `<button class="btn btn-primary btn-sm" data-adv="${i}">${o.status === 'pending' ? 'Accept' : 'Serve'}</button>`
+                  : `<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i></button>`}
+              </span>
+            </div>`;
+            })
+            .join('')}
+        </div>`;
+    } else {
+      grid.classList.remove('is-list');
+      grid.innerHTML = sortedIdx
       .map(({ o, i }) => {
         const guest = o.customerName
           ? `<div class="qguest"><i class="fa-solid fa-user"></i> ${_e(o.customerName)}</div>`
@@ -331,6 +387,7 @@
     </div>`;
       })
       .join('');
+    }
 
     $$('#qr-grid [data-pos]').forEach((b) =>
       b.addEventListener('click', () => {

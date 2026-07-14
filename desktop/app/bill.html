@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Digital Receipt | RestroSuite</title>
+  <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=7">
+  <link rel="icon" href="assets/restrosuite-mark.png?v=7" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
@@ -313,13 +315,25 @@
         return `${symbol} ${formatted}`;
       }
 
-      // Parse parameters
+      // Parse parameters — prefer query (?slug=&no=), also accept path /bill/:slug/:no
       const params = new URLSearchParams(window.location.search);
-      const tenantSlug = params.get('slug');
-      const billNo = params.get('no');
+      let tenantSlug = params.get('slug') || params.get('tenant') || params.get('outlet');
+      let billNo = params.get('no') || params.get('bill') || params.get('orderId');
 
       if (!tenantSlug || !billNo) {
-        showError("Invalid digital receipt URL. Missing outlet slug or bill number.");
+        try {
+          const parts = (location.pathname || '').replace(/\/+$/, '').split('/').filter(Boolean);
+          // …/bill/{slug}/{billNo}
+          const bi = parts.map((p) => p.toLowerCase()).lastIndexOf('bill');
+          if (bi >= 0 && parts[bi + 1] && parts[bi + 2]) {
+            tenantSlug = tenantSlug || decodeURIComponent(parts[bi + 1]);
+            billNo = billNo || decodeURIComponent(parts.slice(bi + 2).join('/'));
+          }
+        } catch (_) {}
+      }
+
+      if (!tenantSlug || !billNo) {
+        showError("Invalid digital receipt URL. Missing outlet slug or bill number. Open the link from a RestroSuite receipt QR.");
         return;
       }
 
@@ -422,7 +436,24 @@
           <hr class="rcp-hr">
           <div class="rcp-line"><span class="q">${bill.paymentMethod || 'Cash'}</span><span>${formatCurrency(bill.total)}</span></div>
           <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>
+          <div style="margin-top:18px;text-align:center">
+            <a id="feedback-link" href="#" style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,79,0,.1);color:#FF4F00;font-weight:800;font-size:13px;padding:10px 14px;border-radius:999px;text-decoration:none">
+              <i class="fa-solid fa-star"></i> Rate your visit
+            </a>
+          </div>
         `;
+
+        // Guest feedback deep-link
+        try {
+          const fb = document.getElementById('feedback-link');
+          if (fb) {
+            const q = new URLSearchParams();
+            q.set('tenant', tenantSlug);
+            if (bill.tableNumber) q.set('table', bill.tableNumber);
+            if (bill.no || billNo) q.set('bill', bill.no || billNo);
+            fb.href = '/feedback?' + q.toString();
+          }
+        } catch (_) {}
 
         // Update page title
         document.title = `${profile.name || 'Receipt'} | Bill ${bill.no}`;

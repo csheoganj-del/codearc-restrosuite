@@ -521,161 +521,174 @@
     }
 
     /* ===================== SETTINGS ===================== */
-    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp','fa-whatsapp'],['payments','Payments','fa-indian-rupee-sign'],['security','Security & PIN','fa-shield-halved'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
+    // Grouped sub-nav: [id, label, icon, groupLabel]
+    const SET_NAV = [
+      ['profile','Outlet profile','fa-store','Outlet'],
+      ['tax','Taxes & pricing','fa-percent','Outlet'],
+      ['printer','Printers & KOT','fa-print','Operations'],
+      ['gateway','WhatsApp','fa-whatsapp','Operations'],
+      ['payments','Payments','fa-indian-rupee-sign','Operations'],
+      ['security','Security & PIN','fa-shield-halved','Access'],
+      ['team','Team & roles','fa-user-shield','Access'],
+      ['plan','Plan & billing','fa-crown','Account'],
+      ['danger','Danger zone','fa-triangle-exclamation','Account'],
+    ];
+    const SET_PANE_META = {
+      profile: { title: 'Outlet profile', sub: 'Name, address, country, and guest QR card details' },
+      tax: { title: 'Taxes & pricing', sub: 'Tax rates, service charge, happy hour, loyalty & promo codes' },
+      printer: { title: 'Printers & KOT', sub: 'Receipt paper, auto-print, kitchen tickets, cash drawer' },
+      gateway: { title: 'WhatsApp', sub: 'Connect your restaurant number and bill preferences' },
+      payments: { title: 'Payments', sub: 'Card / UPI settlement to your bank account' },
+      security: { title: 'Security & PIN', sub: 'Admin PIN and which actions require manager approval' },
+      team: { title: 'Team & roles', sub: 'Staff permissions and cashier restrictions' },
+      plan: { title: 'Plan & billing', sub: 'Subscription, renewals, and upgrade options' },
+      danger: { title: 'Danger zone', sub: 'Irreversible actions for this outlet' },
+    };
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
-    function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
-    function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
+    function field(label, val, ph){ return `<div class="set-field"><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
+    function sel(label, opts, cur){ return `<div class="set-field"><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
     function toggle(t,d,on){ return `<div class="set-row"><div class="si"><div class="st">${t}</div><div class="sd">${d}</div></div><label class="toggle"><input type="checkbox" data-skey="${skey(t)}" ${on?'checked':''}><span></span></label></div>`; }
+    function setBlock(title, sub, html){
+      return `<section class="set-block"><header class="set-block-head"><h4>${title}</h4>${sub?`<p>${sub}</p>`:''}</header><div class="set-block-body">${html}</div></section>`;
+    }
     // Country & currency helpers -- populated from shared RS_COUNTRIES data
     function countrySelect(cur) {
       const countries = window.RS_COUNTRIES || [];
-      if (!countries.length) return `<div><label class="fl">Country</label><input class="form-input" id="set-country" data-skey="set_country" value="${cur||'India'}" placeholder="Outlet country"></div>`;
+      if (!countries.length) return `<div class="set-field"><label class="fl">Country</label><input class="form-input" id="set-country" data-skey="set_country" value="${cur||'India'}" placeholder="Outlet country"></div>`;
       const flag = window.RS_countryFlag || (code => '🌐');
       const opts = countries.map(c => `<option value="${c.name}" ${c.name===(cur||'India')?'selected':''}>${flag(c.code)} ${c.name} (+${c.dial})</option>`).join('');
-      return `<div><label class="fl">Country</label><select class="form-input" id="set-country" data-skey="set_country">${opts}</select></div>`;
+      return `<div class="set-field"><label class="fl">Country</label><select class="form-input" id="set-country" data-skey="set_country">${opts}</select></div>`;
     }
     function currencySelect(cur) {
       const currencies = window.RS_getCurrencies ? window.RS_getCurrencies() : [];
       const defaults = ['INR (₹)','EUR (€)','USD ($)','GBP (£)','AED (د.إ)','SAR (ر.س)','SGD ($)','AUD ($)','CAD ($)','NZD ($)','ZAR (R)'];
-      const flag = window.RS_countryFlag || (() => '');
       const opts = (currencies.length ? currencies.map(c => c.currency) : defaults)
         .map(c => `<option ${c===(cur||'INR (₹)')?'selected':''}>${c}</option>`).join('');
-      return `<div><label class="fl">Currency</label><select class="form-input" id="set-currency" data-skey="set_currency">${opts}</select></div>`;
+      return `<div class="set-field"><label class="fl">Currency</label><select class="form-input" id="set-currency" data-skey="set_currency">${opts}</select></div>`;
     }
     const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
     const defaultOutletName = sessionMeta.tenant_name || sessionMeta.business_name || String(sessionMeta.tenant_slug || sessionStorage.getItem('tenant_slug') || 'Outlet').replace(/[-_]+/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
     const defaultOutletCode = sessionMeta.tenant_slug || sessionMeta.outlet_id || sessionStorage.getItem('tenant_slug') || '';
     const PANES = {
-      profile:`<div class="set-section form-grid-2">${field('Business name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
-<div class="set-section" style="margin-top:12px">
-  <label class="fl">Business type <span style="font-size:11px;color:var(--orange);font-weight:600;margin-left:6px">SaaS vertical</span></label>
-  <select class="form-input" data-skey="set_business_type" style="max-width:320px">
-    <option value="restaurant">Restaurant / Café / Food</option>
-    <option value="retail">Retail Store</option>
-    <option value="salon">Salon / Spa</option>
-    <option value="clinic">Clinic / Hospital</option>
-  </select>
-  <p style="font-size:11.5px;color:var(--text-soft);margin-top:6px">Changing this adapts the dashboard tabs, labels, and features for your business. Save and refresh to apply.</p>
-</div>
-        <div class="set-section">${field('Address','','Outlet address')}</div>
-        <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
-        <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
-        <div class="set-section form-grid-2" id="set-country-currency-row"></div>
-        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-bottom:8px">Guest QR cards</div>
-          <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">Cards already say <b>Order food</b> + <b>Call waiter</b>. Optional extras below — turn on/off when you print.</p>
-          <div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
-          <div style="margin-top:10px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>
-        </div>`,
-      tax:`<div class="set-section form-grid-2">
-          ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
-          ${field('Invoice prefix','INV-')}
-        </div>
-        <div class="set-section form-grid-2">
-          ${field('Tax label','GST','e.g. GST, VAT, Sales Tax')}
-          ${field('Tax rate (%)','5','Tax rate percentage')}
-        </div>
-        ${toggle('Service charge','Add service charge on dine-in orders',false)}
-        <div class="set-section form-grid-2" style="margin-top:8px">
-          ${field('Service charge %','5','e.g. 5 or 10')}
-        </div>
-        ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
-        ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
-        ${toggle('Inclusive pricing','Menu prices include GST',false)}
-        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          ${toggle('Happy hour','Apply time-window menu discount on POS',false)}
-          <div class="set-section form-grid-2" style="margin-top:10px">
+      profile:
+        setBlock('Identity', 'How this outlet appears on bills, QR menus, and the dashboard',
+          `<div class="form-grid-2">${field('Business name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
+          <div class="set-field" style="margin-top:12px">
+            <label class="fl">Business type <span class="set-chip">SaaS vertical</span></label>
+            <select class="form-input" data-skey="set_business_type">
+              <option value="restaurant">Restaurant / Café / Food</option>
+              <option value="retail">Retail store</option>
+              <option value="salon">Salon / Spa</option>
+              <option value="clinic">Clinic / Hospital</option>
+            </select>
+            <p class="set-hint">Adapts tabs and labels for your business. Save, then refresh to apply.</p>
+          </div>`) +
+        setBlock('Contact & location', 'Printed on receipts and digital bills',
+          `${field('Address','','Street, area, city')}
+          <div class="form-grid-2" style="margin-top:12px">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
+          <div class="form-grid-2" style="margin-top:12px">${field('GSTIN','','Tax ID if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
+          <div class="form-grid-2" style="margin-top:12px" id="set-country-currency-row"></div>`) +
+        setBlock('Guest QR cards', 'Optional extras printed on table QR cards (Order food + Call waiter are always on)',
+          `<div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
+          <div style="margin-top:12px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>`),
+      tax:
+        setBlock('Tax engine', 'How tax is calculated on cart and invoices',
+          `${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
+          <div class="form-grid-2" style="margin-top:12px">
+            ${field('Invoice prefix','INV-')}
+            ${field('Tax label','GST','e.g. GST, VAT, Sales Tax')}
+          </div>
+          <div class="form-grid-2" style="margin-top:12px">
+            ${field('Tax rate (%)','5','Tax rate percentage')}
+            <div></div>
+          </div>
+          ${toggle('Service charge','Add service charge on dine-in orders',false)}
+          <div class="form-grid-2" style="margin-top:10px">${field('Service charge %','5','e.g. 5 or 10')}<div></div></div>
+          ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
+          ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
+          ${toggle('Inclusive pricing','Menu prices include tax',false)}`) +
+        setBlock('Happy hour', 'Time-window menu discount on POS',
+          `${toggle('Happy hour','Apply time-window menu discount on POS',false)}
+          <div class="form-grid-2" style="margin-top:12px">
             ${field('Happy hour start','17:00','HH:MM')}
             ${field('Happy hour end','20:00','HH:MM')}
           </div>
-          <div class="set-section form-grid-2" style="margin-top:8px">
+          <div class="form-grid-2" style="margin-top:10px">
             ${field('Happy hour pct','15','Percent off menu prices')}
+            <div></div>
           </div>
-          <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Menu cards show HH badge &amp; struck regular price. Optional per-item <code>happyHourPrice</code> overrides %.</p>
-        </div>
-        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          ${toggle('Loyalty program','Earn & redeem points on CRM customers at checkout',true)}
-          <div class="set-section form-grid-2" style="margin-top:10px">
+          <p class="set-hint">Menu cards show an HH badge. Optional per-item happyHourPrice overrides %.</p>`) +
+        setBlock('Loyalty', 'Points earned and redeemed at checkout',
+          `${toggle('Loyalty program','Earn & redeem points on CRM customers at checkout',true)}
+          <div class="form-grid-2" style="margin-top:12px">
             ${field('Loyalty earn rate','100','Currency spent per 1 point')}
-            ${field('Loyalty point value','1','Currency value of 1 point when redeemed')}
+            ${field('Loyalty point value','1','Currency value of 1 redeemed point')}
           </div>
-          <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Gold earns 2×, VIP 3×. Tiers: Silver → Gold at 5k lifetime spend → VIP at 10k.</p>
-        </div>
-        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          ${toggle('POS promo codes','Apply coupon / offer codes on the POS cart',true)}
-          <div class="set-section form-grid-2" style="margin-top:10px">
-            ${field('Demo promo code','WELCOME10','Fallback code when no offer row matches')}
+          <p class="set-hint">Gold earns 2×, VIP 3×. Tiers: Silver → Gold at ₹5k spend → VIP at ₹10k.</p>`) +
+        setBlock('POS promo codes', 'Coupon codes on the POS cart',
+          `${toggle('POS promo codes','Apply coupon / offer codes on the POS cart',true)}
+          <div class="form-grid-2" style="margin-top:12px">
+            ${field('Demo promo code','WELCOME10','Fallback code when no offer matches')}
             ${field('Demo promo pct','10','Percent off for demo code')}
           </div>
-          <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Looks up active <code>offers</code> by code first; falls back to the demo code. Optional phone-locked offers check cart guest phone.</p>
-        </div>`,
-      printer:`<div class="set-section form-grid-2">
-          ${field('Preferred printer name','','Optional label e.g. Counter 80mm — leave blank to use system default')}
-          ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
-        </div>
-        <p style="font-size:11.5px;color:var(--text-soft);margin:0 0 10px">Printers are detected by the <b>desktop app</b> or <b>Android bridge</b>. Browser-only mode prints via the system dialog — no fake device is assumed.</p>
-        ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer when bridge is connected)',false)}
-        ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
-        ${toggle('Open cash drawer on cash','Pulse cash drawer (ESC/POS) after a cash or cash-split payment',true)}
-        <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${field('Kitchen station label','Main kitchen','Optional name for kitchen routing notes')}</div>
-        <div class="set-section form-grid-2" style="margin-top:12px">
-          ${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}
-        </div>
-        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Cash drawer needs the desktop app or Android bridge.</p>
-        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
-        </div>`,
-      gateway:`
-        <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:var(--text-soft)">Send bills and “order ready” messages from <b style="color:var(--text)">your restaurant’s WhatsApp</b>.</p>
-
-        <div id="outlet-gateway-status-container" style="margin-bottom:12px">
-          <div class="set-row" style="margin:0"><div class="si"><div class="st">Connection</div><div class="sd">Checking…</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6B7280"><i class="fa-solid fa-spinner fa-spin"></i> …</span></div>
-        </div>
-
-        <div class="set-section" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px">
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-test-send"><i class="fa-solid fa-paper-plane"></i> Send test</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-refresh-status"><i class="fa-solid fa-rotate"></i> Refresh</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-gateway-troubleshoot-reset" style="margin-left:auto;color:var(--text-soft)"><i class="fa-solid fa-qrcode"></i> New QR</button>
-        </div>
-
-        <p style="margin:0 0 20px;font-size:12px;line-height:1.45;color:var(--text-mute)"><i class="fa-solid fa-circle-info" style="margin-right:5px;opacity:.8"></i>Prefer a dedicated restaurant number when you can. Personal WhatsApp works too — avoid bulk promos.</p>
-
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 10px">Bill preferences</div>
-        ${toggle('Send bill after payment','WhatsApp the bill when payment is taken',true)}
-        ${sel('Bill format',['Simple text','PDF receipt (recommended)'],'PDF receipt (recommended)')}
-        ${toggle('Order ready alerts','Message customer when order is ready',true)}
-        ${toggle('Promotional messages','Allow offer campaigns (use sparingly)',false)}
-        <div class="set-section"><label class="fl">Message with the bill</label><textarea class="form-input" rows="2">Thanks for dining with us. Your bill is attached.</textarea></div>
-
-        <div class="set-section" style="margin-top:18px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 10px">Owner reports (your number)</div>
-          <p style="margin:0 0 12px;font-size:12.5px;line-height:1.45;color:var(--text-soft)">Daily sales, low-stock / out-of-stock alerts, and weekly/monthly P&amp;L PDFs sent to <b>your</b> WhatsApp.</p>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-owner-wa-reports"><i class="fa-brands fa-whatsapp"></i> Configure owner reports</button>
-        </div>
-
-        <div class="set-section" style="margin-top:22px;border-top:1px solid var(--stroke-2);padding-top:16px">
-          <label class="fl" style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
-            <span>Recent activity</span>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-refresh-client-logs" style="font-size:10px;padding:2px 8px;height:22px"><i class="fa-solid fa-arrows-rotate"></i></button>
-          </label>
-          <div id="client-gateway-logs" style="max-height:140px;overflow-y:auto;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px;font-size:12px;line-height:1.5;color:var(--text-soft)">
-            <div style="text-align:center;padding:10px;color:var(--text-mute)">No activity yet</div>
+          <p class="set-hint">Looks up active offers by code first, then falls back to the demo code.</p>`),
+      printer:
+        setBlock('Printer hardware', 'Desktop app or Android bridge detects devices; browser uses the system print dialog',
+          `<div class="form-grid-2">
+            ${field('Preferred printer name','','e.g. Counter 80mm — blank = system default')}
+            ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
           </div>
-        </div>`,
-      team:`<div class="set-row"><div class="si"><div class="st">Team members</div><div class="sd">Manage staff roles and permissions for this outlet</div></div><button class="btn btn-ghost btn-sm" id="set-team-go">Manage team</button></div>
-        ${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
-        ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
-        ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`,
-      plan:`<div class="panel-head" style="margin-bottom:14px"><h3>Plan &amp; billing</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Your subscription, renewal date, and plan options.</p></div>
-        <div id="rs-plan-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Loading your plan…</span></div></div>`,
-      payments:`<div class="panel-head" style="margin-bottom:14px"><h3>Payments</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Configure Razorpay Route so customer payments go directly to your bank account.</p></div><div id="rzp-route-container"><div style="display:flex;align-items:center;gap:8px;padding:16px;border:1px solid var(--stroke-2);border-radius:var(--r-sm);background:var(--glass)"><i class="fa-solid fa-spinner fa-spin" style="color:var(--orange)"></i><span style="font-size:13px;color:var(--text-soft)">Checking payment status...</span></div></div>`,
-      security:`<div class="panel-head" style="margin-bottom:20px"><h3>Security &amp; PIN</h3><p style="font-size:12.5px;color:var(--text-soft);margin-top:4px">Protect sensitive actions with a 4-digit admin PIN. Staff must enter it for refunds, deletions, and other restricted operations.</p></div><div id="rs-security-panel"></div>`,
-      danger:`<div class="panel-head" style="margin-bottom:14px"><h3>Danger Zone</h3></div>
-        <div style="border:1px solid rgba(239,68,68,0.25);background:rgba(239,68,68,0.03);border-radius:var(--r-md);padding:20px;margin-bottom:18px">
-          <h4 style="color:#ef4444;margin-bottom:8px;font-family:var(--font-display);font-weight:800;font-size:14px;"><i class="fa-solid fa-triangle-exclamation"></i> Reset Operational Data</h4>
-          <p style="font-size:12.5px;color:var(--text-soft);margin-bottom:16px;line-height:1.5">This will permanently delete all operational data for this outlet including all bills, transactions, customer profiles, custom menu items, staff, and inventory records. Account credentials and settings will be preserved.</p>
-          <button class="btn" id="btn-client-reset-data" style="background:#EF4444;color:#fff;border:none;padding:10px 16px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s ease;"><i class="fa-solid fa-trash-can"></i> Reset Outlet Data</button>
-        </div>`
+          <p class="set-hint" style="margin-top:10px">No fake device is assumed until a bridge reports printers.</p>`) +
+        setBlock('Auto-print & drawer', 'When to fire receipts, KOTs, and cash drawer',
+          `${toggle('Auto-print receipt','Print automatically after payment when a bridge is connected',false)}
+          ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
+          ${toggle('Open cash drawer on cash','Pulse cash drawer after cash / cash-split payment',true)}
+          <div class="form-grid-2" style="margin-top:12px">${sel('KOT copies',['1','2','3'],'2')}${field('Kitchen station label','Main kitchen','Kitchen routing label')}</div>
+          <div class="form-grid-2" style="margin-top:12px">${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}<div></div></div>
+          <p class="set-hint">Exact preview matches the settled bill screen. Fast thermal is lighter on slow devices.</p>`) +
+        setBlock('Operating mode', 'Advanced POS behaviour',
+          `${toggle('POS-only mode','Billing only — no KOT to Kitchen Display or waiter app. QR orders still work but stay in POS only.',false)}`),
+      gateway:
+        setBlock('Connection', 'Send bills and order-ready messages from your restaurant WhatsApp',
+          `<div id="outlet-gateway-status-container" class="set-gateway-status">
+            <div class="set-row" style="margin:0;border:0;padding:0"><div class="si"><div class="st">Connection</div><div class="sd">Checking…</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6B7280"><i class="fa-solid fa-spinner fa-spin"></i> …</span></div>
+          </div>
+          <div class="set-actions-row">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-test-send"><i class="fa-solid fa-paper-plane"></i> Send test</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-refresh-status"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-gateway-troubleshoot-reset"><i class="fa-solid fa-qrcode"></i> New QR</button>
+          </div>
+          <p class="set-hint"><i class="fa-solid fa-circle-info"></i> Prefer a dedicated restaurant number when you can. Personal WhatsApp works too — avoid bulk promos.</p>`) +
+        setBlock('Bill preferences', 'What customers receive after payment and for order status',
+          `${toggle('Send bill after payment','WhatsApp the bill when payment is taken',true)}
+          <div class="form-grid-2" style="margin-top:12px">${sel('Bill format',['Simple text','PDF receipt (recommended)'],'PDF receipt (recommended)')}<div></div></div>
+          ${toggle('Order ready alerts','Message customer when order is ready',true)}
+          ${toggle('Promotional messages','Allow offer campaigns (use sparingly)',false)}
+          <div class="set-field" style="margin-top:12px"><label class="fl">Message with the bill</label><textarea class="form-input" rows="2" data-skey="set_bill_message">Thanks for dining with us. Your bill is attached.</textarea></div>`) +
+        setBlock('Owner reports', 'Daily sales, stock alerts, and P&amp;L PDFs to your number',
+          `<div class="set-row" style="border:0;padding:0"><div class="si"><div class="st">Configure owner WhatsApp reports</div><div class="sd">Sales digests, low-stock alerts, weekly/monthly P&amp;L</div></div><button type="button" class="btn btn-primary btn-sm" id="btn-owner-wa-reports"><i class="fa-brands fa-whatsapp"></i> Configure</button></div>`) +
+        setBlock('Recent activity', 'Gateway events for this outlet',
+          `<div class="set-log-head"><span>Activity log</span><button type="button" class="btn btn-ghost btn-sm" id="btn-refresh-client-logs"><i class="fa-solid fa-arrows-rotate"></i></button></div>
+          <div id="client-gateway-logs" class="set-log-box"><div class="set-log-empty">No activity yet</div></div>`),
+      team:
+        setBlock('Staff directory', 'Roles, roster, and payroll live under Employees',
+          `<div class="set-row" style="border:0;padding:0"><div class="si"><div class="st">Open team directory</div><div class="sd">Add staff, set roles, shifts, and PINs</div></div><button type="button" class="btn btn-primary btn-sm" id="set-team-go"><i class="fa-solid fa-users"></i> Manage team</button></div>`) +
+        setBlock('Cashier permissions', 'What floor staff can do without a manager',
+          `${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
+          ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
+          ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`),
+      plan: setBlock('Subscription', 'Current plan, renewals, and upgrades',
+          `<div id="rs-plan-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div></div>`),
+      payments: setBlock('Card &amp; UPI settlement', 'Route guest card/UPI payments to your bank account',
+          `<div id="rzp-route-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking payment status…</div></div>`),
+      security: `<div id="rs-security-panel" class="set-security-host"></div>`,
+      danger:
+        setBlock('Reset operational data', 'Permanent. Account login and settings are kept; sales data is not.',
+          `<div class="set-danger-card">
+            <div class="set-danger-title"><i class="fa-solid fa-triangle-exclamation"></i> Wipe bills, menu, inventory, customers &amp; staff records</div>
+            <p>This permanently deletes operational data for this outlet. Credentials and settings stay. This cannot be undone.</p>
+            <button type="button" class="btn set-danger-btn" id="btn-client-reset-data"><i class="fa-solid fa-trash-can"></i> Reset outlet data</button>
+          </div>`),
     };
     // -- Security & PIN panel --------------------------------------------------
     function initSecurityPanel(body) {
@@ -689,87 +702,62 @@
 
       // -- Sections: PIN management + Protected operations list -------------
       container.innerHTML = `
-        <!-- PIN Status Card -->
-        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:14px;">
-              <div style="width:44px;height:44px;border-radius:50%;background:${hasPIN?'rgba(34,197,94,0.12)':'rgba(255,107,0,0.1)'};display:flex;align-items:center;justify-content:center;font-size:20px;color:${hasPIN?'#22c55e':'#FF4F00'};flex-shrink:0;">
-                <i class="fa-solid ${hasPIN?'fa-lock':'fa-lock-open'}"></i>
-              </div>
+        ${setBlock('Admin PIN', 'Required for refunds, voids, high discounts, and data reset',
+          `<div class="set-pin-status">
+            <div class="set-pin-status-main">
+              <div class="set-pin-icon ${hasPIN?'is-on':'is-off'}"><i class="fa-solid ${hasPIN?'fa-lock':'fa-lock-open'}"></i></div>
               <div>
-                <div style="font-weight:800;font-size:14px;color:var(--text);">${hasPIN?'Admin PIN is active':'No Admin PIN set'}</div>
-                <div style="font-size:12px;color:var(--text-soft);margin-top:2px;">${hasPIN?'Protected actions require this PIN to proceed.':'Set a PIN to restrict refunds, deletions &amp; sensitive settings.'}</div>
+                <div class="st">${hasPIN?'Admin PIN is active':'No Admin PIN set'}</div>
+                <div class="sd">${hasPIN?'Protected actions require this PIN to proceed.':'Set a PIN to restrict refunds, deletions &amp; sensitive settings.'}</div>
               </div>
             </div>
-            <div style="display:flex;gap:8px;flex-shrink:0;">
+            <div class="set-pin-actions">
               ${hasPIN
-                ? `<button id="sec-change-pin" class="btn" style="font-size:12px;padding:8px 14px;"><i class="fa-solid fa-key"></i> Change PIN</button>`
-                : `<button id="sec-set-pin" class="btn btn-primary" style="font-size:12px;padding:8px 14px;"><i class="fa-solid fa-shield-halved"></i> Set PIN</button>`
+                ? `<button type="button" id="sec-change-pin" class="btn btn-ghost btn-sm"><i class="fa-solid fa-key"></i> Change PIN</button>`
+                : `<button type="button" id="sec-set-pin" class="btn btn-primary btn-sm"><i class="fa-solid fa-shield-halved"></i> Set PIN</button>`
               }
             </div>
           </div>
           ${hasPIN?`
-          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--stroke-2);display:flex;align-items:center;gap:12px;">
-            <button id="sec-remove-pin" style="background:none;border:none;font-size:12px;color:#ef4444;cursor:pointer;font-family:inherit;padding:0;display:flex;align-items:center;gap:5px;"><i class="fa-solid fa-trash-can"></i> Remove PIN</button>
-            <span style="color:var(--stroke-2)">|</span>
-            <span style="font-size:11.5px;color:var(--text-soft);">Forgotten PIN resets require a server-verified reset code from the account owner.</span>
-          </div>` : ''}
-        </div>
-
-        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:16px 18px;margin-bottom:18px;">
-          <div style="font-weight:800;font-size:13.5px;margin-bottom:6px"><i class="fa-solid fa-shield-halved" style="color:var(--orange);margin-right:6px"></i>UI copy shield</div>
-          <p style="font-size:12px;color:var(--text-soft);line-height:1.45;margin:0 0 12px">${(window.RSSecurityShield && RSSecurityShield.disclaimer) || 'Blocks casual right-click and DevTools shortcuts on this console. Real security is auth + server rules — this is not unhackable.'}</p>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer">
+          <div class="set-pin-footer">
+            <button type="button" id="sec-remove-pin" class="set-link-danger"><i class="fa-solid fa-trash-can"></i> Remove PIN</button>
+            <span class="set-sep">·</span>
+            <span class="sd">Forgotten PIN resets need a server-verified code from the account owner.</span>
+          </div>` : ''}`)}
+        ${setBlock('UI copy shield', 'Blocks casual inspection — real security is auth + server rules',
+          `<p class="set-hint" style="margin-top:0">${(window.RSSecurityShield && RSSecurityShield.disclaimer) || 'Blocks casual right-click and DevTools shortcuts on this console. Real security is auth + server rules — this is not unhackable.'}</p>
+          <label class="set-check-label">
             <input type="checkbox" id="sec-ui-shield" ${(window.RSSecurityShield && RSSecurityShield.getConfig && RSSecurityShield.getConfig().enabled) ? 'checked' : 'checked'}>
-            Block right-click · F12 · Ctrl+Shift+I on dashboard
-          </label>
-        </div>
-
-        <!-- Always protected -->
-        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
-          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-shield-halved" style="color:#FF4F00;margin-right:6px;"></i>Always PIN-protected</div>
-          <div style="font-size:12px;color:var(--text-soft);margin-bottom:16px;">These actions always require admin PIN when a PIN is set.</div>
-          ${[
+            <span>Block right-click · F12 · Ctrl+Shift+I on dashboard</span>
+          </label>`)}
+        ${setBlock('Always PIN-protected', 'These always require admin PIN when a PIN is set',
+          `<div class="set-prot-list">${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
             ['fa-ban','Void / Refund','Void a paid bill and audit the reason'],
             ['fa-percent','High discount','Discounts above the threshold (default 10%)'],
             ['fa-lock','Close shift','Z-report close when PIN is configured'],
             ['fa-triangle-exclamation','Data Reset','Danger Zone operations always require PIN'],
           ].map(([icon,op,desc])=>`
-            <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--stroke-2);">
-              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,107,0,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;color:#FF4F00;flex-shrink:0;margin-top:1px;"><i class="fa-solid ${icon}"></i></div>
-              <div>
-                <div style="font-weight:700;font-size:13px;color:var(--text);">${op}</div>
-                <div style="font-size:11.5px;color:var(--text-soft);margin-top:1px;">${desc}</div>
-              </div>
-              <div style="margin-left:auto;"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:rgba(255,107,0,0.1);color:#FF4F00;">PIN Required</span></div>
+            <div class="set-prot-item">
+              <div class="set-prot-ic"><i class="fa-solid ${icon}"></i></div>
+              <div class="set-prot-text"><div class="st">${op}</div><div class="sd">${desc}</div></div>
+              <span class="set-chip set-chip-warn">PIN required</span>
             </div>
-          `).join('')}
-        </div>
-
-        <!-- Optional manager gates (saved with Settings → Save) -->
-        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:20px;margin-bottom:18px;">
-          <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-user-shield" style="color:#FF4F00;margin-right:6px;"></i>Optional manager gates</div>
-          <div style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">Toggle off to allow cashiers without a PIN. Defaults are on. Save settings after changing.</div>
-          ${toggle('Pin gate due','Require PIN for Due / credit payments',gateOn('set_pin_gate_due'))}
+          `).join('')}</div>`)}
+        ${setBlock('Optional manager gates', 'Toggle off to allow cashiers without a PIN. Save after changing.',
+          `${toggle('Pin gate due','Require PIN for Due / credit payments',gateOn('set_pin_gate_due'))}
           ${toggle('Pin gate clear cart','Require PIN to clear a non-empty cart',gateOn('set_pin_gate_clear_cart'))}
           ${toggle('Pin gate loyalty','Require PIN when redeeming large loyalty points',gateOn('set_pin_gate_loyalty'))}
           ${toggle('Pin gate cash move','Require PIN for pay-out and safe drop from the drawer',gateOn('set_pin_gate_cash_move'))}
-          <div class="set-section form-grid-2" style="margin-top:10px">
+          <div class="form-grid-2" style="margin-top:12px">
             ${field('Pin discount threshold',String(gateVal('set_pin_discount_threshold','10')),'% above which discount needs PIN')}
             ${field('Pin loyalty threshold',String(gateVal('set_pin_loyalty_threshold','100')),'Points at/above which redeem needs PIN')}
           </div>
-          <div class="set-section form-grid-2" style="margin-top:10px">
+          <div class="form-grid-2" style="margin-top:12px">
             ${field('Idle lock minutes',String(gateVal('set_idle_lock_minutes','5')),'Lock screen after N minutes idle')}
-          </div>
-        </div>
-
-        <!-- Tips -->
-        <div style="border:1px solid rgba(255,107,0,0.2);background:rgba(255,107,0,0.03);border-radius:var(--r-sm);padding:14px 16px;">
-          <div style="font-size:12px;color:var(--text-soft);line-height:1.6;">
-            <strong style="color:#FF4F00;">Tips:</strong> Share the 4-digit PIN only with managers. Forgotten PIN resets are verified by the backend, and PIN attempts are limited to 3 before a 30-second lockout.
-          </div>
-        </div>
+            <div></div>
+          </div>`)}
+        <div class="set-tip-banner"><strong>Tips:</strong> Share the 4-digit PIN only with managers. Forgotten PIN resets are verified by the backend. Attempts are limited to 3 before a 30-second lockout.</div>
       `;
 
       // -- Bind buttons ------------------------------------------------------
@@ -1264,12 +1252,44 @@
         return;
       }
       const NAV = SET_NAV.filter(s => isOwnerAdmin || !['plan','danger'].includes(s[0]));
-      sec.innerHTML = `<div class="set-layout">
-        <div class="set-nav">${NAV.map((s,i)=>`<button class="${i===0?'active':''}" data-s="${s[0]}"><i class="fa-solid ${s[2]}"></i> ${s[1]}</button>`).join('')}</div>
-        <div class="panel panel-pad">
-          <div id="set-body"></div>
-          <div style="display:flex;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--stroke)"><div class="grow"></div><button class="btn btn-ghost" id="set-cancel">Cancel</button><button class="btn btn-primary" id="set-save"><i class="fa-solid fa-circle-check"></i> Save changes</button></div>
-        </div></div>`;
+      // Build grouped side-nav: Outlet · Operations · Access · Account
+      let navHtml = '';
+      let lastGroup = '';
+      NAV.forEach((s, i) => {
+        const group = s[3] || '';
+        if (group && group !== lastGroup) {
+          navHtml += `<div class="set-nav-group">${group}</div>`;
+          lastGroup = group;
+        }
+        navHtml += `<button type="button" class="${i===0?'active':''}" data-s="${s[0]}" title="${s[1]}"><i class="fa-solid ${s[2]}"></i><span>${s[1]}</span></button>`;
+      });
+      sec.innerHTML = `<div class="set-page">
+        <header class="set-page-head">
+          <div class="set-page-titles">
+            <h2 class="set-page-title">Settings</h2>
+            <p class="set-page-sub">Outlet profile, taxes, printers, WhatsApp, payments, security, and account</p>
+          </div>
+        </header>
+        <div class="set-layout">
+          <nav class="set-nav" aria-label="Settings sections">${navHtml}</nav>
+          <div class="set-main panel">
+            <header class="set-pane-head">
+              <div>
+                <h3 id="set-pane-title" class="set-pane-title">Outlet profile</h3>
+                <p id="set-pane-sub" class="set-pane-sub">Name, address, country, and guest QR card details</p>
+              </div>
+            </header>
+            <div id="set-body" class="set-body"></div>
+            <footer class="set-save-bar">
+              <span class="set-save-hint" id="set-save-hint">Changes apply after you save</span>
+              <div class="set-save-actions">
+                <button type="button" class="btn btn-ghost" id="set-cancel">Discard</button>
+                <button type="button" class="btn btn-primary" id="set-save"><i class="fa-solid fa-circle-check"></i> Save changes</button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </div>`;
       const body = $('#set-body');
       let SET_STORE = {};
       let outletGatewayInterval = null;
@@ -1571,11 +1591,35 @@
         // manager deep-linking to Danger Zone via the WhatsApp pill handler)
         if (!NAV.some(s => s[0] === key)) key = 'profile';
         if(body.querySelector('[data-skey]')) collect();
-        body.innerHTML = `<div class="set-pane active">${PANES[key]}</div>`;
+        const meta = SET_PANE_META[key] || { title: key, sub: '' };
+        const titleEl = sec.querySelector('#set-pane-title');
+        const subEl = sec.querySelector('#set-pane-sub');
+        if (titleEl) titleEl.textContent = meta.title;
+        if (subEl) subEl.textContent = meta.sub || '';
+        body.innerHTML = `<div class="set-pane active" data-pane="${key}">${PANES[key] || ''}</div>`;
+        // Hide sticky save on panes that are mostly live/action (still works if shown)
+        const saveBar = sec.querySelector('.set-save-bar');
+        if (saveBar) {
+          const hideSave = key === 'plan' || key === 'danger';
+          saveBar.classList.toggle('is-muted', hideSave);
+          const hint = sec.querySelector('#set-save-hint');
+          if (hint) {
+            if (key === 'danger') hint.textContent = 'Destructive actions below — not saved as settings';
+            else if (key === 'plan') hint.textContent = 'Plan changes are managed by billing';
+            else if (key === 'gateway') hint.textContent = 'Connection is live · preferences save with the button';
+            else hint.textContent = 'Changes apply after you save';
+          }
+        }
         if (key === 'gateway') {
           startOutletGatewayPolling();
         } else {
           stopOutletGatewayPolling();
+        }
+        if (key === 'security') {
+          try { initSecurityPanel(body); } catch (e) { console.warn('security panel', e); }
+        }
+        if (key === 'payments') {
+          try { initRazorpayRoutePanel(body); } catch (e) { console.warn('payments panel', e); }
         }
         if (key === 'plan') { try { initPlanPanel(body); } catch (e) { console.warn('plan panel', e); } }
         // If profile pane: inject country/currency selects dynamically using stored values
@@ -1765,7 +1809,7 @@
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
-    RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & WhatsApp'];
+    RS.titles['settings-tab']=['Settings','Outlet · operations · access · account'];
     RS.addRenderer('settings-tab', renderSettings);
     const openSet = $('#open-settings'); if(openSet) openSet.addEventListener('click', ()=>RS.activateTab('settings-tab'));
 

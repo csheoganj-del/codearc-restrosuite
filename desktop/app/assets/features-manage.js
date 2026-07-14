@@ -729,12 +729,31 @@
               <h3 style="margin:0">Suppliers</h3>
               <span class="pill" style="padding:3px 9px">${SUPPLIERS.length} vendor${SUPPLIERS.length===1?'':'s'}</span>
               <div class="grow"></div>
+              ${window.RSViewMode ? RSViewMode.toggleHtml('suppliers', (window.RSViewMode.get('suppliers','list'))) : ''}
               <button type="button" class="btn btn-primary btn-sm" id="add-sup"><i class="fa-solid fa-plus"></i> Add supplier</button>
             </div>
             ${
               SUPPLIERS.length
-                ? `<div class="crm-grid">${SUPPLIERS.map((s) => {
+                ? (() => {
+                    const mode = window.RSViewMode ? RSViewMode.get('suppliers', 'list') : 'list';
                     const colors = (RS && RS.avatarColors) || ['#FF4F00', '#7c3aed', '#0ea5e9', '#16a34a', '#ca8a04'];
+                    if (mode === 'list') {
+                      return `<div class="rs-line-list">
+                        <div class="rs-line-head sup-line-head">
+                          <span>Supplier</span><span>Category</span><span>Contact</span><span>Terms</span><span class="rl-num">Items</span><span class="rl-num">Rating</span>
+                        </div>
+                        ${SUPPLIERS.map((s) => `
+                        <div class="rs-line-row sup-line-row" data-sup-id="${esc(s.id || s.name)}">
+                          <span class="rl-name">${esc(s.name)}</span>
+                          <span class="rl-mute">${esc(s.cat || s.category || 'General')}</span>
+                          <span class="rl-mute">${esc(s.contact || '—')}</span>
+                          <span class="rl-mute">${esc(s.terms || 'Net 30')}</span>
+                          <span class="rl-num">${esc(String(s.items != null ? s.items : s.itemsCount || 0))}</span>
+                          <span class="rl-num">${esc(String(s.rating != null ? s.rating : 4))} ★</span>
+                        </div>`).join('')}
+                      </div>`;
+                    }
+                    return `<div class="crm-grid">${SUPPLIERS.map((s) => {
                     const bg = colors[(String(s.name || '').length || 0) % colors.length];
                     return `<div class="crm-card" data-sup-id="${esc(s.id || s.name)}">
                 <div class="crm-top">
@@ -747,7 +766,8 @@
                   <div><i class="fa-solid fa-star" style="width:16px;color:var(--amber)"></i> ${esc(String(s.rating != null ? s.rating : 4))} rating</div>
                 </div>
               </div>`;
-                  }).join('')}</div>`
+                  }).join('')}</div>`;
+                  })()
                 : `<div class="sr-empty" style="padding:36px 16px">
               <i class="fa-solid fa-truck-field" style="font-size:28px;opacity:.35;display:block;margin-bottom:10px"></i>
               <div style="font-weight:700;margin-bottom:6px">No suppliers yet</div>
@@ -1556,6 +1576,9 @@
         if (btnAddSup) btnAddSup.onclick = () => openAddSupplierModal();
         const btnAddSupEmpty = $('#add-sup-empty', panes);
         if (btnAddSupEmpty) btnAddSupEmpty.onclick = () => openAddSupplierModal();
+        if (window.RSViewMode && panes) {
+          RSViewMode.wire(panes, 'suppliers', () => drawPanes(), 'list');
+        }
 
         const btnAddPo = $('#add-po');
         if (btnAddPo) {

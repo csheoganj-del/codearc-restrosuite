@@ -36,7 +36,9 @@
       "preload.js",
       "splash.html",
       "config.json",
-      "build/icon.ico"
+      "build/icon.ico",
+      "build/icon.png",
+      "build/splash-mark.png"
     ],
     "extraResources": [
       {

@@ -6,6 +6,14 @@ $ErrorActionPreference = "Stop"
 $SourceDir = $PSScriptRoot
 $DestDir = Join-Path $SourceDir "android-app\app\src\main\assets"
 
+# Keep launcher / web brand marks in lockstep before copying into the APK
+$iconScript = Join-Path $SourceDir "scripts\sync-brand-icons.cjs"
+if (Test-Path $iconScript) {
+    Write-Host "Refreshing brand icons from master source..." -ForegroundColor Yellow
+    node $iconScript
+    if ($LASTEXITCODE -ne 0) { throw "sync-brand-icons.cjs failed" }
+}
+
 if (-not (Test-Path $DestDir)) {
     New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
     Write-Host "Created Android assets directory." -ForegroundColor Green
