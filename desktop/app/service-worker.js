@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260714-10of10";
+const CACHE_NAME = "restrosuite-shell-v20260714-qr-hub-live-v2";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",

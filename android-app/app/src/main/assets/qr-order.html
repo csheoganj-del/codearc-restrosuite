@@ -4,1234 +4,1491 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FF4F00">
-  <title>Dine-In Customer Portal</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <title>Table Portal · RestroSuite</title>
   <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="config.js"></script>
   <style>
     :root {
       --brand: #FF4F00;
-      --brand-hover: #D94300;
-      --font-body: 'DM Sans', system-ui, sans-serif;
-      --bg: #F3EFE8;
+      --brand-2: #FF6A28;
+      --brand-soft: rgba(255,79,0,.10);
+      --brand-ring: rgba(255,79,0,.18);
+      --bg: #F6F2EB;
       --surface: #FFFFFF;
-      --text: #1A1714;
-      --text-muted: #6E675F;
-      --border: rgba(26, 23, 20, 0.1);
-      --shadow: 0 8px 24px rgba(40, 30, 20, 0.08);
-      --r: 14px;
-      --r-sm: 10px;
-      --tr: 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+      --ink: #1A1714;
+      --ink-soft: #4A453F;
+      --muted: #7A736A;
+      --border: rgba(26,23,20,.09);
+      --ok: #059669;
+      --warn: #D97706;
+      --danger: #B91C1C;
+      --shadow: 0 10px 32px rgba(40,30,20,.08);
+      --shadow-sm: 0 2px 8px rgba(40,30,20,.05);
+      --r: 18px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --tr: .22s cubic-bezier(.22,1,.36,1);
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: 'DM Sans', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background:
+        radial-gradient(120% 80% at 50% -10%, rgba(255,79,0,.08), transparent 50%),
+        var(--bg);
+      color: var(--ink);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px 16px;
+      padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + var(--safe-b));
     }
 
-    /* CONTAINER */
-    .portal-container {
+    .portal {
       width: 100%;
-      max-width: 480px;
+      max-width: 440px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 14px;
     }
 
-    /* HEADER */
-    .portal-header {
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; margin-bottom: 2px;
+    }
+    .lang-btn {
+      border: 1px solid var(--border); background: var(--surface);
+      border-radius: 999px; padding: 7px 12px; font-size: 11px; font-weight: 800;
+      cursor: pointer; color: var(--ink-soft); font-family: inherit; letter-spacing: .04em;
+      box-shadow: var(--shadow-sm);
+    }
+    .status-pill {
+      display: none; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 700; padding: 6px 11px; border-radius: 999px;
+      background: #ECFDF5; color: var(--ok); border: 1px solid #A7F3D0;
+    }
+    .status-pill.on { display: inline-flex; }
+    .status-pill .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: currentColor;
+      box-shadow: 0 0 0 3px rgba(5,150,105,.15);
+    }
+
+    .hero {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--r);
-      padding: 24px;
+      border-radius: 22px;
+      padding: 22px 20px 18px;
       box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       text-align: center;
       position: relative;
       overflow: hidden;
     }
-    .portal-hint {
-      font-size: 12.5px;
-      color: var(--text-muted);
-      line-height: 1.4;
-      margin-top: 4px;
-      max-width: 280px;
-    }
-    #menu-btn {
-      border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
-      box-shadow: 0 8px 20px rgba(255, 79, 0, 0.08);
-    }
-    #menu-btn .card-icon { background: var(--brand); color: #fff; }
-
-    .portal-header::before {
+    .hero::before {
       content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 6px;
-      background: var(--brand);
+      position: absolute; inset: 0 0 auto 0; height: 4px;
+      background: linear-gradient(90deg, var(--brand), var(--brand-2));
     }
-
-    .brand-logo {
+    .hero-mark {
+      width: 48px; height: 48px; border-radius: 14px; margin: 0 auto 12px;
+      object-fit: cover; border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+      background: #fff;
+    }
+    .hero-name {
       font-family: 'Fraunces', Georgia, serif;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: 0.02em;
+      font-size: clamp(22px, 6vw, 26px);
+      font-weight: 700; letter-spacing: -.02em; line-height: 1.15;
       margin-bottom: 4px;
-      line-height: 1.25;
     }
-
-    .outlet-name {
-      font-size: 16px;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 12px;
+    .hero-sub {
+      font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 14px;
     }
-
     .table-badge {
-      background: rgba(255, 107, 0, 0.1);
-      color: var(--brand);
-      font-weight: 700;
-      font-size: 14px;
-      padding: 6px 16px;
-      border-radius: 50px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid rgba(255, 107, 0, 0.15);
+      display: inline-flex; align-items: center; gap: 7px;
+      background: linear-gradient(135deg, rgba(255,79,0,.12), rgba(255,106,40,.08));
+      color: var(--brand); font-weight: 800; font-size: 13.5px;
+      padding: 8px 16px; border-radius: 999px;
+      border: 1px solid rgba(255,79,0,.18);
     }
+    .hero-meta {
+      margin-top: 14px; font-size: 12px; color: var(--muted); line-height: 1.45;
+    }
+    .hero-meta b { color: var(--ink-soft); font-weight: 700; }
 
-    /* MENU GRID */
-    .portal-grid {
+    .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
-
-    .portal-card {
+    .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--r);
-      padding: 20px 16px;
-      box-shadow: var(--shadow);
+      border-radius: 18px;
+      padding: 16px 14px 15px;
+      box-shadow: var(--shadow-sm);
       cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      transition: var(--tr);
       text-decoration: none;
       color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 148px;
+      transition: var(--tr);
+      position: relative;
+      -webkit-user-select: none; user-select: none;
     }
-
-    .portal-card:hover {
-      transform: translateY(-4px);
-      border-color: var(--brand);
-      box-shadow: 0 12px 28px rgba(255, 107, 0, 0.08);
+    .card:active { transform: scale(.97); }
+    .card:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    .card.primary {
+      border-color: rgba(255,79,0,.28);
+      box-shadow: 0 10px 28px rgba(255,79,0,.10);
+      background: linear-gradient(165deg, #fff 0%, #FFF8F4 100%);
     }
-
-    .portal-card:active {
-      transform: scale(0.97);
+    .card.disabled {
+      opacity: .55; pointer-events: none; filter: grayscale(.2);
     }
-
     .card-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: var(--r-sm);
-      background: rgba(255, 107, 0, 0.08);
-      color: var(--brand);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      transition: var(--tr);
+      width: 44px; height: 44px; border-radius: 13px;
+      background: var(--brand-soft); color: var(--brand);
+      display: grid; place-items: center; font-size: 18px;
     }
-
-    .portal-card:hover .card-icon {
-      background: var(--brand);
+    .card.primary .card-icon {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
       color: #fff;
+      box-shadow: 0 6px 16px rgba(255,79,0,.28);
     }
-
     .card-title {
-      font-size: 16px;
-      font-weight: 700;
-      line-height: 1.2;
+      font-size: 15px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em;
     }
-
     .card-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.3;
+      font-size: 12px; color: var(--muted); line-height: 1.4; flex: 1;
+    }
+    .card-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: auto; padding-top: 4px;
+    }
+    .card-cta {
+      font-size: 11.5px; font-weight: 800; color: var(--brand);
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .card-badge {
+      display: none; min-width: 20px; height: 20px; padding: 0 6px;
+      border-radius: 999px; background: var(--brand); color: #fff;
+      font-size: 11px; font-weight: 800; align-items: center; justify-content: center;
+    }
+    .card-badge.on { display: inline-flex; }
+
+    .foot-note {
+      text-align: center; font-size: 11.5px; color: var(--muted);
+      margin-top: 6px; line-height: 1.45;
+    }
+    .foot-note a { color: var(--brand); font-weight: 700; text-decoration: none; }
+
+    .offline {
+      display: none; align-items: center; justify-content: center; gap: 8px;
+      background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA;
+      border-radius: 999px; padding: 8px 14px; font-size: 12.5px; font-weight: 700;
+    }
+    .offline.on { display: flex; }
+
+    .sess-banner {
+      display: none; gap: 10px; align-items: flex-start;
+      background: #FEF3C7; border: 1px solid #FCD34D; color: #92400E;
+      border-radius: 14px; padding: 12px 14px; font-size: 13px; line-height: 1.4;
+    }
+    .sess-banner.on { display: flex; }
+    .sess-banner.danger { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+    .sess-banner i { margin-top: 2px; flex-shrink: 0; }
+    .sess-banner button {
+      margin-left: auto; border: none; background: rgba(0,0,0,.08);
+      border-radius: 8px; padding: 6px 10px; font-weight: 800; font-size: 11px;
+      cursor: pointer; font-family: inherit; white-space: nowrap; color: inherit;
     }
 
-    /* MODAL OVERLAY */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(17, 24, 39, 0.4);
+    .overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(20,18,16,.48);
       backdrop-filter: blur(8px);
-      z-index: 1000;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.35s ease;
+      display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity .28s ease;
     }
-
-    .modal-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-sheet {
-      width: 100%;
-      max-width: 480px;
+    .overlay.on { opacity: 1; pointer-events: auto; }
+    .overlay.center { align-items: center; padding: 20px; }
+    .sheet {
+      width: 100%; max-width: 440px;
       background: var(--surface);
-      border-radius: var(--r) var(--r) 0 0;
-      padding: 24px;
-      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
+      border-radius: 22px 22px 0 0;
+      padding: 10px 18px calc(22px + var(--safe-b));
+      max-height: 92vh; overflow-y: auto;
       transform: translateY(100%);
-      transition: transform 0.35s cubic-bezier(0.15, 0.85, 0.35, 1);
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      max-height: 90vh;
-      overflow-y: auto;
+      transition: transform .32s cubic-bezier(.15,.85,.35,1);
+      box-shadow: 0 -12px 40px rgba(0,0,0,.12);
+    }
+    .overlay.on .sheet { transform: translateY(0); }
+    .overlay.center .sheet {
+      border-radius: 20px; transform: scale(.96); max-width: 360px;
+      padding: 22px 20px calc(20px + var(--safe-b));
+    }
+    .overlay.center.on .sheet { transform: scale(1); }
+    .sheet-handle {
+      width: 40px; height: 4px; border-radius: 99px; background: var(--border);
+      margin: 4px auto 14px;
+    }
+    .overlay.center .sheet-handle { display: none; }
+    .sheet-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 16px;
+    }
+    .sheet-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 20px; font-weight: 700; letter-spacing: -.02em;
+    }
+    .sheet-close {
+      width: 36px; height: 36px; border-radius: 11px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--ink-soft); cursor: pointer;
+      display: grid; place-items: center; font-size: 14px;
     }
 
-    .modal-overlay.active .modal-sheet {
-      transform: translateY(0);
+    .svc-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
     }
-
-    .modal-hdr {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 14px;
+    .svc-btn {
+      border: 1px solid var(--border); background: var(--bg);
+      border-radius: 14px; padding: 16px 10px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      cursor: pointer; font-family: inherit; font-weight: 700; font-size: 12.5px;
+      color: var(--ink); transition: var(--tr); text-align: center; min-height: 96px;
     }
+    .svc-btn i { font-size: 20px; color: var(--brand); }
+    .svc-btn:active { transform: scale(.96); border-color: var(--brand); background: #FFF8F4; }
+    .svc-btn:disabled { opacity: .5; cursor: wait; }
+    .svc-btn.wide { grid-column: 1 / -1; flex-direction: row; min-height: 52px; justify-content: center; gap: 10px; }
 
-    .modal-title {
-      font-size: 18px;
-      font-weight: 800;
+    .track-empty, .pay-empty {
+      text-align: center; padding: 28px 16px; color: var(--muted);
     }
-
-    .modal-close {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--bg);
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: var(--text-muted);
-      transition: var(--tr);
+    .track-empty i, .pay-empty i {
+      font-size: 36px; opacity: .35; display: block; margin-bottom: 10px;
     }
-
-    .modal-close:hover {
-      background: var(--border);
-      color: var(--text);
+    .ord-card {
+      border: 1px solid var(--border); border-radius: 16px;
+      padding: 14px; margin-bottom: 12px; background: #fff;
     }
-
-    /* SERVICE BUTTONS GRID */
-    .service-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
+    .ord-head {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+      margin-bottom: 10px;
     }
-
-    .service-btn {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 18px 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 600;
-      font-size: 13px;
-      transition: var(--tr);
-      text-align: center;
+    .ord-id { font-weight: 800; font-size: 14px; color: var(--brand); }
+    .ord-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+    .pill {
+      font-size: 10.5px; font-weight: 800; padding: 4px 9px; border-radius: 999px;
+      text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
     }
-
-    .service-btn:hover {
-      background: #FFF5EE;
-      border-color: var(--brand);
-      color: var(--brand);
-    }
-
-    .service-btn i {
-      font-size: 20px;
-    }
-
-    /* TRACKER LAYOUT */
-    .tracker-box {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .timeline {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      position: relative;
-      padding-left: 28px;
-    }
-
+    .pill-pending { background: #FEF3C7; color: #B45309; }
+    .pill-prep { background: #FFEDD5; color: #C2410C; }
+    .pill-served { background: #D1FAE5; color: #047857; }
+    .pill-paid { background: #E0E7FF; color: #3730A3; }
+    .timeline { display: flex; flex-direction: column; gap: 0; position: relative; padding-left: 22px; margin-top: 8px; }
     .timeline::before {
-      content: '';
-      position: absolute;
-      left: 7px; top: 10px; bottom: 10px;
-      width: 2px;
-      background: var(--border);
+      content: ''; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--border);
     }
-
-    .timeline-step {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .t-step { position: relative; padding: 0 0 14px 0; }
+    .t-step:last-child { padding-bottom: 0; }
+    .t-dot {
+      position: absolute; left: -22px; top: 3px; width: 12px; height: 12px; border-radius: 50%;
+      background: #fff; border: 2.5px solid var(--border);
     }
-
-    .timeline-dot {
-      position: absolute;
-      left: -28px; top: 3px;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--surface);
-      border: 3px solid var(--border);
-      transition: var(--tr);
+    .t-step.done .t-dot { background: var(--ok); border-color: var(--ok); }
+    .t-step.active .t-dot {
+      background: var(--brand); border-color: var(--brand);
+      box-shadow: 0 0 0 4px var(--brand-ring);
     }
-
-    .timeline-step.active .timeline-dot {
-      background: var(--brand);
-      border-color: rgba(255, 107, 0, 0.22);
-      box-shadow: 0 0 0 4px rgba(255, 107, 0, 0.22);
+    .t-title { font-size: 13px; font-weight: 700; color: var(--muted); }
+    .t-step.done .t-title { color: var(--ok); }
+    .t-step.active .t-title { color: var(--brand); }
+    .t-desc { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .eta {
+      margin: 4px 0 12px; padding: 12px; border-radius: 12px; text-align: center;
+      border: 1px solid rgba(255,79,0,.2); background: rgba(255,79,0,.06);
     }
-
-    .timeline-step.done .timeline-dot {
-      background: #10B981;
-      border-color: #10B981;
+    .eta strong { display: block; font-size: 22px; color: var(--brand); font-weight: 800; }
+    .line-items { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+    .line-item {
+      display: flex; justify-content: space-between; font-size: 12.5px;
+      padding: 3px 0; color: var(--ink-soft); gap: 10px;
     }
+    .line-item span:first-child { text-align: left; }
 
-    .step-title {
-      font-weight: 700;
-      font-size: 14px;
-      color: var(--text-muted);
+    .bill-box {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px; margin-bottom: 14px;
     }
-
-    .timeline-step.active .step-title {
-      color: var(--brand);
-    }
-
-    .timeline-step.done .step-title {
-      color: #10B981;
-    }
-
-    .step-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    /* CHECKOUT LAYOUT */
-    .bill-summary {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
     .bill-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 14px;
+      display: flex; justify-content: space-between; font-size: 13.5px;
+      padding: 5px 0; color: var(--ink-soft); gap: 10px;
     }
-
-    .bill-total {
-      border-top: 1px solid var(--border);
-      padding-top: 10px;
-      font-weight: 700;
-      font-size: 16px;
-      color: var(--brand);
+    .bill-row.tot {
+      border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px;
+      font-weight: 800; font-size: 17px; color: var(--ink);
     }
-
-    .upi-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      margin: 12px 0;
-    }
-
-    .qr-container {
-      padding: 10px;
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .qr-img {
-      width: 180px;
-      height: 180px;
-    }
-
-    .utr-form {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      width: 100%;
-    }
-
-    .input-field {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: 12px 14px;
-      outline: none;
-      font-family: inherit;
-      font-size: 14px;
-      transition: var(--tr);
-    }
-
-    .input-field:focus {
-      border-color: var(--brand);
-      background: #fff;
-    }
-
+    .bill-row.tot span:last-child { color: var(--brand); }
+    .pay-actions { display: flex; flex-direction: column; gap: 10px; }
     .btn {
-      width: 100%;
-      background: var(--brand);
-      color: #fff;
-      font-family: inherit;
-      font-weight: 700;
-      border: none;
-      border-radius: var(--r-sm);
-      padding: 14px;
-      cursor: pointer;
-      transition: var(--tr);
-      text-align: center;
+      width: 100%; border: none; border-radius: 13px; padding: 14px 16px;
+      font-family: inherit; font-weight: 800; font-size: 14.5px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: var(--tr); text-decoration: none;
     }
-
-    .btn:hover {
-      background: var(--brand-hover);
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #fff; box-shadow: 0 8px 20px rgba(255,79,0,.28);
     }
+    .btn-dark { background: #1A1714; color: #fff; }
+    .btn-ghost {
+      background: #fff; color: var(--ink); border: 1px solid var(--border);
+    }
+    .btn:active { transform: scale(.98); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .upi-box { text-align: center; margin: 8px 0 4px; }
+    .qr-wrap {
+      display: inline-flex; padding: 12px; background: #fff; border: 1px solid var(--border);
+      border-radius: 14px; margin: 10px 0;
+    }
+    .qr-wrap img { width: 180px; height: 180px; display: block; }
+    .field {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; font-family: inherit; font-size: 15px;
+      outline: none; margin: 6px 0 10px;
+    }
+    .field:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-ring); background: #fff; }
+    .label { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 4px; }
 
-    /* TOAST FEEDBACK */
     .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(100px);
-      background: #111827;
-      color: #fff;
-      font-weight: 600;
-      font-size: 14px;
-      padding: 12px 24px;
-      border-radius: 50px;
-      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
-      z-index: 2000;
-      opacity: 0;
-      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+      position: fixed; left: 50%; bottom: calc(22px + var(--safe-b));
+      transform: translateX(-50%) translateY(80px);
+      background: #1A1714; color: #fff; font-weight: 700; font-size: 13.5px;
+      padding: 12px 18px; border-radius: 999px; z-index: 2000; opacity: 0;
+      transition: .35s cubic-bezier(.22,1,.36,1); max-width: min(92vw, 360px);
+      box-shadow: 0 10px 28px rgba(0,0,0,.22); text-align: center;
       pointer-events: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    }
+    .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin {
+      width: 28px; height: 28px; border: 3px solid var(--border);
+      border-top-color: var(--brand); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 0 auto;
     }
 
-    .toast.show {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
+    .block-icon {
+      width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 14px;
+      display: grid; place-items: center; font-size: 26px;
+      background: #FEF2F2; color: var(--danger);
     }
-
-    .toast i {
-      color: #10B981;
+    .block-icon.warn { background: #FEF3C7; color: #B45309; }
+    .block-title {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px;
     }
-
-    /* OFFLINE STATES */
-    .offline-banner {
-      background: #EF4444;
-      color: white;
-      text-align: center;
-      font-size: 13px;
-      font-weight: 700;
-      padding: 6px;
-      border-radius: 50px;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
+    .block-msg {
+      text-align: center; color: var(--muted); font-size: 13.5px; line-height: 1.5; margin-bottom: 16px;
     }
   </style>
 </head>
 <body>
+  <div class="portal" id="portal">
+    <div class="offline" id="offline"><i class="fa-solid fa-wifi"></i> <span data-i18n="offline">You're offline — actions will retry</span></div>
 
-  <div class="portal-container">
-    <!-- Offline Banner -->
-    <div class="offline-banner" id="offline-banner">
-      <i class="fa-solid fa-cloud-showers-water"></i> Offline Mode - Verification will retry when connected
+    <div class="topbar">
+      <div class="status-pill" id="session-pill"><span class="dot"></span> <span id="session-pill-txt">Table open</span></div>
+      <button type="button" class="lang-btn" id="lang-btn" title="Language">EN</button>
     </div>
 
-    <!-- Header Box -->
-    <div class="portal-header">
-      <div class="brand-logo" id="brand-logo">RESTRONAME</div>
-      <div class="outlet-name" id="outlet-name">Dine-In Operations</div>
-      <div class="table-badge">
-        <i class="fa-solid fa-chair"></i> <span id="table-label">Table --</span>
+    <header class="hero">
+      <img class="hero-mark" src="assets/restrosuite-mark.png" alt="" width="48" height="48" onerror="this.style.display='none'">
+      <div class="hero-name" id="brand-logo">Loading…</div>
+      <div class="hero-sub" id="outlet-name" data-i18n="tableService">Table service</div>
+      <div class="table-badge" id="table-badge">
+        <i class="fa-solid fa-utensils"></i>
+        <span id="table-label">Table —</span>
       </div>
-      <p class="portal-hint" id="portal-hint">No app · free Wi‑Fi · food comes to your table</p>
+      <p class="hero-meta" id="portal-hint"><b data-i18n="noApp">No app</b> · free Wi‑Fi · food comes to your table</p>
+    </header>
+
+    <div class="sess-banner" id="sess-banner" role="status">
+      <i class="fa-solid fa-circle-exclamation"></i>
+      <span id="sess-banner-txt"></span>
+      <button type="button" id="sess-banner-refresh" data-i18n="retry">Retry</button>
     </div>
 
-    <!-- Grid Actions -->
-    <div class="portal-grid">
-      <!-- Menu Order — primary guest action -->
-      <a href="#" class="portal-card" id="menu-btn">
+    <div class="grid" id="action-grid">
+      <a href="#" class="card primary" id="menu-btn">
         <div class="card-icon"><i class="fa-solid fa-utensils"></i></div>
-        <div class="card-title">View Menu & Order</div>
-        <div class="card-desc">Browse dishes and send straight to the kitchen</div>
+        <div class="card-title" data-i18n="menuTitle">View menu &amp; order</div>
+        <div class="card-desc" data-i18n="menuDesc">Browse dishes and send straight to the kitchen</div>
+        <div class="card-foot">
+          <span class="card-cta"><span data-i18n="menuCta">Open menu</span> <i class="fa-solid fa-arrow-right"></i></span>
+        </div>
       </a>
 
-      <!-- Call Waiter (customer mode only -- ringing the bell is for guests) -->
-      <div class="portal-card" id="service-card" onclick="openModal('service-modal')">
+      <div class="card" id="service-card" role="button" tabindex="0">
         <div class="card-icon"><i class="fa-solid fa-bell"></i></div>
-        <div class="card-title">Service Requests</div>
-        <div class="card-desc">Call captain, request water, cutlery or clear table</div>
+        <div class="card-title" data-i18n="svcTitle">Call service</div>
+        <div class="card-desc" data-i18n="svcDesc">Water, cutlery, clear table or call the waiter</div>
+        <div class="card-foot"><span class="card-cta" data-i18n="svcCta">Request help</span></div>
       </div>
 
-      <!-- Live Order Tracker -->
-      <div class="portal-card" id="tracker-card" onclick="openModal('tracker-modal')">
-        <div class="card-icon"><i class="fa-solid fa-hourglass-half"></i></div>
-        <div class="card-title">Track Live Order</div>
-        <div class="card-desc">Check kitchen status of your table orders</div>
+      <div class="card" id="tracker-card" role="button" tabindex="0">
+        <div class="card-icon"><i class="fa-solid fa-fire-burner"></i></div>
+        <div class="card-title" data-i18n="trackTitle">Track orders</div>
+        <div class="card-desc" data-i18n="trackDesc">Live kitchen status for this table</div>
+        <div class="card-foot">
+          <span class="card-cta" data-i18n="trackCta">View status</span>
+          <span class="card-badge" id="track-badge">0</span>
+        </div>
       </div>
 
-      <!-- Checkout / Pay (customer mode only -- waiter settles via POS) -->
-      <div class="portal-card" id="checkout-card" onclick="openModal('checkout-modal')">
-        <div class="card-icon"><i class="fa-solid fa-credit-card"></i></div>
-        <div class="card-title">Pay Bill / Pay Later</div>
-        <div class="card-desc">Check running total and pay using UPI QR</div>
+      <div class="card" id="checkout-card" role="button" tabindex="0">
+        <div class="card-icon"><i class="fa-solid fa-receipt"></i></div>
+        <div class="card-title" data-i18n="payTitle">Bill &amp; pay</div>
+        <div class="card-desc" data-i18n="payDesc">Running total · UPI · pay later</div>
+        <div class="card-foot">
+          <span class="card-cta" id="pay-cta" data-i18n="payCta">See bill</span>
+          <span class="card-badge" id="pay-badge">0</span>
+        </div>
       </div>
     </div>
 
-    <!-- Waiter mode switch (visible only on staff devices) -->
-    <div id="waiter-mode-switch" style="display:none; text-align:center; margin-top:14px;">
-      <a id="waiter-mode-link" href="#" style="font-size:12px; color:var(--text-muted); text-decoration:underline;"></a>
+    <p class="foot-note" id="waiter-switch" style="display:none"></p>
+    <p class="foot-note" data-i18n="powered">Powered by RestroSuite</p>
+  </div>
+
+  <!-- SESSION BLOCK -->
+  <div class="overlay center" id="session-block" aria-hidden="true">
+    <div class="sheet" role="alertdialog" aria-labelledby="block-title">
+      <div class="block-icon" id="block-icon"><i class="fa-solid fa-lock"></i></div>
+      <div class="block-title" id="block-title">Table closed</div>
+      <p class="block-msg" id="block-msg">Ask staff to open this table, then scan the QR again.</p>
+      <button type="button" class="btn btn-primary" id="btn-retry-session"><i class="fa-solid fa-rotate"></i> <span data-i18n="retry">Retry</span></button>
     </div>
   </div>
 
-  <!-- SERVICE REQUESTS MODAL -->
-  <div class="modal-overlay" id="service-modal" onclick="closeModalOnBg(event, 'service-modal')">
-    <div class="modal-sheet">
-      <div class="modal-hdr">
-        <span class="modal-title">Request Table Service</span>
-        <button class="modal-close" onclick="closeModal('service-modal')"><i class="fa-solid fa-xmark"></i></button>
+  <!-- SERVICE -->
+  <div class="overlay" id="service-modal" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-labelledby="svc-title">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hdr">
+        <div class="sheet-title" id="svc-title" data-i18n="svcSheet">Table service</div>
+        <button type="button" class="sheet-close" data-close="service-modal" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="service-grid">
-        <button class="service-btn" onclick="sendServiceRequest('Drinking Water', '💧')">
-          <i class="fa-solid fa-glass-water"></i> Bring Water
-        </button>
-        <button class="service-btn" onclick="sendServiceRequest('Cutlery / Plates', '🍴')">
-          <i class="fa-solid fa-utensils"></i> Need Cutlery
-        </button>
-        <button class="service-btn" onclick="sendServiceRequest('Clear Table', '🧹')">
-          <i class="fa-solid fa-broom"></i> Clear Table
-        </button>
-        <button class="service-btn" onclick="sendServiceRequest('General Assistant', '🙋')">
-          <i class="fa-solid fa-hand"></i> Call Waiter
-        </button>
-        <button class="service-btn" onclick="sendServiceRequest('Request Printed Bill', '🧾')">
-          <i class="fa-solid fa-receipt"></i> Request Bill
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- LIVE TRACKER MODAL -->
-  <div class="modal-overlay" id="tracker-modal" onclick="closeModalOnBg(event, 'tracker-modal')">
-    <div class="modal-sheet">
-      <div class="modal-hdr">
-        <span class="modal-title">Live Order Tracker</span>
-        <button class="modal-close" onclick="closeModal('tracker-modal')"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="tracker-box" id="tracker-box">
-        <!-- Rendered dynamically -->
-        <p style="color: var(--text-muted); text-align: center; padding: 20px;">No active orders tracked on this phone.</p>
+      <div class="svc-grid">
+        <button type="button" class="svc-btn" data-svc="Drinking Water"><i class="fa-solid fa-glass-water"></i><span data-i18n="water">Water</span></button>
+        <button type="button" class="svc-btn" data-svc="Cutlery / Plates"><i class="fa-solid fa-utensils"></i><span data-i18n="cutlery">Cutlery</span></button>
+        <button type="button" class="svc-btn" data-svc="Clear Table"><i class="fa-solid fa-broom"></i><span data-i18n="clear">Clear table</span></button>
+        <button type="button" class="svc-btn" data-svc="General Assistant"><i class="fa-solid fa-hand"></i><span data-i18n="waiter">Call waiter</span></button>
+        <button type="button" class="svc-btn wide" data-svc="Request Printed Bill"><i class="fa-solid fa-receipt"></i><span data-i18n="bill">Request printed bill</span></button>
       </div>
     </div>
   </div>
 
-  <!-- CHECKOUT MODAL -->
-  <div class="modal-overlay" id="checkout-modal" onclick="closeModalOnBg(event, 'checkout-modal')">
-    <div class="modal-sheet">
-      <div class="modal-hdr">
-        <span class="modal-title">Table Self-Checkout</span>
-        <button class="modal-close" onclick="closeModal('checkout-modal')"><i class="fa-solid fa-xmark"></i></button>
+  <!-- TRACKER -->
+  <div class="overlay" id="tracker-modal" aria-hidden="true">
+    <div class="sheet" role="dialog">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hdr">
+        <div class="sheet-title" data-i18n="trackSheet">Live order status</div>
+        <button type="button" class="sheet-close" data-close="tracker-modal" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="tracker-box">
+        <div class="track-empty"><div class="spin"></div></div>
+      </div>
+      <button type="button" class="btn btn-ghost" id="btn-refresh-track" style="margin-top:8px"><i class="fa-solid fa-rotate"></i> <span data-i18n="refresh">Refresh</span></button>
+    </div>
+  </div>
+
+  <!-- PAY -->
+  <div class="overlay" id="checkout-modal" aria-hidden="true">
+    <div class="sheet" role="dialog">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hdr">
+        <div class="sheet-title" data-i18n="paySheet">Your bill</div>
+        <button type="button" class="sheet-close" data-close="checkout-modal" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div id="checkout-box">
-        <!-- Rendered dynamically -->
-        <p style="color: var(--text-muted); text-align: center; padding: 20px;">No running orders found to pay.</p>
+        <div class="pay-empty"><div class="spin"></div></div>
       </div>
     </div>
   </div>
 
-  <!-- Feedback Toast -->
-  <div class="toast" id="toast">
-    <i class="fa-solid fa-circle-check"></i> <span id="toast-message">Request sent successfully!</span>
-  </div>
+  <div class="toast" id="toast" role="status"></div>
 
   <script>
-  function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-    (function() {
-      'use strict';
+  function escHtml(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
 
-      const params = new URLSearchParams(window.location.search);
-      const slug = params.get('tenant') || params.get('outlet') || '';
-      const table = params.get('table') || '';
+  (function () {
+    'use strict';
 
-      if (!slug) {
-        document.body.innerHTML = '<div style="text-align:center; padding: 80px 20px; font-family:sans-serif;">' +
-          '<i class="fa-solid fa-qrcode" style="font-size:64px; color:#FF4F00; margin-bottom:16px;"></i>' +
-          '<h2>No Restaurant Context</h2><p style="color:#666; margin-top:8px;">Please scan the table QR code to start dining.</p></div>';
-        return;
+    var params = new URLSearchParams(window.location.search);
+    var slug = params.get('tenant') || params.get('outlet') || '';
+    var table = params.get('table') || params.get('t') || '';
+    var uiLang = (function () {
+      try { return localStorage.getItem('rs_guest_lang') || 'en'; } catch (e) { return 'en'; }
+    })();
+
+    var I18N = {
+      en: {
+        offline: "You're offline — actions will retry",
+        tableService: 'Table service',
+        noApp: 'No app needed',
+        menuTitle: 'View menu & order',
+        menuDesc: 'Browse dishes and send straight to the kitchen',
+        menuCta: 'Open menu',
+        svcTitle: 'Call service',
+        svcDesc: 'Water, cutlery, clear table or call the waiter',
+        svcCta: 'Request help',
+        trackTitle: 'Track orders',
+        trackDesc: 'Live kitchen status for this table',
+        trackCta: 'View status',
+        payTitle: 'Bill & pay',
+        payDesc: 'Running total · UPI · pay later',
+        payCta: 'See bill',
+        powered: 'Powered by RestroSuite',
+        svcSheet: 'Table service',
+        trackSheet: 'Live order status',
+        paySheet: 'Your bill',
+        water: 'Water', cutlery: 'Cutlery', clear: 'Clear table', waiter: 'Call waiter',
+        bill: 'Request printed bill', refresh: 'Refresh', retry: 'Retry',
+        tableOpen: 'Table open', tablePaused: 'Paused', tableClosed: 'Closed · ask staff',
+        table: 'Table',
+        noOrders: 'No orders on this table yet. Open the menu and place one.',
+        noBill: 'No open amount to pay. Order food first, then come back.',
+        settled: 'All orders on this table are settled. Thank you!',
+        payLater: 'Pay later at counter',
+        payUpi: 'Pay with UPI app',
+        submitUtr: 'Submit UTR / Ref',
+        grand: 'Amount due',
+        afterPay: 'After paying, enter the 12-digit UTR / bank reference',
+        payCounter: 'Pay cash or card at the counter — show this total to staff',
+        scanUpi: 'Scan with any UPI app',
+        sent: 'Sent to staff',
+        failed: 'Could not send — try again',
+        sessionNeeded: 'Table session required. Ask staff to open this table.',
+        closedTitle: 'Table is closed',
+        closedMsg: 'Staff need to open this table before you can order or call service. Then scan the QR again.',
+        pausedTitle: 'Ordering paused',
+        pausedMsg: 'QR ordering is temporarily paused for this table. Please call a waiter for help.',
+        utrInvalid: 'Enter a valid 12-digit UTR',
+        utrSent: 'UTR sent — cashier will verify',
+        payLaterOk: 'Staff notified — pay at the counter',
+        openingStripe: 'Opening secure checkout…',
+        staffWaiter: 'Staff: open waiter KOT mode',
+        staffGuest: 'Switch to guest view',
+        kotTitle: 'Waiter KOT',
+        kotDesc: 'Send kitchen tickets for this table',
+        fromKitchen: 'From kitchen',
+        anyMoment: 'Any moment',
+        estimated: 'Estimated',
+        stepPlaced: 'Order placed',
+        stepPlacedD: 'Received — waiting for kitchen',
+        stepPrep: 'In kitchen',
+        stepPrepD: 'Being prepared',
+        stepServed: 'Served',
+        stepServedD: 'At your table — enjoy',
+        stepPaid: 'Paid',
+        stepPaidD: 'Bill settled'
+      },
+      hi: {
+        offline: 'आप ऑफ़लाइन हैं — कनेक्ट होने पर दोबारा कोशिश',
+        tableService: 'टेबल सर्विस',
+        noApp: 'ऐप नहीं चाहिए',
+        menuTitle: 'मेनू देखें और ऑर्डर',
+        menuDesc: 'डिश चुनें और किचन को भेजें',
+        menuCta: 'मेनू खोलें',
+        svcTitle: 'सर्विस बुलाएँ',
+        svcDesc: 'पानी, कटलरी, टेबल साफ़ या वेटर',
+        svcCta: 'मदद माँगें',
+        trackTitle: 'ऑर्डर ट्रैक',
+        trackDesc: 'किचन की लाइव स्थिति',
+        trackCta: 'स्थिति देखें',
+        payTitle: 'बिल और भुगतान',
+        payDesc: 'कुल राशि · UPI · बाद में भुगतान',
+        payCta: 'बिल देखें',
+        powered: 'RestroSuite द्वारा',
+        svcSheet: 'टेबल सर्विस',
+        trackSheet: 'लाइव ऑर्डर',
+        paySheet: 'आपका बिल',
+        water: 'पानी', cutlery: 'कटलरी', clear: 'टेबल साफ़', waiter: 'वेटर बुलाएँ',
+        bill: 'प्रिंटेड बिल माँगें', refresh: 'रीफ़्रेश', retry: 'दोबारा',
+        tableOpen: 'टेबल खुली', tablePaused: 'रुका हुआ', tableClosed: 'बंद · स्टाफ़ से खोलवाएँ',
+        table: 'टेबल',
+        noOrders: 'अभी कोई ऑर्डर नहीं। पहले मेनू से ऑर्डर करें।',
+        noBill: 'भुगतान के लिए कोई बिल नहीं। पहले ऑर्डर करें।',
+        settled: 'सभी ऑर्डर क्लियर हो चुके हैं। धन्यवाद!',
+        payLater: 'काउंटर पर बाद में भुगतान',
+        payUpi: 'UPI ऐप से भुगतान',
+        submitUtr: 'UTR / रेफ जमा करें',
+        grand: 'देय राशि',
+        afterPay: 'भुगतान के बाद 12 अंकों का UTR / रेफ नंबर डालें',
+        payCounter: 'काउंटर पर कैश/कार्ड से भुगतान करें — यह टोटल दिखाएँ',
+        scanUpi: 'किसी भी UPI ऐप से स्कैन करें',
+        sent: 'स्टाफ़ को भेज दिया',
+        failed: 'नहीं भेजा जा सका — दोबारा कोशिश करें',
+        sessionNeeded: 'टेबल सेशन चाहिए। स्टाफ़ से टेबल खुलवाएँ।',
+        closedTitle: 'टेबल बंद है',
+        closedMsg: 'ऑर्डर या सर्विस के लिए स्टाफ़ को टेबल खोलनी होगी। फिर QR स्कैन करें।',
+        pausedTitle: 'ऑर्डरिंग रुकी हुई है',
+        pausedMsg: 'इस टेबल पर QR ऑर्डर अस्थायी रूप से बंद है। वेटर से मदद माँगें।',
+        utrInvalid: 'सही 12 अंकों का UTR डालें',
+        utrSent: 'UTR भेज दिया — कैशियर जाँचेंगे',
+        payLaterOk: 'स्टाफ़ को बता दिया — काउंटर पर भुगतान करें',
+        openingStripe: 'सुरक्षित चेकआउट खुल रहा है…',
+        staffWaiter: 'स्टाफ़: वेटर KOT मोड',
+        staffGuest: 'गेस्ट व्यू पर जाएँ',
+        kotTitle: 'वेटर KOT',
+        kotDesc: 'इस टेबल के किचन टिकट भेजें',
+        fromKitchen: 'किचन से',
+        anyMoment: 'जल्दी आ रहा है',
+        estimated: 'अनुमानित समय',
+        stepPlaced: 'ऑर्डर मिला',
+        stepPlacedD: 'कैशियर / किचन को मिला',
+        stepPrep: 'किचन में',
+        stepPrepD: 'खाना बन रहा है',
+        stepServed: 'परोसा गया',
+        stepServedD: 'टेबल पर पहुँचा',
+        stepPaid: 'भुगतान',
+        stepPaidD: 'बिल क्लियर'
       }
+    };
 
-      // ── Dual-mode table QR ────────────────────────────────────────────
-      // The SAME table QR serves two roles:
-      //  · CUSTOMER (default): order + track + ring bell + self-checkout.
-      //  · WAITER  (?mode=waiter, offered on staff devices): KOT ordering
-      //    linked to the POS -- no ring-the-bell, no self-checkout.
-      // A device that has logged into the dashboard (tenant_id in storage)
-      // is treated as a staff device and gets a mode toggle link.
-      const isStaffDevice = (() => {
-        try {
-          // Prefer tab-scoped staff session; do not treat another tab's outlet
-          // identity in localStorage as "this device is staff".
-          return !!(sessionStorage.getItem('tenant_session_token') || sessionStorage.getItem('tenant_id'));
-        } catch(e){ return false; }
-      })();
-      const waiterMode = params.get('mode') === 'waiter';
-      window.__RS_WAITER_MODE__ = waiterMode;
-      function displayOrderId(id) {
-        const raw = String(id || '');
-        const m = raw.match(/^DO-(QR|WTR)-(\d{6})-(\d{3,})(?:-[A-Z0-9]+)?$/i);
-        if (m) return `${m[1].toUpperCase()}-${m[2]}-${m[3]}`;
-        if (/^DO-(QR|WTR)-/i.test(raw)) return raw;
-        const hash = Math.abs(raw.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0));
-        if (/^DO-QR-/i.test(raw)) return `QR-${String(hash % 1000).padStart(3, '0')}`;
-        if (/^DO-WTR-/i.test(raw)) return `WTR-${String(hash % 1000).padStart(3, '0')}`;
-        return raw;
-      }
+    function t(k) {
+      return (I18N[uiLang] && I18N[uiLang][k]) || I18N.en[k] || k;
+    }
 
-      // Configure Menu Button Redirect
-      document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}${waiterMode ? '&mode=waiter' : ''}`;
-      const tablePad = table && /^\d+$/.test(String(table)) ? String(table).padStart(2, '0') : (table || '');
-      document.getElementById('table-label').textContent = tablePad ? `Table ${tablePad}` : 'Takeaway';
-      // Instant brand from slug (API overwrites when ready) — never leave RESTRONAME
-      const brandGuess = slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      const brandEl0 = document.getElementById('brand-logo');
-      if (brandEl0 && (!brandEl0.textContent || brandEl0.textContent === 'RESTRONAME')) {
-        brandEl0.textContent = brandGuess;
-      }
-      document.title = (tablePad ? 'Table ' + tablePad + ' · ' : '') + brandGuess;
-
-      if (waiterMode) {
-        // Hide guest-only actions; waiter punches KOTs and settles at the POS.
-        const svcCard = document.getElementById('service-card');
-        const payCard = document.getElementById('checkout-card');
-        if (svcCard) svcCard.style.display = 'none';
-        if (payCard) payCard.style.display = 'none';
-        const outletEl = document.getElementById('outlet-name');
-        if (outletEl) outletEl.innerHTML = '<i class="fa-solid fa-user-tie" style="margin-right:5px;"></i>Waiter Mode · KOT Ordering';
-        const menuCard = document.getElementById('menu-btn');
-        const menuDesc = menuCard ? menuCard.querySelector('.card-desc') : null;
-        if (menuDesc) menuDesc.textContent = 'Punch items straight to the kitchen (KOT/KDS)';
-        const trackDesc = document.querySelector('#tracker-card .card-desc');
-        if (trackDesc) trackDesc.textContent = 'Monitor kitchen status for this table';
-      }
-
-      // Staff devices see a discreet link to flip between the two modes
-      if (isStaffDevice || waiterMode) {
-        const sw = document.getElementById('waiter-mode-switch');
-        const link = document.getElementById('waiter-mode-link');
-        if (sw && link) {
-          sw.style.display = 'block';
-          const base = `qr-order.html?tenant=${encodeURIComponent(slug)}&table=${encodeURIComponent(table)}`;
-          if (waiterMode) {
-            link.textContent = 'Switch to customer view';
-            link.href = base;
-          } else {
-            link.innerHTML = '<i class="fa-solid fa-user-tie" style="margin-right:4px;"></i>Staff? Switch to waiter mode';
-            link.href = base + '&mode=waiter';
-          }
-        }
-      }
-
-      // Load Config variables
-      let SU = '';
-      let SK = '';
-      let FN = '';
-
-      const configPromise = (window.__configReady || Promise.resolve()).then(() => {
-        SU = window.__SUPABASE_URL__ || '';
-        SK = window.__SUPABASE_ANON_KEY__ || '';
-        FN = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-          ? '/functions/v1/tenant-public'
-          : (SU ? SU + '/functions/v1/tenant-public' : '');
+    function applyI18n() {
+      document.querySelectorAll('[data-i18n]').forEach(function (el) {
+        var k = el.getAttribute('data-i18n');
+        if (k && t(k)) el.textContent = t(k);
       });
+      var lb = document.getElementById('lang-btn');
+      if (lb) lb.textContent = uiLang === 'hi' ? 'हिं' : 'EN';
+      document.documentElement.lang = uiLang === 'hi' ? 'hi' : 'en';
+    }
 
-      function showSessionStatusOverlay(status) {
-        const existing = document.getElementById('session-status-overlay');
-        if (existing) existing.remove();
+    if (!slug) {
+      document.body.innerHTML =
+        '<div style="text-align:center;padding:80px 20px;font-family:system-ui;max-width:360px;margin:0 auto">' +
+        '<div style="font-size:48px;margin-bottom:12px">📱</div>' +
+        '<h2 style="margin:0 0 8px;font-family:Georgia,serif">Scan a table QR</h2>' +
+        '<p style="color:#6E675F;line-height:1.5">Open this page only from your restaurant table QR code.</p></div>';
+      return;
+    }
 
-        if (status === 'active') return;
+    var isStaffDevice = false;
+    try {
+      isStaffDevice = !!(sessionStorage.getItem('tenant_session_token') || sessionStorage.getItem('tenant_id') ||
+        localStorage.getItem('tenant_session_token'));
+    } catch (e) {}
+    var waiterMode = params.get('mode') === 'waiter';
+    window.__RS_WAITER_MODE__ = waiterMode;
 
-        const tableTxt = table
-          ? 'Table ' + (/^\d+$/.test(String(table)) ? String(table).padStart(2, '0') : table)
-          : 'This table';
-        const brandEl = document.getElementById('brand-logo');
-        const outletTxt =
-          (brandEl && brandEl.textContent && brandEl.textContent !== 'RESTRONAME'
-            ? brandEl.textContent
-            : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())) || 'Restaurant';
+    var sessionToken = '';
+    try {
+      sessionToken = params.get('token') || params.get('session') || sessionStorage.getItem('qr_session_token') || '';
+    } catch (e) {
+      sessionToken = params.get('token') || params.get('session') || '';
+    }
+    var sessionStatus = 'unknown'; // active | paused | closed | unknown
+    var upiVpaAddress = '';
+    var stripeEnabled = false;
+    var currencySymbol = '₹';
+    var liveOrders = [];
+    var SU = '', SK = '', FN = '';
 
-        let title = 'Almost ready';
-        let desc =
-          tableTxt +
-          ' is not open for phone ordering yet. Ask your host to open the table, then tap Refresh.';
-        let icon = 'fa-mug-hot';
-        let tip = 'You scanned the correct code — staff open the session from the floor map.';
+    function displayOrderId(id) {
+      var raw = String(id || '');
+      var m = raw.match(/^DO-(QR|WTR)-(\d{6})-(\d{3,})(?:-[A-Z0-9]+)?$/i);
+      if (m) return m[1].toUpperCase() + '-' + m[2] + '-' + m[3];
+      return raw.length > 18 ? raw.slice(0, 16) + '…' : raw;
+    }
 
-        if (status === 'paused') {
-          title = 'Ordering paused';
-          desc = tableTxt + ' is paused. Ask staff to resume, then refresh.';
-          icon = 'fa-pause';
-          tip = 'Host can resume QR ordering without reprinting the card.';
+    function padTable(v) {
+      if (!v) return '—';
+      return /^\d+$/.test(String(v)) ? String(parseInt(v, 10)).padStart(2, '0') : String(v);
+    }
+
+    function money(n) {
+      return (currencySymbol || '₹') + Math.round(Number(n) || 0);
+    }
+
+    function storeSession(token) {
+      if (!token) return;
+      sessionToken = token;
+      try { sessionStorage.setItem('qr_session_token', token); } catch (e) {}
+      try {
+        if (params.get('token') !== token) {
+          params.set('token', token);
+          var url = location.pathname + '?' + params.toString() + (location.hash || '');
+          history.replaceState({}, '', url);
         }
+      } catch (e) {}
+    }
 
-        const overlayHtml = `
-          <div id="session-status-overlay" role="alertdialog" aria-modal="true" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(165deg,#1A1714,#2C241C);font-family:inherit">
-            <div style="width:100%;max-width:380px;background:#fff;color:var(--text);border-radius:20px;padding:28px 22px;text-align:center;box-shadow:0 24px 48px rgba(0,0,0,.3)">
-              <div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:rgba(255,79,0,.12);display:flex;align-items:center;justify-content:center">
-                <i class="fa-solid ${icon}" style="font-size:28px;color:var(--brand)"></i>
-              </div>
-              <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">${escHtml(outletTxt)} · ${escHtml(tableTxt)}</div>
-              <h2 style="font-size:22px;font-weight:800;margin:0 0 10px">${title}</h2>
-              <p style="font-size:14px;line-height:1.55;color:var(--text-muted);margin:0 0 12px">${desc}</p>
-              <p style="font-size:12px;line-height:1.45;color:var(--text-muted);margin:0 0 18px;padding:10px;background:var(--bg);border-radius:10px;border:1px solid var(--border)">${tip}</p>
-              <button type="button" class="btn" onclick="window.location.reload()"><i class="fa-solid fa-rotate-right" style="margin-right:6px"></i> I'm ready — refresh</button>
-            </div>
-          </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', overlayHtml);
-      }
+    function apiCall(action, extra) {
+      extra = extra || {};
+      return (window.__configReady || Promise.resolve()).then(function () {
+        SU = window.__SUPABASE_URL__ || (window.CONFIG && window.CONFIG.supabaseUrl) || SU;
+        SK = window.__SUPABASE_ANON_KEY__ || (window.CONFIG && window.CONFIG.supabaseAnonKey) || SK;
+        FN = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic) ||
+          (SU ? SU + '/functions/v1/tenant-public' : '');
+        if (!FN) return Promise.reject(new Error('Config missing'));
 
-      function showStaffLoginOverlay() {
-        const existing = document.getElementById('staff-login-overlay');
-        if (existing) return;
-
-        const overlayHtml = `
-          <div id="staff-login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); backdrop-filter:blur(10px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; font-family:sans-serif; color:#fff;">
-            <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:40px 30px; border-radius:24px; max-width:360px; width:100%; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
-              <i class="fa-solid fa-user-shield" style="font-size:48px; color:var(--orange); margin-bottom:16px; display:block; text-align:center;"></i>
-              <h2 style="font-size:20px; font-weight:800; margin:0 0 6px 0; text-align:center;">Staff Authentication</h2>
-              <p style="font-size:12px; color:#a1a1aa; margin:0 0 24px 0; text-align:center;">Enter staff username & password to enable Waiter Mode</p>
-              
-              <div style="display:flex; flex-direction:column; gap:12px; text-align:left; margin-bottom:20px;">
-                <div>
-                  <label style="font-size:11px; font-weight:700; color:#a1a1aa; display:block; margin-bottom:4px;">Username</label>
-                  <input type="text" id="staff-login-username" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; outline:none;" placeholder="E.g., waiter1">
-                </div>
-                <div>
-                  <label style="font-size:11px; font-weight:700; color:#a1a1aa; display:block; margin-bottom:4px;">Password</label>
-                  <input type="password" id="staff-login-password" style="width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; outline:none;" placeholder="••••••••">
-                </div>
-              </div>
-              <div id="staff-login-error" style="color:#ef4444; font-size:12px; margin-bottom:16px; display:none; text-align:center;"></div>
-              <button id="btn-staff-login-submit" class="btn btn-primary" style="width:100%; padding:12px; font-weight:700; border-radius:12px; font-size:14px;">
-                <i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In
-              </button>
-            </div>
-          </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', overlayHtml);
-
-        const btn = document.getElementById('btn-staff-login-submit');
-        btn.onclick = async () => {
-          const username = document.getElementById('staff-login-username').value.trim();
-          const password = document.getElementById('staff-login-password').value;
-          const errEl = document.getElementById('staff-login-error');
-          if (!username || !password) {
-            errEl.style.display = 'block';
-            errEl.textContent = 'Please enter both username and password.';
-            return;
-          }
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
-
-          try {
-            const accessFn = (window.__SUPABASE_URL__ || '') + '/functions/v1/tenant-access';
-            const res = await fetch(accessFn, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': window.__SUPABASE_ANON_KEY__,
-                'Authorization': 'Bearer ' + window.__SUPABASE_ANON_KEY__
-              },
-              body: JSON.stringify({ action: 'login', slug: slug, username, password })
-            }).then(r => r.json());
-
-            if (res.error) {
-              errEl.style.display = 'block';
-              errEl.textContent = res.error;
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In';
-              return;
-            }
-
-            if (res.session && res.session.session_token) {
-              // Tab-scoped staff session only (matches dashboard multi-tab isolation).
-              sessionStorage.setItem('tenant_session_token', res.session.session_token);
-              sessionStorage.setItem('tenant_id', res.session.tenant_id);
-              sessionStorage.setItem('tenant_slug', res.session.tenant_slug);
-              sessionStorage.setItem('tenant_name', res.session.tenant_name);
-              
-              document.getElementById('staff-login-overlay').remove();
-              window.location.reload();
-            } else {
-              errEl.style.display = 'block';
-              errEl.textContent = 'Authentication failed.';
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In';
-            }
-          } catch (e) {
-            console.error("Staff login failed:", e);
-            errEl.style.display = 'block';
-            errEl.textContent = 'Failed to connect to authentication server.';
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-solid fa-right-to-bracket" style="margin-right:6px;"></i> Log In';
-          }
-        };
-      }
-
-      let upiVpaAddress = "";
-      window.currencySymbol = '₹';
-      let trackerInterval = null;
-
-      // API Caller helper
-      function apiCall(action, extra) {
-        return configPromise.then(() => {
-          if (!FN) return Promise.reject(new Error('Backend endpoint config missing'));
-          const token = sessionStorage.getItem('qr_session_token') || '';
-          return fetch(FN, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SK,
-              'Authorization': 'Bearer ' + SK
-            },
-            body: JSON.stringify(Object.assign({ action, tenant_slug: slug, session_token: token }, extra || {}))
-          }).then(res => res.json().catch(() => ({})));
-        });
-      }
-
-      // Load business profile brand
-      function initBranding() {
-        apiCall('list_menu')
-          .then(res => {
-            if (res.tenantName) {
-              document.getElementById('brand-logo').textContent = res.tenantName;
-              document.getElementById('outlet-name').textContent = 'Table service';
-              document.title = res.tenantName + ' · Table';
-            }
-            if (res.upiVpa) {
-              upiVpaAddress = res.upiVpa;
-            }
-            if (res.currencySymbol) {
-              window.currencySymbol = res.currencySymbol;
-            }
-            window.stripeEnabled = res.stripeEnabled || false;
-            window.stripeAccountId = res.stripeAccountId || null;
-          })
-          .catch(err => console.error("Branding failed to fetch:", err));
-      }
-      
-      // One-tap CX: table QR lands on menu unless guest explicitly opens the hub
-      // (?hub=1) for track / pay / service. Staff waiter mode always stays optional.
-      const forceHub = params.get('hub') === '1' || params.get('track') === '1' || params.get('pay') === '1';
-      function menuUrl(token) {
-        const q = new URLSearchParams();
-        q.set('tenant', slug);
-        if (table) q.set('table', table);
-        if (token) q.set('token', token);
-        if (waiterMode) q.set('mode', 'waiter');
-        return 'order.html?' + q.toString();
-      }
-      function goMenu(token) {
-        if (forceHub || waiterMode) return false;
-        window.location.replace(menuUrl(token));
-        return true;
-      }
-
-      configPromise.then(() => {
-        initBranding();
-        
-        if (waiterMode) {
-          const staffToken = sessionStorage.getItem('tenant_session_token') || localStorage.getItem('tenant_session_token');
-          if (!staffToken) {
-            showStaffLoginOverlay();
-          } else {
-            document.getElementById('menu-btn').href = menuUrl();
-          }
-        } else {
-          // Verify active table session
-          apiCall('get_active_session', { table: table })
-            .then(res => {
-              if (res.active) {
-                if (res.status === 'paused') {
-                  showSessionStatusOverlay('paused');
-                } else {
-                  sessionStorage.setItem('qr_session_token', res.session_token);
-                  const currentToken = params.get('token');
-                  if (currentToken !== res.session_token) {
-                    params.set('token', res.session_token);
-                    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-                  }
-                  document.getElementById('menu-btn').href = menuUrl(res.session_token);
-                  if (goMenu(res.session_token)) return;
-                  showSessionStatusOverlay('active');
-                  if (params.get('track') === '1') {
-                    setTimeout(function(){ try { openModal('tracker-modal'); } catch(e){} }, 200);
-                  }
-                  if (params.get('pay') === '1') {
-                    setTimeout(function(){ try { openModal('checkout-modal'); } catch(e){} }, 200);
-                  }
-                }
-              } else {
-                showSessionStatusOverlay('closed');
-              }
-            })
-            .catch(err => {
-              console.error("Session verification failed:", err);
-              // In local dev/fallback, let it go if Supabase URL is not present, otherwise block
-              if (SU) {
-                showSessionStatusOverlay('closed');
-              } else {
-                document.getElementById('menu-btn').href = menuUrl();
-                goMenu();
-              }
-            });
-        }
-      });
-
-      // Modal management
-      window.openModal = function(id) {
-        document.getElementById(id).classList.add('active');
-        if (id === 'tracker-modal') {
-          pollOrderTrackers(false); // First load: show loading spinner
-          if (trackerInterval) clearInterval(trackerInterval);
-          trackerInterval = setInterval(function() { pollOrderTrackers(true); }, 5000); // Background: silent polling
-        } else if (id === 'checkout-modal') {
-          renderCheckoutSummary();
-        }
-      };
-
-      window.closeModal = function(id) {
-        document.getElementById(id).classList.remove('active');
-        if (id === 'tracker-modal') {
-          if (trackerInterval) {
-            clearInterval(trackerInterval);
-            trackerInterval = null;
-          }
-        }
-      };
-
-      window.closeModalOnBg = function(e, id) {
-        if (e.target.id === id) closeModal(id);
-      };
-
-      // Toast feedback
-      function showToast(msg) {
-        const t = document.getElementById('toast');
-        document.getElementById('toast-message').textContent = msg;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2500);
-      }
-
-      // Send Service Alerts
-      window.sendServiceRequest = function(requestName, icon) {
-        const text = `${requestName} ${icon}`;
-        closeModal('service-modal');
-
-        apiCall('create_notification', {
-          title: `Table ${table} Call`,
-          message: `Dine-in Customer requested: ${requestName}`,
-          type: 'waiter_call',
-          table: table
-        })
-        .then(res => {
-          if (res.success) {
-            showToast(`Paging Waiter for ${requestName}...`);
-          } else {
-            showToast("Server busy. Please call waiter manually.");
-          }
-        })
-        .catch(() => showToast("Connection failed. Try again."));
-      };
-
-      // Track order polling
-      function getPendingOrderList() {
+        var tok = sessionToken || '';
         try {
-          return JSON.parse(localStorage.getItem('doppio_pending_qr_orders') || '[]');
-        } catch(e) {
-          return [];
-        }
-      }
+          tok = tok || params.get('token') || sessionStorage.getItem('qr_session_token') || '';
+        } catch (e) {}
 
-      function pollOrderTrackers(isBackground) {
-        const orderList = getPendingOrderList();
-        const box = document.getElementById('tracker-box');
+        var body = Object.assign({
+          action: action,
+          tenant_slug: slug,
+          table: table,
+          session_token: tok
+        }, extra);
 
-        if (!orderList.length) {
-          box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">No active orders tracked on this phone.</p>`;
-          return;
-        }
-
-        // Fetch the status of the most recent order in list
-        const latestOrder = orderList[orderList.length - 1];
-        if (!isBackground) {
-          box.innerHTML = `<div style="display:flex; justify-content:center; padding:30px;"><div class="spin" style="width:24px; height:24px; border:2px solid var(--border); border-top-color:var(--brand); border-radius:50%; animation:spin 0.8s linear infinite;"></div></div>`;
-        }
-
-        apiCall('get_order_status', { orderId: latestOrder.orderId })
-          .then(res => {
-            if (res.error) {
-              if (!isBackground) {
-                box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Could not verify order status. (${escHtml(String(res.error||'Unknown error'))})</p>`;
-              }
-              return;
-            }
-
-            const ord = res.order;
-            const status = ord.status || 'Pending Review';
-
-            const steps = [
-              { key: 'Pending Review', title: 'Order Placed', desc: 'Received at cashier. Waiting for approval.' },
-              { key: 'Preparing', title: 'Preparing in Kitchen', desc: 'Chef has started cooking your food.' },
-              { key: 'Served', title: 'Served Hot', desc: 'Food is delivered to your table. Enjoy!' },
-              { key: 'Paid', title: 'Paid & Settled', desc: 'Payment received. Thank you!' }
-            ];
-
-            let activeIndex = 0;
-            const normStatus = String(status || '').trim().toLowerCase();
-            if (normStatus === 'preparing' || normStatus === 'accepted') activeIndex = 1;
-            else if (normStatus === 'served') activeIndex = 2;
-            else if (normStatus === 'paid') activeIndex = 3;
-
-            let etaHtml = '';
-            const pm = Number(ord.prepMinutes || 0);
-            if (pm > 0 && ord.prepStartedAt && activeIndex === 1) {
-              const started = new Date(ord.prepStartedAt).getTime();
-              const remainMin = Math.max(0, Math.ceil(((started + pm*60000) - Date.now())/60000));
-              etaHtml = `<div style="margin:4px 0 14px;padding:12px;border:1px solid rgba(234,88,12,0.25);background:rgba(234,88,12,0.06);border-radius:10px;text-align:center">
-                <div style="font-size:12px;color:var(--text-muted)">Estimated time</div>
-                <div style="font-size:22px;font-weight:800;color:var(--brand)">${remainMin>0 ? ('~'+remainMin+' min') : 'Any moment now'}</div>
-                <div style="font-size:11px;color:var(--text-muted)">Kitchen set ${pm} min prep time</div>
-              </div>`;
-            }
-
-            let timelineHtml = steps.map((st, idx) => {
-              let cls = '';
-              if (idx < activeIndex) cls = 'done';
-              else if (idx === activeIndex) cls = 'active';
-
-              return `<div class="timeline-step ${cls}">
-                <div class="timeline-dot"></div>
-                <div class="step-title">${st.title}</div>
-                <div class="step-desc">${st.desc}</div>
-              </div>`;
-            }).join('');
-
-            box.innerHTML = `
-              <div style="font-weight:700; font-size:15px; margin-bottom:10px; color:var(--brand);">Order: ${displayOrderId(latestOrder.orderId)}</div>
-              ${etaHtml}
-              <div class="timeline">${timelineHtml}</div>
-            `;
-          })
-          .catch(() => {
-            if (!isBackground) {
-              box.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Offline. Check connection.</p>`;
-            }
-          });
-      }
-
-      // Self Checkout Summary
-      function renderCheckoutSummary() {
-        const orderList = getPendingOrderList();
-        const checkoutBox = document.getElementById('checkout-box');
-
-        if (!orderList.length) {
-          checkoutBox.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">No running orders found to pay.</p>`;
-          return;
-        }
-
-        const runningTotal = orderList.reduce((sum, ord) => sum + Number(ord.total || 0), 0);
-
-        if (runningTotal <= 0) {
-          checkoutBox.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 20px;">Your bill is settled.</p>`;
-          return;
-        }
-
-        const symbol = window.currencySymbol || '₹';
-        const isUpiSupported = (symbol === '₹');
-        const upiVpa = upiVpaAddress || "merchant@upi"; // Fallback VPA
-        const upiName = document.getElementById('brand-logo').textContent || "Restaurant";
-        const latestOrder = orderList[orderList.length - 1];
-
-        // Format UPI deep link
-        const upiUrl = `upi://pay?pa=${upiVpa}&pn=${encodeURIComponent(upiName)}&am=${runningTotal.toFixed(2)}&tr=${latestOrder.orderId}&tn=Table%20${table}%20Bill&cu=INR`;
-        const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
-
-        let paymentMethodHtml = '';
-        if (isUpiSupported) {
-          paymentMethodHtml = `
-            <div class="upi-box">
-              <p style="font-size:13px; color:var(--text-muted); text-align:center;">Scan below to pay directly via any UPI app</p>
-              <div class="qr-container">
-                <img src="${qrCodeApiUrl}" class="qr-img" alt="UPI QR Code">
-              </div>
-              <a href="${upiUrl}" class="btn" style="text-decoration:none;"><i class="fa-solid fa-mobile-screen-button"></i> Pay via UPI App</a>
-            </div>
-
-            <div class="utr-form">
-              <p style="font-size:12px; font-weight:600; color:var(--text-muted);">After payment, enter the 12-digit UTR/Ref code to auto-verify:</p>
-              <input type="number" class="input-field" id="utr-input" placeholder="e.g. 123456789012" minlength="12" maxlength="12">
-              <button class="btn" onclick="submitUtrCode('${latestOrder.orderId}')" style="background:#111827;"><i class="fa-solid fa-shield-halved"></i> Submit UTR Code</button>
-            </div>
-          `;
-        } else if (window.stripeEnabled) {
-          paymentMethodHtml = `
-            <div style="text-align: center; margin-top: 20px; padding: 20px; border-radius: var(--r-sm); background: rgba(17,24,39,0.03); border: 1px solid var(--border);">
-              <i class="fa-solid fa-credit-card" style="font-size: 28px; color: var(--brand); margin-bottom: 8px;"></i>
-              <p style="font-size: 15px; font-weight: 700; color: var(--text);">Pay Online via Stripe</p>
-              <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px; margin-bottom: 16px;">Secure card, Apple Pay, & Google Pay processing.</p>
-              <button class="btn" onclick="payViaStripe('${latestOrder.orderId}', ${runningTotal})" style="background: #635bff; color: #fff; border: none; font-weight: 700;"><i class="fa-solid fa-credit-card"></i> Pay ${symbol}${runningTotal.toFixed(2)} with Card</button>
-            </div>
-          `;
-        } else {
-          paymentMethodHtml = `
-            <div style="text-align: center; margin-top: 20px; padding: 20px; border-radius: var(--r-sm); background: rgba(17,24,39,0.03); border: 1px solid var(--border);">
-              <i class="fa-solid fa-credit-card" style="font-size: 28px; color: var(--brand); margin-bottom: 8px;"></i>
-              <p style="font-size: 15px; font-weight: 700; color: var(--text);">Pay at Counter</p>
-              <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Please present this bill summary to the waiter or cashier to complete your payment.</p>
-            </div>
-          `;
-        }
-
-        checkoutBox.innerHTML = `
-          <div class="bill-summary">
-            <div class="bill-row">
-              <span>Running Bill (Table ${table})</span>
-              <span>${symbol}${runningTotal}</span>
-            </div>
-            <div class="bill-row bill-total">
-              <span>Grand Total</span>
-              <span>${symbol}${runningTotal}</span>
-            </div>
-          </div>
-          ${paymentMethodHtml}
-        `;
-      }
-
-      window.submitUtrCode = function(orderId) {
-        const val = document.getElementById('utr-input').value.trim();
-        if (val.length !== 12) {
-          showToast("Please enter a valid 12-digit UTR/Ref code.");
-          return;
-        }
-
-        apiCall('create_notification', {
-          title: `Table ${table} Payment Check`,
-          message: `UTR submitted: ${val} for Order ID: ${orderId}`,
-          type: 'payment_alert'
-        })
-        .then(res => {
-          if (res.success) {
-            showToast("UTR code submitted. Waiting for cashier approval.");
-            closeModal('checkout-modal');
-          } else {
-            showToast("Failed to submit verification. Try again.");
-          }
-        })
-        .catch(() => showToast("Connection failed. Try again."));
-      };
-
-      window.payViaStripe = function(orderId, amount) {
-        showToast("Initiating secure card checkout...");
-        
-        fetch(SU + '/functions/v1/stripe-connect', {
+        return fetch(FN, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': SK
+            'apikey': SK,
+            'Authorization': 'Bearer ' + SK
           },
-          body: JSON.stringify({
-            action: 'create_checkout_session',
-            tenant_slug: slug,
-            order_id: orderId,
-            amount: amount,
-            table: table,
-            currency: (window.currencySymbol === '€') ? 'EUR' : 'EUR'
-          })
-        })
-        .then(r => r.json())
-        .then(res => {
-          if (res.checkout_url) {
-            window.location.href = res.checkout_url;
-          } else {
-            showToast("Checkout failed: " + (res.error || "unknown error"));
-          }
-        })
-        .catch(err => {
-          console.error("Stripe payment init error:", err);
-          showToast("Network error. Please try again.");
+          body: JSON.stringify(body)
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; });
         });
+      });
+    }
+
+    // ── Branding via list_menu (real public endpoint) ──
+    function initBranding() {
+      apiCall('list_menu').then(function (res) {
+        if (!res || res.error) return;
+        if (res.tenantName) {
+          document.getElementById('brand-logo').textContent = res.tenantName;
+          document.title = res.tenantName + ' · Table ' + padTable(table);
+        }
+        if (res.upiVpa) upiVpaAddress = res.upiVpa;
+        if (res.currencySymbol) currencySymbol = res.currencySymbol;
+        if (res.stripeEnabled) stripeEnabled = true;
+        window.currencySymbol = currencySymbol;
+        window.stripeEnabled = stripeEnabled;
+        updateBadges();
+      }).catch(function () {});
+    }
+
+    // ── Session ──
+    function setSessionUi(status) {
+      sessionStatus = status || 'unknown';
+      var pill = document.getElementById('session-pill');
+      var banner = document.getElementById('sess-banner');
+      var bannerTxt = document.getElementById('sess-banner-txt');
+      var block = document.getElementById('session-block');
+      var cards = ['menu-btn', 'service-card', 'tracker-card', 'checkout-card'];
+
+      if (!pill) return;
+      pill.classList.add('on');
+
+      if (status === 'active') {
+        pill.style.background = '#ECFDF5';
+        pill.style.color = '#059669';
+        pill.style.borderColor = '#A7F3D0';
+        document.getElementById('session-pill-txt').textContent = t('tableOpen');
+        if (banner) banner.classList.remove('on', 'danger');
+        if (block) {
+          block.classList.remove('on');
+          block.setAttribute('aria-hidden', 'true');
+        }
+        cards.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.classList.remove('disabled');
+        });
+      } else if (status === 'paused') {
+        pill.style.background = '#FEF3C7';
+        pill.style.color = '#B45309';
+        pill.style.borderColor = '#FCD34D';
+        document.getElementById('session-pill-txt').textContent = t('tablePaused');
+        if (banner) {
+          banner.classList.add('on');
+          banner.classList.remove('danger');
+          if (bannerTxt) bannerTxt.textContent = t('pausedMsg');
+        }
+        if (block) {
+          block.classList.remove('on');
+          block.setAttribute('aria-hidden', 'true');
+        }
+        // Still allow track/pay if they have history; block new order/service slightly softer
+        var menu = document.getElementById('menu-btn');
+        var svc = document.getElementById('service-card');
+        if (menu) menu.classList.add('disabled');
+        if (svc) svc.classList.add('disabled');
+      } else if (status === 'closed') {
+        pill.style.background = '#FEF2F2';
+        pill.style.color = '#B91C1C';
+        pill.style.borderColor = '#FECACA';
+        document.getElementById('session-pill-txt').textContent = t('tableClosed');
+        if (banner) {
+          banner.classList.add('on', 'danger');
+          if (bannerTxt) bannerTxt.textContent = t('closedMsg');
+        }
+        showSessionBlock('closed');
+        cards.forEach(function (id) {
+          var el = document.getElementById(id);
+          // Keep tracker/pay reachable for existing orders; disable menu/service
+          if (id === 'menu-btn' || id === 'service-card') {
+            if (el) el.classList.add('disabled');
+          }
+        });
+      }
+    }
+
+    function showSessionBlock(kind) {
+      var block = document.getElementById('session-block');
+      if (!block) return;
+      var icon = document.getElementById('block-icon');
+      var title = document.getElementById('block-title');
+      var msg = document.getElementById('block-msg');
+      if (kind === 'paused') {
+        if (icon) {
+          icon.className = 'block-icon warn';
+          icon.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        }
+        if (title) title.textContent = t('pausedTitle');
+        if (msg) msg.textContent = t('pausedMsg');
+      } else {
+        if (icon) {
+          icon.className = 'block-icon';
+          icon.innerHTML = '<i class="fa-solid fa-lock"></i>';
+        }
+        if (title) title.textContent = t('closedTitle');
+        if (msg) msg.textContent = t('closedMsg');
+      }
+      block.classList.add('on');
+      block.setAttribute('aria-hidden', 'false');
+    }
+
+    function refreshSession() {
+      if (waiterMode) {
+        setSessionUi('active');
+        return Promise.resolve({ active: true, status: 'active' });
+      }
+      if (!table) {
+        setSessionUi('closed');
+        return Promise.resolve({ active: false });
+      }
+      return apiCall('get_active_session', { table: table }).then(function (res) {
+        if (res && res.active && res.status !== 'paused') {
+          if (res.session_token) storeSession(res.session_token);
+          setSessionUi('active');
+          refreshLiveOrders();
+        } else if (res && res.active && res.status === 'paused') {
+          setSessionUi('paused');
+        } else {
+          setSessionUi('closed');
+        }
+        return res;
+      }).catch(function () {
+        // Offline: keep last known token if any
+        if (sessionToken) setSessionUi('active');
+        return null;
+      });
+    }
+
+    function menuUrl(token) {
+      var u = new URL(location.origin + location.pathname.replace(/qr-order\.html?$/i, 'order.html').replace(/\/qr-order\/?$/i, '/order'));
+      // Prefer clean rewrite path when on production host
+      if (!/order\.html$/i.test(u.pathname) && u.pathname.indexOf('/order') < 0) {
+        u = new URL(location.origin + '/order');
+      }
+      // Always fall back to order.html relative if origin path is odd
+      if (location.protocol === 'file:' || !location.origin || location.origin === 'null') {
+        return 'order.html?tenant=' + encodeURIComponent(slug) +
+          (table ? '&table=' + encodeURIComponent(table) : '') +
+          (token ? '&token=' + encodeURIComponent(token) : '') +
+          (waiterMode ? '&mode=waiter' : '');
+      }
+      u.searchParams.set('tenant', slug);
+      if (table) u.searchParams.set('table', table);
+      if (token) u.searchParams.set('token', token);
+      if (waiterMode) u.searchParams.set('mode', 'waiter');
+      return u.toString();
+    }
+
+    function goMenu() {
+      if (sessionStatus === 'closed' || sessionStatus === 'paused') {
+        showSessionBlock(sessionStatus === 'paused' ? 'paused' : 'closed');
+        return;
+      }
+      var tok = sessionToken;
+      if (tok) {
+        location.href = menuUrl(tok);
+        return;
+      }
+      apiCall('get_active_session', { table: table }).then(function (res) {
+        if (res && res.session_token) storeSession(res.session_token);
+        if (res && res.active && res.status !== 'paused') {
+          location.href = menuUrl(sessionToken || res.session_token || '');
+        } else if (res && res.status === 'paused') {
+          setSessionUi('paused');
+          showSessionBlock('paused');
+        } else {
+          setSessionUi('closed');
+          showSessionBlock('closed');
+        }
+      }).catch(function () {
+        location.href = menuUrl(sessionToken || '');
+      });
+    }
+
+    // ── Orders: live table API + local fallback ──
+    function getLocalOrders() {
+      try {
+        var all = JSON.parse(localStorage.getItem('doppio_pending_qr_orders') || '[]');
+        if (!Array.isArray(all)) return [];
+        return all.filter(function (o) {
+          if (o.tenant_slug && o.tenant_slug !== slug) return false;
+          if (!table) return true;
+          var tn = String(o.tableNumber || o.table || '');
+          var key = String(table);
+          if (!tn) return true;
+          if (tn === key || tn === 'Table ' + padTable(table) || tn.indexOf(key) >= 0) return true;
+          // normalize digits
+          var a = tn.replace(/\D/g, '');
+          var b = key.replace(/\D/g, '');
+          return a && b && String(parseInt(a, 10)) === String(parseInt(b, 10));
+        });
+      } catch (e) { return []; }
+    }
+
+    function mergeOrderLists(serverOrders, localOrders) {
+      var map = {};
+      (serverOrders || []).forEach(function (o) {
+        if (o && o.orderId) map[o.orderId] = o;
+      });
+      (localOrders || []).forEach(function (o) {
+        if (!o || !o.orderId) return;
+        if (!map[o.orderId]) {
+          map[o.orderId] = {
+            orderId: o.orderId,
+            status: o.status || 'Pending Review',
+            items: o.items || [],
+            total: Number(o.total) || 0,
+            dateTime: o.dateTime || '',
+            source: 'local'
+          };
+        }
+      });
+      return Object.keys(map).map(function (k) { return map[k]; })
+        .sort(function (a, b) {
+          return String(b.dateTime || '').localeCompare(String(a.dateTime || ''));
+        });
+    }
+
+    function openOrders(list) {
+      return (list || []).filter(function (o) {
+        var st = String(o.status || '').toLowerCase();
+        return !/paid|settled|closed|cancelled|canceled|void/.test(st);
+      });
+    }
+
+    function refreshLiveOrders() {
+      var local = getLocalOrders();
+      if (!sessionToken && !waiterMode) {
+        liveOrders = mergeOrderLists([], local);
+        updateBadges();
+        return Promise.resolve(liveOrders);
+      }
+      return apiCall('get_table_orders', { table: table }).then(function (res) {
+        if (res && Array.isArray(res.orders)) {
+          liveOrders = mergeOrderLists(res.orders, local);
+        } else {
+          liveOrders = mergeOrderLists([], local);
+        }
+        updateBadges();
+        return liveOrders;
+      }).catch(function () {
+        liveOrders = mergeOrderLists([], local);
+        updateBadges();
+        return liveOrders;
+      });
+    }
+
+    function updateBadges() {
+      var open = openOrders(liveOrders.length ? liveOrders : getLocalOrders());
+      var n = open.length;
+      var tb = document.getElementById('track-badge');
+      var pb = document.getElementById('pay-badge');
+      if (tb) {
+        tb.textContent = String(n);
+        tb.classList.toggle('on', n > 0);
+      }
+      if (pb) {
+        pb.textContent = String(n);
+        pb.classList.toggle('on', n > 0);
+      }
+      var total = open.reduce(function (s, o) { return s + (Number(o.total) || 0); }, 0);
+      var cta = document.getElementById('pay-cta');
+      if (cta) {
+        cta.textContent = total > 0 ? money(total) : t('payCta');
+      }
+    }
+
+    function statusPillClass(st) {
+      st = String(st || '').toLowerCase();
+      if (st.indexOf('paid') >= 0 || st.indexOf('settled') >= 0) return 'pill-paid';
+      if (st.indexOf('served') >= 0 || st.indexOf('ready') >= 0 || st.indexOf('deliver') >= 0) return 'pill-served';
+      if (st.indexOf('prepar') >= 0 || st.indexOf('accept') >= 0 || st.indexOf('kot') >= 0 || st.indexOf('cook') >= 0) return 'pill-prep';
+      return 'pill-pending';
+    }
+
+    function statusLabel(st) {
+      st = String(st || 'Pending').trim();
+      if (uiLang !== 'hi') return st;
+      var map = {
+        'pending review': 'प्रतीक्षा', pending: 'प्रतीक्षा', preparing: 'बन रहा है',
+        accepted: 'स्वीकृत', served: 'परोसा गया', paid: 'भुगतान', ready: 'तैयार'
       };
+      return map[st.toLowerCase()] || st;
+    }
 
-      // Handle offline status alerts
-      window.addEventListener('online', () => document.getElementById('offline-banner').style.display = 'none');
-      window.addEventListener('offline', () => document.getElementById('offline-banner').style.display = 'flex');
+    function activeStep(status) {
+      var ns = String(status || '').toLowerCase();
+      if (/paid|settled|closed/.test(ns)) return 3;
+      if (/served|delivered|done/.test(ns)) return 2;
+      if (/prepar|accept|kot|cook|ready/.test(ns)) return 1;
+      return 0;
+    }
 
-    })();
+    function parseItems(raw) {
+      try {
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') return JSON.parse(raw);
+      } catch (e) {}
+      return [];
+    }
+
+    // ── Modals ──
+    function openModal(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('on');
+      el.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      if (id === 'tracker-modal') {
+        pollOrderTrackers(false);
+        if (window.__trackTimer) clearInterval(window.__trackTimer);
+        window.__trackTimer = setInterval(function () { pollOrderTrackers(true); }, 5000);
+      }
+      if (id === 'checkout-modal') renderCheckoutSummary();
+    }
+
+    function closeModal(id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('on');
+      el.setAttribute('aria-hidden', 'true');
+      if (!document.querySelector('.overlay.on')) document.body.style.overflow = '';
+      if (id === 'tracker-modal' && window.__trackTimer) {
+        clearInterval(window.__trackTimer);
+        window.__trackTimer = null;
+      }
+    }
+
+    document.querySelectorAll('[data-close]').forEach(function (b) {
+      b.addEventListener('click', function () { closeModal(b.getAttribute('data-close')); });
+    });
+    document.querySelectorAll('.overlay').forEach(function (ov) {
+      if (ov.id === 'session-block') return;
+      ov.addEventListener('click', function (e) {
+        if (e.target === ov) closeModal(ov.id);
+      });
+    });
+
+    function showToast(msg) {
+      var tEl = document.getElementById('toast');
+      tEl.textContent = msg;
+      tEl.classList.add('on');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(function () { tEl.classList.remove('on'); }, 2800);
+    }
+
+    function ensureSessionOrWarn() {
+      if (waiterMode) return true;
+      if (sessionStatus === 'active' && sessionToken) return true;
+      if (sessionStatus === 'paused') {
+        showSessionBlock('paused');
+        return false;
+      }
+      if (sessionStatus === 'closed' || !sessionToken) {
+        showToast(t('sessionNeeded'));
+        refreshSession();
+        return false;
+      }
+      return true;
+    }
+
+    // ── Service (real waiter_call notifications) ──
+    document.querySelectorAll('.svc-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!ensureSessionOrWarn()) return;
+        var name = btn.getAttribute('data-svc');
+        btn.disabled = true;
+        apiCall('create_notification', {
+          title: 'Table ' + padTable(table) + ' Call',
+          message: 'Dine-in Customer requested: ' + name,
+          type: 'waiter_call',
+          table: table
+        }).then(function (res) {
+          if (res && (res.success || res.deduped) && !res.error) {
+            showToast(t('sent') + ' · ' + name);
+            closeModal('service-modal');
+          } else {
+            showToast((res && res.error) || t('failed'));
+          }
+        }).catch(function () {
+          showToast(t('failed'));
+        }).finally(function () {
+          btn.disabled = false;
+        });
+      });
+    });
+
+    function renderOrderCard(o) {
+      var status = o.status || 'Pending Review';
+      var active = activeStep(status);
+      var steps = [
+        { title: t('stepPlaced'), desc: t('stepPlacedD') },
+        { title: t('stepPrep'), desc: t('stepPrepD') },
+        { title: t('stepServed'), desc: t('stepServedD') },
+        { title: t('stepPaid'), desc: t('stepPaidD') }
+      ];
+      var items = parseItems(o.items);
+      var itemsHtml = items.length ? '<div class="line-items">' + items.map(function (it) {
+        return '<div class="line-item"><span>' + escHtml((it.qty || 1) + '× ' + (it.name || '')) +
+          '</span><span>' + escHtml(money((it.price || 0) * (it.qty || 1))) + '</span></div>';
+      }).join('') + '</div>' : '';
+
+      var eta = '';
+      var pm = Number(o.prepMinutes || 0);
+      if (pm > 0 && o.prepStartedAt && active === 1) {
+        var started = new Date(o.prepStartedAt).getTime();
+        var remain = Math.max(0, Math.ceil((started + pm * 60000 - Date.now()) / 60000));
+        eta = '<div class="eta"><div style="font-size:11px;color:var(--muted)">' + escHtml(t('estimated')) +
+          '</div><strong>' + (remain > 0 ? '~' + remain + ' min' : escHtml(t('anyMoment'))) + '</strong></div>';
+      }
+
+      var tl = steps.map(function (st, idx) {
+        var cls = idx < active ? 'done' : (idx === active ? 'active' : '');
+        return '<div class="t-step ' + cls + '"><div class="t-dot"></div><div class="t-title">' +
+          escHtml(st.title) + '</div><div class="t-desc">' + escHtml(st.desc) + '</div></div>';
+      }).join('');
+
+      var src = o.source === 'staff' ? ' · ' + t('fromKitchen') : '';
+      return '<div class="ord-card">' +
+        '<div class="ord-head"><div><div class="ord-id">' + escHtml(displayOrderId(o.orderId)) + '</div>' +
+        '<div class="ord-meta">' + escHtml(money(o.total)) +
+        (o.dateTime ? ' · ' + escHtml(String(o.dateTime).slice(0, 19).replace('T', ' ')) : '') +
+        escHtml(src) + '</div></div>' +
+        '<span class="pill ' + statusPillClass(status) + '">' + escHtml(statusLabel(status)) + '</span></div>' +
+        eta + '<div class="timeline">' + tl + '</div>' + itemsHtml + '</div>';
+    }
+
+    function pollOrderTrackers(silent) {
+      var box = document.getElementById('tracker-box');
+      if (!silent) box.innerHTML = '<div style="padding:28px" class="spin"></div>';
+
+      refreshLiveOrders().then(function (list) {
+        if (!list.length) {
+          box.innerHTML = '<div class="track-empty"><i class="fa-solid fa-receipt"></i><p>' +
+            escHtml(t('noOrders')) + '</p>' +
+            '<button type="button" class="btn btn-primary" style="margin-top:14px" id="go-menu-from-track">' +
+            escHtml(t('menuCta')) + '</button></div>';
+          var g = document.getElementById('go-menu-from-track');
+          if (g) g.onclick = goMenu;
+          return;
+        }
+        // Show open first, then recent paid (max 6)
+        var open = openOrders(list);
+        var paid = list.filter(function (o) {
+          return /paid|settled/i.test(String(o.status || ''));
+        }).slice(0, 2);
+        var show = (open.length ? open : list).slice(0, 5);
+        if (open.length && paid.length) show = show.concat(paid).slice(0, 6);
+        box.innerHTML = show.map(renderOrderCard).join('');
+      });
+    }
+
+    function renderCheckoutSummary() {
+      var box = document.getElementById('checkout-box');
+      box.innerHTML = '<div style="padding:28px" class="spin"></div>';
+
+      refreshLiveOrders().then(function (list) {
+        var open = openOrders(list);
+        if (!open.length) {
+          var allPaid = list.length && list.every(function (o) {
+            return /paid|settled/i.test(String(o.status || ''));
+          });
+          box.innerHTML = '<div class="pay-empty"><i class="fa-solid fa-receipt"></i><p>' +
+            escHtml(allPaid ? t('settled') : t('noBill')) + '</p>' +
+            (!allPaid ? '<button type="button" class="btn btn-primary" style="margin-top:14px" id="go-menu-pay">' +
+              escHtml(t('menuCta')) + '</button>' : '') + '</div>';
+          var g = document.getElementById('go-menu-pay');
+          if (g) g.onclick = goMenu;
+          return;
+        }
+
+        var total = open.reduce(function (s, o) { return s + (Number(o.total) || 0); }, 0);
+        var symbol = currencySymbol || '₹';
+        var lines = open.map(function (o) {
+          return '<div class="bill-row"><span>' + escHtml(displayOrderId(o.orderId)) +
+            '</span><span>' + escHtml(money(o.total)) + '</span></div>';
+        }).join('');
+
+        var latest = open[0];
+        var isInr = symbol === '₹' || symbol === 'Rs' || symbol === 'INR' || !symbol;
+        var payHtml = '';
+
+        if (isInr && upiVpaAddress) {
+          var upiName = document.getElementById('brand-logo').textContent || 'Restaurant';
+          var upiUrl = 'upi://pay?pa=' + encodeURIComponent(upiVpaAddress) +
+            '&pn=' + encodeURIComponent(upiName) +
+            '&am=' + encodeURIComponent(Number(total).toFixed(2)) +
+            '&tr=' + encodeURIComponent(String(latest.orderId || '')) +
+            '&tn=' + encodeURIComponent('Table ' + padTable(table) + ' Bill') +
+            '&cu=INR';
+          var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(upiUrl);
+          payHtml =
+            '<div class="upi-box"><p style="font-size:13px;color:var(--muted)">' + escHtml(t('scanUpi')) + '</p>' +
+            '<div class="qr-wrap"><img src="' + qrUrl + '" alt="UPI QR" width="180" height="180" loading="lazy"></div>' +
+            '<a class="btn btn-primary" href="' + escHtml(upiUrl) + '"><i class="fa-solid fa-mobile-screen-button"></i> ' +
+            escHtml(t('payUpi')) + '</a></div>' +
+            '<p class="label">' + escHtml(t('afterPay')) + '</p>' +
+            '<input class="field" id="utr-input" inputmode="numeric" maxlength="12" placeholder="123456789012" autocomplete="off">' +
+            '<button type="button" class="btn btn-dark" id="btn-utr"><i class="fa-solid fa-shield-halved"></i> ' +
+            escHtml(t('submitUtr')) + '</button>';
+        } else if (stripeEnabled) {
+          payHtml = '<button type="button" class="btn btn-primary" id="btn-stripe"><i class="fa-solid fa-credit-card"></i> Pay ' +
+            escHtml(symbol + Number(total).toFixed(2)) + '</button>';
+        } else {
+          payHtml = '<div class="pay-empty" style="padding:16px"><i class="fa-solid fa-building-columns"></i><p>' +
+            escHtml(t('payCounter')) + '</p></div>';
+        }
+
+        box.innerHTML =
+          '<div class="bill-box">' + lines +
+          '<div class="bill-row tot"><span>' + escHtml(t('grand')) + '</span><span>' + escHtml(money(total)) +
+          '</span></div></div>' +
+          '<div class="pay-actions">' + payHtml +
+          '<button type="button" class="btn btn-ghost" id="btn-pay-later"><i class="fa-solid fa-clock"></i> ' +
+          escHtml(t('payLater')) + '</button></div>';
+
+        wirePayActions(open, total, latest);
+      });
+    }
+
+    function wirePayActions(openList, total, latest) {
+      var symbol = currencySymbol || '₹';
+      var utrBtn = document.getElementById('btn-utr');
+      if (utrBtn) {
+        utrBtn.onclick = function () {
+          if (!ensureSessionOrWarn()) return;
+          var val = (document.getElementById('utr-input').value || '').trim().replace(/\s/g, '');
+          if (!/^\d{12}$/.test(val) && val.length < 12) {
+            showToast(t('utrInvalid'));
+            return;
+          }
+          utrBtn.disabled = true;
+          apiCall('create_notification', {
+            title: 'Table ' + padTable(table) + ' Payment Check',
+            message: 'UTR submitted: ' + val + ' for Order ID: ' + latest.orderId + ' · Amount ' + symbol + Math.round(total),
+            type: 'payment_alert',
+            table: table
+          }).then(function (res) {
+            if (res && (res.success || res.deduped) && !res.error) {
+              showToast(t('utrSent'));
+              closeModal('checkout-modal');
+            } else showToast((res && res.error) || t('failed'));
+          }).catch(function () { showToast(t('failed')); })
+            .finally(function () { utrBtn.disabled = false; });
+        };
+      }
+
+      var later = document.getElementById('btn-pay-later');
+      if (later) {
+        later.onclick = function () {
+          if (!ensureSessionOrWarn()) return;
+          later.disabled = true;
+          apiCall('create_notification', {
+            title: 'Table ' + padTable(table) + ' · Pay later',
+            message: 'Guest will pay at counter. Due ' + symbol + Math.round(total) + ' · ' + openList.length + ' order(s)',
+            type: 'payment_alert',
+            table: table
+          }).then(function (res) {
+            if (res && (res.success || res.deduped) && !res.error) {
+              showToast(t('payLaterOk'));
+              closeModal('checkout-modal');
+            } else showToast((res && res.error) || t('failed'));
+          }).catch(function () { showToast(t('failed')); })
+            .finally(function () { later.disabled = false; });
+        };
+      }
+
+      var st = document.getElementById('btn-stripe');
+      if (st) {
+        st.onclick = function () {
+          showToast(t('openingStripe'));
+          (window.__configReady || Promise.resolve()).then(function () {
+            var su = window.__SUPABASE_URL__;
+            var sk = window.__SUPABASE_ANON_KEY__;
+            return fetch(su + '/functions/v1/stripe-connect', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': sk },
+              body: JSON.stringify({
+                action: 'create_checkout_session',
+                tenant_slug: slug,
+                order_id: latest.orderId,
+                amount: total,
+                table: table
+              })
+            }).then(function (r) { return r.json(); });
+          }).then(function (res) {
+            if (res && res.checkout_url) location.href = res.checkout_url;
+            else showToast((res && res.error) || t('failed'));
+          }).catch(function () { showToast(t('failed')); });
+        };
+      }
+    }
+
+    // ── Wire UI ──
+    document.getElementById('table-label').textContent = t('table') + ' ' + padTable(table);
+    document.getElementById('brand-logo').textContent = slug
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+
+    if (waiterMode) {
+      var sc = document.getElementById('service-card');
+      var cc = document.getElementById('checkout-card');
+      if (sc) sc.style.display = 'none';
+      if (cc) cc.style.display = 'none';
+      var mt = document.querySelector('#menu-btn .card-title');
+      var md = document.querySelector('#menu-btn .card-desc');
+      if (mt) mt.textContent = t('kotTitle');
+      if (md) md.textContent = t('kotDesc');
+    }
+
+    if (isStaffDevice) {
+      var ws = document.getElementById('waiter-switch');
+      if (ws) {
+        ws.style.display = 'block';
+        var next = waiterMode ? 'customer' : 'waiter';
+        var label = waiterMode ? t('staffGuest') : t('staffWaiter');
+        var u = new URL(location.href);
+        if (next === 'waiter') u.searchParams.set('mode', 'waiter');
+        else u.searchParams.delete('mode');
+        ws.innerHTML = '<a href="' + escHtml(u.toString()) + '">' + escHtml(label) + '</a>';
+      }
+    }
+
+    function wireCard(el, fn) {
+      if (!el) return;
+      el.addEventListener('click', function (e) {
+        if (el.tagName === 'A') e.preventDefault();
+        if (el.classList.contains('disabled')) return;
+        fn();
+      });
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (!el.classList.contains('disabled')) fn();
+        }
+      });
+    }
+
+    wireCard(document.getElementById('menu-btn'), goMenu);
+    wireCard(document.getElementById('service-card'), function () {
+      if (!ensureSessionOrWarn()) return;
+      openModal('service-modal');
+    });
+    wireCard(document.getElementById('tracker-card'), function () { openModal('tracker-modal'); });
+    wireCard(document.getElementById('checkout-card'), function () { openModal('checkout-modal'); });
+
+    document.getElementById('btn-refresh-track').addEventListener('click', function () {
+      pollOrderTrackers(false);
+    });
+    document.getElementById('btn-retry-session').addEventListener('click', function () {
+      refreshSession();
+    });
+    document.getElementById('sess-banner-refresh').addEventListener('click', function () {
+      refreshSession();
+    });
+
+    document.getElementById('lang-btn').onclick = function () {
+      uiLang = uiLang === 'hi' ? 'en' : 'hi';
+      try { localStorage.setItem('rs_guest_lang', uiLang); } catch (e) {}
+      applyI18n();
+      document.getElementById('table-label').textContent = t('table') + ' ' + padTable(table);
+      if (sessionStatus === 'active') setSessionUi('active');
+      else if (sessionStatus === 'paused') setSessionUi('paused');
+      else if (sessionStatus === 'closed') setSessionUi('closed');
+      updateBadges();
+      if (waiterMode) {
+        var mt = document.querySelector('#menu-btn .card-title');
+        var md = document.querySelector('#menu-btn .card-desc');
+        if (mt) mt.textContent = t('kotTitle');
+        if (md) md.textContent = t('kotDesc');
+      }
+    };
+
+    function syncNet() {
+      document.getElementById('offline').classList.toggle('on', !navigator.onLine);
+    }
+    window.addEventListener('online', function () {
+      syncNet();
+      refreshSession();
+    });
+    window.addEventListener('offline', syncNet);
+    syncNet();
+
+    // Deep links
+    function openDeepLinks() {
+      if (params.get('track') === '1') setTimeout(function () { openModal('tracker-modal'); }, 280);
+      if (params.get('pay') === '1') setTimeout(function () { openModal('checkout-modal'); }, 280);
+      if (params.get('service') === '1') setTimeout(function () {
+        if (sessionStatus === 'active') openModal('service-modal');
+      }, 280);
+    }
+
+    // Boot
+    applyI18n();
+    initBranding();
+    refreshSession().then(function () {
+      openDeepLinks();
+    });
+    setInterval(function () {
+      if (sessionToken || waiterMode) refreshLiveOrders();
+      else updateBadges();
+    }, 10000);
+    setInterval(function () {
+      if (!waiterMode) refreshSession();
+    }, 45000);
+  })();
   </script>
   <script src="pwa.js"></script>
 </body>
