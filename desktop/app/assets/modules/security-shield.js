@@ -1,18 +1,17 @@
 /* ============================================================
-   RestroSuite — Client UI shield (devtools / right-click / inspect)
+   RestroSuite — System UI shield (devtools / right-click / inspect)
    ------------------------------------------------------------
-   Honest scope: this raises the bar against casual copying via
-   View Source / Inspect in the browser UI. It is NOT "unhackable".
-   Real security is server RLS, lease signatures, auth, and not
-   shipping secrets in the client. DevTools can always be opened
-   from outside the page (browser menu, other devices, proxies).
+   Always-on for staff surfaces. Not user-configurable in Settings.
+   Raises the bar against casual copy / Inspect in the browser UI.
+   Real security remains auth, encryption, RLS, and lease signatures.
+   DevTools can still be opened from outside the page (browser menu).
 
-   Desktop Electron can go further (menu strip, webPreferences).
+   Escape hatch for developers only: ?debug=1 or session rs_debug_ui=1
+   (session-only; never saved as a restaurant setting).
    ============================================================ */
 (function (global) {
   'use strict';
 
-  var KEY = 'rs_security_shield_v1';
   var DEFAULTS = {
     enabled: true,
     blockContextMenu: true,
@@ -21,28 +20,18 @@
     warnOnDevtools: false,
   };
 
-  function loadCfg() {
-    try {
-      var raw = localStorage.getItem(KEY);
-      if (!raw) return Object.assign({}, DEFAULTS);
-      return Object.assign({}, DEFAULTS, JSON.parse(raw));
-    } catch (_) {
-      return Object.assign({}, DEFAULTS);
-    }
-  }
+  var cfg = Object.assign({}, DEFAULTS);
 
-  function saveCfg(cfg) {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(cfg));
-    } catch (_) {}
-  }
-
-  var cfg = loadCfg();
-  // Superadmin / debug can disable
+  // Developer escape only — session/query, never a Settings toggle or localStorage flag
   try {
     if (new URLSearchParams(location.search).get('debug') === '1') cfg.enabled = false;
     if (sessionStorage.getItem('rs_debug_ui') === '1') cfg.enabled = false;
-    if (localStorage.getItem('rs_security_shield_off') === '1') cfg.enabled = false;
+  } catch (_) {}
+
+  // Clear any legacy "user turned shield off" preference so staff cannot leave it disabled
+  try {
+    localStorage.removeItem('rs_security_shield_v1');
+    localStorage.removeItem('rs_security_shield_off');
   } catch (_) {}
 
   function isEditableTarget(t) {
@@ -81,10 +70,8 @@
       if (k === 'u' || k === 's') {
         // Allow Ctrl+S only if an input is focused (staff may save drafts in forms via browser)
         if (k === 's' && isEditableTarget(e.target)) return;
-        if (k === 'u' || k === 's') {
-          e.preventDefault();
-          e.stopPropagation();
-        }
+        e.preventDefault();
+        e.stopPropagation();
       }
     }
   }
@@ -97,11 +84,13 @@
     e.preventDefault();
   }
 
+  var installed = false;
   function install() {
+    if (installed) return;
+    installed = true;
     document.addEventListener('contextmenu', onContextMenu, true);
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('selectstart', onSelectStart, true);
-    // Drag of images / source sniffing
     document.addEventListener(
       'dragstart',
       function (e) {
@@ -112,14 +101,17 @@
     );
   }
 
+  // setEnabled is a no-op for turning off — system policy is always on for staff.
+  // Kept for API compatibility; only re-enables if something called setEnabled(true).
   function setEnabled(on) {
-    cfg.enabled = !!on;
-    saveCfg(cfg);
+    if (on) cfg.enabled = true;
   }
 
-  function configure( partial ) {
-    cfg = Object.assign(cfg, partial || {});
-    saveCfg(cfg);
+  function configure(partial) {
+    // Ignore attempts to disable core protections from app code
+    var next = Object.assign({}, partial || {});
+    delete next.enabled;
+    cfg = Object.assign(cfg, next, { enabled: cfg.enabled });
   }
 
   global.RSSecurityShield = {
@@ -129,9 +121,9 @@
     getConfig: function () {
       return Object.assign({}, cfg);
     },
-    /** Truthful note for settings UI */
+    /** Internal note — not shown in Settings UI */
     disclaimer:
-      'Blocks casual right-click and DevTools shortcuts. Does not make the app unhackable — real protection is auth, encryption, and server rules.',
+      'System UI shield is always active on staff consoles. Real protection is auth, encryption, and server rules.',
   };
 
   // Auto-install on staff surfaces only (never on guest QR / public order pages)

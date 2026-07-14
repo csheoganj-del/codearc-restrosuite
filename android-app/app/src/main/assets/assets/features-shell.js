@@ -744,12 +744,6 @@
             <span class="set-sep">·</span>
             <span class="sd">Forgotten PIN resets need a server-verified code from the account owner.</span>
           </div>` : ''}`)}
-        ${setBlock('UI copy shield', 'Blocks casual inspection — real security is auth + server rules',
-          `<p class="set-hint" style="margin-top:0">${(window.RSSecurityShield && RSSecurityShield.disclaimer) || 'Blocks casual right-click and DevTools shortcuts on this console. Real security is auth + server rules — this is not unhackable.'}</p>
-          <label class="set-check-label">
-            <input type="checkbox" id="sec-ui-shield" ${(window.RSSecurityShield && RSSecurityShield.getConfig && RSSecurityShield.getConfig().enabled) ? 'checked' : 'checked'}>
-            <span>Block right-click · F12 · Ctrl+Shift+I on dashboard</span>
-          </label>`)}
         ${setBlock('Always PIN-protected', 'These always require admin PIN when a PIN is set',
           `<div class="set-prot-list">${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
@@ -807,15 +801,6 @@
         }
         RS.toast('Admin PIN removed','fa-lock-open');
         initSecurityPanel(body);
-      });
-
-      container.querySelector('#sec-ui-shield')?.addEventListener('change', (e) => {
-        const on = !!e.target.checked;
-        if (window.RSSecurityShield) {
-          RSSecurityShield.setEnabled(on);
-          if (on) RSSecurityShield.install();
-          RS.toast(on ? 'UI copy shield on' : 'UI copy shield off', 'fa-shield-halved');
-        }
       });
     }
 
