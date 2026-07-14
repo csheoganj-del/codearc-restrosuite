@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FF4F00">
+  <meta name="robots" content="noindex">
+  <title>Share feedback · RestroSuite</title>
+  <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="config.js"></script>
+  <style>
+    :root {
+      --brand: #FF4F00;
+      --ink: #141210;
+      --muted: #7A746C;
+      --line: rgba(20,18,16,.1);
+      --bg: #F4F1EB;
+      --surf: #fff;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: radial-gradient(100% 60% at 50% 0%, rgba(255,79,0,.08), transparent 55%), var(--bg);
+      color: var(--ink);
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      padding: max(16px, env(safe-area-inset-top)) 16px calc(20px + var(--safe-b));
+    }
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surf);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 22px 18px 18px;
+      box-shadow: 0 12px 36px rgba(20,18,16,.08);
+      align-self: flex-start;
+      margin-top: 8vh;
+    }
+    .kicker {
+      font-size: 11px; font-weight: 800; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+    }
+    h1 { font-size: 22px; font-weight: 800; letter-spacing: -.03em; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: var(--muted); line-height: 1.45; margin-bottom: 18px; }
+    label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 6px; }
+    .field, textarea, select {
+      width: 100%; border: 1px solid var(--line); border-radius: 12px;
+      padding: 11px 12px; font: inherit; font-size: 15px; background: #FAF8F5;
+      outline: none; margin-bottom: 12px;
+    }
+    .field:focus, textarea:focus, select:focus {
+      border-color: var(--brand); box-shadow: 0 0 0 3px rgba(255,79,0,.12); background: #fff;
+    }
+    textarea { min-height: 88px; resize: vertical; }
+    .stars {
+      display: flex; gap: 8px; margin-bottom: 14px;
+    }
+    .stars button {
+      width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line);
+      background: #FAF8F5; font-size: 20px; cursor: pointer; color: #C4BEB6;
+    }
+    .stars button.on { background: #FFF4ED; border-color: rgba(255,79,0,.35); color: var(--brand); }
+    .btn {
+      width: 100%; border: 0; border-radius: 13px; padding: 14px;
+      font: inherit; font-weight: 800; font-size: 15px; cursor: pointer;
+      background: linear-gradient(135deg, #FF4F00, #FF7A3D); color: #fff;
+      box-shadow: 0 8px 20px rgba(255,79,0,.28);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:disabled { opacity: .55; }
+    .ok {
+      text-align: center; padding: 28px 8px;
+    }
+    .ok i { font-size: 40px; color: #0F9F6E; margin-bottom: 10px; }
+    .err { color: #B91C1C; font-size: 13px; font-weight: 600; margin-bottom: 10px; display: none; }
+    .err.on { display: block; }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="kicker">Guest feedback</div>
+    <h1 id="title">How was your visit?</h1>
+    <p class="sub" id="sub">Your rating helps the kitchen and service team improve.</p>
+    <div class="err" id="err"></div>
+    <form id="form">
+      <label>Your rating</label>
+      <div class="stars" id="stars" role="group" aria-label="Star rating">
+        <button type="button" data-r="1" aria-label="1 star">★</button>
+        <button type="button" data-r="2" aria-label="2 stars">★</button>
+        <button type="button" data-r="3" aria-label="3 stars">★</button>
+        <button type="button" data-r="4" aria-label="4 stars">★</button>
+        <button type="button" data-r="5" aria-label="5 stars">★</button>
+      </div>
+      <label for="name">Name (optional)</label>
+      <input class="field" id="name" autocomplete="name" placeholder="Your name">
+      <label for="comment">Comment (optional)</label>
+      <textarea id="comment" placeholder="Food, service, ambience…"></textarea>
+      <button type="submit" class="btn" id="submit"><i class="fa-solid fa-paper-plane"></i> Submit feedback</button>
+    </form>
+  </div>
+  <script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var slug = params.get('tenant') || params.get('slug') || params.get('outlet') || '';
+    var table = params.get('table') || params.get('t') || '';
+    var billNo = params.get('bill') || params.get('no') || '';
+    var rating = 5;
+    var err = document.getElementById('err');
+    var stars = document.getElementById('stars');
+
+    if (!slug) {
+      document.getElementById('card').innerHTML =
+        '<div class="ok"><i class="fa-solid fa-link-slash" style="color:#B91C1C"></i><h1 style="font-size:18px">Invalid link</h1><p class="sub">Open this page from your restaurant feedback QR or digital bill.</p></div>';
+      return;
+    }
+
+    function paintStars() {
+      stars.querySelectorAll('button').forEach(function (b) {
+        b.classList.toggle('on', Number(b.getAttribute('data-r')) <= rating);
+      });
+    }
+    stars.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () {
+        rating = Number(b.getAttribute('data-r')) || 5;
+        paintStars();
+      };
+    });
+    paintStars();
+
+    document.getElementById('form').onsubmit = async function (e) {
+      e.preventDefault();
+      err.classList.remove('on');
+      var btn = document.getElementById('submit');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…';
+      try {
+        if (window.__configReady) await window.__configReady;
+        var su = window.__SUPABASE_URL__;
+        var sk = window.__SUPABASE_ANON_KEY__;
+        var fn = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic)
+          || (su ? su + '/functions/v1/tenant-public' : '');
+        if (!fn) throw new Error('Config missing');
+        var res = await fetch(fn, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': sk || '', 'Authorization': 'Bearer ' + (sk || '') },
+          body: JSON.stringify({
+            action: 'submit_review',
+            tenant_slug: slug,
+            rating: rating,
+            guest_name: (document.getElementById('name').value || '').trim() || 'Guest',
+            comment: (document.getElementById('comment').value || '').trim(),
+            source: billNo ? 'bill' : (table ? 'qr' : 'qr'),
+            table: table,
+            bill_no: billNo
+          })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+        document.getElementById('card').innerHTML =
+          '<div class="ok"><i class="fa-solid fa-circle-check"></i><h1 style="font-size:20px;margin-bottom:6px">Thank you!</h1>' +
+          '<p class="sub">Your ' + rating + '★ feedback was sent to the restaurant team.</p></div>';
+      } catch (ex) {
+        err.textContent = ex.message || 'Could not send — try again';
+        err.classList.add('on');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit feedback';
+      }
+    };
+  })();
+  </script>
+</body>
+</html>

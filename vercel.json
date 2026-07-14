@@ -61,6 +61,10 @@
       "destination": "/qr-order.html"
     },
     {
+      "source": "/feedback",
+      "destination": "/feedback.html"
+    },
+    {
       "source": "/kds",
       "destination": "/kds.html"
     },

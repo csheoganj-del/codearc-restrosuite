@@ -200,6 +200,7 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
     create_order: { limit: 20, windowSeconds: 5 * 60 },
     get_table_orders: { limit: 90, windowSeconds: 60 },
     create_notification: { limit: 12, windowSeconds: 60 },
+    submit_review: { limit: 8, windowSeconds: 60 },
   };
   const rule = rules[action];
   if (!rule) return { allowed: true };
@@ -686,6 +687,57 @@ serve(async (req) => {
         orders: [...orders, ...paidOrders].slice(0, 40),
         serverTime: new Date().toISOString(),
       }, 200, req);
+    }
+
+    // Public guest feedback (no table session required — used from digital bill / QR feedback link)
+    if (action === "submit_review") {
+      const rating = Math.max(1, Math.min(5, Number(payload.rating) || 0));
+      if (!rating) return jsonResponse({ error: "Rating 1–5 is required." }, 400, req);
+      const guestName = String(payload.guest_name || payload.guestName || "Guest").trim().slice(0, 80) || "Guest";
+      const comment = String(payload.comment || payload.message || "").trim().slice(0, 500);
+      const source = String(payload.source || "qr").trim().slice(0, 40) || "qr";
+      const tableRaw = String(payload.table || payload.table_number || "").trim().slice(0, 40);
+      const billNo = String(payload.bill_no || payload.billNo || "").trim().slice(0, 64);
+
+      // Soft anti-spam: same IP/tenant limited by checkRateLimit above
+      const row = {
+        tenant_id: tenant.id,
+        guest_name: guestName,
+        rating,
+        comment,
+        source,
+        table_number: tableRaw || null,
+        bill_no: billNo || null,
+      };
+
+      let reviewId: string | null = null;
+      const { data: inserted, error: revErr } = await supabaseAdmin
+        .from("doppio_guest_reviews")
+        .insert(row)
+        .select("id")
+        .maybeSingle();
+
+      if (revErr) {
+        // Table may not exist on older deploys — fall through to notification-only
+        console.warn("tenant-public submit_review insert:", revErr.message || revErr);
+      } else if (inserted && (inserted as { id?: string }).id) {
+        reviewId = String((inserted as { id: string }).id);
+      }
+
+      const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
+      const notifId = "rev_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      await supabaseAdmin.from("doppio_notifications").insert({
+        id: notifId,
+        tenant_id: tenant.id,
+        title: `Guest review ${stars}`,
+        message: `${guestName}${tableRaw ? " · Table " + tableRaw : ""}${billNo ? " · Bill " + billNo : ""}: ${comment || "(no comment)"}`.slice(0, 240),
+        type: "guest_review",
+        role: "staff",
+        is_read: false,
+        timestamp: new Date().toISOString(),
+      }).then(() => {}).catch((e: unknown) => console.warn("submit_review notif:", e));
+
+      return jsonResponse({ success: true, id: reviewId || notifId, rating }, 200, req);
     }
 
     if (action === "create_notification") {

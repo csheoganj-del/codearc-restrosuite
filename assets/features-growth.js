@@ -4405,13 +4405,19 @@
       try { localStorage.setItem(hubLocalKey(kind), JSON.stringify(rows || [])); } catch (e) {}
     }
 
+    async function hubSave(coll, row) {
+      if (RS.saveOne) return RS.saveOne(coll, row);
+      if (window.RS_DB) return RS_DB.put(coll, row.id, row);
+      return row;
+    }
+
     async function hubScreen(name){
       let body='', size='md', icon='fa-rocket', sub='';
       let records = [];
       let footExtra = '';
 
       if(name==='Reservations'){ 
-        icon='fa-calendar-check'; sub="Bookings · synced to floor plan"; size='lg';
+        icon='fa-calendar-check'; sub="Bookings · floor plan · WhatsApp confirm"; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reservations'); } catch(e){}
         }
@@ -4420,89 +4426,135 @@
         const upcoming = sorted.filter(r => !r.date || r.date >= today);
         const show = upcoming.length ? upcoming : sorted;
         body = show.length 
-          ? `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px">${show.length} booking(s)${upcoming.length ? ' · upcoming first' : ''} · appears on Floor when date matches</div>`
-            + table(['Date','Time','Guest','Phone','Pax','Table','Status'], show.map(r=>`<tr>
+          ? `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px">${show.length} booking(s) · Seat / cancel updates floor plan status</div>`
+            + table(['Date','Time','Guest','Pax','Table','Status','Actions'], show.map(r=>{
+              const st = String(r.status || 'confirmed').toLowerCase();
+              const open = st === 'confirmed' || st === 'booked' || st === 'pending';
+              return `<tr data-res-id="${esc(r.id)}">
               <td>${esc(r.date || '—')}</td>
               <td class="td-strong">${esc(r.time || '—')}</td>
-              <td>${esc(r.guestName || '—')}</td>
-              <td style="font-size:12px;color:var(--text-soft)">${esc(r.guestPhone || '—')}</td>
+              <td>${esc(r.guestName || '—')}<div style="font-size:11px;color:var(--text-soft)">${esc(r.guestPhone || '')}</div></td>
               <td>${esc(r.pax || 2)}</td>
               <td>${esc(r.tableNumber || '—')}</td>
-              <td><span class="pill ${r.status==='confirmed'||r.status==='booked'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${esc(r.status || 'confirmed')}</span></td>
-            </tr>`).join(''))
+              <td><span class="pill ${open?'pill-green':st==='seated'?'pill-violet':st==='cancelled'||st==='no_show'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${esc(st)}</span></td>
+              <td style="white-space:nowrap">${open ? `
+                <button type="button" class="btn btn-ghost btn-sm" data-hub-act="res-seat" data-id="${esc(r.id)}" title="Seated">Seat</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-hub-act="res-noshow" data-id="${esc(r.id)}" title="No-show">No-show</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-hub-act="res-cancel" data-id="${esc(r.id)}" title="Cancel">Cancel</button>
+              ` : '—'}</td>
+            </tr>`;
+            }).join(''))
           : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-calendar-check"></i></div><div style="font-weight:700;margin-bottom:4px">No reservations yet</div><div style="font-size:13px;color:var(--text-soft);max-width:320px;margin:0 auto">Book a table for walk-ins or WhatsApp enquiries. Confirmed bookings show on the floor plan for that day.</div></div>'; 
       }
       else if(name==='Support Tickets'){ 
-        icon='fa-headset'; sub='Customer issues · cloud-synced'; size='lg';
+        icon='fa-headset'; sub='Open → resolve workflow · cloud-synced'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('support_tickets'); } catch(e){}
         }
+        const openN = (records || []).filter(r => String(r.status||'open').toLowerCase() === 'open' || String(r.status).toLowerCase() === 'waiting').length;
         body = records && records.length 
-          ? table(['Ticket','Subject','Customer','Priority','Status','Notes'], records.map(r=>`<tr>
+          ? `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px"><b>${openN}</b> open · ${records.length} total · resolve when fixed</div>`
+            + table(['Ticket','Subject','Customer','Priority','Status','Actions'], records.map(r=>{
+              const st = String(r.status || 'open').toLowerCase();
+              const isOpen = st === 'open' || st === 'waiting';
+              return `<tr>
               <td><b>${esc(r.ticketNumber || r.id)}</b></td>
-              <td>${esc(r.subject)}</td>
+              <td>${esc(r.subject)}<div style="font-size:11px;color:var(--text-soft);max-width:180px;overflow:hidden;text-overflow:ellipsis">${esc(r.notes || '')}</div></td>
               <td>${esc(r.customerName)}</td>
               <td><span class="pill ${r.priority==='high'?'pill-red':r.priority==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${esc(r.priority||'medium')}</span></td>
-              <td><span class="pill ${r.status==='open'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(r.status||'open')}</span></td>
-              <td style="font-size:12px;color:var(--text-soft);max-width:160px;overflow:hidden;text-overflow:ellipsis">${esc(r.notes || '—')}</td>
-            </tr>`).join('')) 
+              <td><span class="pill ${isOpen?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(st)}</span></td>
+              <td style="white-space:nowrap">${isOpen
+                ? `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="tkt-resolve" data-id="${esc(r.id)}">Resolve</button>
+                   <button type="button" class="btn btn-ghost btn-sm" data-hub-act="tkt-wait" data-id="${esc(r.id)}">Waiting</button>`
+                : `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="tkt-reopen" data-id="${esc(r.id)}">Reopen</button>`
+              }</td>
+            </tr>`;
+            }).join('')) 
           : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-headset"></i></div><div style="font-weight:700;margin-bottom:4px">No support tickets</div><div style="font-size:13px;color:var(--text-soft)">Log complaints, double-charge issues, or service feedback. Tickets sync to your outlet cloud DB.</div></div>'; 
       }
       else if(name==='Recipe Costing'){ 
-        icon='fa-flask-vial'; sub='Plate cost & margin from menu + inventory'; size='lg';
+        icon='fa-flask-vial'; sub='Plate cost from Menu Editor recipes × inventory costs'; size='lg';
         const menu = Array.isArray(RS.MENU) ? RS.MENU : [];
         const inv = Array.isArray(RS.INVENTORY) ? RS.INVENTORY : [];
-        const findInv = (name) => inv.find(x => String(x.name||'').toLowerCase() === String(name||'').toLowerCase());
+        const findInv = (g) => {
+          const nm = String((g && (g.name || g.ingredient || g.item)) || '').toLowerCase();
+          const key = String((g && g.key) || '').toLowerCase();
+          return inv.find(x =>
+            (key && String(x.key || '').toLowerCase() === key) ||
+            String(x.name || '').toLowerCase() === nm ||
+            String(x.id || '') === String(g && g.id || '')
+          );
+        };
         const lines = menu.map(m => {
-          const ing = m.ingredients || m.recipe || [];
-          let recipeCost = 0;
-          let fromRecipe = false;
-          if (Array.isArray(ing) && ing.length) {
-            recipeCost = ing.reduce((a, g) => {
-              const row = findInv(g.name || g.ingredient || g.item);
-              const unitCost = row ? Number(row.cost || row.unit_cost || 0) : 0;
-              const qty = Number(g.qty || g.quantity || 0) || 0;
-              return a + unitCost * qty;
-            }, 0);
-            fromRecipe = recipeCost > 0;
+          const ing = Array.isArray(m.ingredients) ? m.ingredients : [];
+          const servings = Math.max(1, Number(m.recipeServings != null ? m.recipeServings : m.servings) || 1);
+          let batchCost = 0;
+          let linked = 0;
+          let missing = 0;
+          if (ing.length) {
+            ing.forEach((g) => {
+              const row = findInv(g);
+              const unitCost = row ? Number(row.cost != null ? row.cost : row.unit_cost) || 0 : 0;
+              const qty = Number(g.qty != null ? g.qty : g.quantity) || 0;
+              if (row && unitCost > 0) linked += 1;
+              else if (qty > 0) missing += 1;
+              batchCost += unitCost * qty;
+            });
           }
+          const recipeCost = batchCost / servings;
+          const fromRecipe = linked > 0 && recipeCost > 0;
           const price = Number(m.price) || 0;
-          const c = fromRecipe ? recipeCost : (price > 0 ? Math.round(price * 0.32 * 100) / 100 : 0);
+          const c = fromRecipe ? Math.round(recipeCost * 100) / 100 : (price > 0 ? Math.round(price * 0.32 * 100) / 100 : 0);
           const margin = price > 0 ? Math.round((1 - c / price) * 100) : 0;
-          return { name: m.name, cat: m.cat || m.category || '—', price, cost: c, margin, fromRecipe };
+          return {
+            id: m.id, name: m.name, cat: m.cat || m.category || '—', price, cost: c, margin, fromRecipe,
+            linked, missing, ingCount: ing.length, pending: !!m.recipePending,
+          };
         }).sort((a,b) => a.margin - b.margin);
         const avgM = lines.length ? Math.round(lines.reduce((s,l)=>s+l.margin,0)/lines.length) : 0;
         const low = lines.filter(l => l.margin < 50).length;
+        const withRecipe = lines.filter(l => l.fromRecipe).length;
         const kpis = `<div class="crm-stats" style="margin-bottom:12px">
           <div class="cs"><div class="csv">${lines.length}</div><div class="csl">Items</div></div>
+          <div class="cs"><div class="csv">${withRecipe}</div><div class="csl">Recipe-costed</div></div>
           <div class="cs"><div class="csv">${avgM}%</div><div class="csl">Avg margin</div></div>
           <div class="cs"><div class="csv" style="color:${low?'var(--orange)':'var(--green)'}">${low}</div><div class="csl">Below 50%</div></div>
         </div>
         <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.4">
-          Cost uses <b>recipe ingredients × inventory unit cost</b> when linked. Otherwise estimates ~32% of sell price (mark “est.”). Set inventory unit costs + recipes for accuracy.
+          Plate cost = <b>(recipe qty × inventory unit cost) ÷ servings</b> from Menu Editor. Items without recipes or unit costs show <b>(est.)</b> ~32% of sell price.
+          <button type="button" class="btn btn-ghost btn-sm" data-open-menu style="margin-left:6px"><i class="fa-solid fa-utensils"></i> Menu Editor</button>
         </p>`;
         const rows = lines.map(l => `<tr>
-          <td><b>${esc(l.name)}</b></td>
+          <td><b>${esc(l.name)}</b>${l.pending ? ' <span class="pill pill-amber" style="padding:2px 6px;font-size:10px">recipe?</span>' : ''}</td>
           <td style="font-size:12px">${esc(l.cat)}</td>
           <td class="td-strong">${rs(l.price)}</td>
-          <td>${rs(l.cost)}${l.fromRecipe ? '' : ' <span style="font-size:10px;color:var(--text-mute)">(est.)</span>'}</td>
+          <td>${rs(l.cost)}${l.fromRecipe
+            ? ` <span style="font-size:10px;color:var(--text-mute)">${l.linked}/${l.ingCount} ing</span>`
+            : ' <span style="font-size:10px;color:var(--text-mute)">(est.)</span>'}</td>
           <td style="color:${l.margin<50?'var(--orange)':'var(--green)'};font-weight:700">${l.margin}%</td>
         </tr>`).join('');
         body = lines.length
           ? kpis + table(['Item','Category','Sells at','Plate cost','Margin'], rows)
-          : '<div class="sr-empty">No menu items — add dishes in Menu Editor first.</div>'; 
+          : '<div class="sr-empty">No menu items — add dishes in Menu Editor first.</div>';
+        footExtra = `<button class="btn btn-ghost" data-open-menu><i class="fa-solid fa-utensils"></i> Edit recipes</button>`;
       }
       else if(name==='Offers & Coupons'){ 
-        icon='fa-tags'; sub='POS promo codes · cloud-synced'; size='lg';
+        icon='fa-tags'; sub='POS promo codes · pause / resume'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('offers'); } catch(e){}
         }
         if ((!records || !records.length) && Array.isArray(RS.OFFERS) && RS.OFFERS.length) records = RS.OFFERS;
         body = records && records.length 
-          ? `<p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Staff enter the <b>code</b> on POS cart promo. Percent or fixed amount applies to the bill.</p>`
-            + table(['Code','Offer','Discount','Usage','Status'], records.map(r=>{
+          ? `<p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Staff enter the <b>code</b> on POS cart promo. Only <b>active</b> codes discount the cart.</p>`
+            + table(['Code','Offer','Discount','Usage','Status','Actions'], records.map(r=>{
               const disc = (Number(r.fixed||r.amount)>0) ? rs(r.fixed||r.amount)+' off' : ((r.pct||r.discount_pct||0)+'% off');
-              return `<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.description || r.title || 'Discount')}</td><td>${esc(disc)}</td><td>${esc(r.usageCount || 0)}</td><td><span class="pill ${r.status==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${esc(r.status||'active')}</span></td></tr>`;
+              const st = String(r.status || 'active').toLowerCase();
+              return `<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.description || r.title || 'Discount')}</td><td>${esc(disc)}</td><td>${esc(r.usageCount || 0)}</td>
+              <td><span class="pill ${st==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${esc(st)}</span></td>
+              <td style="white-space:nowrap">${st==='active'
+                ? `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="off-pause" data-id="${esc(r.id)}">Pause</button>`
+                : `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="off-activate" data-id="${esc(r.id)}">Activate</button>`
+              }</td></tr>`;
             }).join('')) 
           : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-tags"></i></div><div style="font-weight:700;margin-bottom:4px">No offers yet</div><div style="font-size:13px;color:var(--text-soft)">Create FESTIVE20-style codes. They work on the POS cart when staff enter the code.</div></div>'; 
       }
@@ -4561,28 +4613,47 @@
           : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-bullhorn"></i></div><div style="font-weight:700;margin-bottom:4px">No campaigns yet</div><div style="font-size:13px;color:var(--text-soft);max-width:340px;margin:0 auto">Compose a message for VIP / Gold / all customers with phones. Same engine as CRM → Broadcast.</div></div>'; 
       }
       else if(name==='Feedback & Reviews'){ 
-        icon='fa-star'; sub='Guest ratings logged by staff'; size='lg';
+        icon='fa-star'; sub='QR guest feedback + staff log'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reviews'); } catch(e){}
         }
-        if (!records || !records.length) records = hubLocalList('reviews');
+        const local = hubLocalList('reviews');
+        if (!records || !records.length) records = local;
+        else {
+          // merge local-only ids not yet on cloud
+          const ids = new Set(records.map(r => String(r.id)));
+          local.forEach(r => { if (!ids.has(String(r.id))) records.push(r); });
+        }
         records = (records || []).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
         const avg = records.length
           ? (records.reduce((s,r)=>s+(Number(r.rating)||0),0)/records.length).toFixed(1)
           : '—';
-        body = (records.length
+        let feedbackUrl = '';
+        try {
+          const slug = sessionStorage.getItem('tenant_slug') || '';
+          if (slug) feedbackUrl = location.origin + '/feedback?tenant=' + encodeURIComponent(slug);
+        } catch (e) {}
+        const linkBar = feedbackUrl
+          ? `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;padding:10px 12px;background:var(--panel-2,rgba(0,0,0,.03));border:1px solid var(--stroke);border-radius:12px">
+              <div style="flex:1;min-width:160px;font-size:12px;color:var(--text-soft)"><b style="color:var(--text)">Guest QR link</b><br><span style="word-break:break-all">${esc(feedbackUrl)}</span></div>
+              <button type="button" class="btn btn-ghost btn-sm" data-copy-feedback><i class="fa-solid fa-copy"></i> Copy</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-open-feedback><i class="fa-solid fa-arrow-up-right-from-square"></i> Open</button>
+            </div>`
+          : '';
+        body = linkBar + (records.length
           ? `<div class="crm-stats" style="margin-bottom:12px">
               <div class="cs"><div class="csv">${records.length}</div><div class="csl">Reviews</div></div>
               <div class="cs"><div class="csv">${avg}</div><div class="csl">Avg stars</div></div>
+              <div class="cs"><div class="csv">${records.filter(r=>String(r.source||'').indexOf('qr')>=0||r.source==='bill').length}</div><div class="csl">From QR/bill</div></div>
             </div>`
             + table(['Date','Guest','Stars','Comment','Source'], records.map(r=>`<tr>
               <td style="font-size:12px">${esc(String(r.createdAt||'').slice(0,10))}</td>
-              <td><b>${esc(r.guestName||'Guest')}</b></td>
+              <td><b>${esc(r.guestName||'Guest')}</b>${r.tableNumber ? `<div style="font-size:11px;color:var(--text-soft)">T ${esc(r.tableNumber)}</div>` : ''}</td>
               <td style="color:var(--orange);font-weight:800">${'★'.repeat(Math.min(5,Number(r.rating)||0))}${'☆'.repeat(Math.max(0,5-Math.min(5,Number(r.rating)||0)))}</td>
               <td style="font-size:12px;max-width:200px">${esc(r.comment||'—')}</td>
               <td style="font-size:11px;color:var(--text-soft)">${esc(r.source||'staff')}</td>
             </tr>`).join(''))
-          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Log walk-out feedback or Google/Zomato scores so the team sees trends in one place.</div></div>');
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Share the guest QR link (also on digital bills) or log walk-out / Google scores here.</div></div>');
       }
       else if(name==='Purchase Orders'){ 
         RS.activateTab('inventory-tab'); 
@@ -4613,6 +4684,90 @@
             close();
             try { RS.activateTab('customers-tab'); } catch (e) {}
           };
+          modal.querySelectorAll('[data-open-menu]').forEach((b) => {
+            b.onclick = () => {
+              close();
+              try { RS.activateTab('editor-tab'); } catch (e) {}
+            };
+          });
+          const copyFb = modal.querySelector('[data-copy-feedback]');
+          if (copyFb) {
+            copyFb.onclick = async () => {
+              try {
+                const slug = sessionStorage.getItem('tenant_slug') || '';
+                const url = location.origin + '/feedback?tenant=' + encodeURIComponent(slug);
+                await navigator.clipboard.writeText(url);
+                RS.toast('Guest feedback link copied', 'fa-copy');
+              } catch (e) { RS.toast('Could not copy link', 'fa-circle-exclamation'); }
+            };
+          }
+          const openFb = modal.querySelector('[data-open-feedback]');
+          if (openFb) {
+            openFb.onclick = () => {
+              try {
+                const slug = sessionStorage.getItem('tenant_slug') || '';
+                window.open(location.origin + '/feedback?tenant=' + encodeURIComponent(slug), '_blank', 'noopener');
+              } catch (e) {}
+            };
+          }
+
+          // Row actions: tickets / reservations / offers
+          modal.querySelectorAll('[data-hub-act]').forEach((btn) => {
+            btn.onclick = async () => {
+              const act = btn.getAttribute('data-hub-act');
+              const id = btn.getAttribute('data-id');
+              if (!act || !id) return;
+              btn.disabled = true;
+              try {
+                if (act.startsWith('tkt-')) {
+                  let list = [];
+                  try { list = await RS_DB.list('support_tickets'); } catch (e) {}
+                  const row = (list || []).find((r) => String(r.id) === String(id) || String(r.ticketNumber) === String(id));
+                  if (!row) { RS.toast('Ticket not found', 'fa-circle-exclamation'); return; }
+                  if (act === 'tkt-resolve') row.status = 'resolved';
+                  if (act === 'tkt-wait') row.status = 'waiting';
+                  if (act === 'tkt-reopen') row.status = 'open';
+                  await hubSave('support_tickets', row);
+                  RS.toast('Ticket ' + row.status, 'fa-headset');
+                  close();
+                  hubScreen('Support Tickets');
+                } else if (act.startsWith('res-')) {
+                  let list = [];
+                  try { list = await RS_DB.list('reservations'); } catch (e) {}
+                  const row = (list || []).find((r) => String(r.id) === String(id));
+                  if (!row) { RS.toast('Reservation not found', 'fa-circle-exclamation'); return; }
+                  if (act === 'res-seat') row.status = 'seated';
+                  if (act === 'res-noshow') row.status = 'no_show';
+                  if (act === 'res-cancel') row.status = 'cancelled';
+                  await hubSave('reservations', row);
+                  try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (e) {}
+                  RS.toast('Reservation ' + row.status.replace('_', ' '), 'fa-calendar-check');
+                  close();
+                  hubScreen('Reservations');
+                } else if (act.startsWith('off-')) {
+                  let list = [];
+                  try { list = await RS_DB.list('offers'); } catch (e) {}
+                  let row = (list || []).find((r) => String(r.id) === String(id));
+                  if (!row && Array.isArray(RS.OFFERS)) row = RS.OFFERS.find((r) => String(r.id) === String(id));
+                  if (!row) { RS.toast('Offer not found', 'fa-circle-exclamation'); return; }
+                  row.status = act === 'off-pause' ? 'paused' : 'active';
+                  await hubSave('offers', row);
+                  if (Array.isArray(RS.OFFERS)) {
+                    const i = RS.OFFERS.findIndex((r) => String(r.id) === String(id));
+                    if (i >= 0) RS.OFFERS[i] = { ...RS.OFFERS[i], status: row.status };
+                  }
+                  RS.toast('Offer ' + row.status, 'fa-tags');
+                  close();
+                  hubScreen('Offers & Coupons');
+                }
+              } catch (e) {
+                console.warn(e);
+                RS.toast('Update failed — try again', 'fa-circle-exclamation');
+              } finally {
+                btn.disabled = false;
+              }
+            };
+          });
 
           const newBtn = modal.querySelector('[data-x]');
           if (newBtn) {
@@ -4973,7 +5128,7 @@
                       const source = rvModal.querySelector('#rv-source').value || 'staff';
                       const comment = (rvModal.querySelector('#rv-comment').value || '').trim();
                       const row = {
-                        id: 'rev_' + Date.now(),
+                        id: crypto.randomUUID ? crypto.randomUUID() : 'rev_' + Date.now(),
                         guestName,
                         rating,
                         source,
@@ -4982,8 +5137,11 @@
                       };
                       rvClose();
                       try {
-                        if (window.RS_DB) await RS_DB.put('reviews', row.id, row);
-                      } catch (e) {}
+                        const saved = await hubSave('reviews', row);
+                        if (saved && saved.id) row.id = saved.id;
+                      } catch (e) {
+                        console.warn('review cloud save', e);
+                      }
                       const prev = hubLocalList('reviews');
                       prev.unshift(row);
                       hubLocalSave('reviews', prev.slice(0, 200));

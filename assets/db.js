@@ -834,11 +834,31 @@
       clientId: true,
       localOnly: true,
     },
+    // Guest + staff reviews — cloud when doppio_guest_reviews exists
     reviews: {
-      table: null,
+      table: 'doppio_guest_reviews',
       pk: 'id',
-      clientId: true,
-      localOnly: true,
+      clientId: false,
+      uuidPK: true,
+      order: { column: 'created_at', ascending: false },
+      from: (r) => ({
+        id: r.id,
+        guestName: r.guest_name || r.guestName || 'Guest',
+        rating: num(r.rating) || 5,
+        comment: r.comment || '',
+        source: r.source || 'staff',
+        tableNumber: r.table_number || r.tableNumber || '',
+        billNo: r.bill_no || r.billNo || '',
+        createdAt: r.created_at || r.createdAt || null,
+      }),
+      to: (o) => ({
+        guest_name: o.guestName || o.guest_name || 'Guest',
+        rating: Math.max(1, Math.min(5, num(o.rating) || 5)),
+        comment: o.comment || '',
+        source: o.source || 'staff',
+        table_number: o.tableNumber || o.table_number || null,
+        bill_no: o.billNo || o.bill_no || null,
+      }),
     },
   };
   const conflictTargets = Object.freeze({
