@@ -2640,11 +2640,13 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 16px 20px 20px;
+  padding: 16px 20px 28px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: 28px;
+  scrollbar-gutter: stable;
 }
 
 /* Next step strip */
@@ -2732,7 +2734,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   color: var(--text-mute, #64748b);
   line-height: 1.4;
 }
-.pg-block-body { padding: 12px 14px 14px; }
+.pg-block-body { padding: 12px 14px 16px; overflow: visible; }
 
 .pg-progress-ring {
   font-family: var(--font-display, system-ui);
@@ -2929,19 +2931,21 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   grid-auto-rows: auto;
+  padding-bottom: 8px;
+  margin-bottom: 0;
 }
 .pg-feature {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 14px 12px;
+  gap: 8px;
+  padding: 14px;
   border-radius: 12px;
   border: 1px solid var(--stroke-2, #e5e7eb);
   background: var(--panel-solid, var(--panel, #fff));
+  min-height: 100%;
   height: auto;
-  min-height: 0;
   overflow: visible;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
@@ -2998,7 +3002,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-soft, #64748b);
-  flex: 1;
+  flex: 0 1 auto;
+  overflow: visible;
+  word-break: break-word;
 }
 .pg-feature-try {
   margin: 0;
@@ -3007,8 +3013,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   background: var(--glass, #f8fafc);
   border: 1px solid var(--stroke, #eef2f7);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--text-soft, #64748b);
+  flex: none;
 }
 .pg-feature-try span {
   font-weight: 800;
@@ -3017,8 +3024,10 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 }
 .pg-feature-open {
   align-self: flex-start;
-  margin-top: 4px;
+  margin-top: auto;
   flex: none;
+  position: relative;
+  z-index: 1;
 }
 
 .pg-pill {
@@ -3073,7 +3082,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   gap: 12px;
   padding: 12px 20px 14px;
   border-top: 1px solid var(--stroke, #e5e7eb);
-  background: color-mix(in srgb, var(--glass, #f8fafc) 55%, var(--panel-solid, #fff));
+  background: var(--panel-solid, var(--panel, #fff));
+  position: relative;
+  z-index: 2;
 }
 .product-guide-footer-text strong {
   display: block;
