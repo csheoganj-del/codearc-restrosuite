@@ -569,19 +569,39 @@
     const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
     const defaultOutletName = sessionMeta.tenant_name || sessionMeta.business_name || String(sessionMeta.tenant_slug || sessionStorage.getItem('tenant_slug') || 'Outlet').replace(/[-_]+/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
     const defaultOutletCode = sessionMeta.tenant_slug || sessionMeta.outlet_id || sessionStorage.getItem('tenant_slug') || '';
+    // Business type is assigned at registration (outlet_type) — not editable in Settings
+    const BIZ_TYPE_LABELS = {
+      restaurant: 'Restaurant / Café / Food',
+      retail: 'Retail store',
+      salon: 'Salon / Spa',
+      clinic: 'Clinic / Hospital',
+    };
+    function resolveLockedBusinessType(store) {
+      const st = store || {};
+      const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const raw = String(
+        sess.outlet_type ||
+        sess.business_type ||
+        st.set_business_type ||
+        (window.RS_SETTINGS && RS_SETTINGS.set_business_type) ||
+        (typeof localStorage !== 'undefined' && localStorage.getItem('rs:business_type')) ||
+        'restaurant'
+      ).toLowerCase().trim();
+      const key = BIZ_TYPE_LABELS[raw] ? raw : 'restaurant';
+      return { key, label: BIZ_TYPE_LABELS[key] };
+    }
     const PANES = {
       profile:
         setBlock('Identity', 'How this outlet appears on bills, QR menus, and the dashboard',
           `<div class="form-grid-2">${field('Business name',defaultOutletName)}${field('Outlet code',defaultOutletCode)}</div>
           <div class="set-field" style="margin-top:12px">
-            <label class="fl">Business type <span class="set-chip">SaaS vertical</span></label>
-            <select class="form-input" data-skey="set_business_type">
-              <option value="restaurant">Restaurant / Café / Food</option>
-              <option value="retail">Retail store</option>
-              <option value="salon">Salon / Spa</option>
-              <option value="clinic">Clinic / Hospital</option>
-            </select>
-            <p class="set-hint">Adapts tabs and labels for your business. Save, then refresh to apply.</p>
+            <label class="fl">Business type <span class="set-chip">Locked</span></label>
+            <div class="set-locked-field" id="set-business-type-display" aria-readonly="true">
+              <i class="fa-solid fa-lock set-locked-ic" aria-hidden="true"></i>
+              <span class="set-locked-label" id="set-business-type-label">Restaurant / Café / Food</span>
+            </div>
+            <input type="hidden" data-skey="set_business_type" id="set-business-type" value="restaurant">
+            <p class="set-hint">Assigned when this outlet was registered. It cannot be changed here — contact RestroSuite support if you need a different vertical.</p>
           </div>`) +
         setBlock('Contact & location', 'Printed on receipts and digital bills',
           `${field('Address','','Street, area, city')}
@@ -1624,6 +1644,14 @@
         if (key === 'plan') { try { initPlanPanel(body); } catch (e) { console.warn('plan panel', e); } }
         // If profile pane: inject country/currency selects dynamically using stored values
         if (key === 'profile') {
+          // Lock business type to registration / session value (never a free dropdown)
+          const biz = resolveLockedBusinessType(SET_STORE);
+          SET_STORE['set_business_type'] = biz.key;
+          const bizHidden = body.querySelector('#set-business-type, [data-skey="set_business_type"]');
+          const bizLabel = body.querySelector('#set-business-type-label');
+          if (bizHidden) bizHidden.value = biz.key;
+          if (bizLabel) bizLabel.textContent = biz.label;
+
           const row = body.querySelector('#set-country-currency-row');
           if (row) {
             const curCountry  = SET_STORE['set_country']  || 'India';
@@ -1783,7 +1811,10 @@
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
       $('#set-save').onclick=async ()=>{ 
-        collect(); 
+        collect();
+        // Business type is registration-locked — never let a stale/hidden field flip the vertical
+        const lockedBiz = resolveLockedBusinessType(SET_STORE);
+        SET_STORE['set_business_type'] = lockedBiz.key;
         try {
           await (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve());
           // Update RS_SETTINGS immediately with new settings

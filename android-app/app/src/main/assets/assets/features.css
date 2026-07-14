@@ -1316,6 +1316,29 @@ table.rcp-qr-wrap {
   vertical-align: middle;
   margin-left: 6px;
 }
+/* Locked / read-only setting values (e.g. business type from registration) */
+.set-locked-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: var(--r-sm, 10px);
+  border: 1px solid var(--stroke-2);
+  background: var(--glass, rgba(0,0,0,.03));
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: default;
+  user-select: none;
+}
+.set-locked-ic {
+  color: var(--text-mute);
+  font-size: 12px;
+  flex: none;
+  opacity: 0.85;
+}
+.set-locked-label { flex: 1; min-width: 0; }
 .set-chip-warn {
   background: color-mix(in srgb, var(--orange) 12%, transparent);
   color: var(--orange);

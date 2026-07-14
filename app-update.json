@@ -1,11 +1,11 @@
 {
-  "version": "v190-20260714-settings-dropdowns",
+  "version": "v191-20260714-biz-type-locked",
   "date": "2026-07-14",
-  "title": "Settings dropdowns fixed + force refresh",
-  "summary": "Custom dropdown menus in Settings were clipped by overflow containers. Menus now open on the document body with fixed positioning and inline styles so lists always show. App version bumped to v190 so clients load the new JS/CSS.",
+  "title": "Business type locked in Settings",
+  "summary": "Business type is assigned at registration and is no longer a free dropdown in Settings. It shows as a locked read-only field.",
   "highlights": [
-    "Settings Country / Currency / Cuisine / Paper size lists open fully",
-    "Dropdowns portal above overflow cards",
-    "Version pill shows v190 after refresh"
+    "Business type locked to registration value",
+    "Settings dropdown menus fixed (v190)",
+    "Version pill shows v191 after refresh"
   ]
 }

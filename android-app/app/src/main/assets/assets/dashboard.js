@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v190-20260714-settings-dropdowns';
+    return 'v191-20260714-biz-type-locked';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
