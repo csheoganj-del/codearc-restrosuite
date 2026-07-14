@@ -147,39 +147,128 @@
   const MAP = {
     menu: {
       table:'doppio_menu', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, cat:r.category, price:num(r.price),
-                    veg: !(r.recipe_specs && r.recipe_specs.veg===false),
-                    stock: r.available===false ? 'out' : 'ok',
-                    ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [],
-                    taxCategory: r.tax_category || 'IN_REST_5' }),
-      to: o => ({ id:o.id, name:o.name, category:o.cat, price:num(o.price),
-                  available: o.stock!=='out',
-                  recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] },
-                  tax_category: o.taxCategory || 'IN_REST_5' })
+      from: r => {
+        const specs = r.recipe_specs && typeof r.recipe_specs === 'object' ? r.recipe_specs : {};
+        return {
+          id: r.id,
+          name: r.name,
+          cat: r.category,
+          price: num(r.price),
+          veg: !(specs && specs.veg === false),
+          stock: r.available === false ? 'out' : 'ok',
+          ingredients: (specs && specs.ingredients) || [],
+          // Recipe quantities are written for this many servings (default 1 plate)
+          recipeServings: num(specs.recipeServings != null ? specs.recipeServings : specs.servings) || 1,
+          serveUnit: specs.serveUnit || specs.serve_unit || 'plate',
+          taxCategory: r.tax_category || 'IN_REST_5',
+          bestseller: !!(r.bestseller || specs.bestseller),
+          isSpecial: !!(specs.isSpecial || specs.special),
+          isStaple: !!(specs.isStaple || specs.staple),
+          pairWater: specs.pairWater,
+          addons: Array.isArray(specs.addons) ? specs.addons : [],
+          orderCount: num(specs.orderCount) || 0,
+          recipePending: !!specs.recipePending,
+          description: r.description || specs.description || '',
+        };
+      },
+      to: o => ({
+        id: o.id,
+        name: o.name,
+        category: o.cat,
+        price: num(o.price),
+        available: o.stock !== 'out',
+        bestseller: !!o.bestseller,
+        description: o.description || '',
+        recipe_specs: {
+          veg: !!o.veg,
+          ingredients: (o.ingredients || []).map((g) => ({
+            name: g.name,
+            qty: num(g.qty),
+            unit: g.unit || 'unit',
+            key: g.key || undefined,
+          })),
+          recipeServings: Math.max(1, num(o.recipeServings != null ? o.recipeServings : o.servings) || 1),
+          serveUnit: o.serveUnit || o.serve_unit || 'plate',
+          isSpecial: !!o.isSpecial,
+          isStaple: !!o.isStaple,
+          bestseller: !!o.bestseller,
+          pairWater: o.pairWater,
+          addons: Array.isArray(o.addons) ? o.addons : [],
+          orderCount: num(o.orderCount) || 0,
+          recipePending: !!o.recipePending,
+          description: o.description || '',
+        },
+        tax_category: o.taxCategory || 'IN_REST_5',
+      })
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
-      from: r => ({ id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
-                    _items:parseItems(r.items),
-                    items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
-                    subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
-                    amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
-                    refundReason:r.refund_reason || '',
-                    refundedAt:r.refunded_at || '',
-                    customerName:r.customer_name, customerPhone:r.customer_phone,
-                    tenders:parseTenders(r.tenders), change:num(r.change),
-                    taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
-                    channel: r.channel || 'dine_in',
-                    taxProfile: typeof r.tax_profile === 'string' ? JSON.parse(r.tax_profile) : (r.tax_profile || {}),
-                    liquorTaxAmount: num(r.liquor_tax_amount),
-                    serviceChargeAmount: num(r.service_charge_amount) }),
+      from: r => {
+        const taxProfile = typeof r.tax_profile === 'string' ? (()=>{ try { return JSON.parse(r.tax_profile); } catch(e){ return {}; } })() : (r.tax_profile || {});
+        // Competitive packs store tip/promo/covers/etc in tax_profile._ops (no new columns/tables).
+        const ops = (taxProfile && taxProfile._ops) || {};
+        return {
+          id:r.id, no:r.order_id, time:r.date_time, table:(r.table_number||'--'), dateTime:r.created_at,
+          _items:parseItems(r.items),
+          items: parseItems(r.items).reduce((a,i)=>a+(i.qty||1),0) || parseItems(r.items).length,
+          subtotal:num(r.subtotal), gst:num(r.gst), cgst:num(r.cgst), sgst:num(r.sgst),
+          amount:num(r.total), pay:r.payment_method, status:r.status || 'paid',
+          refundReason:r.refund_reason || '',
+          refundedAt:r.refunded_at || '',
+          customerName:r.customer_name, customerPhone:r.customer_phone,
+          tenders:parseTenders(r.tenders), change:num(r.change),
+          taxSummary: typeof r.tax_summary === 'string' ? JSON.parse(r.tax_summary) : (r.tax_summary || []),
+          channel: r.channel || 'dine_in',
+          taxProfile,
+          liquorTaxAmount: num(r.liquor_tax_amount),
+          serviceChargeAmount: num(r.service_charge_amount),
+          tipAmount: num(ops.tipAmount),
+          deliveryCharge: num(ops.deliveryCharge),
+          promoCode: ops.promoCode || '',
+          promoAmount: num(ops.promoAmount),
+          promoTitle: ops.promoTitle || '',
+          promoOfferId: ops.promoOfferId || null,
+          covers: num(ops.covers),
+          pax: num(ops.covers),
+          loyaltyRedeemAmount: num(ops.loyaltyRedeemAmount),
+          loyaltyPointsUsed: num(ops.loyaltyPointsUsed),
+          stationId: ops.stationId || '',
+          stationLabel: ops.stationLabel || '',
+          cashier: ops.cashier || '',
+          shiftId: ops.shiftId || r.shift_id || '',
+          disc: num(ops.disc != null ? ops.disc : r.discount),
+        };
+      },
       to: o => {
         const statusRaw = String(o.status || 'paid').toLowerCase();
         const status = statusRaw === 'refunded' ? 'refunded' : 'paid';
         const orderType = o.orderType || o.channel || 'dine_in';
         const tableNum = o.table && o.table !== '--' ? String(o.table) : null;
-        return {
-          id: cleanIdForCollection('bills', o.id != null ? o.id : o.no),
+        let taxProfile = {};
+        try {
+          taxProfile = typeof o.taxProfile === 'object' && o.taxProfile
+            ? { ...o.taxProfile }
+            : (typeof o.taxProfile === 'string' ? JSON.parse(o.taxProfile || '{}') : {});
+        } catch (_) { taxProfile = {}; }
+        taxProfile._ops = {
+          tipAmount: num(o.tipAmount),
+          deliveryCharge: num(o.deliveryCharge),
+          promoCode: o.promoCode || '',
+          promoAmount: num(o.promoAmount),
+          promoTitle: o.promoTitle || '',
+          promoOfferId: o.promoOfferId || null,
+          covers: num(o.covers != null ? o.covers : o.pax),
+          loyaltyRedeemAmount: num(o.loyaltyRedeemAmount),
+          loyaltyPointsUsed: num(o.loyaltyPointsUsed),
+          stationId: o.stationId || '',
+          stationLabel: o.stationLabel || '',
+          cashier: o.cashier || '',
+          shiftId: o.shiftId || '',
+          disc: num(o.disc != null ? o.disc : o.discount),
+        };
+        const body = {
+          // Prefer natural key order_id for upsert; omit hashed client id when
+          // possible so Postgres identity can allocate a stable PK.
           order_id: String(o.no || o.orderId || o.id || ''),
           customer_name: o.customerName || 'Walk-in Guest',
           customer_phone: o.customerPhone || null,
@@ -197,7 +286,7 @@
           change: num(o.change || o.changeAmount || 0),
           tax_summary: Array.isArray(o.taxSummary) ? JSON.stringify(o.taxSummary) : (o.taxSummary ? JSON.stringify([o.taxSummary]) : '[]'),
           channel: o.channel || 'dine_in',
-          tax_profile: typeof o.taxProfile === 'object' ? JSON.stringify(o.taxProfile) : (o.taxProfile || '{}'),
+          tax_profile: JSON.stringify(taxProfile),
           liquor_tax_amount: num(o.liquorTaxAmount),
           service_charge_amount: num(o.serviceChargeAmount),
           status,
@@ -206,6 +295,17 @@
           table_number: tableNum,
           order_type: String(orderType),
         };
+        if (o.idempotencyKey || o.idempotency_key) {
+          body.idempotency_key = String(o.idempotencyKey || o.idempotency_key);
+        }
+        // Only send id when it is already a real cloud bigint (not a hash of "RS-…")
+        if (o.id != null && Number.isFinite(Number(o.id)) && Number(o.id) < 9e15 && String(o.id).length < 16) {
+          // Keep id for updates of already-synced rows; upsert ignores it on conflict order_id
+          if (known.bills && known.bills.has(String(o.id))) {
+            body.id = Number(o.id);
+          }
+        }
+        return body;
       }
     },
     tax_rates: {
@@ -232,11 +332,32 @@
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
-      from: r => ({ id:r.id, key:r.key, name:r.label||r.name, cat:r.category, stock:num(r.current),
-                    unit:r.unit, min:num(r.threshold), max:num(r.max_stock), cost:0 }),
-      to: o => ({ id:o.id, key:o.key||String(o.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'),
-                  name:o.name, label:o.name, category:o.cat||'General', current:num(o.stock),
-                  threshold:num(o.min), max_stock:num(o.max||o.stock), unit:o.unit||'unit' })
+      from: r => ({
+        id: r.id,
+        key: r.key,
+        name: r.label || r.name,
+        cat: r.category,
+        stock: num(r.current),
+        unit: r.unit,
+        min: num(r.threshold),
+        max: num(r.max_stock),
+        // unit_cost is optional (added via align migrations / client optional columns)
+        cost: num(r.unit_cost != null ? r.unit_cost : r.cost),
+        supplier: r.supplier || r.vendor || '',
+      }),
+      to: o => ({
+        id: o.id,
+        key: o.key || String(o.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        name: o.name,
+        label: o.name,
+        category: o.cat || 'General',
+        current: num(o.stock),
+        threshold: num(o.min),
+        max_stock: num(o.max || o.stock),
+        unit: o.unit || 'unit',
+        unit_cost: num(o.cost),
+        supplier: o.supplier || '',
+      }),
     },
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
@@ -257,9 +378,145 @@
     },
     employees: {
       table:'doppio_employees', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, role:r.role, rc:'r-'+String(r.role||'').toLowerCase(),
-                    email:r.contact, baseSalary:num(r.base_salary), shift:r.shift }),
-      to: o => ({ id:o.id, name:o.name, role:o.role, contact:o.email||'', base_salary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
+      from: r => {
+        const role = r.role || r.role_key || 'staff';
+        const roleKey = String(r.role_key || r.roleKey || role).toLowerCase().replace(/\s+/g, '_');
+        const pay = num(r.payroll != null ? r.payroll : r.base_salary != null ? r.base_salary : r.baseSalary);
+        const phone = r.phone || r.contact || '';
+        const leaves = r.leaves && typeof r.leaves === 'object' ? r.leaves : {};
+        return {
+          id: r.id,
+          name: r.name,
+          role: typeof role === 'string' && role.length < 40 ? role : roleKey,
+          roleKey,
+          rc: 'r-' + roleKey,
+          email: r.email || r.contact || '',
+          phone: phone,
+          whatsapp: r.whatsapp || phone,
+          baseSalary: pay,
+          payroll: pay > 0 ? String(pay) : '',
+          shift: r.shift || 'Day',
+          pin: r.pin || '',
+          leaves: leaves,
+          casualLeave: num(leaves.casual != null ? leaves.casual : leaves.casualLeave) || 12,
+          sickLeave: num(leaves.sick != null ? leaves.sick : leaves.sickLeave) || 6,
+          earnedLeave: num(leaves.earned != null ? leaves.earned : leaves.earnedLeave) || 15,
+          status: r.status || 'active',
+          staffUserId: r.staff_user_id || r.staffUserId || null,
+        };
+      },
+      to: o => {
+        const pay = num(o.baseSalary != null ? o.baseSalary : String(o.payroll || '').replace(/[^0-9.]/g, ''));
+        const leaves = Object.assign(
+          { casual: 12, sick: 6, earned: 15 },
+          o.leaves && typeof o.leaves === 'object' ? o.leaves : {},
+          {
+            casual: num(o.casualLeave != null ? o.casualLeave : (o.leaves && o.leaves.casual)) || 12,
+            sick: num(o.sickLeave != null ? o.sickLeave : (o.leaves && o.leaves.sick)) || 6,
+            earned: num(o.earnedLeave != null ? o.earnedLeave : (o.leaves && o.leaves.earned)) || 15,
+          }
+        );
+        return {
+          id: o.id,
+          name: o.name,
+          role: o.role || o.roleKey || 'staff',
+          role_key: o.roleKey || String(o.role || 'staff').toLowerCase(),
+          contact: o.email || o.phone || '',
+          phone: o.phone || o.whatsapp || '',
+          base_salary: pay,
+          payroll: pay,
+          shift: o.shift || 'Day',
+          leaves,
+          status: o.status || 'active',
+          daily_rate: 0,
+        };
+      },
+    },
+    salary_advances: {
+      table: 'doppio_salary_advances', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
+        amount: num(r.amount), remaining: num(r.remaining != null ? r.remaining : r.amount),
+        recover: r.recover || 'next_payroll', note: r.note || '',
+        status: r.status || 'paid', paidAt: r.paid_at || r.created_at,
+      }),
+      to: o => ({
+        id: o.id, employee_id: o.employeeId, employee_name: o.employeeName || '',
+        amount: num(o.amount), remaining: num(o.remaining != null ? o.remaining : o.amount),
+        recover: o.recover || 'next_payroll', note: o.note || '',
+        status: o.status || 'paid', paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    salary_payments: {
+      table: 'doppio_salary_payments', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, employeeId: r.employee_id, employeeName: r.employee_name, month: r.month,
+        base: num(r.base), advanceDeducted: num(r.advance_deducted), net: num(r.net),
+        paidAt: r.paid_at,
+      }),
+      to: o => ({
+        id: o.id, employee_id: o.employeeId, employee_name: o.employeeName || '',
+        month: o.month || '', base: num(o.base), advance_deducted: num(o.advanceDeducted),
+        net: num(o.net), paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    commission_partners: {
+      table: 'doppio_commission_partners', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, name: r.name, phone: r.phone || '',
+        type: r.rate_type || r.type || 'percent', rate: num(r.rate),
+        active: r.active !== false, notes: r.notes || '',
+      }),
+      to: o => ({
+        id: o.id, name: o.name, phone: o.phone || '',
+        rate_type: o.type || o.rate_type || 'percent', rate: num(o.rate),
+        active: o.active !== false, notes: o.notes || '',
+      }),
+    },
+    commission_events: {
+      table: 'doppio_commission_events', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, partnerId: r.partner_id, partnerName: r.partner_name,
+        billNo: r.bill_no, billGrand: num(r.bill_grand), commission: num(r.commission),
+        customer: r.customer || '', paidOut: !!r.paid_out, at: r.at || r.created_at,
+      }),
+      to: o => ({
+        id: o.id, partner_id: o.partnerId, partner_name: o.partnerName || '',
+        bill_no: o.billNo || '', bill_grand: num(o.billGrand), commission: num(o.commission),
+        customer: o.customer || '', paid_out: !!o.paidOut, at: o.at || new Date().toISOString(),
+      }),
+    },
+    commission_payouts: {
+      table: 'doppio_commission_payouts', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, partnerId: r.partner_id, partnerName: r.partner_name,
+        amount: num(r.amount), period: r.period || 'monthly', paidAt: r.paid_at,
+      }),
+      to: o => ({
+        id: o.id, partner_id: o.partnerId, partner_name: o.partnerName || '',
+        amount: num(o.amount), period: o.period || 'monthly',
+        paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    owner_report_prefs: {
+      table: 'doppio_owner_report_prefs', pk: 'tenant_id', clientId: false,
+      from: r => ({
+        id: r.tenant_id, tenantId: r.tenant_id, enabled: r.enabled !== false,
+        ownerPhone: r.owner_phone || '', dailySales: r.daily_sales !== false,
+        dailySalesHour: num(r.daily_sales_hour) || 22, stockAlerts: r.stock_alerts !== false,
+        stockAlertHour: num(r.stock_alert_hour) || 10, weeklyPL: r.weekly_pl !== false,
+        weeklyPLDay: num(r.weekly_pl_day) || 1, monthlyPL: r.monthly_pl !== false,
+        monthlyPLDay: num(r.monthly_pl_day) || 1,
+      }),
+      to: o => ({
+        tenant_id: o.tenantId || o.id,
+        enabled: o.enabled !== false, owner_phone: o.ownerPhone || '',
+        daily_sales: o.dailySales !== false, daily_sales_hour: num(o.dailySalesHour) || 22,
+        stock_alerts: o.stockAlerts !== false, stock_alert_hour: num(o.stockAlertHour) || 10,
+        weekly_pl: o.weeklyPL !== false, weekly_pl_day: num(o.weeklyPLDay) || 1,
+        monthly_pl: o.monthlyPL !== false, monthly_pl_day: num(o.monthlyPLDay) || 1,
+        updated_at: new Date().toISOString(),
+      }),
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
@@ -299,16 +556,53 @@
     },
     shifts: {
       table:'doppio_shifts', pk:'shift_id', clientId:true,
-      from: r => ({ shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
-                    openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
-                    variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
-                    totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
-                    status:r.status, notes:r.notes }),
-      to: o => ({ shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
-                  opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
-                  variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
-                  total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
-                  status:o.status||'OPEN', notes:o.notes||'' })
+      from: r => {
+        // Cash movements packed into notes as JSON (existing text column — no new table).
+        let notes = r.notes || '';
+        let cashMovements = [];
+        let totalPayIns = 0;
+        let stationId = '';
+        let stationLabel = '';
+        let zScope = '';
+        try {
+          const parsed = notes && String(notes).trim().startsWith('{') ? JSON.parse(notes) : null;
+          if (parsed && typeof parsed === 'object') {
+            cashMovements = Array.isArray(parsed.cashMovements) ? parsed.cashMovements : [];
+            totalPayIns = num(parsed.totalPayIns);
+            stationId = parsed.stationId || '';
+            stationLabel = parsed.stationLabel || '';
+            zScope = parsed.zScope || '';
+            notes = parsed.note || parsed.notes || '';
+          }
+        } catch (_) {}
+        return {
+          shiftId:r.shift_id, cashierName:r.cashier_name, openedAt:r.opened_at, closedAt:r.closed_at,
+          openingFloat:num(r.opening_float), expectedCash:num(r.expected_cash), actualCash:num(r.actual_cash),
+          variance:num(r.variance), totalSalesCash:num(r.total_sales_cash), totalSalesUpi:num(r.total_sales_upi),
+          totalSalesCard:num(r.total_sales_card), totalPayouts:num(r.total_payouts), totalSafeDrops:num(r.total_safe_drops),
+          totalPayIns, cashMovements, stationId, stationLabel, zScope,
+          status:r.status, notes,
+        };
+      },
+      to: o => {
+        const payIns = num(o.totalPayIns);
+        const moves = Array.isArray(o.cashMovements) ? o.cashMovements : [];
+        const notesPayload = {
+          note: o.notes || '',
+          cashMovements: moves,
+          totalPayIns: payIns,
+          stationId: o.stationId || '',
+          stationLabel: o.stationLabel || '',
+          zScope: o.zScope || '',
+        };
+        return {
+          shift_id:o.shiftId, cashier_name:o.cashierName||'', opened_at:o.openedAt, closed_at:o.closedAt||null,
+          opening_float:num(o.openingFloat), expected_cash:num(o.expectedCash), actual_cash:num(o.actualCash),
+          variance:num(o.variance), total_sales_cash:num(o.totalSalesCash), total_sales_upi:num(o.totalSalesUpi),
+          total_sales_card:num(o.totalSalesCard), total_payouts:num(o.totalPayouts), total_safe_drops:num(o.totalSafeDrops),
+          status:o.status||'OPEN', notes: JSON.stringify(notesPayload),
+        };
+      }
     },
     shift_events: {
       table:'doppio_shift_events', pk:'event_id', clientId:true,
@@ -322,8 +616,49 @@
     },
     leave_requests: {
       table:'doppio_leave_requests', pk:'id', clientId:true,
-      from: r => ({ id:r.id, employeeId:r.employee_id, employeeName:r.employee_name, type:r.type, startDate:r.start_date, endDate:r.end_date, reason:r.reason, status:r.status, days:num(r.days) }),
-      to: o => ({ id:o.id, employee_id:o.employeeId, employee_name:o.employeeName, type:o.type, start_date:o.startDate, end_date:o.endDate, reason:o.reason||'', status:o.status||'Pending', days:num(o.days) })
+      from: r => {
+        const start = r.start_date || r.startDate || r.from || '';
+        const end = r.end_date || r.endDate || r.to || start;
+        const st = String(r.status || 'Pending');
+        return {
+          id: r.id,
+          employeeId: r.employee_id || r.employeeId,
+          employeeName: r.employee_name || r.employeeName,
+          type: r.type || 'casual',
+          startDate: start,
+          endDate: end,
+          from: start,
+          to: end,
+          reason: r.reason || '',
+          status: st.toLowerCase() === 'pending' ? 'pending' : st.toLowerCase() === 'approved' ? 'approved' : st.toLowerCase() === 'rejected' ? 'rejected' : st,
+          days: num(r.days) || 1,
+          createdAt: r.created_at || r.createdAt,
+        };
+      },
+      to: o => {
+        const start = o.startDate || o.from;
+        const end = o.endDate || o.to || start;
+        let days = num(o.days);
+        if (!days && start && end) {
+          try {
+            days = Math.max(1, Math.round((new Date(end) - new Date(start)) / 86400000) + 1);
+          } catch (_) { days = 1; }
+        }
+        const stRaw = String(o.status || 'pending').toLowerCase();
+        const status =
+          stRaw === 'approved' ? 'Approved' : stRaw === 'rejected' ? 'Rejected' : 'Pending';
+        return {
+          id: o.id,
+          employee_id: o.employeeId,
+          employee_name: o.employeeName,
+          type: o.type || 'Casual',
+          start_date: start,
+          end_date: end,
+          reason: o.reason || '',
+          status,
+          days: days || 1,
+        };
+      },
     },
     reservations: {
       table:'doppio_reservations', pk:'id', clientId:false, uuidPK:true,
@@ -332,18 +667,140 @@
     },
     offers: {
       table:'doppio_offers', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, code:r.code, description:r.title, usageCount:num(r.usage_count), status:r.status }),
-      to: o => ({ code:o.code||'', title:o.description||o.code||'Offer', usage_count:num(o.usageCount), status:o.status||'active' })
+      from: r => {
+        const dtype = String(r.discount_type || 'percent').toLowerCase();
+        const dval = num(r.discount_value);
+        const pct = dtype === 'amount' ? 0 : dval;
+        const fixed = dtype === 'amount' ? dval : 0;
+        return {
+          id: r.id,
+          code: r.code,
+          title: r.title,
+          description: r.title,
+          pct,
+          fixed,
+          discount_pct: pct,
+          amount: fixed,
+          usageCount: num(r.usage_count),
+          status: r.status,
+          expiresAt: r.ends_at || null,
+          expires_at: r.ends_at || null,
+          startsAt: r.starts_at || null,
+        };
+      },
+      to: o => {
+        const fixed = num(o.fixed != null ? o.fixed : o.amount);
+        const pct = num(o.pct != null ? o.pct : o.discount_pct);
+        return {
+          code: o.code || '',
+          title: o.title || o.description || o.code || 'Offer',
+          discount_type: fixed > 0 ? 'amount' : 'percent',
+          discount_value: fixed > 0 ? fixed : pct,
+          ends_at: o.expiresAt || o.expires_at || null,
+          starts_at: o.startsAt || o.starts_at || null,
+          usage_count: num(o.usageCount),
+          status: o.status || 'active',
+        };
+      }
     },
     vendors: {
-      table:'doppio_vendors', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, name:r.name, category:r.category, contact:r.phone, terms:r.terms, rating:num(r.rating), itemsCount:num(r.items_count) }),
-      to: o => ({ name:o.name, category:o.category||'', phone:o.contact||'', terms:o.terms||'', rating:num(o.rating), items_count:num(o.itemsCount) })
+      table: 'doppio_vendors',
+      pk: 'id',
+      clientId: false,
+      uuidPK: true,
+      from: (r) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category || 'General',
+        cat: r.category || 'General',
+        contact: r.phone || r.email || '',
+        email: r.email || '',
+        terms: r.terms || 'Net 30',
+        rating: num(r.rating) || 4,
+        itemsCount: num(r.items_count),
+        items: num(r.items_count),
+      }),
+      // Core schema: name, phone, email, category, status (extra cols dropped gracefully if absent)
+      to: (o) => ({
+        name: o.name,
+        category: o.category || o.cat || 'General',
+        phone: o.contact || o.phone || '',
+        email: o.email || '',
+        status: o.status || 'active',
+        terms: o.terms || 'Net 30',
+        rating: num(o.rating) || 4,
+        items_count: num(o.itemsCount != null ? o.itemsCount : o.items),
+      }),
     },
     purchase_orders: {
-      table:'doppio_purchase_orders', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, poNumber:r.po_number, supplier:r.vendor_name, items:r.item_name, value:num(r.expected_cost), date:r.due_date, status:r.status }),
-      to: o => ({ po_number:o.poNumber||'', vendor_name:o.supplier||'Supplier', item_name:o.items||'Supply items', expected_cost:num(o.value), due_date:(o.date||new Date().toISOString()).slice(0,10), status:o.status||'pending' })
+      table: 'doppio_purchase_orders',
+      pk: 'id',
+      clientId: false,
+      uuidPK: true,
+      from: (r) => ({
+        id: r.id,
+        poNumber: r.po_number,
+        supplier: r.vendor_name,
+        items: r.item_name,
+        value: num(r.expected_cost),
+        date: r.due_date || r.created_at,
+        status: r.status,
+        lines: r.lines || null,
+        quantity: num(r.quantity),
+        unit: r.unit || 'unit',
+      }),
+      to: (o) => ({
+        po_number: o.poNumber || o.po || '',
+        vendor_name: o.supplier || 'Supplier',
+        item_name: o.items || 'Supply items',
+        quantity: num(
+          o.quantity != null
+            ? o.quantity
+            : Array.isArray(o.lines)
+              ? o.lines.reduce((a, l) => a + (Number(l.qty) || 0), 0)
+              : 0
+        ),
+        unit:
+          (Array.isArray(o.lines) && o.lines[0] && o.lines[0].unit) || o.unit || 'unit',
+        expected_cost: num(o.value),
+        due_date: (o.date || new Date().toISOString()).slice(0, 10),
+        status: o.status || 'pending',
+      }),
+    },
+    // Waste is local-first (no dedicated cloud table in all deploys). HYBRID falls back to LS.
+    waste_log: {
+      table: null,
+      pk: 'id',
+      clientId: true,
+      localOnly: true,
+    },
+    // Batches with expiry — prefer local; cloud table doppio_inventory_batches when available
+    inventory_batches: {
+      table: 'doppio_inventory_batches',
+      pk: 'id',
+      clientId: false,
+      // Composite PK on server is (tenant_id, id) with text id
+      from: (r) => ({
+        id: r.id,
+        invId: r.inv_id || r.invId || null,
+        ingredientKey: r.ingredient_key || r.ingredientKey || '',
+        ingredientName: r.ingredient_name || r.ingredientName || r.label || '',
+        qty: num(r.qty != null ? r.qty : r.quantity),
+        unit: r.unit || 'unit',
+        expiryDate: r.expiryDate || r.expiry_date || null,
+        receivedDate: r.receivedDate || r.received_date || null,
+        source: r.source || 'receive',
+        poId: r.po_id || r.poId || null,
+        cost: num(r.cost),
+        createdAt: r.created_at || r.createdAt || null,
+      }),
+      to: (o) => ({
+        id: o.id,
+        ingredient_key: o.ingredientKey || o.ingredient_key || '',
+        qty: num(o.qty),
+        expiryDate: o.expiryDate || o.expiry_date || null,
+        receivedDate: o.receivedDate || o.received_date || null,
+      }),
     },
     support_tickets: {
       table:'doppio_support_tickets', pk:'id', clientId:false, uuidPK:true,
@@ -355,14 +812,20 @@
     businessProfile: { table: 'doppio_business_profile', onConflict: 'tenant_id' },
     menu: { table: 'doppio_menu', onConflict: 'tenant_id,name' },
     recipeCosting: { table: 'doppio_custom_recipes', onConflict: 'tenant_id,item_name' },
-    billSql: 'ON CONFLICT (tenant_id, "orderId") DO UPDATE SET'
+    bills: { table: 'doppio_bills', onConflict: 'tenant_id,order_id' },
+    billSql: 'ON CONFLICT (tenant_id, order_id) DO UPDATE SET'
   });
   const optionalCloudColumns = Object.freeze({
     menu: ['tax_category'],
+    bills: ['idempotency_key', 'cgst', 'sgst', 'igst', 'tax_summary', 'tax_profile', 'channel', 'liquor_tax_amount', 'service_charge_amount', 'transaction_type'],
     // These persist once migration 20260709160000_crm_customer_fields is
     // applied; until then a DB without the columns will drop them gracefully
     // instead of rejecting the whole customer upsert.
-    customers: ['email', 'dues', 'marketing_opt_in']
+    customers: ['email', 'dues', 'marketing_opt_in'],
+    // unit_cost / supplier may be missing on older doppio_inventory schemas
+    inventory: ['unit_cost', 'supplier', 'cost'],
+    vendors: ['terms', 'rating', 'items_count', 'email'],
+    inventory_batches: ['ingredient_name', 'unit', 'source', 'po_id', 'cost', 'inv_id', 'receivedDate', 'expiryDate'],
   });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
@@ -412,7 +875,7 @@
       }catch(e){ return []; }
     },
     write:(c,a)=>{ try{ localStorage.setItem(LS.key(c), JSON.stringify(a)); }catch(e){} },
-    async list(c){ return LS.read(c); },
+    async list(c, _opts){ return LS.read(c); },
     async put(c,id,obj){
       const cleanId = cleanIdForCollection(c, id);
       const a=LS.read(c);
@@ -483,17 +946,75 @@
   }
 
   const CLOUD = {
-    async list(c){
+    async list(c, opts){
       const m=MAP[c]; if(!m) return [];
-      const rows = await API.select(m.table, { order:m.order||{column:m.pk,ascending:true}, limit:500 });
+      // Collections without a cloud table (e.g. waste_log) stay localStorage-backed
+      if (m.localOnly || !m.table) return LS.list(c, opts);
+      const options = opts && typeof opts === 'object' ? opts : {};
+      // Higher default for money/CRM collections (Wave 2 pagination)
+      const defaultLimit = (c === 'bills' || c === 'customers') ? 1000 : 500;
+      const limit = Number.isFinite(Number(options.limit)) && Number(options.limit) > 0
+        ? Math.min(Number(options.limit), 2000)
+        : defaultLimit;
+      const offset = Number.isFinite(Number(options.offset)) && Number(options.offset) > 0
+        ? Number(options.offset)
+        : 0;
+      const rows = await API.select(m.table, {
+        order: options.order || m.order || { column: m.pk, ascending: true },
+        limit,
+        offset: offset || null,
+      });
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
-      return (rows||[]).map(m.from);
+      // Preserve client-only fields (e.g. unit cost) that older cloud schemas omit
+      const mapped = (rows || []).map(m.from);
+      if (c === 'inventory') {
+        const local = LS.read(c) || [];
+        mapped.forEach((row) => {
+          const loc = local.find(
+            (x) =>
+              String(x.id) === String(row.id) ||
+              String(x.key || '') === String(row.key || '') ||
+              String(x.name || '').toLowerCase() === String(row.name || '').toLowerCase()
+          );
+          if (loc) {
+            if (!(Number(row.cost) > 0) && Number(loc.cost) > 0) row.cost = Number(loc.cost);
+            if (!row.supplier && loc.supplier) row.supplier = loc.supplier;
+          }
+        });
+      }
+      return mapped;
     },
     async put(c,id,obj){
       const m=MAP[c]; if(!m) return obj;
+      if (m.localOnly || !m.table) return LS.put(c, id, obj);
       const cleanId = cleanIdForCollection(c, id);
       const cleanObj = { ...obj, id: cleanId };
       const body = m.to(cleanObj);
+
+      // Bills: upsert on (tenant_id, order_id) — multi-device safe, no hash PK races
+      if (c === 'bills' && body.order_id) {
+        try {
+          const upsertBody = { ...body };
+          // Let identity allocate id when not a known cloud row
+          if (upsertBody.id == null) delete upsertBody.id;
+          let res;
+          try {
+            res = await API.upsert(m.table, upsertBody, 'tenant_id,order_id', { returning: true, columns: '*' });
+          } catch (err) {
+            if (!omitUnsupportedOptionalColumns(c, upsertBody, err)) throw err;
+            res = await API.upsert(m.table, upsertBody, 'tenant_id,order_id', { returning: true, columns: '*' });
+          }
+          const row = Array.isArray(res) ? res[0] : res;
+          const newId = row && row.id != null ? row.id : cleanId;
+          if (!known[c]) known[c] = new Set();
+          known[c].add(String(newId));
+          return { ...obj, id: newId, no: (row && (row.order_id || row.orderId)) || obj.no || body.order_id };
+        } catch (err) {
+          console.warn('[RS_DB] Bill upsert failed, falling back to insert/update:', err.message);
+          // fall through to generic path
+        }
+      }
+
       const isKnown = known[c] && known[c].has(String(cleanId));
       if(isKnown){
         try {
@@ -510,12 +1031,28 @@
       // text id (e.g. "PO-123456") that can't live in a uuid column. Leave the id
       // off the insert so the database generates it; the human-readable code is
       // preserved in a dedicated column (po_number / ticket_number / etc.).
+      else if(!body[m.pk] && !m.uuidPK && c !== 'bills') { body[m.pk] = cleanId; }
+      else if (c === 'bills' && body.id == null) { /* leave id for identity */ }
       else if(!body[m.pk] && !m.uuidPK) { body[m.pk] = cleanId; }
       try {
         let res;
         try {
           res = await API.insert(m.table, body);
         } catch (err) {
+          // Unique on order_id → update that row instead of hashing client id
+          const msg = String(err && err.message || '');
+          if (c === 'bills' && body.order_id && /duplicate|unique|order_id/i.test(msg)) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
+            const rows = await API.select(m.table, {
+              filters: [{ operator: 'eq', column: 'order_id', value: body.order_id }],
+              limit: 1,
+            }).catch(() => null);
+            const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+            const newId = row && row.id != null ? row.id : cleanId;
+            if (!known[c]) known[c] = new Set();
+            known[c].add(String(newId));
+            return { ...obj, id: newId };
+          }
           if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
           res = await API.insert(m.table, body);
         }
@@ -526,6 +1063,10 @@
       } catch (err) {
         console.warn(`[RS_DB] Cloud insert failed for ${c}/${cleanId}, attempting update fallback:`, err.message);
         try {
+          if (c === 'bills' && body.order_id) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
+            return { ...obj, id: cleanId };
+          }
           try {
             await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
           } catch (updateErr) {
@@ -542,6 +1083,7 @@
     async bulkPut(c,arr){ for(const o of arr){ await CLOUD.put(c, o.id, o); } return arr; },
     async del(c,id){
       const m=MAP[c]; if(!m) return true;
+      if (m.localOnly || !m.table) return LS.del(c, id);
       const cleanId = cleanIdForCollection(c, id);
       await API.remove(m.table, [{operator:'eq',column:m.pk,value:cleanId}]);
       if(known[c]) known[c].delete(String(cleanId));
@@ -576,9 +1118,22 @@
         } catch(e) {}
       }
       
-      // Store all UI settings in feature_flags.ui_settings
-      flags.ui_settings = { ...o };
-      // Delete duplicate columns
+      // Store UI settings in feature_flags.ui_settings — never embed _raw or functions
+      // (spreading getSettings() used to nest the full business profile and break upserts)
+      const ui = {};
+      if (o && typeof o === 'object') {
+        Object.keys(o).forEach((k) => {
+          if (k === '_raw' || k === 'feature_flags') return;
+          if (typeof o[k] === 'function') return;
+          try {
+            // Ensure JSON-serializable (custom_tables, etc.)
+            JSON.stringify(o[k]);
+            ui[k] = o[k];
+          } catch (_) {}
+        });
+      }
+      flags.ui_settings = ui;
+      // Delete duplicate columns that live on the profile row itself
       for (const k in SETTINGS_MAP) {
         delete flags.ui_settings[k];
       }
@@ -724,17 +1279,17 @@
         e.message.includes('column') ||
         e.message.includes('42703')
       );
-      if (!isSchemaCacheError) {
-        window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now() };
-        window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
-        // Queue for retry when back online. bulkPut used to be silently
-        // dropped here (only put/del were queued) -- bulk menu/recipe
-        // imports done while offline would never actually reach the cloud.
-        if (method === 'put' || method === 'del' || method === 'bulkPut') {
+      // Always surface + queue money-critical collections. Schema errors still
+      // queue bills so nothing is silently lost; admin can fix migration later.
+      const isMoneyCritical = (c === 'bills' || c === 'inventory' || c === 'customers');
+      window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now(), schema: !!isSchemaCacheError };
+      window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
+      if (method === 'put' || method === 'del' || method === 'bulkPut') {
+        if (!isSchemaCacheError || isMoneyCritical) {
           addToSyncQueue(method, c, args);
         }
-      } else {
-        // Log silently -- user needs to run the DB migration
+      }
+      if (isSchemaCacheError) {
         console.warn(`[RS_DB] Schema mismatch on ${c}: "${e.message}". Run the missing DB migration to fix.`);
       }
       window.dispatchEvent(new CustomEvent('rs:sync-done', { detail: { method, collection: c, error: true } }));
@@ -742,23 +1297,200 @@
     }
   }
 
-  /* ---------------- OFFLINE SYNC QUEUE (retry failed cloud writes on reconnect) ---------------- */
+  /* ---------------- OFFLINE SYNC QUEUE (IndexedDB primary, localStorage mirror) ---------------- */
   const SYNC_QUEUE_KEY = 'rs:sync_queue';
-  function getSyncQueue() { try { return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]'); } catch(e){ return []; } }
-  function saveSyncQueue(q) { try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(q)); } catch(e){} }
+  const SYNC_IDB_NAME = 'rs_sync_queue_v1';
+  const SYNC_IDB_STORE = 'queue';
+  const MONEY_COLLECTIONS = new Set(['bills', 'inventory', 'customers', 'drafts', 'pending_orders']);
+  let drainInFlight = false;
+  let _syncQueueMem = null; // in-memory cache (source of truth after boot)
+  let _idbReady = null;
+
+  function openSyncIdb() {
+    if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+    if (_idbReady) return _idbReady;
+    _idbReady = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open(SYNC_IDB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(SYNC_IDB_STORE)) {
+            db.createObjectStore(SYNC_IDB_STORE, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    return _idbReady;
+  }
+
+  async function idbLoadAll() {
+    const db = await openSyncIdb();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SYNC_IDB_STORE, 'readonly');
+        const store = tx.objectStore(SYNC_IDB_STORE);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  async function idbReplaceAll(entries) {
+    const db = await openSyncIdb();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(SYNC_IDB_STORE, 'readwrite');
+        const store = tx.objectStore(SYNC_IDB_STORE);
+        store.clear();
+        (entries || []).forEach((e) => {
+          if (e && e.id) store.put(e);
+        });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      } catch (_) {
+        resolve(false);
+      }
+    });
+  }
+
+  function loadSyncQueueSync() {
+    if (_syncQueueMem) return _syncQueueMem;
+    try {
+      _syncQueueMem = JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+      if (!Array.isArray(_syncQueueMem)) _syncQueueMem = [];
+    } catch (e) {
+      _syncQueueMem = [];
+    }
+    return _syncQueueMem;
+  }
+
+  function getSyncQueue() {
+    return loadSyncQueueSync().slice();
+  }
+
+  function saveSyncQueue(q) {
+    _syncQueueMem = Array.isArray(q) ? q.slice() : [];
+    // Mirror to localStorage (small critical backup; may truncate non-critical if huge)
+    try {
+      const mirror = _syncQueueMem.length > 80
+        ? _syncQueueMem.filter((e) => e && e.critical).concat(_syncQueueMem.filter((e) => e && !e.critical).slice(-40))
+        : _syncQueueMem;
+      localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(mirror));
+    } catch (e) {
+      try {
+        // last resort: bills only
+        const billsOnly = _syncQueueMem.filter((e) => e && e.collection === 'bills');
+        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(billsOnly.slice(-50)));
+      } catch (_) {}
+    }
+    // Durable primary store
+    idbReplaceAll(_syncQueueMem).catch(() => {});
+  }
+
+  // Boot: prefer IndexedDB contents if present, else migrate localStorage → IDB
+  (async function migrateSyncQueueToIdb() {
+    try {
+      const fromIdb = await idbLoadAll();
+      if (fromIdb && fromIdb.length) {
+        _syncQueueMem = fromIdb;
+        // refresh LS mirror
+        try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(fromIdb.slice(0, 80))); } catch (_) {}
+      } else {
+        const fromLs = loadSyncQueueSync();
+        if (fromLs.length) await idbReplaceAll(fromLs);
+      }
+      if (typeof window !== 'undefined' && window.RS_DB_NOTIFY_SYNC) {
+        try { window.RS_DB_NOTIFY_SYNC(); } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[RS_DB] sync queue IDB migrate failed', e);
+    }
+  })();
+  function entryKey(method, collection, args) {
+    const id = args && args[0];
+    if (method === 'bulkPut' && Array.isArray(id)) {
+      return method + '|' + collection + '|' + id.map(r => r && r.id).join(',');
+    }
+    return method + '|' + collection + '|' + String(id);
+  }
+  function notifySyncQueue() {
+    const q = getSyncQueue();
+    const pending = q.filter(e => e && e.status !== 'acked');
+    const billPending = pending.filter(e => e.collection === 'bills').length;
+    window.__rsSyncQueueDepth = pending.length;
+    window.__rsSyncBillPending = billPending;
+    window.dispatchEvent(new CustomEvent('rs:sync-queue-changed', {
+      detail: { depth: pending.length, bills: billPending, entries: pending.slice(0, 20) }
+    }));
+    try {
+      let badge = document.getElementById('rs-sync-queue-badge');
+      if (!badge) {
+        const host = document.querySelector('.topbar-right, .topbar-actions, #topbar-right, .topbar');
+        if (host) {
+          badge = document.createElement('button');
+          badge.id = 'rs-sync-queue-badge';
+          badge.type = 'button';
+          badge.title = 'Pending cloud sync — click to retry';
+          badge.style.cssText = 'display:none;align-items:center;gap:6px;border:1px solid rgba(234,179,8,.4);background:rgba(234,179,8,.12);color:var(--text,#16151c);border-radius:999px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer';
+          host.insertBefore(badge, host.firstChild);
+          badge.onclick = () => {
+            drainSyncQueue().then(() => {
+              if (window.RS && RS.toast) RS.toast('Retrying pending sync…', 'fa-cloud-arrow-up');
+            }).catch(() => {});
+          };
+        }
+      }
+      if (badge) {
+        if (pending.length > 0) {
+          badge.style.display = 'inline-flex';
+          badge.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ' +
+            (billPending ? (billPending + ' bill' + (billPending === 1 ? '' : 's') + ' pending') : (pending.length + ' pending'));
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    } catch (_) {}
+  }
   function addToSyncQueue(method, collection, args) {
     // 'settings' is a whole-object save (not a per-row collection in MAP),
     // so allow it through explicitly; everything else must be a known collection.
     if (!MAP[collection] && collection !== 'settings') return;
     const q = getSyncQueue();
-    // Deduplicate: if same collection+id already queued for put, replace it
-    const id = args[0];
-    const idx = q.findIndex(x => x.method === method && x.collection === collection && String(x.args[0]) === String(id));
-    const entry = { method, collection, args, queuedAt: Date.now() };
+    const key = entryKey(method, collection, args);
+    const idx = q.findIndex(x => entryKey(x.method, x.collection, x.args) === key);
+    const entry = {
+      id: (idx >= 0 && q[idx].id) ? q[idx].id : ('sq_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+      method,
+      collection,
+      args,
+      queuedAt: Date.now(),
+      status: 'pending',
+      attempts: (idx >= 0 && q[idx].attempts) ? q[idx].attempts : 0,
+      critical: MONEY_COLLECTIONS.has(collection) || collection === 'settings',
+    };
     if (idx >= 0) q[idx] = entry; else q.push(entry);
-    // Cap queue at 200 entries to prevent localStorage bloat
-    if (q.length > 200) q.splice(0, q.length - 200);
+
+    // Cap non-critical at 180; NEVER drop bills/inventory/customers
+    if (q.length > 220) {
+      const dropIdx = q.findIndex(e => e && !e.critical && e.status !== 'in_progress');
+      if (dropIdx >= 0) q.splice(dropIdx, 1);
+      else {
+        // All critical — drop oldest non-bill non-in_progress if still over hard cap
+        const soft = q.findIndex(e => e && e.collection !== 'bills' && e.status !== 'in_progress');
+        if (soft >= 0 && q.length > 300) q.splice(soft, 1);
+      }
+    }
     saveSyncQueue(q);
+    notifySyncQueue();
   }
   function queuedWriteIdsForCollection(collection) {
     try {
@@ -786,29 +1518,69 @@
   }
   async function drainSyncQueue() {
     if (!signedIn()) return;
-    const q = getSyncQueue();
-    if (!q.length) return;
-    saveSyncQueue([]); // optimistic clear -- failures re-enqueue
-    let failed = 0;
-    for (const entry of q) {
-      try {
-        if (entry.method === 'setSettings') {
-          // Whole-object save -- CLOUD.setSettings(o) takes only the settings
-          // object, not a leading collection name like put/del/bulkPut do.
-          await CLOUD.setSettings(entry.args[0]);
-        } else {
-          await CLOUD[entry.method](entry.collection, ...entry.args);
+    if (drainInFlight) return;
+    drainInFlight = true;
+    try {
+      let q = getSyncQueue().filter(e => e && e.status !== 'acked');
+      if (!q.length) { notifySyncQueue(); return; }
+
+      // Mark all pending as in_progress and persist BEFORE attempting
+      // (crash mid-drain must not lose the queue — old code cleared first)
+      q = q.map(e => ({ ...e, status: e.status === 'in_progress' ? 'in_progress' : 'pending' }));
+      saveSyncQueue(q);
+      notifySyncQueue();
+
+      let ok = 0;
+      let failed = 0;
+      const remaining = [];
+      for (const entry of q) {
+        const working = { ...entry, status: 'in_progress', attempts: (entry.attempts || 0) + 1 };
+        // Persist in_progress state for this entry
+        const snap = getSyncQueue().map(e =>
+          (e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
+            ? working : e
+        );
+        saveSyncQueue(snap);
+
+        try {
+          if (entry.method === 'setSettings') {
+            await CLOUD.setSettings(entry.args[0]);
+          } else {
+            await CLOUD[entry.method](entry.collection, ...entry.args);
+          }
+          ok++;
+          // Remove only this entry on success
+          const after = getSyncQueue().filter(e =>
+            !(e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
+          );
+          saveSyncQueue(after);
+        } catch (e) {
+          console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
+          failed++;
+          remaining.push({
+            ...working,
+            status: 'pending',
+            lastError: e.message || String(e),
+            lastAttemptAt: Date.now(),
+          });
+          // Write failed entry back as pending
+          const cur = getSyncQueue();
+          const ix = cur.findIndex(x =>
+            x.id === working.id || entryKey(x.method, x.collection, x.args) === entryKey(working.method, working.collection, working.args)
+          );
+          if (ix >= 0) cur[ix] = remaining[remaining.length - 1];
+          else cur.push(remaining[remaining.length - 1]);
+          saveSyncQueue(cur);
         }
-      } catch(e) {
-        console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
-        addToSyncQueue(entry.method, entry.collection, entry.args);
-        failed++;
       }
-    }
-    if (failed === 0 && q.length > 0) {
-      // Invalidate list cache so UI refreshes with latest cloud data
-      for (const entry of q) { delete lastListFetchTime[entry.collection]; }
-      window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: q.length } }));
+
+      if (ok > 0) {
+        for (const entry of q) { delete lastListFetchTime[entry.collection]; }
+        window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: ok, failed } }));
+      }
+      notifySyncQueue();
+    } finally {
+      drainInFlight = false;
     }
   }
   // Retry on reconnect
@@ -818,13 +1590,20 @@
   });
   // Also expose for manual call
   window.RS_DB_DRAIN = drainSyncQueue;
+  window.RS_DB_SYNC_DEPTH = () => getSyncQueue().filter(e => e && e.status !== 'acked').length;
+  window.RS_DB_NOTIFY_SYNC = notifySyncQueue;
   // Drain at boot too, not just on the 'online' event. Without this, anything
   // queued from a previous tab/session (e.g. the browser was closed while
   // offline, or was left signed out) would just sit in localStorage forever
   // -- the 'online' listener only fires on a live offline->online transition,
   // which never happens if the page is loaded fresh while already online.
   if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-    setTimeout(() => { drainSyncQueue().catch(()=>{}); }, 2000);
+    setTimeout(() => { drainSyncQueue().catch(()=>{}); notifySyncQueue(); }, 2000);
+  }
+  // Paint badge after DOM ready
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(notifySyncQueue, 500));
+    else setTimeout(notifySyncQueue, 800);
   }
 
   /* ---------------- AUTH (delegates to RS_API in cloud) ---------------- */
@@ -860,27 +1639,41 @@
     async session(){ if(window.RS_API) { const s = window.RS_API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }
   };
 
+  function cachePinHashFromSettings(settings) {
+    try {
+      if (settings && settings.admin_pin_hash) {
+        localStorage.setItem('rs:admin_pin_hash', String(settings.admin_pin_hash));
+      }
+    } catch (_) {}
+  }
+
   window.RS_DB = {
     get mode(){ return mode(); },
     get isCloud(){ return signedIn(); },
     get cloudConfigured(){ return isCloudConfigured(); },
-    list:(c)=>guard('list',c),
+    list:(c, opts)=>guard('list',c, opts),
     listLocal:(c)=>LS.list(c),
-    listCloud:(c)=>CLOUD.list(c),
+    listCloud:(c, opts)=>CLOUD.list(c, opts),
     writeLocal:(c,arr)=>LS.write(c,arr),
     put:(c,id,obj)=>guard('put',c,id,obj),
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),
-    getSettings:()=>guard('getSettings','settings'),
+    getSettings: async ()=>{
+      const s = await guard('getSettings','settings');
+      cachePinHashFromSettings(s);
+      return s;
+    },
     setSettings: async (o)=> {
       const tenantId = getActiveTenantId();
       cachedSettingsMap[tenantId] = o;
+      cachePinHashFromSettings(o);
       await LS.setSettings(o);
       if (signedIn()) {
         try {
           const res = await CLOUD.setSettings(o);
           if (res) {
             cachedSettingsMap[tenantId] = res;
+            cachePinHashFromSettings(res);
             await LS.setSettings(res);
           }
           return res;

@@ -32,9 +32,20 @@
       'Veg Biryani':[['Basmati Rice',0.15,'kg'],['Onion',0.05,'kg'],['Cooking Oil',0.02,'L']],
       'Garlic Naan':[['Wheat Flour',0.12,'kg'],['Butter',0.01,'kg']]
     };
-    function recipeOf(m){ if(!m.ingredients){ m.ingredients = (SEED[m.name]||[]).map(x=>({name:x[0],qty:x[1],unit:x[2]})); } return m.ingredients; }
+    // Only use real recipe data — never invent ingredients for named dishes
+    function recipeOf(m){
+      if (Array.isArray(m.ingredients) && m.ingredients.length) return m.ingredients;
+      return [];
+    }
     function invCost(name){ const i=(RS.INVENTORY||[]).find(x=>x.name===name); return i?i.cost:0; }
-    function plateCost(m){ return recipeOf(m).reduce((a,g)=>a+g.qty*invCost(g.name),0); }
+    function plateCost(m){
+      if (window.RSRecipeUnits && typeof RSRecipeUnits.plateCost === 'function') {
+        return RSRecipeUnits.plateCost(m, RS.INVENTORY || []);
+      }
+      const base = Math.max(1, Number(m.recipeServings) || 1);
+      return recipeOf(m).reduce((a,g)=>a+(Number(g.qty)||0)*invCost(g.name),0) / base;
+    }
+    function escEd(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
     /* ---------------- left form ---------------- */
     function buildForm(){
@@ -58,14 +69,42 @@
               <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category...</option></select></div>
             </div>
             <div id="ed-new-cat-row" style="display:none"><label class="fl">New category name</label><input class="form-input" id="ed-new-cat" placeholder="e.g. Wraps, Soups..."></div>
-            </div>
             <div class="form-grid-2">
               <div><label class="fl">Type</label><select class="form-input" id="ed-type"><option value="veg">Veg</option><option value="nonveg">Non-veg</option></select></div>
               <div><label class="fl">${taxLabel} slab</label><select class="form-input" id="ed-gst">${slabs.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
             </div>
-            <div><label class="fl">Linked ingredients (recipe)</label><div class="ing-chips" id="ed-ings"></div></div>
+            <div class="form-grid-2">
+              <div>
+                <label class="fl">Sold as</label>
+                <select class="form-input" id="ed-serve-unit">
+                  <option value="plate">Plate</option>
+                  <option value="bowl">Bowl</option>
+                  <option value="glass">Glass / cup</option>
+                  <option value="piece">Piece</option>
+                  <option value="portion">Portion</option>
+                  <option value="pack">Pack / box</option>
+                  <option value="serve">Serve</option>
+                </select>
+              </div>
+              <div>
+                <label class="fl">Recipe for (servings)</label>
+                <input class="form-input" id="ed-recipe-servings" type="number" min="1" step="1" value="1" title="Ingredient quantities below are for this many servings">
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:14px 18px;padding:10px 12px;border:1px solid var(--stroke-2);border-radius:12px;background:var(--glass)">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-bestseller"> Best seller</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-special"> Today&rsquo;s special</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-staple"> Staple (roti/rice)</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-pair-water"> Offer water with this</label>
+            </div>
+            <div>
+              <label class="fl">Add-ons <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">extra ghee, butter… one per line: Name, Price</span></label>
+              <textarea class="form-input" id="ed-addons" rows="2" placeholder="Extra ghee, 20&#10;Extra butter, 15" style="resize:vertical;font-size:13px"></textarea>
+            </div>
+            <div><label class="fl">Uses from store room (recipe) <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">qty + unit · optional</span></label><div class="ing-chips" id="ed-ings"></div></div>
             <div id="ed-costline" style="font-size:12.5px;color:var(--text-mute)"></div>
             <button class="btn btn-primary btn-block" id="ed-save"><i class="fa-solid fa-circle-check"></i> Save item</button>
+            <button type="button" class="btn btn-ghost btn-block" id="ed-help-link" style="margin-top:2px"><i class="fa-solid fa-wand-magic-sparkles"></i> Need help linking stock?</button>
           </div>`;
       } else {
         const edGst = $('#ed-gst');
@@ -85,15 +124,44 @@
       let draftIngs = [];
       const ingsEl = $('#ed-ings'), costEl = $('#ed-costline');
       function renderIngs(){
-        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${esc(g.name)} ${esc(g.qty)}${esc(g.unit)} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
+        ingsEl.innerHTML = draftIngs.map((g,i)=>`<span class="ing-chip">${esc(g.name)} ${esc(g.qty)} ${esc(g.unit || '')} <button data-i="${i}"><i class="fa-solid fa-xmark"></i></button></span>`).join('')
           + `<span class="ing-chip add" id="ed-add-ing"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span>`;
         ingsEl.querySelectorAll('[data-i]').forEach(b=> b.onclick=()=>{ draftIngs.splice(+b.dataset.i,1); renderIngs(); });
         $('#ed-add-ing').onclick = openIngPicker;
-        const cost = draftIngs.reduce((a,g)=>a+g.qty*invCost(g.name),0);
+        const serv = Math.max(1, Number($('#ed-recipe-servings') && $('#ed-recipe-servings').value) || 1);
+        const costBatch = draftIngs.reduce((a,g)=>a+(Number(g.qty)||0)*invCost(g.name),0);
+        const cost = costBatch / serv;
         const price = +$('#ed-price').value||0;
-        costEl.innerHTML = cost? `Plate cost <b style="color:var(--text)">${rs(cost)}</b>${price?` · margin <b style="color:var(--green)">${Math.round((1-cost/price)*100)}%</b>`:''}` : '';
+        const su = ($('#ed-serve-unit') && $('#ed-serve-unit').value) || 'plate';
+        costEl.innerHTML = cost
+          ? `Cost per ${esc(su)} <b style="color:var(--text)">${rs(cost)}</b> (recipe for ${serv} ${esc(su)}${serv===1?'':'s'})${price?` · margin <b style="color:var(--green)">${Math.round((1-cost/price)*100)}%</b>`:''}`
+          : '';
       }
       $('#ed-price').addEventListener('input', renderIngs);
+      const edServ = $('#ed-recipe-servings');
+      if (edServ && !edServ._rsCostWire) {
+        edServ._rsCostWire = true;
+        edServ.addEventListener('input', renderIngs);
+      }
+      const edSu = $('#ed-serve-unit');
+      if (edSu && !edSu._rsCostWire) {
+        edSu._rsCostWire = true;
+        edSu.addEventListener('change', renderIngs);
+      }
+      const helpLinkBtn = $('#ed-help-link');
+      if (helpLinkBtn && !helpLinkBtn._rsWired) {
+        helpLinkBtn._rsWired = true;
+        helpLinkBtn.onclick = () => {
+          if (window.RSKitchenLinkCoach) {
+            if (editingId) RSKitchenLinkCoach.openLinkWizard(editingId);
+            else RSKitchenLinkCoach.openSetupChecklist
+              ? RSKitchenLinkCoach.openSetupChecklist()
+              : RSKitchenLinkCoach.openHowItWorks();
+          } else {
+            RS.toast('Open Inventory → Recipes for the simple helper', 'fa-circle-info');
+          }
+        };
+      }
       function openIngPicker(){
         const list = RS.INVENTORY||[];
         RSModal.open({ title:'Add ingredient', sub:'Link a raw material to this recipe', icon:'fa-flask', size:'sm',
@@ -181,6 +249,19 @@
           }
         }
 
+        function parseAddonsText(raw) {
+          return String(raw || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+              const parts = line.split(/[,|]/);
+              const an = (parts[0] || '').trim();
+              const ap = parseFloat(String(parts[1] || '0').replace(/[^0-9.]/g, '')) || 0;
+              return an ? { name: an, price: ap } : null;
+            })
+            .filter(Boolean);
+        }
         const data = { 
           name, 
           price, 
@@ -188,7 +269,14 @@
           veg: $('#ed-type').value==='veg', 
           gst: selectedGst, 
           taxCategory: rateCode, 
-          ingredients: draftIngs.slice() 
+          ingredients: draftIngs.slice(),
+          serveUnit: ($('#ed-serve-unit') && $('#ed-serve-unit').value) || 'plate',
+          recipeServings: Math.max(1, Number($('#ed-recipe-servings') && $('#ed-recipe-servings').value) || 1),
+          bestseller: !!(document.getElementById('ed-bestseller') && document.getElementById('ed-bestseller').checked),
+          isSpecial: !!(document.getElementById('ed-special') && document.getElementById('ed-special').checked),
+          isStaple: !!(document.getElementById('ed-staple') && document.getElementById('ed-staple').checked),
+          pairWater: !!(document.getElementById('ed-pair-water') && document.getElementById('ed-pair-water').checked),
+          addons: parseAddonsText(document.getElementById('ed-addons') && document.getElementById('ed-addons').value),
         };
         
         try {
@@ -219,7 +307,18 @@
       };
       // expose for edit
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
+        try { window.buildFormLoad = buildForm._load; } catch (_) {}
         $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg';
+        if ($('#ed-serve-unit')) $('#ed-serve-unit').value = m.serveUnit || 'plate';
+        if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = Math.max(1, Number(m.recipeServings) || 1);
+        if (document.getElementById('ed-bestseller')) document.getElementById('ed-bestseller').checked = !!m.bestseller;
+        if (document.getElementById('ed-special')) document.getElementById('ed-special').checked = !!(m.isSpecial || m.special);
+        if (document.getElementById('ed-staple')) document.getElementById('ed-staple').checked = !!(m.isStaple || m.staple);
+        if (document.getElementById('ed-pair-water')) document.getElementById('ed-pair-water').checked = m.pairWater === true || (!!m.isStaple && m.pairWater !== false);
+        if (document.getElementById('ed-addons')) {
+          const ads = Array.isArray(m.addons) ? m.addons : [];
+          document.getElementById('ed-addons').value = ads.map(a => (a.name || '') + ', ' + (a.price != null ? a.price : 0)).join('\n');
+        }
         const edGst = $('#ed-gst');
         
         // Resolve slab percentage from m.taxCategory if missing or stale
@@ -253,13 +352,48 @@
         }
         draftIngs = recipeOf(m).map(g=>({...g})); renderIngs(); $('#ed-name').focus(); };
       function resetForm(){ editingId=null; $('#ed-form-title').textContent='Add new item'; $('#ed-reset').style.display='none';
-        $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0; draftIngs=[]; renderIngs(); }
+        $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0;
+        if ($('#ed-serve-unit')) $('#ed-serve-unit').value = 'plate';
+        if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = 1;
+        if (document.getElementById('ed-bestseller')) document.getElementById('ed-bestseller').checked = false;
+        if (document.getElementById('ed-special')) document.getElementById('ed-special').checked = false;
+        if (document.getElementById('ed-staple')) document.getElementById('ed-staple').checked = false;
+        if (document.getElementById('ed-pair-water')) document.getElementById('ed-pair-water').checked = false;
+        if (document.getElementById('ed-addons')) document.getElementById('ed-addons').value = '';
+        draftIngs=[]; renderIngs(); }
       renderIngs();
     }
 
     /* ---------------- right list ---------------- */
     function renderList(){
       const body = $('#editor-list'); if(!body) return;
+
+      // Coach banner ABOVE the 2-column grid — never inside report-grid
+      // (inserting into the grid stole the right column and hid the menu list)
+      try {
+        const edTab = $('#editor-tab');
+        if (edTab && window.RSKitchenLinkCoach && RSKitchenLinkCoach.miniBannerHtml) {
+          let host = document.getElementById('klc-editor-banner');
+          const grid = edTab.querySelector('.report-grid');
+          if (!host) {
+            host = document.createElement('div');
+            host.id = 'klc-editor-banner';
+            host.style.cssText = 'margin:0 0 12px;grid-column:1/-1;width:100%';
+            if (grid && grid.parentElement === edTab) {
+              edTab.insertBefore(host, grid);
+            } else if (grid) {
+              grid.parentElement.insertBefore(host, grid);
+            } else {
+              edTab.prepend(host);
+            }
+          } else if (grid && host.parentElement === grid) {
+            // Repair older broken placement: move banner out of the grid
+            edTab.insertBefore(host, grid);
+          }
+          host.innerHTML = RSKitchenLinkCoach.miniBannerHtml({ id: 'klc-ed-mini', place: 'menu' });
+          RSKitchenLinkCoach.wireMiniBanner(host);
+        }
+      } catch (_) {}
 
       const catFil = $('#editor-cat-filter');
       if (catFil && !catFil._rsListenerBound) {
@@ -275,7 +409,7 @@
       const catFilter = ($('#editor-cat-filter')?.value || 'All').toLowerCase();
       const stockFilter = ($('#editor-stock-filter')?.value || 'All').toLowerCase();
 
-      let filtered = RS.MENU;
+      let filtered = Array.isArray(RS.MENU) ? RS.MENU.slice() : [];
       if (catFilter !== 'all') {
         filtered = filtered.filter(m => m.cat && m.cat.toLowerCase() === catFilter);
       }
@@ -286,14 +420,33 @@
         });
       }
 
+      if (!filtered.length) {
+        const hasF = catFilter !== 'all' || stockFilter !== 'all';
+        body.innerHTML = `<tr><td colspan="6" style="padding:0;border:none">
+          <div class="sr-empty" style="padding:36px 16px">
+            <i class="fa-solid fa-utensils" style="font-size:22px;opacity:.4;display:block;margin-bottom:8px"></i>
+            <div style="font-weight:700;margin-bottom:4px">${hasF ? 'No items match filters' : 'No menu items yet'}</div>
+            <div style="font-size:13px;color:var(--text-soft);margin-bottom:12px">${hasF ? 'Clear filters to see the full menu.' : 'Add your first dish on the left form to start selling.'}</div>
+            ${hasF ? '<button type="button" class="btn btn-ghost btn-sm" id="ed-clear-filters">Clear filters</button>' : ''}
+          </div></td></tr>`;
+        const cf = document.getElementById('ed-clear-filters');
+        if (cf) cf.onclick = () => {
+          const c = document.getElementById('editor-cat-filter');
+          const s = document.getElementById('editor-stock-filter');
+          if (c) c.value = 'All';
+          if (s) s.value = 'All';
+          renderList();
+        };
+      } else {
       body.innerHTML = filtered.map(m=>`
-        <tr data-id="${m.id}">
-          <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${m.name}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${m.cat}</div></div></div></td>
-          <td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td>
-          <td><span class="stock-dot ${RS.stockCls[m.stock]}">${RS.stockLabel[m.stock]}</span></td>
-          <td><label class="switch-mini"><input type="checkbox" data-av="${m.id}" ${m.stock!=='out'?'checked':''}><span></span></label></td>
-          <td><div class="row-actions"><button class="icon-act go" data-edit="${m.id}" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" data-recipe="${m.id}" title="Recipe & cost"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" data-del="${m.id}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
+        <tr data-id="${escEd(m.id)}">
+          <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${escEd(m.name)}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} · ${escEd(m.cat)}</div></div></div></td>
+          <td>${escEd(m.cat)}</td><td class="td-strong">${rs(m.price)}</td>
+          <td><span class="stock-dot ${(RS.stockCls&&RS.stockCls[m.stock])||''}">${(RS.stockLabel&&RS.stockLabel[m.stock])||m.stock||'—'}</span></td>
+          <td><label class="switch-mini"><input type="checkbox" data-av="${escEd(m.id)}" ${m.stock!=='out'?'checked':''}><span></span></label></td>
+          <td><div class="row-actions"><button class="icon-act go" data-edit="${escEd(m.id)}" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="icon-act" data-recipe="${escEd(m.id)}" title="Recipe & cost"><i class="fa-solid fa-flask"></i></button><button class="icon-act danger" data-del="${escEd(m.id)}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></td>
         </tr>`).join('');
+      }
       const count = filtered.length, cats=[...new Set(filtered.map(m=>m.cat))].length;
       const sub = $('#editor-tab .ph-sub'); if(sub) sub.textContent = `${count} items · ${cats} categories`;
       body.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=>{ buildForm(); buildForm._load(RS.MENU.find(x=>String(x.id)===String(b.dataset.edit))); $('#editor-tab').scrollIntoView({block:'start'}); });

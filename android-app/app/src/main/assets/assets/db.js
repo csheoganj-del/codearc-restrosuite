@@ -147,15 +147,59 @@
   const MAP = {
     menu: {
       table:'doppio_menu', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, cat:r.category, price:num(r.price),
-                    veg: !(r.recipe_specs && r.recipe_specs.veg===false),
-                    stock: r.available===false ? 'out' : 'ok',
-                    ingredients: (r.recipe_specs && r.recipe_specs.ingredients) || [],
-                    taxCategory: r.tax_category || 'IN_REST_5' }),
-      to: o => ({ id:o.id, name:o.name, category:o.cat, price:num(o.price),
-                  available: o.stock!=='out',
-                  recipe_specs: { veg: !!o.veg, ingredients: o.ingredients || [] },
-                  tax_category: o.taxCategory || 'IN_REST_5' })
+      from: r => {
+        const specs = r.recipe_specs && typeof r.recipe_specs === 'object' ? r.recipe_specs : {};
+        return {
+          id: r.id,
+          name: r.name,
+          cat: r.category,
+          price: num(r.price),
+          veg: !(specs && specs.veg === false),
+          stock: r.available === false ? 'out' : 'ok',
+          ingredients: (specs && specs.ingredients) || [],
+          // Recipe quantities are written for this many servings (default 1 plate)
+          recipeServings: num(specs.recipeServings != null ? specs.recipeServings : specs.servings) || 1,
+          serveUnit: specs.serveUnit || specs.serve_unit || 'plate',
+          taxCategory: r.tax_category || 'IN_REST_5',
+          bestseller: !!(r.bestseller || specs.bestseller),
+          isSpecial: !!(specs.isSpecial || specs.special),
+          isStaple: !!(specs.isStaple || specs.staple),
+          pairWater: specs.pairWater,
+          addons: Array.isArray(specs.addons) ? specs.addons : [],
+          orderCount: num(specs.orderCount) || 0,
+          recipePending: !!specs.recipePending,
+          description: r.description || specs.description || '',
+        };
+      },
+      to: o => ({
+        id: o.id,
+        name: o.name,
+        category: o.cat,
+        price: num(o.price),
+        available: o.stock !== 'out',
+        bestseller: !!o.bestseller,
+        description: o.description || '',
+        recipe_specs: {
+          veg: !!o.veg,
+          ingredients: (o.ingredients || []).map((g) => ({
+            name: g.name,
+            qty: num(g.qty),
+            unit: g.unit || 'unit',
+            key: g.key || undefined,
+          })),
+          recipeServings: Math.max(1, num(o.recipeServings != null ? o.recipeServings : o.servings) || 1),
+          serveUnit: o.serveUnit || o.serve_unit || 'plate',
+          isSpecial: !!o.isSpecial,
+          isStaple: !!o.isStaple,
+          bestseller: !!o.bestseller,
+          pairWater: o.pairWater,
+          addons: Array.isArray(o.addons) ? o.addons : [],
+          orderCount: num(o.orderCount) || 0,
+          recipePending: !!o.recipePending,
+          description: o.description || '',
+        },
+        tax_category: o.taxCategory || 'IN_REST_5',
+      })
     },
     bills: {
       table:'doppio_bills', pk:'id', clientId:false, order:{column:'created_at',ascending:false},
@@ -288,11 +332,32 @@
     },
     inventory: {
       table:'doppio_inventory', pk:'id', clientId:true,
-      from: r => ({ id:r.id, key:r.key, name:r.label||r.name, cat:r.category, stock:num(r.current),
-                    unit:r.unit, min:num(r.threshold), max:num(r.max_stock), cost:0 }),
-      to: o => ({ id:o.id, key:o.key||String(o.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'),
-                  name:o.name, label:o.name, category:o.cat||'General', current:num(o.stock),
-                  threshold:num(o.min), max_stock:num(o.max||o.stock), unit:o.unit||'unit' })
+      from: r => ({
+        id: r.id,
+        key: r.key,
+        name: r.label || r.name,
+        cat: r.category,
+        stock: num(r.current),
+        unit: r.unit,
+        min: num(r.threshold),
+        max: num(r.max_stock),
+        // unit_cost is optional (added via align migrations / client optional columns)
+        cost: num(r.unit_cost != null ? r.unit_cost : r.cost),
+        supplier: r.supplier || r.vendor || '',
+      }),
+      to: o => ({
+        id: o.id,
+        key: o.key || String(o.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+        name: o.name,
+        label: o.name,
+        category: o.cat || 'General',
+        current: num(o.stock),
+        threshold: num(o.min),
+        max_stock: num(o.max || o.stock),
+        unit: o.unit || 'unit',
+        unit_cost: num(o.cost),
+        supplier: o.supplier || '',
+      }),
     },
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
@@ -313,9 +378,145 @@
     },
     employees: {
       table:'doppio_employees', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, role:r.role, rc:'r-'+String(r.role||'').toLowerCase(),
-                    email:r.contact, baseSalary:num(r.base_salary), shift:r.shift }),
-      to: o => ({ id:o.id, name:o.name, role:o.role, contact:o.email||'', base_salary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
+      from: r => {
+        const role = r.role || r.role_key || 'staff';
+        const roleKey = String(r.role_key || r.roleKey || role).toLowerCase().replace(/\s+/g, '_');
+        const pay = num(r.payroll != null ? r.payroll : r.base_salary != null ? r.base_salary : r.baseSalary);
+        const phone = r.phone || r.contact || '';
+        const leaves = r.leaves && typeof r.leaves === 'object' ? r.leaves : {};
+        return {
+          id: r.id,
+          name: r.name,
+          role: typeof role === 'string' && role.length < 40 ? role : roleKey,
+          roleKey,
+          rc: 'r-' + roleKey,
+          email: r.email || r.contact || '',
+          phone: phone,
+          whatsapp: r.whatsapp || phone,
+          baseSalary: pay,
+          payroll: pay > 0 ? String(pay) : '',
+          shift: r.shift || 'Day',
+          pin: r.pin || '',
+          leaves: leaves,
+          casualLeave: num(leaves.casual != null ? leaves.casual : leaves.casualLeave) || 12,
+          sickLeave: num(leaves.sick != null ? leaves.sick : leaves.sickLeave) || 6,
+          earnedLeave: num(leaves.earned != null ? leaves.earned : leaves.earnedLeave) || 15,
+          status: r.status || 'active',
+          staffUserId: r.staff_user_id || r.staffUserId || null,
+        };
+      },
+      to: o => {
+        const pay = num(o.baseSalary != null ? o.baseSalary : String(o.payroll || '').replace(/[^0-9.]/g, ''));
+        const leaves = Object.assign(
+          { casual: 12, sick: 6, earned: 15 },
+          o.leaves && typeof o.leaves === 'object' ? o.leaves : {},
+          {
+            casual: num(o.casualLeave != null ? o.casualLeave : (o.leaves && o.leaves.casual)) || 12,
+            sick: num(o.sickLeave != null ? o.sickLeave : (o.leaves && o.leaves.sick)) || 6,
+            earned: num(o.earnedLeave != null ? o.earnedLeave : (o.leaves && o.leaves.earned)) || 15,
+          }
+        );
+        return {
+          id: o.id,
+          name: o.name,
+          role: o.role || o.roleKey || 'staff',
+          role_key: o.roleKey || String(o.role || 'staff').toLowerCase(),
+          contact: o.email || o.phone || '',
+          phone: o.phone || o.whatsapp || '',
+          base_salary: pay,
+          payroll: pay,
+          shift: o.shift || 'Day',
+          leaves,
+          status: o.status || 'active',
+          daily_rate: 0,
+        };
+      },
+    },
+    salary_advances: {
+      table: 'doppio_salary_advances', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
+        amount: num(r.amount), remaining: num(r.remaining != null ? r.remaining : r.amount),
+        recover: r.recover || 'next_payroll', note: r.note || '',
+        status: r.status || 'paid', paidAt: r.paid_at || r.created_at,
+      }),
+      to: o => ({
+        id: o.id, employee_id: o.employeeId, employee_name: o.employeeName || '',
+        amount: num(o.amount), remaining: num(o.remaining != null ? o.remaining : o.amount),
+        recover: o.recover || 'next_payroll', note: o.note || '',
+        status: o.status || 'paid', paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    salary_payments: {
+      table: 'doppio_salary_payments', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, employeeId: r.employee_id, employeeName: r.employee_name, month: r.month,
+        base: num(r.base), advanceDeducted: num(r.advance_deducted), net: num(r.net),
+        paidAt: r.paid_at,
+      }),
+      to: o => ({
+        id: o.id, employee_id: o.employeeId, employee_name: o.employeeName || '',
+        month: o.month || '', base: num(o.base), advance_deducted: num(o.advanceDeducted),
+        net: num(o.net), paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    commission_partners: {
+      table: 'doppio_commission_partners', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, name: r.name, phone: r.phone || '',
+        type: r.rate_type || r.type || 'percent', rate: num(r.rate),
+        active: r.active !== false, notes: r.notes || '',
+      }),
+      to: o => ({
+        id: o.id, name: o.name, phone: o.phone || '',
+        rate_type: o.type || o.rate_type || 'percent', rate: num(o.rate),
+        active: o.active !== false, notes: o.notes || '',
+      }),
+    },
+    commission_events: {
+      table: 'doppio_commission_events', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, partnerId: r.partner_id, partnerName: r.partner_name,
+        billNo: r.bill_no, billGrand: num(r.bill_grand), commission: num(r.commission),
+        customer: r.customer || '', paidOut: !!r.paid_out, at: r.at || r.created_at,
+      }),
+      to: o => ({
+        id: o.id, partner_id: o.partnerId, partner_name: o.partnerName || '',
+        bill_no: o.billNo || '', bill_grand: num(o.billGrand), commission: num(o.commission),
+        customer: o.customer || '', paid_out: !!o.paidOut, at: o.at || new Date().toISOString(),
+      }),
+    },
+    commission_payouts: {
+      table: 'doppio_commission_payouts', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, partnerId: r.partner_id, partnerName: r.partner_name,
+        amount: num(r.amount), period: r.period || 'monthly', paidAt: r.paid_at,
+      }),
+      to: o => ({
+        id: o.id, partner_id: o.partnerId, partner_name: o.partnerName || '',
+        amount: num(o.amount), period: o.period || 'monthly',
+        paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    owner_report_prefs: {
+      table: 'doppio_owner_report_prefs', pk: 'tenant_id', clientId: false,
+      from: r => ({
+        id: r.tenant_id, tenantId: r.tenant_id, enabled: r.enabled !== false,
+        ownerPhone: r.owner_phone || '', dailySales: r.daily_sales !== false,
+        dailySalesHour: num(r.daily_sales_hour) || 22, stockAlerts: r.stock_alerts !== false,
+        stockAlertHour: num(r.stock_alert_hour) || 10, weeklyPL: r.weekly_pl !== false,
+        weeklyPLDay: num(r.weekly_pl_day) || 1, monthlyPL: r.monthly_pl !== false,
+        monthlyPLDay: num(r.monthly_pl_day) || 1,
+      }),
+      to: o => ({
+        tenant_id: o.tenantId || o.id,
+        enabled: o.enabled !== false, owner_phone: o.ownerPhone || '',
+        daily_sales: o.dailySales !== false, daily_sales_hour: num(o.dailySalesHour) || 22,
+        stock_alerts: o.stockAlerts !== false, stock_alert_hour: num(o.stockAlertHour) || 10,
+        weekly_pl: o.weeklyPL !== false, weekly_pl_day: num(o.weeklyPLDay) || 1,
+        monthly_pl: o.monthlyPL !== false, monthly_pl_day: num(o.monthlyPLDay) || 1,
+        updated_at: new Date().toISOString(),
+      }),
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
@@ -415,8 +616,49 @@
     },
     leave_requests: {
       table:'doppio_leave_requests', pk:'id', clientId:true,
-      from: r => ({ id:r.id, employeeId:r.employee_id, employeeName:r.employee_name, type:r.type, startDate:r.start_date, endDate:r.end_date, reason:r.reason, status:r.status, days:num(r.days) }),
-      to: o => ({ id:o.id, employee_id:o.employeeId, employee_name:o.employeeName, type:o.type, start_date:o.startDate, end_date:o.endDate, reason:o.reason||'', status:o.status||'Pending', days:num(o.days) })
+      from: r => {
+        const start = r.start_date || r.startDate || r.from || '';
+        const end = r.end_date || r.endDate || r.to || start;
+        const st = String(r.status || 'Pending');
+        return {
+          id: r.id,
+          employeeId: r.employee_id || r.employeeId,
+          employeeName: r.employee_name || r.employeeName,
+          type: r.type || 'casual',
+          startDate: start,
+          endDate: end,
+          from: start,
+          to: end,
+          reason: r.reason || '',
+          status: st.toLowerCase() === 'pending' ? 'pending' : st.toLowerCase() === 'approved' ? 'approved' : st.toLowerCase() === 'rejected' ? 'rejected' : st,
+          days: num(r.days) || 1,
+          createdAt: r.created_at || r.createdAt,
+        };
+      },
+      to: o => {
+        const start = o.startDate || o.from;
+        const end = o.endDate || o.to || start;
+        let days = num(o.days);
+        if (!days && start && end) {
+          try {
+            days = Math.max(1, Math.round((new Date(end) - new Date(start)) / 86400000) + 1);
+          } catch (_) { days = 1; }
+        }
+        const stRaw = String(o.status || 'pending').toLowerCase();
+        const status =
+          stRaw === 'approved' ? 'Approved' : stRaw === 'rejected' ? 'Rejected' : 'Pending';
+        return {
+          id: o.id,
+          employee_id: o.employeeId,
+          employee_name: o.employeeName,
+          type: o.type || 'Casual',
+          start_date: start,
+          end_date: end,
+          reason: o.reason || '',
+          status,
+          days: days || 1,
+        };
+      },
     },
     reservations: {
       table:'doppio_reservations', pk:'id', clientId:false, uuidPK:true,
@@ -462,14 +704,103 @@
       }
     },
     vendors: {
-      table:'doppio_vendors', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, name:r.name, category:r.category, contact:r.phone, terms:r.terms, rating:num(r.rating), itemsCount:num(r.items_count) }),
-      to: o => ({ name:o.name, category:o.category||'', phone:o.contact||'', terms:o.terms||'', rating:num(o.rating), items_count:num(o.itemsCount) })
+      table: 'doppio_vendors',
+      pk: 'id',
+      clientId: false,
+      uuidPK: true,
+      from: (r) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category || 'General',
+        cat: r.category || 'General',
+        contact: r.phone || r.email || '',
+        email: r.email || '',
+        terms: r.terms || 'Net 30',
+        rating: num(r.rating) || 4,
+        itemsCount: num(r.items_count),
+        items: num(r.items_count),
+      }),
+      // Core schema: name, phone, email, category, status (extra cols dropped gracefully if absent)
+      to: (o) => ({
+        name: o.name,
+        category: o.category || o.cat || 'General',
+        phone: o.contact || o.phone || '',
+        email: o.email || '',
+        status: o.status || 'active',
+        terms: o.terms || 'Net 30',
+        rating: num(o.rating) || 4,
+        items_count: num(o.itemsCount != null ? o.itemsCount : o.items),
+      }),
     },
     purchase_orders: {
-      table:'doppio_purchase_orders', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, poNumber:r.po_number, supplier:r.vendor_name, items:r.item_name, value:num(r.expected_cost), date:r.due_date, status:r.status }),
-      to: o => ({ po_number:o.poNumber||'', vendor_name:o.supplier||'Supplier', item_name:o.items||'Supply items', expected_cost:num(o.value), due_date:(o.date||new Date().toISOString()).slice(0,10), status:o.status||'pending' })
+      table: 'doppio_purchase_orders',
+      pk: 'id',
+      clientId: false,
+      uuidPK: true,
+      from: (r) => ({
+        id: r.id,
+        poNumber: r.po_number,
+        supplier: r.vendor_name,
+        items: r.item_name,
+        value: num(r.expected_cost),
+        date: r.due_date || r.created_at,
+        status: r.status,
+        lines: r.lines || null,
+        quantity: num(r.quantity),
+        unit: r.unit || 'unit',
+      }),
+      to: (o) => ({
+        po_number: o.poNumber || o.po || '',
+        vendor_name: o.supplier || 'Supplier',
+        item_name: o.items || 'Supply items',
+        quantity: num(
+          o.quantity != null
+            ? o.quantity
+            : Array.isArray(o.lines)
+              ? o.lines.reduce((a, l) => a + (Number(l.qty) || 0), 0)
+              : 0
+        ),
+        unit:
+          (Array.isArray(o.lines) && o.lines[0] && o.lines[0].unit) || o.unit || 'unit',
+        expected_cost: num(o.value),
+        due_date: (o.date || new Date().toISOString()).slice(0, 10),
+        status: o.status || 'pending',
+      }),
+    },
+    // Waste is local-first (no dedicated cloud table in all deploys). HYBRID falls back to LS.
+    waste_log: {
+      table: null,
+      pk: 'id',
+      clientId: true,
+      localOnly: true,
+    },
+    // Batches with expiry — prefer local; cloud table doppio_inventory_batches when available
+    inventory_batches: {
+      table: 'doppio_inventory_batches',
+      pk: 'id',
+      clientId: false,
+      // Composite PK on server is (tenant_id, id) with text id
+      from: (r) => ({
+        id: r.id,
+        invId: r.inv_id || r.invId || null,
+        ingredientKey: r.ingredient_key || r.ingredientKey || '',
+        ingredientName: r.ingredient_name || r.ingredientName || r.label || '',
+        qty: num(r.qty != null ? r.qty : r.quantity),
+        unit: r.unit || 'unit',
+        expiryDate: r.expiryDate || r.expiry_date || null,
+        receivedDate: r.receivedDate || r.received_date || null,
+        source: r.source || 'receive',
+        poId: r.po_id || r.poId || null,
+        cost: num(r.cost),
+        createdAt: r.created_at || r.createdAt || null,
+      }),
+      to: (o) => ({
+        id: o.id,
+        ingredient_key: o.ingredientKey || o.ingredient_key || '',
+        qty: num(o.qty),
+        expiryDate: o.expiryDate || o.expiry_date || null,
+        receivedDate: o.receivedDate || o.received_date || null,
+      }),
     },
     support_tickets: {
       table:'doppio_support_tickets', pk:'id', clientId:false, uuidPK:true,
@@ -490,7 +821,11 @@
     // These persist once migration 20260709160000_crm_customer_fields is
     // applied; until then a DB without the columns will drop them gracefully
     // instead of rejecting the whole customer upsert.
-    customers: ['email', 'dues', 'marketing_opt_in']
+    customers: ['email', 'dues', 'marketing_opt_in'],
+    // unit_cost / supplier may be missing on older doppio_inventory schemas
+    inventory: ['unit_cost', 'supplier', 'cost'],
+    vendors: ['terms', 'rating', 'items_count', 'email'],
+    inventory_batches: ['ingredient_name', 'unit', 'source', 'po_id', 'cost', 'inv_id', 'receivedDate', 'expiryDate'],
   });
   const known = {}; // collection -> Set of ids seen from server
   function newClientId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
@@ -613,6 +948,8 @@
   const CLOUD = {
     async list(c, opts){
       const m=MAP[c]; if(!m) return [];
+      // Collections without a cloud table (e.g. waste_log) stay localStorage-backed
+      if (m.localOnly || !m.table) return LS.list(c, opts);
       const options = opts && typeof opts === 'object' ? opts : {};
       // Higher default for money/CRM collections (Wave 2 pagination)
       const defaultLimit = (c === 'bills' || c === 'customers') ? 1000 : 500;
@@ -628,10 +965,28 @@
         offset: offset || null,
       });
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
-      return (rows||[]).map(m.from);
+      // Preserve client-only fields (e.g. unit cost) that older cloud schemas omit
+      const mapped = (rows || []).map(m.from);
+      if (c === 'inventory') {
+        const local = LS.read(c) || [];
+        mapped.forEach((row) => {
+          const loc = local.find(
+            (x) =>
+              String(x.id) === String(row.id) ||
+              String(x.key || '') === String(row.key || '') ||
+              String(x.name || '').toLowerCase() === String(row.name || '').toLowerCase()
+          );
+          if (loc) {
+            if (!(Number(row.cost) > 0) && Number(loc.cost) > 0) row.cost = Number(loc.cost);
+            if (!row.supplier && loc.supplier) row.supplier = loc.supplier;
+          }
+        });
+      }
+      return mapped;
     },
     async put(c,id,obj){
       const m=MAP[c]; if(!m) return obj;
+      if (m.localOnly || !m.table) return LS.put(c, id, obj);
       const cleanId = cleanIdForCollection(c, id);
       const cleanObj = { ...obj, id: cleanId };
       const body = m.to(cleanObj);
@@ -728,6 +1083,7 @@
     async bulkPut(c,arr){ for(const o of arr){ await CLOUD.put(c, o.id, o); } return arr; },
     async del(c,id){
       const m=MAP[c]; if(!m) return true;
+      if (m.localOnly || !m.table) return LS.del(c, id);
       const cleanId = cleanIdForCollection(c, id);
       await API.remove(m.table, [{operator:'eq',column:m.pk,value:cleanId}]);
       if(known[c]) known[c].delete(String(cleanId));
@@ -762,9 +1118,22 @@
         } catch(e) {}
       }
       
-      // Store all UI settings in feature_flags.ui_settings
-      flags.ui_settings = { ...o };
-      // Delete duplicate columns
+      // Store UI settings in feature_flags.ui_settings — never embed _raw or functions
+      // (spreading getSettings() used to nest the full business profile and break upserts)
+      const ui = {};
+      if (o && typeof o === 'object') {
+        Object.keys(o).forEach((k) => {
+          if (k === '_raw' || k === 'feature_flags') return;
+          if (typeof o[k] === 'function') return;
+          try {
+            // Ensure JSON-serializable (custom_tables, etc.)
+            JSON.stringify(o[k]);
+            ui[k] = o[k];
+          } catch (_) {}
+        });
+      }
+      flags.ui_settings = ui;
+      // Delete duplicate columns that live on the profile row itself
       for (const k in SETTINGS_MAP) {
         delete flags.ui_settings[k];
       }

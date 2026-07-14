@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260709-pill-icon";
+const CACHE_NAME = "restrosuite-shell-v20260714-10of10";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -43,7 +43,42 @@ const APP_SHELL = [
   
   // Missing Feature Scripts Loaded Dynamically by dashboard.html
   "/assets/dashboard.js",
+  // Offline-lease guard — MUST be cached so enforcement survives offline.
+  "/assets/license-config.js",
+  "/assets/license-guard.js",
   "/assets/features-pos.js",
+  "/assets/competitive-ops.js",
+  "/assets/receipt.js",
+  "/assets/print-bridge.js",
+  "/assets/escpos-encoder.js",
+  "/assets/modules/bill-identity.js",
+  "/assets/modules/recipe-units.js",
+  "/assets/modules/inventory-ledger.js",
+  "/assets/modules/inventory-batches.js",
+  "/assets/modules/kitchen-link-coach.js",
+  "/assets/modules/xlsx-lite.js",
+  "/assets/modules/bills-history.js",
+  "/assets/modules/inventory-ui.js",
+  "/assets/modules/reports-ui.js",
+  "/assets/modules/gateway-monitor.js",
+  "/assets/modules/super-admin.js",
+  "/assets/modules/kds-ui.js",
+  "/assets/modules/qr-orders-ui.js",
+  "/assets/modules/employees-ui.js",
+  "/assets/modules/progress-ops.js",
+  "/assets/modules/report-pdf.js",
+  "/assets/lib/jspdf.umd.min.js",
+  "/assets/modules/menu-intelligence.js",
+  "/assets/modules/owner-wa-reports.js",
+  "/assets/modules/hr-extended.js",
+  "/assets/modules/commission.js",
+  "/assets/modules/security-shield.js",
+  "/assets/modules/wa-send-queue.js",
+  "/assets/modules/pos-ui.js",
+  "/assets/modules/tax-helpers.js",
+  "/assets/modules/growth-hub-shell.js",
+  "/assets/modules/demo-script.js",
+  "/assets/dist/critical.bundle.js",
   "/assets/features-editor.js",
   "/assets/features-manage.js",
   "/assets/features-growth.js",
@@ -53,7 +88,11 @@ const APP_SHELL = [
   
   // Images/Assets
   "/assets/restrosuite-mark.png",
+  "/assets/restrosuite-mark-512.png",
+  "/assets/restrosuite-maskable-512.png",
   "/assets/restrosuite_logo.png",
+  "/assets/screenshot-pos.png",
+  "/assets/screenshot-cart.png",
   
   // External CDN Dependencies (Pre-cached)
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js",

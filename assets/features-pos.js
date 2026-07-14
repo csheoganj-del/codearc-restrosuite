@@ -1198,10 +1198,7 @@
               <button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">
                 <i class="fa-brands fa-whatsapp"></i>
               </button>
-              <button type="button" class="rc-icon-btn rc-thermal" id="rc-thermal" title="Thermal roll printer (same layout as preview)" aria-label="Thermal print">
-                <i class="fa-solid fa-ticket"></i>
-              </button>
-              <button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print" aria-label="Print">
+              <button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print receipt (thermal when available, otherwise browser)" aria-label="Print">
                 <i class="fa-solid fa-print"></i>
               </button>
               <button type="button" class="rc-icon-btn rc-new" id="rc-new" title="New order" aria-label="New order">
@@ -1240,17 +1237,11 @@
             }
           };
 
+          // Single Print control: prefers thermal bridge when present, else browser print.
+          // (Previously two buttons often ran the same path — confusing.)
           const printBtn = modal.querySelector('#rc-print');
           if (printBtn) {
             printBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              RSPrint(printHtml, 'Receipt ' + bill.no);
-            };
-          }
-          const thEl = modal.querySelector('#rc-thermal');
-          if (thEl) {
-            thEl.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
               if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
@@ -2305,6 +2296,32 @@
           promoOfferId: totals.promoOfferId || null,
         };
         if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
+
+        // Commission partner (who brought this customer)
+        try {
+          const partnerId =
+            (window.RSCommission && typeof RSCommission.getSelectedPartnerId === 'function'
+              ? RSCommission.getSelectedPartnerId()
+              : '') ||
+            (document.getElementById('cart-commission-partner') || {}).value ||
+            '';
+          if (partnerId && window.RSCommission && typeof RSCommission.recordSale === 'function') {
+            RSCommission.recordSale(partnerId, {
+              no: bill.no,
+              grand: bill.grand,
+              total: bill.grand,
+              customer: bill.customer,
+              customerName: bill.customer,
+            });
+          }
+          document.dispatchEvent(
+            new CustomEvent('rs:bill-settled', {
+              detail: { bill: billRow, partnerId: partnerId || '' },
+            })
+          );
+        } catch (commErr) {
+          console.warn('[Commission] record failed', commErr);
+        }
 
         // 1) Memory + DURABLE local/cloud put BEFORE clearing cart (money integrity)
         RS.BILLS.unshift(billRow);

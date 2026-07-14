@@ -393,6 +393,37 @@
 
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Session soft banner (browse while waiting for staff) */
+    .sess-banner {
+      position: sticky; top: 56px; z-index: 95;
+      display: none; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 14px; margin: 0; font-size: 13px; font-weight: 600;
+      background: #FFF7ED; color: #9A3412; border-bottom: 1px solid #FDBA74;
+    }
+    .sess-banner.on { display: flex; }
+    .sess-banner .sb-msg { flex: 1; min-width: 160px; line-height: 1.35; }
+    .sess-banner button {
+      border: none; border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: 12px;
+      cursor: pointer; font-family: inherit; background: #FF4F00; color: #fff;
+    }
+    .sess-banner button.ghost { background: #fff; color: #9A3412; border: 1px solid #FDBA74; }
+    .guest-toast {
+      position: fixed; left: 50%; bottom: 88px; transform: translateX(-50%) translateY(20px);
+      background: #1A1714; color: #fff; padding: 12px 18px; border-radius: 999px;
+      font-size: 13.5px; font-weight: 700; z-index: 800; opacity: 0; pointer-events: none;
+      transition: .3s cubic-bezier(.22,1,.36,1); max-width: min(92vw, 360px); text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2);
+    }
+    .guest-toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .order-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .skeleton-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px; padding-bottom:110px; }
+    .skel {
+      height: 140px; border-radius: var(--r); background: linear-gradient(90deg, #ebe6de 25%, #f5f1ea 50%, #ebe6de 75%);
+      background-size: 200% 100%; animation: shimmer 1.2s infinite;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    body.session-locked .float-btn { box-shadow: 0 6px 18px rgba(154,52,18,.25); }
   </style>
 </head>
 <body>
@@ -416,11 +447,19 @@
   </div>
 </header>
 
-<!-- HERO -->
+<!-- HERO — first impression after table QR scan -->
 <div class="hero">
   <div class="hero-title" id="hero-title">Browse &amp; <span>Order</span></div>
-  <div class="hero-sub" id="hero-sub">Add items to your cart and we'll bring it right to you!</div>
+  <div class="hero-sub" id="hero-sub">Order from your phone — food comes to your table. No app needed.</div>
 </div>
+
+<!-- Soft session banner (shown when table not open yet; menu still browsable) -->
+<div class="sess-banner" id="sess-banner" role="status" aria-live="polite">
+  <span class="sb-msg" id="sess-banner-msg">Waiting for staff to open this table for ordering…</span>
+  <button type="button" id="sess-banner-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+</div>
+
+<div id="guest-toast" class="guest-toast" role="status" aria-live="polite"></div>
 
 <!-- Service dock -->
 <div class="svc-dock" id="svc-dock" style="display:none">
@@ -441,7 +480,10 @@
 <main id="main">
   <div class="loading" id="loader">
     <div class="spin"></div>
-    <span>Loading menu...</span>
+    <span>Loading menu…</span>
+  </div>
+  <div class="skeleton-grid" id="skel" aria-hidden="true">
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div>
   </div>
 </main>
 
@@ -543,10 +585,30 @@
 
   function slugToName(s){ return s.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim(); }
   const restName = slug ? slugToName(slug) : '';
+
+  // Instant first paint from URL (before API) — guest must see table # immediately
+  (function paintTableFast() {
+    try {
+      if (tNum) {
+        var pad = /^\d+$/.test(String(tNum))
+          ? String(parseInt(tNum, 10)).padStart(2, '0')
+          : String(tNum);
+        var pill = document.getElementById('table-pill');
+        var ptxt = document.getElementById('table-pill-txt');
+        if (ptxt) ptxt.textContent = 'Table ' + pad;
+        if (pill) pill.style.display = 'flex';
+        document.title = 'Table ' + pad + (restName ? ' · ' + restName : ' · Order');
+      }
+      if (restName) {
+        var rn = document.getElementById('rest-name');
+        if (rn && (/loading/i.test(rn.textContent) || !rn.textContent.trim())) rn.textContent = restName;
+      }
+    } catch (e) {}
+  })();
   var uiLang = (function(){ try { return localStorage.getItem('rs_guest_lang') || 'en'; } catch(e){ return 'en'; } })();
   var STR = {
     en: {
-      browse: 'Browse & Order', heroSub: 'Order from your table — kitchen gets it instantly.',
+      browse: 'Browse & Order', heroSub: 'Order from your phone — food comes to your table. No app needed.',
       search: 'Search dishes…', all: 'All', veg: 'Veg', nonveg: 'Non-veg',
       cart: 'Your Order', place: 'Place Order', nameReq: 'Your name (required)',
       phone: 'Phone (optional)', track: 'Track my order', more: 'Order more', home: 'Table home',
@@ -555,7 +617,7 @@
       sent: 'Request sent to staff', empty: 'No items match your filters'
     },
     hi: {
-      browse: 'मेनू देखें और ऑर्डर करें', heroSub: 'टेबल से ऑर्डर करें — किचन तुरंत पाएगा।',
+      browse: 'मेनू देखें और ऑर्डर करें', heroSub: 'फ़ोन से ऑर्डर करें — खाना टेबल पर आएगा। ऐप नहीं चाहिए।',
       search: 'डिश खोजें…', all: 'सभी', veg: 'वेज', nonveg: 'नॉन-वेज',
       cart: 'आपका ऑर्डर', place: 'ऑर्डर करें', nameReq: 'नाम (ज़रूरी)',
       phone: 'फ़ोन (वैकल्पिक)', track: 'ऑर्डर ट्रैक करें', more: 'और ऑर्डर', home: 'टेबल होम',
@@ -639,7 +701,10 @@
   }
   
   if(tNum){
-    var pad = parseInt(tNum) < 10 ? '0'+tNum : tNum;
+    // Normalize "5" / "05" / "005" → display "05" (never "005")
+    var pad = /^\d+$/.test(String(tNum))
+      ? String(parseInt(tNum, 10)).padStart(2, '0')
+      : String(tNum);
     document.getElementById('table-pill-txt').textContent = 'Table '+pad;
     document.getElementById('table-pill').style.display = 'flex';
     document.getElementById('drawer-tag').textContent = 'Table '+pad;
@@ -672,37 +737,208 @@
   var SK = '';
   var FN = '';
 
+  window.__rsQrSessionActive = false;
+  window.__rsQrSessionStatus = 'unknown';
+  var __sessPollTimer = null;
+  var __sessModalShown = false;
+
+  function guestToast(msg) {
+    var el = document.getElementById('guest-toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(el._t);
+    el._t = setTimeout(function () {
+      el.classList.remove('on');
+    }, 3200);
+  }
+
+  function tableDisplayLabel() {
+    if (!tNum) return 'This table';
+    return (
+      'Table ' +
+      (/^\d+$/.test(String(tNum)) ? String(parseInt(tNum, 10)).padStart(2, '0') : tNum)
+    );
+  }
+
+  function setSessionBanner(on, status) {
+    var ban = document.getElementById('sess-banner');
+    var msg = document.getElementById('sess-banner-msg');
+    if (!ban) return;
+    if (!on) {
+      ban.classList.remove('on');
+      document.body.classList.remove('session-locked');
+      return;
+    }
+    ban.classList.add('on');
+    document.body.classList.add('session-locked');
+    if (msg) {
+      msg.textContent =
+        status === 'paused'
+          ? tableDisplayLabel() + ' ordering is paused — ask staff to resume, then refresh.'
+          : tableDisplayLabel() +
+            ' isn’t open for phone orders yet — browse the menu, then ask your host to open the table.';
+    }
+  }
+
+  function startSessionPoll() {
+    if (__sessPollTimer || waiterMode || !tNum) return;
+    __sessPollTimer = setInterval(function () {
+      checkTableSession({ silent: true });
+    }, 5000);
+  }
+
+  function stopSessionPoll() {
+    if (__sessPollTimer) {
+      clearInterval(__sessPollTimer);
+      __sessPollTimer = null;
+    }
+  }
+
+  function applySessionState(status, sessionToken, opts) {
+    var options = opts || {};
+    var wasActive = window.__rsQrSessionActive;
+    window.__rsQrSessionStatus = status || 'closed';
+    window.__rsQrSessionActive = status === 'active';
+
+    var overlay = document.getElementById('session-status-overlay');
+    if (status === 'active') {
+      stopSessionPoll();
+      setSessionBanner(false);
+      if (overlay) overlay.remove();
+      if (sessionToken) {
+        try {
+          sessionStorage.setItem('qr_session_token', sessionToken);
+        } catch (e) {}
+        var currentToken = params.get('token');
+        if (currentToken !== sessionToken) {
+          params.set('token', sessionToken);
+          try {
+            window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+          } catch (e) {}
+        }
+      }
+      if (!wasActive && !options.silent) {
+        guestToast("You're connected — order anytime");
+      }
+      return;
+    }
+
+    // closed or paused
+    setSessionBanner(true, status);
+    startSessionPoll();
+    if (!__sessModalShown && !options.skipModal && !options.silent) {
+      __sessModalShown = true;
+      showSessionStatusOverlay(status === 'paused' ? 'paused' : 'closed');
+    }
+  }
+
   function showSessionStatusOverlay(status) {
     var existing = document.getElementById('session-status-overlay');
     if (existing) existing.remove();
 
     if (status === 'active') return;
 
-    var title = 'Table Session Closed';
-    var desc = 'This table does not have an active session. Please contact staff or scan the QR code again once seated.';
-    var icon = 'fa-power-off';
-    var color = '#ef4444';
+    var tableTxt = tableDisplayLabel();
+    var outletTxt = (document.getElementById('rest-name') && document.getElementById('rest-name').textContent) || restName || 'the restaurant';
+    if (/loading/i.test(outletTxt)) outletTxt = restName || 'the restaurant';
+
+    var title = 'Almost ready';
+    var desc =
+      tableTxt +
+      ' is not open for phone ordering yet. Wave to your host — they open the table in a second.';
+    var icon = 'fa-mug-hot';
+    var accent = '#FF4F00';
+    var tip = 'You scanned the right QR. Staff open the session when they seat you.';
 
     if (status === 'paused') {
-      title = 'QR Ordering Paused';
-      desc = 'Ordering is temporarily paused for this table. Please ask staff for assistance.';
+      title = 'Ordering paused';
+      desc = tableTxt + ' is temporarily paused. Ask staff to resume.';
       icon = 'fa-pause';
-      color = 'var(--orange)';
+      tip = 'Your host can turn QR ordering back on without a new code.';
     }
 
-    var overlayHtml = `
-      <div id="session-status-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; font-family:sans-serif; color:#fff;">
-        <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:40px 30px; border-radius:24px; max-width:400px; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
-          <i class="fa-solid ${icon}" style="font-size:64px; color:${color}; margin-bottom:20px;"></i>
-          <h2 style="font-size:24px; font-weight:800; margin:0 0 12px 0;">${title}</h2>
-          <p style="font-size:14px; line-height:1.6; color:#a1a1aa; margin:0 0 24px 0;">${desc}</p>
-          <button onclick="window.location.reload();" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:12px; font-size:14px;">
-            <i class="fa-solid fa-rotate-right" style="margin-right:6px;"></i> Refresh Page
-          </button>
-        </div>
-      </div>
-    `;
+    var overlayHtml =
+      '<div id="session-status-overlay" role="alertdialog" aria-modal="true" aria-labelledby="sess-title" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(165deg,#1A1714 0%,#2C241C 55%,#1A1714 100%);font-family:\'DM Sans\',system-ui,sans-serif;color:#fff">' +
+      '<div style="width:100%;max-width:380px;background:#FAF6F1;color:#1A1714;border-radius:20px;padding:28px 22px 22px;box-shadow:0 24px 48px rgba(0,0,0,.35);text-align:center">' +
+      '<div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:rgba(255,79,0,.12);display:flex;align-items:center;justify-content:center">' +
+      '<i class="fa-solid ' +
+      icon +
+      '" style="font-size:28px;color:' +
+      accent +
+      '"></i></div>' +
+      '<div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6E675F;margin-bottom:6px">' +
+      escHtml(outletTxt) +
+      ' · ' +
+      escHtml(tableTxt) +
+      '</div>' +
+      '<h2 id="sess-title" style="font-family:\'Fraunces\',Georgia,serif;font-size:22px;font-weight:700;margin:0 0 10px;color:#1A1714">' +
+      title +
+      '</h2>' +
+      '<p style="font-size:14px;line-height:1.55;color:#4A453F;margin:0 0 12px">' +
+      desc +
+      '</p>' +
+      '<p style="font-size:12px;line-height:1.45;color:#6E675F;margin:0 0 20px;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid rgba(26,23,20,.08)">' +
+      tip +
+      '</p>' +
+      '<button type="button" id="sess-refresh-btn" style="width:100%;padding:14px 18px;font-weight:700;border-radius:12px;font-size:15px;border:none;cursor:pointer;background:#FF4F00;color:#fff;font-family:inherit;box-shadow:0 6px 16px rgba(255,79,0,.28)">' +
+      '<i class="fa-solid fa-rotate-right" style="margin-right:8px"></i>Check again' +
+      '</button>' +
+      '<button type="button" id="sess-browse-btn" style="width:100%;margin-top:8px;padding:12px;font-weight:600;border-radius:12px;font-size:13px;border:1px solid rgba(26,23,20,.12);cursor:pointer;background:transparent;color:#4A453F;font-family:inherit">Browse menu while I wait</button>' +
+      '</div></div>';
     document.body.insertAdjacentHTML('beforeend', overlayHtml);
+    var rb = document.getElementById('sess-refresh-btn');
+    if (rb)
+      rb.onclick = function () {
+        checkTableSession({ forceModal: true });
+        guestToast('Checking with the restaurant…');
+      };
+    var bb = document.getElementById('sess-browse-btn');
+    if (bb)
+      bb.onclick = function () {
+        var o = document.getElementById('session-status-overlay');
+        if (o) o.remove();
+        setSessionBanner(true, status);
+        startSessionPoll();
+        guestToast('Browse freely — order unlocks when staff open the table');
+      };
+  }
+
+  function checkTableSession(opts) {
+    var options = opts || {};
+    if (waiterMode) {
+      window.__rsQrSessionActive = true;
+      return Promise.resolve();
+    }
+    if (!tNum) {
+      // Takeaway — no table session required
+      window.__rsQrSessionActive = true;
+      return Promise.resolve();
+    }
+    return apiCall('get_active_session', { table: tNum })
+      .then(function (res) {
+        if (res && res.active) {
+          if (res.status === 'paused') {
+            applySessionState('paused', null, options);
+          } else {
+            applySessionState('active', res.session_token, options);
+            if (options.forceModal) {
+              var ov = document.getElementById('session-status-overlay');
+              if (ov) ov.remove();
+            }
+          }
+        } else {
+          applySessionState('closed', null, options);
+          if (options.forceModal) {
+            showSessionStatusOverlay('closed');
+          }
+        }
+      })
+      .catch(function (err) {
+        console.error('Session verification failed:', err);
+        // Offline / backend miss: allow browse; block only when we know closed
+        if (SU && !options.silent) applySessionState('closed', null, options);
+      });
   }
 
   function showStaffLoginOverlay() {
@@ -858,37 +1094,36 @@
 
   configPromise.then(function() {
     if (waiterMode) {
+      window.__rsQrSessionActive = true;
       var staffToken = sessionStorage.getItem('tenant_session_token') || localStorage.getItem('tenant_session_token');
       if (!staffToken) {
         showStaffLoginOverlay();
       }
     } else {
-      apiCall('get_active_session', { table: tNum })
-        .then(function(res) {
-          if (res.active) {
-            if (res.status === 'paused') {
-              showSessionStatusOverlay('paused');
-            } else {
-              sessionStorage.setItem('qr_session_token', res.session_token);
-              var currentToken = params.get('token');
-              if (currentToken !== res.session_token) {
-                params.set('token', res.session_token);
-                window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-              }
-              showSessionStatusOverlay('active');
-            }
-          } else {
-            showSessionStatusOverlay('closed');
-          }
-        })
-        .catch(function(err) {
-          console.error("Session verification failed:", err);
-          if (SU) {
-            showSessionStatusOverlay('closed');
-          }
-        });
+      checkTableSession({ silent: false });
     }
   });
+
+  // Wire soft banner refresh
+  (function wireSessBanner() {
+    var btn = document.getElementById('sess-banner-refresh');
+    if (btn) {
+      btn.onclick = function () {
+        checkTableSession({ forceModal: false, silent: false });
+        guestToast('Checking…');
+      };
+    }
+  })();
+
+  // Prefill guest details from last visit
+  try {
+    var savedName = localStorage.getItem('rs_name');
+    var savedPhone = localStorage.getItem('rs_phone');
+    var cn = document.getElementById('cust-name');
+    var cp = document.getElementById('cust-phone');
+    if (cn && savedName && !waiterMode) cn.value = savedName;
+    if (cp && savedPhone && !waiterMode) cp.value = savedPhone;
+  } catch (e) {}
 
   // ── DEFAULT MENU ──
   var DEFAULT = [
@@ -939,12 +1174,18 @@
       description: i.description || i.desc || '',
       image: i.image || i.image_url || i.photo || '',
       bestseller: !!i.bestseller,
+      isSpecial: !!(i.isSpecial || i.special),
+      isStaple: !!(i.isStaple || i.staple),
+      orderCount: parseFloat(i.orderCount) || 0,
+      addons: Array.isArray(i.addons) ? i.addons : [],
+      pairWater: i.pairWater,
       available: i.available !== false && i.enabled !== false,
       stock: i.stock || '',
       veg: i.veg,
       isVeg: i.isVeg,
       diet: i.diet
     };
+    if (!row.isStaple && /roti|chapati|naan|rice|paratha/i.test(row.name)) row.isStaple = true;
     row.dietKind = inferDiet(row);
     row.soldOut = isSoldOut(row);
     return row;
@@ -1066,18 +1307,23 @@
   function buildUI(){
     if (items.length === 0) {
       document.getElementById('main').innerHTML =
-        '<div class="empty" style="padding: 64px 24px; text-align: center; color: var(--text-mute);">' +
-          '<i class="fa-solid fa-mug-hot" style="font-size: 32px; margin-bottom: 12px; opacity: 0.5;"></i>' +
-          '<p style="font-size: 14px; font-weight: 500; margin: 0 0 4px 0;">No menu items available</p>' +
-          '<span style="font-size: 11px; opacity: 0.7;">Check back later once the outlet has published their menu!</span>' +
+        '<div class="empty" style="padding: 64px 24px; text-align: center; color: var(--muted);">' +
+          '<i class="fa-solid fa-utensils" style="font-size: 36px; margin-bottom: 14px; opacity: 0.4; display:block"></i>' +
+          '<p style="font-size: 16px; font-weight: 700; margin: 0 0 6px 0; color: var(--text);">Menu is being prepared</p>' +
+          '<span style="font-size: 13px; line-height: 1.45; display:block; max-width:280px; margin:0 auto 16px">The kitchen hasn’t published dishes yet. Ask staff, or pull to refresh in a moment.</span>' +
+          '<button type="button" onclick="location.reload()" style="border:none;background:var(--brand);color:#fff;font-weight:700;padding:12px 20px;border-radius:12px;font-family:inherit;cursor:pointer"><i class="fa-solid fa-rotate"></i> Refresh menu</button>' +
         '</div>';
       return;
     }
     var cats = ['ALL'];
+    var hasSpecials = items.some(function(i){ return i.isSpecial; });
+    var hasStaples = items.some(function(i){ return i.isStaple; });
+    if (hasSpecials) cats.push('SPECIALS');
+    if (hasStaples) cats.push('STAPLES');
     items.forEach(function(i){ if(cats.indexOf(i.category)===-1) cats.push(i.category); });
     var chipsHtml = cats.map(function(c){
-      return '<button class="chip'+(c==='ALL'?' on':'')+'" onclick="setC(\''+c+'\',this)">'+
-        (c==='ALL'?'All':c.charAt(0).toUpperCase()+c.slice(1).toLowerCase())+'</button>';
+      var label = c==='ALL' ? 'All' : c==='SPECIALS' ? '★ Specials' : c==='STAPLES' ? 'Staples' : (c.charAt(0).toUpperCase()+c.slice(1).toLowerCase());
+      return '<button class="chip'+(c==='ALL'?' on':'')+'" onclick="setC(\''+c+'\',this)">'+label+'</button>';
     }).join('');
     document.getElementById('main').innerHTML =
       (waiterMode ? '<div class="mode-banner"><i class="fa-solid fa-user-tie"></i><span>Waiter mode: orders go to KOT/KDS. Payment stays in POS.</span></div>' : '') +
@@ -1124,6 +1370,8 @@
     var grid = document.getElementById('grid');
     if(!grid) return;
     var list = items.filter(function(i){
+      if (cat === 'SPECIALS') return !!i.isSpecial;
+      if (cat === 'STAPLES') return !!i.isStaple;
       if (cat!=='ALL' && i.category!==cat) return false;
       if (dietF === 'veg' && i.dietKind === 'nv') return false;
       if (dietF === 'nv' && i.dietKind === 'veg') return false;
@@ -1132,6 +1380,12 @@
         if (!(i.name||'').toLowerCase().includes(qq) && !(i.description||'').toLowerCase().includes(qq)) return false;
       }
       return true;
+    });
+    // Same popularity order as POS main menu
+    list = list.slice().sort(function(a,b){
+      var as = (a.isSpecial?1e9:0) + (a.bestseller?1e6:0) + (a.isStaple?1e5:0) + (a.orderCount||0);
+      var bs = (b.isSpecial?1e9:0) + (b.bestseller?1e6:0) + (b.isStaple?1e5:0) + (b.orderCount||0);
+      return bs - as || String(a.name||'').localeCompare(String(b.name||''));
     });
     if(!list.length){
       grid.innerHTML = '<div class="empty"><i class="fa-solid fa-magnifying-glass"></i><p>'+escHtml(t('empty'))+'</p></div>';
@@ -1143,10 +1397,16 @@
       var sn  = escHtml(item.name);
       var sold = !!item.soldOut;
       var dietCls = item.dietKind === 'veg' ? 'veg' : (item.dietKind === 'nv' ? 'nv' : '');
+      var tag = '';
+      if (!sold) {
+        if (item.isSpecial) tag = '<span class="best-tag" style="background:#7c3aed">Special</span>';
+        else if (item.bestseller) tag = '<span class="best-tag">Best Seller</span>';
+        else if (item.isStaple) tag = '<span class="best-tag" style="background:#0891b2">Staple</span>';
+      }
       return '<div class="card'+(sold?' sold-out':'')+'" '+(sold?'':'onclick="addItem(\''+sn+'\')"')+'>'+
         '<div class="card-bar"></div>'+
         (item.image ? '<img class="card-img show" src="'+escHtml(item.image)+'" alt="'+escHtml(item.name)+'" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
-        (item.bestseller && !sold ? '<span class="best-tag">Best Seller</span>' : '')+
+        tag+
         '<div class="card-body">'+
           '<div class="card-name">'+(dietCls?'<span class="diet-mark '+dietCls+'"></span>':'')+escHtml(item.name)+'</div>'+
           (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : '')+
@@ -1174,6 +1434,33 @@
     if(!item || item.soldOut) return;
     var ex = cart.find(function(c){ return c.name===name; });
     if(ex){ ex.qty++; } else { cart.push({name:item.name,price:item.price,qty:1,category:item.category,note:''}); }
+    // Bread staples → optional water (normal free / bottle charged)
+    try {
+      var isBread = item.pairWater === true || /roti|chapati|naan|paratha|kulcha|phulka/i.test(item.name||'');
+      if (isBread && item.pairWater !== false) {
+        var bottlePrice = 20;
+        var wantBottle = window.confirm(
+          item.name + ' added.\n\nAdd bottled water (+' + (window.currencySymbol||'₹') + bottlePrice + ')?\n\nOK = bottled water\nCancel = complimentary normal water'
+        );
+        if (wantBottle) {
+          var bw = cart.find(function(c){ return c.name === 'Bottled water'; });
+          if (bw) bw.qty++; else cart.push({ name:'Bottled water', price:bottlePrice, qty:1, category:'Beverages', note:'' });
+        } else {
+          var line = cart.find(function(c){ return c.name===item.name; });
+          if (line) line.note = (line.note ? line.note + ' · ' : '') + 'Normal water';
+        }
+      }
+    } catch(e) {}
+    // Simple add-on prompt for first add only
+    try {
+      if (!ex && Array.isArray(item.addons) && item.addons.length) {
+        var names = item.addons.map(function(a){ return a.name + ' (+' + (window.currencySymbol||'₹') + (a.price||0) + ')'; }).join('\n');
+        if (window.confirm('Add-ons available:\n' + names + '\n\nAdd first add-on?')) {
+          var a0 = item.addons[0];
+          cart.push({ name: a0.name + ' (add-on)', price: parseFloat(a0.price)||0, qty:1, category:'Add-on', note:'' });
+        }
+      }
+    } catch(e) {}
     updateFloat(); renderGrid(); bop();
   };
   window.chQty = function(name,d){
@@ -1265,6 +1552,11 @@
   }
 
   window.placeOrder = function(){
+    if (!waiterMode && tNum && !window.__rsQrSessionActive) {
+      showSessionStatusOverlay(window.__rsQrSessionStatus === 'paused' ? 'paused' : 'closed');
+      guestToast('Ask staff to open this table, then try again');
+      return;
+    }
     var name  = (document.getElementById('cust-name').value||'').trim();
     var phone = (document.getElementById('cust-phone').value||'').trim();
     if(waiterMode && !name){ name = 'Waiter' + (tNum ? ' - T' + tNum : ''); }
@@ -1273,9 +1565,14 @@
       ni.style.outline='2px solid #ff4444';
       ni.focus();
       setTimeout(function(){ni.style.outline='';},1500);
+      guestToast(t('nameReq') || 'Please enter your name');
+      openCart();
       return;
     }
-    if(!cart.length) return;
+    if(!cart.length) {
+      guestToast('Add something delicious first');
+      return;
+    }
     if(!waiterMode){
       localStorage.setItem('rs_name',name);
       if(phone) localStorage.setItem('rs_phone',phone);
@@ -1314,7 +1611,7 @@
     apiCall('create_order', { order: Object.assign({}, order, { items: JSON.stringify(cartPayload) }) })
       .then(function(res) {
         if (res.error) {
-          alert("Order failed: " + res.error);
+          guestToast('Order failed — ' + String(res.error).slice(0, 80));
           if (orderBtn) {
             orderBtn.disabled = false;
             orderBtn.innerHTML = originalText;
@@ -1338,7 +1635,7 @@
         showSuccess(order);
       })
       .catch(function(err) {
-        alert("Failed to submit order. Please check your connection.");
+        guestToast('Connection issue — check Wi‑Fi and try again');
         if (orderBtn) {
           orderBtn.disabled = false;
           orderBtn.innerHTML = originalText;
@@ -1349,7 +1646,9 @@
   function showSuccess(order){
     var rn = document.getElementById('rest-name').textContent;
     document.getElementById('r-rest').textContent = rn;
-    var pd = tNum && parseInt(tNum)<10 ? '0'+tNum : tNum;
+    var pd = tNum
+      ? (/^\d+$/.test(String(tNum)) ? String(parseInt(tNum, 10)).padStart(2, '0') : tNum)
+      : '';
     document.getElementById('r-table').textContent = tNum ? 'Table '+pd : 'Takeaway';
     document.getElementById('r-id').textContent = 'Order ID: '+(order.displayOrderId || displayOrderId(order.orderId));
     if(waiterMode){
@@ -1426,8 +1725,8 @@
       type: 'waiter_call',
       table: tNum
     }).then(function(res){
-      alert((res && res.success) ? t('sent') : 'Please wave to a waiter.');
-    }).catch(function(){ alert('Please wave to a waiter.'); });
+      guestToast((res && res.success) ? t('sent') : 'Please wave to a waiter');
+    }).catch(function(){ guestToast('Please wave to a waiter'); });
   }
   function openSvcSheet(){
     paintSvcGrid();

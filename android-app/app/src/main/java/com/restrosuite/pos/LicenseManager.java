@@ -38,8 +38,9 @@ public class LicenseManager {
     private static final String TAG = "RSLicense";
 
     // MUST match assets/license-config.js (RS_LICENSE_PUBLIC_KEY_SPKI_B64).
+    // Synced 2026-07-14 with web/desktop public key.
     private static final String PUBLIC_KEY_SPKI_B64 =
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEKR/Nnyv7NfFdHoNmQ0lkSv/NCYitxAT5d42DcKCaRkkSIeQsTdD7tTm5PG5Rosqxc22YDo5/eP81D7aol0OkXg==";
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtyguKkhJ+rIV9Smp65g5K7Q4mf6Ru1YMdjgG6rNN5d6Ygaz3RtgbgdMLCmeGveoQr9h1HitaSTyl63OgrZz66g==";
 
     private static final long BOOTSTRAP_GRACE_MS = 3L * 24 * 60 * 60 * 1000; // 3 days
     private static final long CLOCK_SKEW_TOLERANCE_MS = 60L * 1000;

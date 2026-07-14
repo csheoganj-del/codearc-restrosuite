@@ -1386,28 +1386,53 @@
                 modal.querySelector('[data-import]').onclick = async () => {
                   const raw = (modal.querySelector('#bulk-rec-input').value || '').trim();
                   const resBox = modal.querySelector('#bulk-rec-result');
-                  if (!raw) { resBox.innerHTML = '<span style="color:var(--red)">Nothing to import.</span>'; return; }
+                  const prog =
+                    window.RSProgress &&
+                    RSProgress.open({
+                      title: 'Importing recipes…',
+                      sub: 'Validating lines and linking ingredients',
+                      total: 0,
+                      unit: 'lines',
+                    });
+                  if (!raw) {
+                    if (prog) prog.close();
+                    resBox.innerHTML = '<span style="color:var(--red)">Nothing to import.</span>';
+                    return;
+                  }
                   const byItem = {}; const errors = [];
-                  raw.split(/\r?\n/).forEach((line, idx) => {
+                  const lines = raw.split(/\r?\n/).filter((l) => l.trim());
+                  if (prog) prog.update({ total: lines.length, done: 0, unit: 'lines' });
+                  lines.forEach((line, idx) => {
                     const t = line.trim();
                     if (!t) return;
                     const parts = t.split(',').map(s => s.trim());
-                    if (parts.length < 3) { errors.push(`Line ${idx + 1}: expected "Item, Ingredient, Qty, Unit"`); return; }
+                    if (parts.length < 3) { errors.push(`Line ${idx + 1}: expected "Item, Ingredient, Qty, Unit"`); if (prog) prog.update({ done: idx + 1 }); return; }
                     const itemName = parts[0], ingName = parts[1], qtyStr = parts[2], unitRaw = parts[3];
                     const menuItem = (RS.MENU || []).find(m => m.name.toLowerCase() === itemName.toLowerCase());
-                    if (!menuItem) { errors.push(`Line ${idx + 1}: menu item "${esc(itemName)}" not found`); return; }
+                    if (!menuItem) { errors.push(`Line ${idx + 1}: menu item "${esc(itemName)}" not found`); if (prog) prog.update({ done: idx + 1 }); return; }
                     const invItem = (RS.INVENTORY || []).find(i => i.name.toLowerCase() === ingName.toLowerCase());
-                    if (!invItem) { errors.push(`Line ${idx + 1}: ingredient "${esc(ingName)}" not in inventory`); return; }
+                    if (!invItem) { errors.push(`Line ${idx + 1}: ingredient "${esc(ingName)}" not in inventory`); if (prog) prog.update({ done: idx + 1 }); return; }
                     const qty = parseFloat(qtyStr);
-                    if (!(qty > 0)) { errors.push(`Line ${idx + 1}: invalid qty "${esc(qtyStr)}"`); return; }
+                    if (!(qty > 0)) { errors.push(`Line ${idx + 1}: invalid qty "${esc(qtyStr)}"`); if (prog) prog.update({ done: idx + 1 }); return; }
                     (byItem[menuItem.id] = byItem[menuItem.id] || { m: menuItem, ings: [] }).ings.push({ name: invItem.name, qty: qty, unit: unitRaw || invItem.unit || '' });
+                    if (prog) prog.update({ done: idx + 1 });
                   });
                   const itemIds = Object.keys(byItem);
-                  if (!itemIds.length) { resBox.innerHTML = `<span style="color:var(--red)">No valid rows.</span>${errors.length ? '<br>' + errors.slice(0, 6).join('<br>') : ''}`; return; }
+                  if (!itemIds.length) {
+                    if (prog) prog.close();
+                    resBox.innerHTML = `<span style="color:var(--red)">No valid rows.</span>${errors.length ? '<br>' + errors.slice(0, 6).join('<br>') : ''}`;
+                    return;
+                  }
                   let ingTotal = 0;
                   itemIds.forEach(id => { byItem[id].m.ingredients = byItem[id].ings; ingTotal += byItem[id].ings.length; });
                   try {
-                    if (RS.save) await RS.save('menu');
+                    if (prog) prog.update({ title: 'Saving…', total: itemIds.length, done: 0, unit: 'items' });
+                    for (let i = 0; i < itemIds.length; i++) {
+                      if (RS.saveOne) await RS.saveOne('menu', byItem[itemIds[i]].m);
+                      if (prog) prog.update({ done: i + 1 });
+                    }
+                    if (RS.save && !RS.saveOne) await RS.save('menu');
+                    if (prog) prog.close();
                     // Toast only after the save has actually completed successfully.
                     RS.toast(`Recipes imported: ${itemIds.length} item${itemIds.length === 1 ? '' : 's'}, ${ingTotal} ingredient links`, 'fa-circle-check');
                     if (errors.length) {
@@ -1417,6 +1442,7 @@
                       drawPanes();
                     }
                   } catch (e) {
+                    if (prog) prog.close();
                     console.warn('Recipe import save failed', e);
                     resBox.innerHTML = '<span style="color:var(--red)">Save failed -- recipes were not saved. Try again.</span>';
                     RS.toast('Recipe import failed to save -- try again', 'fa-circle-exclamation');

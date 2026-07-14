@@ -5,8 +5,8 @@
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#FFFDFA",
-  "theme_color": "#172033",
+  "background_color": "#F3EFE8",
+  "theme_color": "#FF4F00",
   "orientation": "any",
   "categories": [
     "business",
@@ -20,10 +20,32 @@
       "purpose": "any"
     },
     {
-      "src": "/assets/restrosuite-mark.png",
+      "src": "/assets/restrosuite-mark-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/restrosuite-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/screenshot-pos.png",
+      "sizes": "1400x900",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Point of sale — menu grid and live cart"
+    },
+    {
+      "src": "/assets/screenshot-cart.png",
+      "sizes": "1400x900",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Cart, split payment and checkout"
     }
   ]
 }

@@ -21,7 +21,19 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
+  // Production: log only. Visual banner only on localhost / ?debug=1 / superadmin flag.
+  window.__RS_DEBUG_UI__ = (function() {
+    try {
+      var h = location.hostname || '';
+      if (h === 'localhost' || h === '127.0.0.1') return true;
+      if (new URLSearchParams(location.search).get('debug') === '1') return true;
+      if (sessionStorage.getItem('rs_debug_ui') === '1') return true;
+    } catch (e) {}
+    return false;
+  })();
   window.onerror = function(msg, url, line, col, error) {
+    try { console.error('[RS]', msg, url, line, col, error); } catch (e) {}
+    if (!window.__RS_DEBUG_UI__) return;
     var div = document.getElementById('debug-error-banner');
     if (!div) {
       div = document.createElement('div');
@@ -33,6 +45,8 @@
     div.innerHTML += '<div><b>JavaScript Error:</b> ' + _e(msg) + ' at <small>' + _e(url) + ':' + _e(line) + ':' + _e(col) + '</small></div>';
   };
   window.onunhandledrejection = function(event) {
+    try { console.error('[RS] unhandledrejection', event && event.reason); } catch (e) {}
+    if (!window.__RS_DEBUG_UI__) return;
     var div = document.getElementById('debug-error-banner');
     if (!div) {
       div = document.createElement('div');
@@ -63,7 +77,71 @@
     }
   }
 
-  window.__RESTROSUITE_ASSET_VERSION__ = new URLSearchParams(location.search).get('appv') || 'v41-20260711-amend';
+  // Canonical build tag. The SERVER builtin always wins for the version chip.
+  // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
+  // to pin the pill forever; we now rewrite them to the current short tag.
+  window.__RESTROSUITE_ASSET_VERSION__ = (function () {
+    var builtin = 'v189-20260713-qr-center';
+    function isReal(v) {
+      v = String(v || '').trim();
+      if (!v) return false;
+      if (/system\s*patch/i.test(v)) return false;
+      return /^v\d+/i.test(v);
+    }
+    function majorNum(v) {
+      var m = String(v || '').match(/^v(\d+)/i);
+      return m ? parseInt(m[1], 10) : 0;
+    }
+    var shortBuiltin = builtin.split('-')[0]; // e.g. v159
+    var q = '';
+    try { q = String(new URLSearchParams(location.search).get('appv') || '').trim(); } catch (_) {}
+    // Always display/load this deploy's builtin — never stay stuck on an older appv.
+    var resolved = builtin;
+    try {
+      var url = new URL(location.href);
+      var cur = String(url.searchParams.get('appv') || '').trim();
+      var needRewrite = false;
+      if (!cur || !isReal(cur)) needRewrite = true;
+      else if (majorNum(cur) < majorNum(shortBuiltin)) needRewrite = true; // v151 < v159
+      else if (cur !== shortBuiltin && cur !== builtin) {
+        // Same major or newer short form → normalize to shortBuiltin for clean URLs
+        if (majorNum(cur) === majorNum(shortBuiltin)) needRewrite = true;
+      }
+      if (needRewrite) {
+        url.searchParams.set('appv', shortBuiltin);
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
+    } catch (_) {}
+    return resolved;
+  })();
+  // Role shell BEFORE first paint: super-admin and client share dashboard.html,
+  // so we stamp html/body classes from sessionStorage immediately. Without this,
+  // CSS/JS reveal paints POS chrome for a frame before lockdown runs.
+  (function earlyRoleShell() {
+    try {
+      var role = sessionStorage.getItem('logged_in_role') || '';
+      var hasAdminTok = !!sessionStorage.getItem('superadmin_admin_token');
+      var isSuper = role === 'superadmin' || hasAdminTok;
+      var isBrand = role === 'brand_admin';
+      var html = document.documentElement;
+      html.classList.remove('rs-role-superadmin', 'rs-role-brandadmin', 'rs-role-client');
+      if (isSuper) {
+        html.classList.add('rs-role-superadmin');
+        html.setAttribute('data-rs-shell', 'superadmin');
+      } else if (isBrand) {
+        html.classList.add('rs-role-brandadmin');
+        html.setAttribute('data-rs-shell', 'brandadmin');
+      } else if (role) {
+        html.classList.add('rs-role-client');
+        html.setAttribute('data-rs-shell', 'client');
+      } else {
+        html.setAttribute('data-rs-shell', 'unknown');
+      }
+      window.__RS_EARLY_SHELL__ = html.getAttribute('data-rs-shell') || 'unknown';
+    } catch (e) {
+      try { document.documentElement.setAttribute('data-rs-shell', 'unknown'); } catch (_) {}
+    }
+  })();
   // Inject versioned CSS links without document.write (which blocks the parser).
   // Using createElement + insertBefore keeps them in the <head> before </head>.
   //
@@ -84,6 +162,14 @@
       revealed = true;
       pending = 0;
       document.documentElement.classList.add('rs-styles-ready');
+      // Mirror html role classes onto body if body already exists
+      try {
+        if (document.body) {
+          ['rs-role-superadmin', 'rs-role-brandadmin', 'rs-role-client'].forEach(function(c) {
+            document.body.classList.toggle(c, document.documentElement.classList.contains(c));
+          });
+        }
+      } catch (e) {}
     }
     hrefs.forEach(function(href) {
       var link = document.createElement('link');
@@ -112,6 +198,9 @@
     flex-direction: column; gap: 14px;
   }
   html.rs-styles-ready #rs-boot-loader { display: none; }
+  html.rs-role-superadmin #rs-boot-loader .rs-boot-label::after {
+    content: none;
+  }
   #rs-boot-loader .rs-boot-spinner {
     width: 34px; height: 34px; border-radius: 50%;
     border: 3px solid rgba(255,255,255,0.18); border-top-color: #FF4F00;
@@ -155,72 +244,109 @@
     .support-dropdown .dropdown-trigger i:last-child { display: none; }
   }
 
-  /* Hold Buttons Styling */
-  .hold-buttons-group {
-    display: flex;
-    gap: 8px;
+  /* Hold Buttons Styling — single primary Hold + Send KOT */
+  .hold-buttons-group,
+  .hold-kot-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
   }
   .hold-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 12px;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
     padding: 8px 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid var(--stroke-2);
     background: var(--glass-2);
     color: var(--text-soft);
     cursor: pointer;
     transition: var(--t);
+    --hold-color: var(--orange);
   }
   .hold-btn:hover {
     background: var(--glass-3);
     color: var(--text);
     border-color: var(--stroke-hi);
   }
-  .hold-btn-takeaway {
-    --hold-color: var(--orange);
-  }
-  .hold-btn-dinein {
-    --hold-color: var(--green);
-  }
-  .hold-btn-delivery {
-    --hold-color: var(--violet-soft);
-  }
-  .hold-btn-takeaway:hover {
+  .hold-btn-current:hover {
     border-color: var(--orange);
     color: var(--orange);
   }
-  .hold-btn-dinein:hover {
-    border-color: var(--green);
-    color: var(--green);
-  }
-  .hold-btn-delivery:hover {
-    border-color: var(--violet-soft);
-    color: var(--violet-soft);
-  }
+  .hold-btn-takeaway { --hold-color: var(--orange); }
+  .hold-btn-dinein { --hold-color: var(--green); }
+  .hold-btn-delivery { --hold-color: var(--violet-soft); }
+  .hold-btn-legacy { display: none !important; }
   .hold-btn-blinking {
     animation: holdBtnBlink 1s ease-in-out infinite;
     border-color: var(--hold-color);
     color: var(--hold-color);
     background: color-mix(in srgb, var(--hold-color) 10%, var(--glass-2));
   }
+  /* Role shells (html + body): applied in <head> from sessionStorage so first
+     paint never shows the wrong chrome. html.* works before body exists. */
+  html:not(.rs-role-superadmin) .superadmin-only,
   body:not(.rs-role-superadmin) .superadmin-only {
     display: none !important;
   }
+  html:not(.rs-role-brandadmin) .brandadmin-only,
   body:not(.rs-role-brandadmin) .brandadmin-only {
     display: none !important;
   }
+  html.rs-role-superadmin .superadmin-only.sidebar-link,
+  html.rs-role-superadmin .superadmin-only.mnav-link,
   body.rs-role-superadmin .superadmin-only.sidebar-link,
   body.rs-role-superadmin .superadmin-only.mnav-link {
     display: flex !important;
   }
+  html.rs-role-superadmin .sb-section.superadmin-only,
   body.rs-role-superadmin .sb-section.superadmin-only {
     display: block !important;
   }
+  html.rs-role-brandadmin .brandadmin-only.sidebar-link,
+  html.rs-role-brandadmin .brandadmin-only.mnav-link,
   body.rs-role-brandadmin .brandadmin-only.sidebar-link,
   body.rs-role-brandadmin .brandadmin-only.mnav-link {
     display: flex !important;
+  }
+
+  /* ── Super-admin platform shell: hide entire client POS surface ── */
+  html.rs-role-superadmin .sidebar-link:not(.superadmin-only),
+  html.rs-role-superadmin .sb-section:not(.superadmin-only):not(.brandadmin-only),
+  html.rs-role-superadmin .superadmin-hide,
+  html.rs-role-superadmin #role-switch,
+  html.rs-role-superadmin .support-dropdown,
+  html.rs-role-superadmin #open-settings,
+  html.rs-role-superadmin #open-product-guide-btn,
+  html.rs-role-superadmin .tb-search,
+  html.rs-role-superadmin #rs-station-chip,
+  html.rs-role-superadmin #rs-printer-chip,
+  html.rs-role-superadmin #app-version-pill,
+  html.rs-role-superadmin #cash-drawer,
+  html.rs-role-superadmin #cpay-drawer-backdrop,
+  html.rs-role-superadmin .cpay-side-drawer,
+  body.rs-role-superadmin .sidebar-link:not(.superadmin-only),
+  body.rs-role-superadmin .sb-section:not(.superadmin-only):not(.brandadmin-only),
+  body.rs-role-superadmin .superadmin-hide,
+  body.rs-role-superadmin #role-switch,
+  body.rs-role-superadmin .support-dropdown,
+  body.rs-role-superadmin #open-settings,
+  body.rs-role-superadmin #open-product-guide-btn,
+  body.rs-role-superadmin .tb-search,
+  body.rs-role-superadmin #rs-station-chip,
+  body.rs-role-superadmin #rs-printer-chip,
+  body.rs-role-superadmin #app-version-pill {
+    display: none !important;
+  }
+  html.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#gateway-monitor-tab),
+  body.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#gateway-monitor-tab) {
+    display: none !important;
+  }
+  html.rs-role-superadmin .user-pill .ur::before {
+    content: none;
   }
   @keyframes holdBtnBlink {
     0%, 100% {
@@ -233,73 +359,29 @@
 </style>
 </head>
 <body>
+<div id="rs-boot-loader"><div class="rs-boot-spinner"></div><span id="rs-boot-label" class="rs-boot-label">Loading RestroSuite&hellip;</span></div>
+<script>
+/* Stamp body role classes before any deferred scripts paint the wrong shell */
+(function() {
+  try {
+    var h = document.documentElement;
+    var b = document.body;
+    ['rs-role-superadmin', 'rs-role-brandadmin', 'rs-role-client'].forEach(function(c) {
+      b.classList.toggle(c, h.classList.contains(c));
+    });
+    var label = document.getElementById('rs-boot-label');
+    if (label) {
+      if (h.classList.contains('rs-role-superadmin')) label.textContent = 'Loading platform console\u2026';
+      else if (h.classList.contains('rs-role-brandadmin')) label.textContent = 'Loading chain console\u2026';
+      else label.textContent = 'Loading RestroSuite\u2026';
+    }
+  } catch (e) {}
+})();
+</script>
 
-<div id="rs-boot-loader"><div class="rs-boot-spinner"></div><span>Loading RestroSuite&hellip;</span></div>
-
-<!-- ======= CASH CALCULATOR SIDE DRAWER (slides in from LEFT of cart) ======= -->
+<!-- Backdrop kept for rare floating drawers (customer insights); cash/split are inline in cart -->
 <div id="cpay-drawer-backdrop" style="display:none; position:fixed; inset:0; z-index:299;"></div>
 
-<div id="cash-drawer" class="cpay-side-drawer cpay-drawer-left">
-  <div class="csd-header">
-    <span class="csd-title"><i class="fa-solid fa-money-bill-wave" style="color:#25d366;"></i> Cash</span>
-    <button type="button" id="cash-drawer-close" class="csd-close">&times;</button>
-  </div>
-  <div class="csd-body">
-    <div class="csd-row">
-      <label class="csd-label">Received</label>
-      <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0">
-    </div>
-    <div class="csd-change-row">
-      <span class="csd-label">Change</span>
-      <strong id="inline-cash-change" class="csd-change-amt">₹0</strong>
-    </div>
-    <div class="csd-label" style="margin-top:10px; margin-bottom:4px; font-size:10px; text-transform:uppercase; letter-spacing:.05em;">Quick Amounts</div>
-    <div id="cash-denominations-grid" class="csd-den-grid">
-      <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact">Exact</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
-      <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
-      <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">Clear</button>
-    </div>
-  </div>
-</div>
-
-<!-- ======= SPLIT PAYMENT SIDE DRAWER (slides in from RIGHT of cart) ======= -->
-<div id="split-drawer" class="cpay-side-drawer cpay-drawer-right">
-  <div class="csd-header">
-    <button type="button" id="split-drawer-close" class="csd-close">&times;</button>
-    <span class="csd-title"><i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0;"></i> Split</span>
-  </div>
-  <div class="csd-body">
-    <div id="split-calc-compact" style="display:contents;">
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(37,211,102,.12); color:#25d366;"><i class="fa-solid fa-money-bill-wave"></i></div>
-        <label class="csd-label">Cash</label>
-        <input type="number" id="split-cash" placeholder="0" class="form-input csd-input">
-      </div>
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(255,79,0,.1); color:var(--orange);"><i class="fa-solid fa-qrcode"></i></div>
-        <label class="csd-label">UPI</label>
-        <input type="number" id="split-upi" placeholder="0" class="form-input csd-input">
-      </div>
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(30,144,255,.1); color:#1e90ff;"><i class="fa-solid fa-credit-card"></i></div>
-        <label class="csd-label">Card</label>
-        <input type="number" id="split-card" placeholder="0" class="form-input csd-input">
-      </div>
-      <div class="csd-split-field">
-        <div class="csd-split-icon" style="background:rgba(255,69,58,.1); color:var(--red);"><i class="fa-solid fa-clock-rotate-left"></i></div>
-        <label class="csd-label">Due</label>
-        <input type="number" id="split-due" placeholder="0" class="form-input csd-input">
-      </div>
-    </div>
-    <div class="csd-split-status">
-      <span id="split-status-text" class="csd-split-remaining">Remaining: ₹0</span>
-      <strong id="split-total-text" class="csd-split-paid">Paid: ₹0</strong>
-    </div>
-  </div>
-</div>
 <div class="app" id="app">
 
   <!-- ===================== SIDEBAR ===================== -->
@@ -308,100 +390,120 @@
     <i class="fa fa-bars"></i>
   </button>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
-  <aside class="sidebar">
-    <!-- Workspace Menu -->
+  <aside class="sidebar" aria-label="Main navigation">
     <div class="sb-top">
-      <a class="sb-brand brand" href="index.html">
-        <img class="brand-logo" src="assets/restrosuite-mark.png" alt="CodeArc RestroSuite">
+      <a class="sb-brand brand" href="index.html" title="RestroSuite home">
+        <img class="brand-logo" src="assets/restrosuite-mark.png" alt="">
         <span class="brand-name">
           <span class="codearc">CodeArc</span>
           Restro<b>Suite</b>
         </span>
       </a>
-      <button class="sb-collapse" id="sb-collapse" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
+      <button class="sb-collapse" id="sb-collapse" type="button" aria-label="Collapse sidebar" title="Collapse"><i class="fa-solid fa-angles-left"></i></button>
     </div>
 
-    <div class="user-pill">
-      <div class="avatar">RS</div>
-      <div class="uinfo hide-collapsed"><div class="un">Outlet User</div><div class="ur">Outlet · Admin</div></div>
+    <div class="user-pill" title="Outlet &amp; role">
+      <div class="avatar" aria-hidden="true">RS</div>
+      <div class="uinfo hide-collapsed">
+        <div class="un">Outlet User</div>
+        <div class="ur">Outlet · Admin</div>
+      </div>
     </div>
 
     <nav class="sb-nav">
       <div class="sb-section">Operations</div>
-      <a class="sidebar-link" data-tab="pos-tab"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
-      <a class="sidebar-link" data-tab="qr-orders-tab"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link" data-tab="kds-tab"><i class="fa-solid fa-fire-burner"></i><span>Kitchen Display</span></a>
-      <a class="sidebar-link" data-tab="tokens-tab" class="superadmin-only" style="display:none;"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
-      <a class="sidebar-link" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
-      <a class="sidebar-link" data-tab="aggregator-tab"><i class="fa-solid fa-bowl-rice"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link" data-tab="bills-tab"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
+      <a class="sidebar-link" data-tab="pos-tab" title="Point of Sale"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
+      <a class="sidebar-link" data-tab="qr-orders-tab" title="QR table orders"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
+      <a class="sidebar-link" data-tab="kds-tab" title="Kitchen Display System"><i class="fa-solid fa-fire-burner"></i><span>Kitchen</span><span class="badge-count" style="display:none">0</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="tokens-tab" style="display:none" title="Token display"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
+      <a class="sidebar-link" data-tab="floor-tab" title="Floor plan &amp; tables"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
+      <a class="sidebar-link" data-tab="aggregator-tab" title="Aggregator / online orders"><i class="fa-solid fa-motorcycle"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
+      <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
-      <a class="sidebar-link" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
-      <a class="sidebar-link" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i><span>Menu Editor</span></a>
-      <a class="sidebar-link" data-tab="employees-tab"><i class="fa-solid fa-users"></i><span>Employees</span></a>
-      <a class="sidebar-link" data-tab="customers-tab"><i class="fa-solid fa-address-book"></i><span>Customers</span></a>
-      <a class="sidebar-link" data-tab="tax-tab"><i class="fa-solid fa-file-invoice"></i><span>Tax &amp; GST</span></a>
+      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup · Menu · Recipe · Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
+      <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
+      <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
+      <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
+      <a class="sidebar-link" data-tab="customers-tab" title="CRM customers"><i class="fa-solid fa-address-book"></i><span>Customers</span></a>
+      <a class="sidebar-link" data-tab="tax-tab" title="Tax &amp; GST profile"><i class="fa-solid fa-percent"></i><span>Tax &amp; GST</span></a>
 
       <div class="sb-section">Grow</div>
-      <a class="sidebar-link" data-tab="reports-tab"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
-      <a class="sidebar-link" data-tab="analytics-tab"><i class="fa-solid fa-chart-mixed"></i><span>Advanced Analytics</span></a>
-      <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
+      <a class="sidebar-link" data-tab="reports-tab" title="Sales reports"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
+      <a class="sidebar-link" data-tab="analytics-tab" title="Advanced analytics"><i class="fa-solid fa-chart-pie"></i><span>Analytics</span></a>
+      <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab" title="Growth Hub"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
 
-      <div class="sb-section brandadmin-only" style="display:none">Chain Management</div>
-      <a class="sidebar-link brandadmin-only" data-tab="chain-dashboard-tab" style="display:none"><i class="fa-solid fa-network-wired"></i><span>Chain Dashboard</span></a>
+      <div class="sb-section brandadmin-only" style="display:none">Chain</div>
+      <a class="sidebar-link brandadmin-only" data-tab="chain-dashboard-tab" style="display:none" title="Chain dashboard"><i class="fa-solid fa-network-wired"></i><span>Chain Dashboard</span></a>
 
       <div class="sb-section superadmin-only" style="display:none">Platform</div>
-      <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
-      <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none"><i class="fa-solid fa-server"></i><span>Gateway Monitor</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none" title="Super-Admin"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none" title="Gateway monitor"><i class="fa-solid fa-server"></i><span>Gateway</span></a>
     </nav>
 
     <div class="sb-foot">
-      <div class="sb-foot-btn" id="role-switch" title="Toggle Super-Admin view">
+      <div class="sb-foot-btn" id="role-switch" title="Toggle Super-Admin view" style="display:none">
         <span class="rs-track"></span>
-        <span class="hide-collapsed" id="role-switch-label" style="font-size:12.5px">Outlet Owner</span>
+        <span class="hide-collapsed" id="role-switch-label" style="font-size:12px">Owner view</span>
       </div>
-      <button class="sb-foot-btn" id="open-settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
-      <button class="sb-foot-btn" id="open-product-guide-btn" onclick="window.openProductGuide &amp;&amp; window.openProductGuide()"><i class="fa-solid fa-circle-question"></i><span>Help &amp; Setup</span></button>
-      <button class="sb-foot-btn logout" type="button"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
+      <button type="button" class="sb-foot-btn" id="open-settings" title="Settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
+      <button type="button" class="sb-foot-btn" id="open-product-guide-btn" title="Help &amp; setup" onclick="window.openProductGuide &amp;&amp; window.openProductGuide()"><i class="fa-solid fa-circle-question"></i><span>Help</span></button>
+      <button type="button" class="sb-foot-btn logout" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
     </div>
   </aside>
 
   <!-- ===================== MAIN ===================== -->
   <main class="main">
-    <header class="topbar">
-      <div class="tb-title"><h1 id="page-title">Point of Sale</h1><p id="page-sub">Ring up takeaway & dine-in orders</p></div>
-      <div class="tb-spacer"></div>
-      <div class="tb-search"><i class="fa-solid fa-magnifying-glass"></i><input placeholder="Search anything…"></div>
-      <div class="tb-dropdown support-dropdown">
-        <button class="tb-pill dropdown-trigger" id="support-trigger" aria-label="Support Options" data-tooltip="Support Options">
-          <i class="fa-solid fa-headset"></i><span>Support</span>
-        </button>
-        <div class="dropdown-menu support-menu" id="support-menu">
-          <a href="tel:+919983721179" class="dropdown-item call">
-            <i class="fa-solid fa-phone"></i>
-            <div>
-              <strong>Call Support</strong>
-              <span>+91 99837 21179</span>
-            </div>
-          </a>
-          <a href="https://wa.me/919983721179" target="_blank" class="dropdown-item whatsapp">
-            <i class="fa-brands fa-whatsapp"></i>
-            <div>
-              <strong>WhatsApp Support</strong>
-              <span>Chat online with us</span>
-            </div>
-          </a>
+    <header class="topbar topbar-calm">
+      <!-- Left: Counter (injected) + screen title -->
+      <div class="tb-left" id="tb-left">
+        <div class="tb-title">
+          <h1 id="page-title">Point of Sale</h1>
+          <p id="page-sub" class="tb-sub">Takeaway &amp; dine-in</p>
         </div>
       </div>
-      <span class="tb-pill txt" id="topbar-whatsapp-status-pill">
-        <span id="topbar-whatsapp-status-text"><i class="fa-solid fa-spinner fa-spin"></i><span>WhatsApp</span></span>
-      </span>
-      <span class="tb-pill txt" id="db-mode-pill"><i class="fa-solid fa-spinner fa-spin"></i><span>Loading</span></span>
-      <span class="tb-pill txt" id="app-version-pill"></span>
-      <span class="tb-pill txt clock-pill"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
-      <button class="tb-icon-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i><span class="dot-notif"></span></button>
-      <button class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
+      <div class="tb-spacer"></div>
+      <!-- Center: shift host injected by competitive-ops (#rs-topbar-shift) -->
+      <!-- Right: search · call · bill WhatsApp · clock · bell · theme · version (no ⋯ dump) -->
+      <div class="tb-right" id="tb-right">
+        <div class="tb-search tb-search-compact" title="Global search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="search" placeholder="Search…" aria-label="Search anything" autocomplete="off">
+        </div>
+        <div class="tb-support-wrap" id="tb-support-wrap">
+          <button type="button" class="tb-icon-btn tb-call-btn" id="tb-call-support" aria-label="Contact support" aria-expanded="false" aria-haspopup="true" title="Contact support" data-tooltip="Contact support">
+            <i class="fa-solid fa-headset" aria-hidden="true"></i>
+          </button>
+          <div class="tb-support-menu" id="tb-support-menu" role="menu" hidden>
+            <div class="tb-support-menu-title">Support</div>
+            <a href="tel:+919983721179" class="tb-support-item" role="menuitem" id="tb-support-call">
+              <span class="tb-support-ico call"><i class="fa-solid fa-phone" aria-hidden="true"></i></span>
+              <span class="tb-support-copy">
+                <strong>Call support</strong>
+                <span>+91 99837 21179</span>
+              </span>
+            </a>
+            <a href="https://wa.me/919983721179" target="_blank" rel="noopener noreferrer" class="tb-support-item" role="menuitem" id="tb-support-wa">
+              <span class="tb-support-ico wa"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></span>
+              <span class="tb-support-copy">
+                <strong>WhatsApp support</strong>
+                <span>Chat with us</span>
+              </span>
+            </a>
+          </div>
+        </div>
+        <!-- Bill WhatsApp only (not support chat) — green / red / spin -->
+        <button type="button" class="tb-pill tb-wa-pill js-wa-status-pill wa-starting" id="tb-wa-status-btn" role="status" aria-label="Bill WhatsApp status" title="Bill WhatsApp" data-tooltip="Bill WhatsApp">
+          <i class="fa-brands fa-whatsapp tb-wa-icon" id="tb-wa-icon" aria-hidden="true"></i>
+          <span class="tb-badge-label" id="tb-wa-label">…</span>
+        </button>
+        <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
+        <button type="button" class="tb-icon-btn" id="tb-notif-btn" aria-label="Notifications" title="Notifications" data-tooltip="Notifications"><i class="fa-regular fa-bell" aria-hidden="true"></i><span class="dot-notif" style="display:none"></span></button>
+        <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
+        <span class="tb-version" id="app-version-pill" role="status" title="App version" aria-label="App version"></span>
+        <!-- Hidden cloud state for JS / offline lock (not shown in UI chrome) -->
+        <span id="db-mode-pill" class="tb-cloud-sr" role="status" aria-hidden="true"></span>
+      </div>
     </header>
 
     <div class="content">
@@ -410,43 +512,46 @@
       <section class="tab-content" id="pos-tab" data-screen-label="POS">
         <div class="pos-wrap">
           <div class="pos-left">
-            <div class="pos-toolbar">
+            <!-- Petpooja-style menu chrome: search + tools only (order type lives on cart) -->
+            <div class="pos-toolbar pos-toolbar-menu">
               <div class="pos-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="pos-search-input" placeholder="Search menu…">
+                <input id="pos-search-input" placeholder="Search menu or item code…" autocomplete="off" enterkeyhint="search">
                 <div class="mobile-only-inline pos-m-hold-buttons" id="pos-m-hold-buttons" style="display:none; align-items:center; gap:4px;">
-                  <button class="hold-btn hold-btn-takeaway" id="btn-m-hold-takeaway" style="padding: 4px 8px; font-size: 11px;">
-                    <i class="fa-solid fa-bag-shopping"></i> <span id="held-count-takeaway-m"></span>
+                  <button type="button" class="hold-btn hold-btn-current" id="btn-m-hold-current" style="padding: 4px 10px; font-size: 11px;" title="Held orders">
+                    <i class="fa-solid fa-pause"></i> Holds <span id="held-count-current-m"></span>
                   </button>
-                  <button class="hold-btn hold-btn-dinein" id="btn-m-hold-dinein" style="padding: 4px 8px; font-size: 11px;">
-                    <i class="fa-solid fa-utensils"></i> <span id="held-count-dinein-m"></span>
-                  </button>
-                  <button class="hold-btn hold-btn-delivery" id="btn-m-hold-delivery" style="padding: 4px 8px; font-size: 11px;">
-                    <i class="fa-solid fa-motorcycle"></i> <span id="held-count-delivery-m"></span>
-                  </button>
+                  <button type="button" class="hold-btn hold-btn-takeaway hold-btn-legacy" id="btn-m-hold-takeaway" hidden aria-hidden="true" tabindex="-1"><span id="held-count-takeaway-m"></span></button>
+                  <button type="button" class="hold-btn hold-btn-dinein hold-btn-legacy" id="btn-m-hold-dinein" hidden aria-hidden="true" tabindex="-1"><span id="held-count-dinein-m"></span></button>
+                  <button type="button" class="hold-btn hold-btn-delivery hold-btn-legacy" id="btn-m-hold-delivery" hidden aria-hidden="true" tabindex="-1"><span id="held-count-delivery-m"></span></button>
                 </div>
               </div>
-              <div class="pos-sort">
-                <select id="pos-sort-select" class="pos-sort-select">
-                  <option value="popular">Most Ordered</option>
-                  <option value="default">Default Order</option>
-                  <option value="name-asc">Alphabetical: A-Z</option>
-                  <option value="name-desc">Alphabetical: Z-A</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="veg-first">Veg First</option>
-                  <option value="nonveg-first">Non-Veg First</option>
-                </select>
-              </div>
-              <div class="pos-size-control">
-                <button id="btn-grid-dec" title="Decrease item size"><i class="fa-solid fa-minus"></i></button>
-                <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Adjust item size">
-                <button id="btn-grid-inc" title="Increase item size"><i class="fa-solid fa-plus"></i></button>
-              </div>
-              <div class="order-types">
-                <button class="order-type-btn active"><i class="fa-solid fa-bag-shopping"></i> Takeaway</button>
-                <button class="order-type-btn"><i class="fa-solid fa-utensils"></i> Dine-in</button>
-                <button class="order-type-btn"><i class="fa-solid fa-motorcycle"></i> Delivery</button>
+              <div class="pos-toolbar-secondary" id="pos-toolbar-secondary">
+                <details class="pos-display-opts" id="pos-display-opts">
+                  <summary title="Sort &amp; card size"><i class="fa-solid fa-sliders"></i></summary>
+                  <div class="pos-display-panel">
+                    <label class="pos-display-label">Sort
+                      <select id="pos-sort-select" class="pos-sort-select" aria-label="Sort menu">
+                        <option value="popular">Most Ordered</option>
+                        <option value="default">Default</option>
+                        <option value="name-asc">A–Z</option>
+                        <option value="name-desc">Z–A</option>
+                        <option value="price-asc">Price ↑</option>
+                        <option value="price-desc">Price ↓</option>
+                        <option value="veg-first">Veg first</option>
+                        <option value="nonveg-first">Non-veg first</option>
+                      </select>
+                    </label>
+                    <label class="pos-display-label">Card size
+                      <div class="pos-size-control pos-size-control-panel">
+                        <button type="button" id="btn-grid-dec" title="Smaller cards"><i class="fa-solid fa-minus"></i></button>
+                        <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Card size" aria-label="Menu card size">
+                        <button type="button" id="btn-grid-inc" title="Larger cards"><i class="fa-solid fa-plus"></i></button>
+                      </div>
+                    </label>
+                  </div>
+                </details>
+                <!-- More tools (Day pack / Keys / Demo) mounts here via JS -->
               </div>
             </div>
             <!-- Active Table Status Banner (Dine-in Only) -->
@@ -477,56 +582,67 @@
             </div>
           </div>
 
-          <aside class="pos-cart">
-            <div class="cart-head">
-              <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" style="margin-right:8px; padding: 4px 8px; font-size:12px; font-weight:600;"><i class="fa-solid fa-chevron-left"></i> Back</button>
-              <h3>Current Order</h3>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span class="pill pill-orange" style="padding:4px 11px"><span id="cart-count">0 items</span></span>
-                <button class="btn btn-ghost" id="btn-clear-cart" title="Clear Cart" style="padding:4px 6px; color:var(--orange); font-size:12px; height:24px; display:inline-flex; align-items:center; justify-content:center;"><i class="fa-solid fa-trash-can"></i></button>
+          <aside class="pos-cart pos-cart-workbench pos-cart-symbols">
+            <!-- Symbol chrome: title · order type icons · count · clear (one row) -->
+            <div class="cart-head cart-head-symbols">
+              <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" title="Back to menu" aria-label="Back to menu"><i class="fa-solid fa-chevron-left"></i></button>
+              <h3 title="Current order"><i class="fa-solid fa-receipt cart-head-ico" aria-hidden="true"></i><span class="cart-head-title">Order</span></h3>
+              <div class="order-types order-types-cart order-types-icons" id="pos-cart-order-types" role="group" aria-label="Order type">
+                <button type="button" class="order-type-btn active" title="Takeaway" aria-label="Takeaway"><i class="fa-solid fa-bag-shopping"></i><span class="sr-only">Takeaway</span></button>
+                <button type="button" class="order-type-btn" title="Dine-in" aria-label="Dine-in"><i class="fa-solid fa-utensils"></i><span class="sr-only">Dine-in</span></button>
+                <button type="button" class="order-type-btn" title="Delivery" aria-label="Delivery"><i class="fa-solid fa-motorcycle"></i><span class="sr-only">Delivery</span></button>
+              </div>
+              <div class="cart-head-actions">
+                <span class="pill pill-orange cart-count-pill" title="Items in cart"><span id="cart-count">0</span></span>
+                <button class="btn btn-ghost cart-clear-btn" id="btn-clear-cart" title="Clear cart" aria-label="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <div class="cart-table-sel" style="display: grid; grid-template-columns: 1fr; gap: 8px; position: relative; align-items: start;">
-              <select class="form-input" id="cart-table" style="height: 44px; padding: 0 32px 0 12px; font-size: 14px; border-radius: 8px; box-sizing: border-box;"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
-              <div class="custom-customer-widget" id="custom-customer-widget">
-                <!-- Direct inputs visible in cart -->
-                <div class="cart-cust-direct-inputs" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                  <input type="text" id="cust-input-name" placeholder="Guest name" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="off">
-                  <input type="tel" id="cust-input-phone" placeholder="Guest phone" class="form-input" style="padding: 10px 12px; font-size: 14px; height: 44px; width: 100%; border-radius: 8px; box-sizing: border-box;" autocomplete="tel">
+            <!-- Customer only (shift tools live in top bar — Petpooja order cart) -->
+            <div class="cart-meta-row cart-meta-customer-only" id="cart-meta-row">
+              <div id="pos-shift-slot" class="pos-shift-slot" hidden aria-hidden="true"></div>
+              <div class="cart-table-sel" id="cart-table-sel">
+                <div class="cart-table-pax-row" id="cart-table-pax-row">
+                  <select class="form-input" id="cart-table"><option>Walk-in / Takeaway</option><option>Table 01</option><option>Table 02</option><option>Table 04</option><option>Table 08</option></select>
+                  <input type="number" id="cart-covers" class="form-input" min="0" max="99" step="1" placeholder="#" title="Guest covers (pax)" inputmode="numeric" aria-label="Guest covers">
                 </div>
-                
-                <!-- Hidden trigger for backwards compatibility -->
-                <div class="cust-widget-trigger" id="cust-widget-trigger" style="display: none;">
-                  <span id="cust-trigger-text">Walk-in</span>
-                </div>
-
-                <!-- Dropdown overlay for search results, insights and actions -->
-                <div class="cpay-side-drawer cpay-drawer-left" id="cust-widget-dropdown">
-                  <div class="csd-header">
-                    <span class="csd-title"><i class="fa-solid fa-user-gear" style="color:var(--orange);"></i> Customer Insights</span>
-                    <button type="button" id="cust-widget-close" class="csd-close">&times;</button>
+                <div class="custom-customer-widget" id="custom-customer-widget">
+                  <div class="cart-cust-row">
+                    <button type="button" class="cart-cust-toggle is-walkin" id="cart-cust-toggle" aria-expanded="false" aria-controls="cart-cust-direct-inputs" title="Add customer (optional)">
+                      <i class="fa-solid fa-user"></i>
+                      <span id="cart-cust-toggle-label" class="cart-cust-label">Walk-in</span>
+                      <span class="cart-cust-hint">optional</span>
+                      <i class="fa-solid fa-chevron-down cart-cust-chevron"></i>
+                    </button>
                   </div>
-                  <div class="csd-body" style="overflow-y: auto;">
-                    <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
-                    
-                    <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
-                      <div class="insight-item">
-                        <span class="insight-label">Visits</span>
-                        <span class="insight-val" id="insight-visits">0</span>
-                      </div>
-                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
-                        <span class="insight-label">Spent</span>
-                        <span class="insight-val" id="insight-spend">₹0</span>
-                      </div>
-                      <div class="insight-item" style="border-top: 1px solid var(--stroke); padding-top: 5px; margin-top: 2px;">
-                        <span class="insight-label">Favorite</span>
-                        <span class="insight-val" id="insight-favorite" style="max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">None</span>
+                  <div class="cart-cust-direct-inputs" id="cart-cust-direct-inputs" hidden>
+                    <div class="cart-cust-fields">
+                      <input type="text" id="cust-input-name" placeholder="Name" class="form-input" autocomplete="off" title="Guest name or search">
+                      <input type="tel" id="cust-input-phone" placeholder="10-digit mobile" class="form-input" autocomplete="tel" inputmode="numeric" maxlength="15" title="Mobile number">
+                    </div>
+                    <div id="cust-search-popover" class="cust-search-popover" style="display:none" role="listbox" aria-label="Matching customers"></div>
+                  </div>
+                  <div id="cart-customer-dues-banner" class="cart-dues-banner" style="display:none"></div>
+                  <div class="cust-widget-trigger" id="cust-widget-trigger" style="display: none;">
+                    <span id="cust-trigger-text">Walk-in</span>
+                  </div>
+                  <div class="cpay-side-drawer cpay-drawer-left" id="cust-widget-dropdown">
+                    <div class="csd-header">
+                      <span class="csd-title"><i class="fa-solid fa-user-gear" style="color:var(--orange);"></i> Customer Insights</span>
+                      <button type="button" id="cust-widget-close" class="csd-close">&times;</button>
+                    </div>
+                    <div class="csd-body" style="overflow-y: auto;">
+                      <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
+                      <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
+                        <div class="insight-item"><span class="insight-label">Visits</span><span class="insight-val" id="insight-visits">0</span></div>
+                        <div class="insight-item"><span class="insight-label">Spent</span><span class="insight-val" id="insight-spend">₹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Dues</span><span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Favorite</span><span class="insight-val" id="insight-favorite">None</span></div>
                       </div>
                     </div>
                   </div>
                 </div>
+                <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
               </div>
-              <select class="form-input" id="cart-customer-sel" style="display: none;"><option value="">Walk-in Customer</option></select>
             </div>
             <!-- Delivery Details Row (hidden by default) -->
             <div class="cart-delivery-details" id="cart-delivery-details" style="display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px; background: var(--glass-2); border: 1px solid var(--stroke-2); border-radius: var(--r-sm);">
@@ -541,51 +657,141 @@
             </div>
             <div class="cart-items" id="cart-items"></div>
               <div class="cart-foot">
-              <!-- Compact totals: sub+gst inline, grand prominent -->
-              <div class="totals-compact">
+              <!-- Plain Sub / Tax / Total — readable at a glance -->
+              <div class="totals-compact totals-readable">
                 <div class="totals-meta">
-                  <span>Sub <b id="t-sub">₹0</b></span>
-                  <span id="t-disc-wrap" style="color:var(--orange)">Disc <b id="t-disc">₹0</b></span>
-                  <span>GST <b id="t-gst">₹0</b></span>
+                  <span title="Subtotal">Sub <b id="t-sub">₹0</b></span>
+                  <span id="t-disc-wrap" style="color:var(--orange);display:none" title="Discount">Disc <b id="t-disc">₹0</b></span>
+                  <span title="Tax">Tax <b id="t-gst">₹0</b></span>
                 </div>
                 <div class="totals-grand">
-                  <span>Total</span>
+                  <span class="totals-grand-lbl">Total</span>
                   <span class="amt" id="t-grand">₹0</span>
                 </div>
               </div>
-              <div class="cart-payment" id="cart-payment" style="margin-top: 6px; padding: 6px; border: 1px solid var(--stroke-2); border-radius: var(--r-sm); background: var(--glass-1);">
-                <div class="cpay-methods" id="cart-pay-methods" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;">
-                  <button type="button" class="active" data-pay-method="Cash" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-money-bill-wave" style="font-size: 12px; color: #25d366;"></i>
-                    <span>Cash</span>
-                  </button>
-                  <button type="button" data-pay-method="UPI" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-qrcode" style="font-size: 12px; color: var(--orange);"></i>
-                    <span>UPI</span>
-                  </button>
-                  <button type="button" data-pay-method="Card" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-credit-card" style="font-size: 12px; color: #1e90ff;"></i>
-                    <span>Card</span>
-                  </button>
-                  <button type="button" data-pay-method="Due" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-clock-rotate-left" style="font-size: 12px; color: var(--red);"></i>
-                    <span>Due</span>
-                  </button>
-                  <button type="button" data-pay-method="Split" style="min-height: 38px; padding: 4px 2px; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
-                    <i class="fa-solid fa-arrows-split-up-and-left" style="font-size: 12px; color: #9c27b0;"></i>
-                    <span>Split</span>
-                  </button>
+              <details class="cart-more-opts" id="cart-more-opts">
+                <summary title="Discount, tip, promo">
+                  <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                  <span class="cart-more-summary-txt">Discount · Tip · Promo</span>
+                </summary>
+                <div class="cart-tip-row" id="cart-tip-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 8px">
+                  <input type="number" id="disc-input" min="0" max="100" step="1" placeholder="Disc %" title="Discount percent" class="form-input" style="width:68px;height:36px;font-size:12px;padding:4px 6px">
+                  <input type="number" id="tip-input" min="0" step="1" placeholder="Tip" title="Tip amount" class="form-input" style="width:72px;height:36px;font-size:12px;padding:4px 6px">
+                  <button type="button" class="btn btn-ghost btn-sm" data-tip-pct="0" style="min-height:36px;padding:0 10px;font-size:11px">No tip</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-tip-pct="5" style="min-height:36px;padding:0 10px;font-size:11px">5%</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-tip-pct="10" style="min-height:36px;padding:0 10px;font-size:11px">10%</button>
+                </div>
+                <div class="cart-promo-row" id="cart-promo-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 10px">
+                  <input type="text" id="promo-input" placeholder="Promo code" title="Offer / coupon code" class="form-input" style="flex:1;min-width:100px;height:36px;font-size:12px;padding:4px 8px;text-transform:uppercase" autocomplete="off">
+                  <button type="button" class="btn btn-ghost btn-sm" id="promo-apply" style="min-height:36px;padding:0 12px;font-size:11px"><i class="fa-solid fa-tags"></i> Apply</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="promo-clear" style="min-height:36px;padding:0 10px;font-size:11px" title="Clear promo">×</button>
+                  <span id="promo-applied-badge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(255,79,0,.12);color:var(--orange)"></span>
+                </div>
+              </details>
+              <div class="cart-pay-zone" id="cart-pay-zone">
+                <!-- Pay: icon + short label (discoverable, still compact) -->
+                <div class="cart-payment cart-payment-labeled" id="cart-payment">
+                  <div class="cpay-methods" id="cart-pay-methods">
+                    <button type="button" data-pay-method="Cash" title="Cash" aria-label="Cash">
+                      <i class="fa-solid fa-money-bill-wave" style="color:#25d366"></i>
+                      <span class="cpay-lbl">Cash</span>
+                    </button>
+                    <button type="button" class="active" data-pay-method="UPI" title="UPI" aria-label="UPI">
+                      <i class="fa-solid fa-qrcode" style="color:var(--orange)"></i>
+                      <span class="cpay-lbl">UPI</span>
+                    </button>
+                    <button type="button" data-pay-method="Card" title="Card" aria-label="Card">
+                      <i class="fa-solid fa-credit-card" style="color:#1e90ff"></i>
+                      <span class="cpay-lbl">Card</span>
+                    </button>
+                    <button type="button" data-pay-method="Due" title="Due / credit" aria-label="Due">
+                      <i class="fa-solid fa-clock-rotate-left" style="color:var(--red)"></i>
+                      <span class="cpay-lbl">Due</span>
+                    </button>
+                    <button type="button" data-pay-method="Split" title="Split payment" aria-label="Split">
+                      <i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0"></i>
+                      <span class="cpay-lbl">Split</span>
+                    </button>
+                  </div>
+                  <!-- Cash/Split: popover above pay icons so cart list keeps height -->
+                  <div class="cart-tender-host cart-tender-popover" id="cart-tender-host">
+                    <div id="cash-drawer" class="cart-tender-panel cart-tender-cash" hidden>
+                      <div class="cart-tender-cash-row">
+                        <i class="fa-solid fa-hand-holding-dollar csd-ico" title="Received" aria-hidden="true"></i>
+                        <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0" inputmode="decimal" title="Cash received" aria-label="Cash received">
+                        <i class="fa-solid fa-coins csd-ico" title="Change" aria-hidden="true"></i>
+                        <strong id="inline-cash-change" class="csd-change-amt" title="Change due">₹0</strong>
+                        <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact" title="Exact amount">=</button>
+                        <button type="button" class="btn btn-ghost btn-sm cart-cash-more" id="cash-dens-toggle" title="Quick notes" aria-expanded="false" aria-label="Quick cash notes"><i class="fa-solid fa-ellipsis"></i></button>
+                        <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Hide cash pad" aria-label="Hide cash pad">&times;</button>
+                      </div>
+                      <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens" hidden aria-label="Quick cash amounts">
+                        <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
+                        <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">CLR</button>
+                      </div>
+                    </div>
+
+                    <div id="split-drawer" class="cart-tender-panel cart-tender-split" hidden>
+                      <div class="cart-tender-head">
+                        <span title="Split tender"><i class="fa-solid fa-arrows-split-up-and-left" style="color:#9c27b0"></i></span>
+                        <button type="button" id="split-drawer-close" class="cart-tender-close" title="Collapse">&times;</button>
+                      </div>
+                      <div id="split-calc-compact" class="cart-split-grid">
+                        <div class="csd-split-field">
+                          <label class="csd-label" for="split-cash" title="Cash"><i class="fa-solid fa-money-bill-wave"></i></label>
+                          <input type="number" id="split-cash" placeholder="0" class="form-input csd-input" inputmode="decimal" aria-label="Split cash">
+                        </div>
+                        <div class="csd-split-field">
+                          <label class="csd-label" for="split-upi" title="UPI"><i class="fa-solid fa-qrcode"></i></label>
+                          <input type="number" id="split-upi" placeholder="0" class="form-input csd-input" inputmode="decimal" aria-label="Split UPI">
+                        </div>
+                        <div class="csd-split-field">
+                          <label class="csd-label" for="split-card" title="Card"><i class="fa-solid fa-credit-card"></i></label>
+                          <input type="number" id="split-card" placeholder="0" class="form-input csd-input" inputmode="decimal" aria-label="Split card">
+                        </div>
+                        <div class="csd-split-field">
+                          <label class="csd-label" for="split-due" title="Due"><i class="fa-solid fa-clock-rotate-left"></i></label>
+                          <input type="number" id="split-due" placeholder="0" class="form-input csd-input" inputmode="decimal" aria-label="Split due">
+                        </div>
+                      </div>
+                      <div id="split-quick-fill" class="cart-split-quick">
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Rest to cash">→₹</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Rest to UPI">→UPI</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Rest to card">→Card</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Rest to due">→Due</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="Half cash half UPI">½</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear">×</button>
+                      </div>
+                      <div class="csd-split-status cart-split-status">
+                        <span id="split-status-text" class="csd-split-remaining">—</span>
+                        <strong id="split-total-text" class="csd-split-paid">—</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="cart-actions cart-actions-final">
+                  <div class="hold-kot-row">
+                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order · right-click for held list" aria-label="Hold order">
+                      <i class="fa-solid fa-pause"></i>
+                      <span class="act-lbl">Hold</span>
+                      <span id="held-count-current" class="hold-count"></span>
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-kot" id="btn-kot" title="Send KOT to kitchen" aria-label="Send KOT">
+                      <i class="fa-solid fa-fire"></i>
+                      <span class="act-lbl">KOT</span>
+                    </button>
+                    <button type="button" class="hold-btn hold-btn-takeaway hold-btn-legacy" id="btn-hold-takeaway" hidden aria-hidden="true" tabindex="-1"><span id="held-count-takeaway"></span></button>
+                    <button type="button" class="hold-btn hold-btn-dinein hold-btn-legacy" id="btn-hold-dinein" hidden aria-hidden="true" tabindex="-1"><span id="held-count-dinein"></span></button>
+                    <button type="button" class="hold-btn hold-btn-delivery hold-btn-legacy" id="btn-hold-delivery" hidden aria-hidden="true" tabindex="-1"><span id="held-count-delivery"></span></button>
+                  </div>
+                  <button type="button" class="btn btn-primary" id="btn-checkout" title="Print bill and take payment"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
                 </div>
               </div>
-              <div class="cart-actions">
-                <div class="hold-buttons-group">
-                  <button class="hold-btn hold-btn-takeaway" id="btn-hold-takeaway"><i class="fa-solid fa-bag-shopping"></i> Hold <span id="held-count-takeaway"></span></button>
-                  <button class="hold-btn hold-btn-dinein" id="btn-hold-dinein"><i class="fa-solid fa-utensils"></i> Hold <span id="held-count-dinein"></span></button>
-                  <button class="hold-btn hold-btn-delivery" id="btn-hold-delivery"><i class="fa-solid fa-motorcycle"></i> Hold <span id="held-count-delivery"></span></button>
-                </div>
-                <button class="btn btn-ghost" id="btn-kot"><i class="fa-solid fa-fire"></i> Send KOT</button>
-                <button class="btn btn-primary" id="btn-checkout" style="grid-column:1 / -1"><i class="fa-solid fa-print"></i> Print &amp; Pay</button>
-              </div>
+              <p class="cart-empty-hint" id="cart-empty-hint"><i class="fa-solid fa-arrow-left"></i> Tap menu items</p>
             </div>
           </aside>
         </div>
@@ -615,24 +821,47 @@
       <!-- ============ BILLS ============ -->
       <section class="tab-content" id="bills-tab" data-screen-label="Bills">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl">Bills generated</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl" id="bills-stat-sales-label">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl" id="bills-stat-count-label">Bills in range</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">₹0</div><div class="sl">Avg order value</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl">Refunds today</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl" id="bills-stat-refunds-label">Refunds in range</div></div></div>
         </div>
         <div class="panel panel-pad">
-          <div class="toolbar-row">
-            <div class="pos-search grow" style="max-width:340px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill no. or table…"></div>
-            <button class="btn btn-ghost btn-sm"><i class="fa-solid fa-filter"></i> Filter</button>
-            <button class="btn btn-ghost btn-sm" id="btn-export-bills"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
-            <button class="btn btn-primary btn-sm" id="btn-print-day-report"><i class="fa-solid fa-print"></i> Print day report</button>
+          <div class="toolbar-row bills-toolbar">
+            <div class="bills-date-chips" id="bills-date-chips" role="group" aria-label="Bill date range">
+              <button type="button" class="bills-date-chip is-active" data-range="today">Today</button>
+              <button type="button" class="bills-date-chip" data-range="yesterday">Yesterday</button>
+              <button type="button" class="bills-date-chip" data-range="7d">7 days</button>
+              <button type="button" class="bills-date-chip" data-range="all">All</button>
+              <button type="button" class="bills-date-chip" data-range="custom">Custom</button>
+            </div>
+            <div class="bills-custom-range" id="bills-custom-range" hidden>
+              <input type="date" id="bills-date-from" aria-label="From date">
+              <span class="bills-custom-sep">–</span>
+              <input type="date" id="bills-date-to" aria-label="To date">
+              <button type="button" class="btn btn-ghost btn-sm" id="bills-date-apply">Apply</button>
+            </div>
+            <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…" autocomplete="off" aria-label="Search bills"></div>
+            <span id="bills-result-meta" class="bills-result-meta" hidden></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
+            <div class="bills-export-group" role="group" aria-label="Export bills">
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills" title="Excel workbook: Summary + Bills + Line items (recommended)"><i class="fa-solid fa-file-excel"></i> Excel</button>
+              <button type="button" class="btn btn-ghost btn-sm bills-csv-btn" id="btn-export-bills-csv" title="Plain CSV for imports / scripts"><i class="fa-solid fa-file-csv"></i> CSV</button>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report" title="A4 / PDF sales summary for the selected date range"><i class="fa-solid fa-print"></i> Print report</button>
           </div>
-          <div class="table-scroll"><table class="data-table">
+          <div id="bills-filter-hint" class="bills-filter-hint" hidden aria-hidden="true">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>Date chips control stats + the table. Payment / Status filters are in the table header. Export respects the same filters.</span>
+            <button type="button" class="bills-hint-dismiss" id="bills-hint-dismiss" aria-label="Dismiss tip" title="Dismiss">×</button>
+          </div>
+          <div class="table-scroll"><table class="data-table bills-table">
             <thead>
               <tr>
                 <th>Bill No.</th>
                 <th>Time</th>
                 <th>Table</th>
+                <th>Customer</th>
                 <th>Items</th>
                 <th>
                   Payment
@@ -664,39 +893,47 @@
       <section class="tab-content" id="inventory-tab" data-screen-label="Inventory">
         <div class="banner warn" id="inv-banner">
           <i class="fa-solid fa-triangle-exclamation"></i>
-          <div><b><span id="inv-low-count">0</span> ingredients</b> are below their minimum stock level and need reordering.</div>
+          <div><b><span id="inv-low-count">0</span> stock items</b> are below their minimum level and need reordering (food, packaging, etc.).</div>
+          <button class="btn btn-ghost btn-sm banner-cta" id="btn-export-low-stock" style="margin-right:6px"><i class="fa-solid fa-file-csv"></i> Low-stock CSV</button>
           <button class="btn btn-primary btn-sm banner-cta" id="btn-auto-draft-pos"><i class="fa-solid fa-truck"></i> Auto-draft POs</button>
         </div>
-        <div class="toolbar-row">
+        <div class="toolbar-row inv-toolbar">
           <div class="seg" id="inv-seg">
-            <button class="active" data-inv-tab="stock">Stock levels</button>
-            <button data-inv-tab="recipes">Recipes</button>
-            <button data-inv-tab="suppliers">Suppliers</button>
+            <button type="button" class="active" data-inv-tab="stock">Stock levels</button>
+            <button type="button" data-inv-tab="recipes">Recipes</button>
+            <button type="button" data-inv-tab="suppliers">Suppliers</button>
+            <button type="button" data-inv-tab="pos">Purchase orders</button>
+            <button type="button" data-inv-tab="waste">Waste log</button>
           </div>
           <div class="grow"></div>
-          <button class="btn btn-ghost btn-sm" id="btn-download-inventory-template"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
-          <button class="btn btn-ghost btn-sm" id="btn-import-inventory"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
-          <button class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add ingredient</button>
+          <div class="pos-search inv-search-wrap" style="max-width:220px;padding:8px 12px">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="inv-stock-search" placeholder="Search food, boxes, bags…" autocomplete="off" aria-label="Search inventory">
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-variance" title="Theoretical usage from sales vs stock"><i class="fa-solid fa-chart-column"></i> Variance</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-prep" title="Run prep batch: use stock to make stock"><i class="fa-solid fa-blender"></i> Prep</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-takeaway-pack" title="Packaging auto-used on Takeaway / Delivery orders"><i class="fa-solid fa-bag-shopping"></i> Takeaway pack</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-inventory" title="Export all stock items to CSV"><i class="fa-solid fa-file-export"></i> Export</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-low-stock-toolbar" title="Export items below min"><i class="fa-solid fa-file-csv"></i> Low stock</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-download-inventory-template" title="CSV template for bulk import"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-import-inventory" title="Import stock from CSV"><i class="fa-solid fa-file-import"></i> Import</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-ingredient"><i class="fa-solid fa-plus"></i> Add stock item</button>
         </div>
+        <div id="inv-link-tip" class="banner warn" style="display:none;margin-bottom:12px" role="status"></div>
         <!-- Stock panel -->
-        <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table">
+        <div id="inv-panel-stock" class="inv-panel-section panel panel-pad"><div class="table-scroll"><table class="data-table inv-stock-table">
           <thead>
             <tr>
-              <th>Ingredient</th>
+              <th>Stock item</th>
               <th>
                 Category
                 <select id="inv-cat-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
                   <option value="All">All</option>
-                  <option value="veg">veg</option>
-                  <option value="dairy">dairy</option>
-                  <option value="grocery">grocery</option>
-                  <option value="meat">meat</option>
-                  <option value="dry-goods">dry-goods</option>
                 </select>
               </th>
               <th>In stock</th>
               <th>Min level</th>
-              <th>Unit cost</th>
+              <th title="Click a cell to set/edit — links to plate cost">Unit cost · value</th>
               <th>
                 Status
                 <select id="inv-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
@@ -711,19 +948,18 @@
           </thead>
           <tbody id="inv-table-body"></tbody>
         </table></div></div>
-        <!-- Recipes panel -->
-        <div id="inv-panel-recipes" class="inv-panel-section panel panel-pad" style="display:none;">
-          <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><h3>Menu Recipes</h3><span class="ph-sub">Ingredients linked to each menu item — used for automatic inventory deduction</span></div><button class="btn btn-primary btn-sm" id="btn-bulk-recipe-import" style="white-space:nowrap;"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import Recipes</button></div>
+        <!-- Recipes / suppliers / POs / waste are injected by features-manage.js (live, synced panels).
+             Keep lightweight fallback shells for when that module is delayed. -->
+        <div id="inv-panel-recipes" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="recipes">
+          <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><h3>Menu Recipes</h3><span class="ph-sub">Link ingredients to menu items for stock deduction</span></div><button type="button" class="btn btn-primary btn-sm" id="btn-bulk-recipe-import" style="white-space:nowrap;"><i class="fa-solid fa-file-arrow-up"></i> Bulk Import Recipes</button></div>
           <div class="table-scroll"><table class="data-table">
             <thead><tr><th>Menu Item</th><th>Category</th><th>Ingredients</th><th>Plate Cost</th><th>Selling Price</th><th>Margin</th><th>Actions</th></tr></thead>
             <tbody id="recipe-table-body"></tbody>
           </table></div>
         </div>
-        <!-- Suppliers panel -->
-        <div id="inv-panel-suppliers" class="inv-panel-section panel panel-pad" style="display:none;">
-          <div class="panel-head"><h3>Suppliers</h3><span class="ph-sub">Manage your raw material vendors and purchase orders</span></div>
-          <div style="color:var(--text-mute);font-size:13px;padding:20px 0;text-align:center;"><i class="fa-solid fa-truck" style="font-size:32px;opacity:.3;margin-bottom:12px;"></i><br>No suppliers configured yet. Add suppliers via Growth Hub → Procurement.</div>
-        </div>
+        <div id="inv-panel-suppliers" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="suppliers" hidden aria-hidden="true"></div>
+        <div id="inv-panel-pos" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="pos" hidden aria-hidden="true"></div>
+        <div id="inv-panel-waste" class="inv-panel-section panel panel-pad" style="display:none;" data-pane="waste" hidden aria-hidden="true"></div>
       </section>
 
       <!-- ============ MENU EDITOR ============ -->
@@ -743,9 +979,10 @@
           <div class="panel panel-pad">
             <div class="panel-head" style="display:flex;justify-content:space-between;align-items:center;">
               <h3>Menu items</h3>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button class="btn btn-ghost btn-sm" id="btn-download-menu-template" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-arrow-down"></i> Download Template</button>
-                <button class="btn btn-ghost btn-sm" id="btn-import-menu" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-arrow-down"></i> Import CSV</button>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" id="btn-export-menu" style="padding: 5px 10px; font-size: 11px;" title="Export full menu to CSV"><i class="fa-solid fa-file-export"></i> Export</button>
+                <button class="btn btn-ghost btn-sm" id="btn-download-menu-template" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-arrow-down"></i> Template</button>
+                <button class="btn btn-ghost btn-sm" id="btn-import-menu" style="padding: 5px 10px; font-size: 11px;"><i class="fa-solid fa-file-import"></i> Import</button>
               </div>
             </div>
                         <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; background:rgba(0,0,0,0.02); padding:8px 12px; border-radius:6px; border:1px solid var(--stroke-2);">
@@ -840,7 +1077,6 @@
           <form id="growth-refund-form"></form>
           <button id="growth-device-test-btn" type="button" aria-label="Run device test"></button>
           <form id="growth-outlet-form"></form>
-          <div id="saas-platform-summary"></div>
         </div>
       </section>
 
@@ -864,7 +1100,7 @@
         <div class="toolbar-row">
           <div class="seg"><button class="active">Directory</button><button>Shift roster</button><button>Attendance</button><button>Payroll</button><button>Logins</button></div>
           <div class="grow"></div>
-          <button class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus"></i> Add team member</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-employee"><i class="fa-solid fa-user-plus"></i> Add team member</button>
         </div>
         <div class="emp-grid" id="emp-grid"></div>
         <div class="panel panel-pad subtab-pane" data-pane="logins" style="margin-top:16px"></div>
@@ -947,8 +1183,8 @@
 
       <!-- ============ SUPER-ADMIN ============ -->
       <section class="tab-content" id="super-admin-tab" data-screen-label="Super-Admin">
-        <div class="stat-row" id="saas-platform-summary">
-          <!-- Dynamic snapshot cards will go here -->
+        <div class="stat-row" id="saas-platform-summary" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px">
+          <!-- Dynamic snapshot cards -->
         </div>
         <div class="panel panel-pad">
           <div class="panel-head" style="flex-wrap:wrap;gap:10px">
@@ -1027,25 +1263,29 @@
             </div>
 
             <div class="stat-row" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-o" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-check-double"></i></div><div><div class="sv" id="gw-delivery-rate" style="font-size: 15px;">-</div><div class="sl" style="font-size: 10px;">Delivery rate</div></div></div>
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-v" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-gauge-high"></i></div><div><div class="sv" id="gw-latency" style="font-size: 15px;">-</div><div class="sl" style="font-size: 10px;">Avg latency</div></div></div>
-              <div class="stat-card" style="padding: 12px;"><div class="stat-ic bg-a" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-layer-group"></i></div><div><div class="sv" id="gw-queued" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Queued</div></div></div>
+              <div class="stat-card" style="padding: 12px;" title="Messages / alerts dispatched today"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">—</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
+              <div class="stat-card" style="padding: 12px;" title="Successful deliveries vs attempts"><div class="stat-ic bg-o" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-check-double"></i></div><div><div class="sv" id="gw-delivery-rate" style="font-size: 15px;">n/a</div><div class="sl" style="font-size: 10px;">Delivery rate</div></div></div>
+              <div class="stat-card" style="padding: 12px;" title="Average send latency"><div class="stat-ic bg-v" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-gauge-high"></i></div><div><div class="sv" id="gw-latency" style="font-size: 15px;">n/a</div><div class="sl" style="font-size: 10px;">Avg latency</div></div></div>
+              <div class="stat-card" style="padding: 12px;" title="Messages waiting in queue"><div class="stat-ic bg-a" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-layer-group"></i></div><div><div class="sv" id="gw-queued" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Queued</div></div></div>
             </div>
 
             <!-- Application Incidents -->
             <div class="panel panel-pad" style="margin-bottom: 0; flex: 1; display: flex; flex-direction: column;">
-              <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--stroke); padding-bottom: 8px; margin-bottom: 12px;">
+              <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--stroke); padding-bottom: 8px; margin-bottom: 8px;">
                 <h3 style="font-size: 14px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-bug" style="color:var(--orange)"></i> Incidents</h3>
-                <div style="display: flex; gap: 6px; align-items: center;">
-                  <select id="app-incidents-status-filter" style="padding: 3px 6px; border-radius: 6px; border: 1px solid var(--stroke); background: var(--panel); color: var(--text); font-size: 11px;">
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                  <select id="app-incidents-status-filter" style="padding: 3px 6px; border-radius: 6px; border: 1px solid var(--stroke); background: var(--panel); color: var(--text); font-size: 11px;" title="Filter by review status">
                     <option value="open">Open</option>
                     <option value="resolved">Resolved</option>
                     <option value="all">All</option>
                   </select>
-                  <button id="btn-refresh-app-incidents" class="btn btn-ghost btn-sm" title="Refresh incidents" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
+                  <button type="button" id="btn-resolve-all-incidents" class="btn btn-ghost btn-sm" title="Mark all open incidents as resolved" style="padding: 4px 8px; font-size: 11px; color: #16a34a; border-color: rgba(34,197,94,0.35);"><i class="fa-solid fa-check-double"></i> Resolve all</button>
+                  <button type="button" id="btn-refresh-app-incidents" class="btn btn-ghost btn-sm" title="Refresh incidents" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
                 </div>
               </div>
+              <p style="font-size:11.5px;color:var(--text-mute);margin:0 0 12px;line-height:1.45">
+                Client crashes and unhandled errors from restaurant dashboards (and related apps). <b>Resolve</b> only marks them reviewed — it does not fix the bug. Safe to clear old noise after you’ve checked.
+              </p>
               <div id="app-incidents-list" style="display: flex; flex-direction: column; gap: 8px; flex: 1; max-height: 250px; overflow-y: auto;">
                 <div style="text-align: center; padding: 20px; color: var(--text-mute); font-size: 12px;"><i class="fa-solid fa-spinner fa-spin"></i> Checking incidents...</div>
               </div>
@@ -1186,10 +1426,13 @@
 
     <!-- Header -->
     <div style="padding:18px 24px 16px;border-bottom:1px solid var(--stroke);display:flex;align-items:center;gap:12px">
-      <div style="width:42px;height:42px;background:var(--orange,#FF4F00);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;color:#fff;font-weight:700" id="manage-tenant-avatar">D</div>
+      <div style="width:42px;height:42px;background:var(--orange,#FF4F00);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;color:#fff;font-weight:700;letter-spacing:.02em" id="manage-tenant-avatar">D</div>
       <div style="min-width:0;flex:1">
-        <div id="manage-tenant-name" style="font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Outlet Name</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <div id="manage-tenant-name" style="font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Outlet Name</div>
+          <span id="manage-outlet-type" style="flex-shrink:0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--stroke);color:var(--text-mute);text-transform:none;letter-spacing:0">Restaurant</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
           <span id="manage-status-badge" style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:700"><span style="width:6px;height:6px;border-radius:50%;background:#22C55E;display:inline-block"></span>Active</span>
           <button id="manage-copy-login-btn" title="Copy tenant login URL" style="background:none;border:1px solid var(--stroke);border-radius:6px;cursor:pointer;color:var(--text-mute);font-size:11px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px"><i class="fa-solid fa-link" style="font-size:10px"></i> Copy login URL</button>
           <button id="manage-open-dashboard-btn" title="Open workspace dashboard" style="background:rgba(252,128,25,0.08);border:1px solid rgba(252,128,25,0.28);border-radius:6px;cursor:pointer;color:var(--orange);font-size:11px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px"><i class="fa-solid fa-arrow-right-to-bracket" style="font-size:10px"></i> View dashboard</button>
@@ -1401,6 +1644,7 @@
     <div id="mobile-more-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);" onclick="document.getElementById('mobile-more-sheet').style.display='none'"></div>
     <div style="position:absolute;bottom:70px;left:12px;right:12px;background:var(--panel);border:1px solid var(--stroke);border-radius:20px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
       <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-mute);grid-column:1/-1;margin-bottom:4px;">MORE SECTIONS</div>
+      <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
       <button class="mnav-more-btn" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></button>
       <button class="mnav-more-btn" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i><span>Menu Editor</span></button>
       <button class="mnav-more-btn" data-tab="employees-tab"><i class="fa-solid fa-users"></i><span>Employees</span></button>
@@ -1447,6 +1691,33 @@
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js?v=20260618-realdata"></script>
+<script src="assets/print-bridge.js"></script>
+<script src="assets/escpos-encoder.js"></script>
+<script src="assets/modules/bill-identity.js"></script>
+<script src="assets/modules/recipe-units.js"></script>
+<script src="assets/modules/inventory-ledger.js"></script>
+<script src="assets/modules/inventory-batches.js"></script>
+<script src="assets/modules/kitchen-link-coach.js"></script>
+<script src="assets/modules/xlsx-lite.js"></script>
+<script src="assets/modules/bills-history.js"></script>
+<script src="assets/modules/inventory-ui.js"></script>
+<script src="assets/modules/reports-ui.js"></script>
+<script src="assets/modules/gateway-monitor.js"></script>
+<script src="assets/modules/super-admin.js"></script>
+<script src="assets/modules/kds-ui.js"></script>
+<script src="assets/modules/qr-orders-ui.js"></script>
+<script src="assets/modules/employees-ui.js"></script>
+<script src="assets/modules/tax-helpers.js"></script>
+<script src="assets/modules/progress-ops.js"></script>
+<script src="assets/modules/report-pdf.js"></script>
+<script src="assets/modules/menu-intelligence.js"></script>
+<script src="assets/modules/owner-wa-reports.js"></script>
+<script src="assets/modules/hr-extended.js"></script>
+<script src="assets/modules/commission.js"></script>
+<script src="assets/modules/security-shield.js"></script>
+<script src="assets/modules/pos-ui.js"></script>
+<script src="assets/modules/growth-hub-shell.js"></script>
+<script src="assets/modules/demo-script.js"></script>
 <script src="assets/saas-core.js"></script>
 <script src="assets/license-config.js"></script>
 <script src="assets/license-guard.js"></script>
@@ -1471,57 +1742,80 @@
 <script src="src/dashboard/chain.js"></script>
 <script>
   (function() {
-    var lockMessage = 'Logout is disabled while offline to prevent lock-out.';
+    var lockMessage = 'You may have unsynced data. Confirm logout only if you understand bills may still be pending upload.';
+
+    function queueDepth() {
+      try {
+        if (typeof window.RS_DB_SYNC_DEPTH === 'function') return window.RS_DB_SYNC_DEPTH() || 0;
+        return Number(window.__rsSyncQueueDepth || 0) || 0;
+      } catch (e) { return 0; }
+    }
 
     function hasRecentCloudFailure() {
       var last = window.RS_LAST_CLOUD_ERROR;
-      return !!(last && last.time && (Date.now() - last.time < 120000));
+      // Only treat as soft warning (not hard lock) — 60s window
+      return !!(last && last.time && (Date.now() - last.time < 60000));
     }
 
-    function pillShowsOfflineMode() {
-      var pill = document.getElementById('db-mode-pill');
-      var text = ((pill && pill.textContent) || '').toLowerCase();
-      return text.indexOf('local only') !== -1 ||
-        text.indexOf('app offline') !== -1 ||
-        text.indexOf('offline') !== -1 ||
-        text.indexOf('sync error') !== -1;
+    function trulyOffline() {
+      try {
+        return navigator.onLine === false || window.__OFFLINE_CONFIG__ === true;
+      } catch (e) {
+        return false;
+      }
     }
 
+    // Soft lock: warn when offline or queue has money rows; allow force logout with confirm
     window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE = function() {
       try {
-        return navigator.onLine === false ||
-          window.__OFFLINE_CONFIG__ === true ||
-          hasRecentCloudFailure() ||
-          pillShowsOfflineMode() ||
-          document.body.classList.contains('rs-offline-lock');
+        if (document.body.classList.contains('rs-offline-lock') && trulyOffline()) return true;
+        if (trulyOffline()) return true;
+        if (queueDepth() > 0) return true;
+        return false;
       } catch (e) {
         return navigator.onLine === false;
       }
     };
 
     window.RS_SHOW_OFFLINE_LOGOUT_LOCK = function() {
-      if (window.RS && typeof window.RS.toast === 'function') {
-        window.RS.toast(lockMessage, 'fa-circle-xmark');
+      var depth = queueDepth();
+      var msg = depth > 0
+        ? (depth + ' change(s) still pending cloud sync. Logout anyway? Unsynced bills stay on this device until you sign in again.')
+        : 'You appear offline. Logout anyway? Prefer staying signed in until connection returns.';
+      var ok = false;
+      try { ok = window.confirm(msg); } catch (e) { ok = false; }
+      if (!ok) {
+        if (window.RS && typeof window.RS.toast === 'function') {
+          window.RS.toast(lockMessage, 'fa-cloud-arrow-up');
+        }
         return;
       }
-      if (typeof window.toast === 'function') {
-        window.toast(lockMessage, 'fa-circle-xmark');
-        return;
-      }
-      var toast = document.getElementById('toast');
-      if (toast) {
-        toast.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + lockMessage;
-        toast.classList.add('show');
-        clearTimeout(window.__rsOfflineLogoutToastTimer);
-        window.__rsOfflineLogoutToastTimer = setTimeout(function() {
-          toast.classList.remove('show');
-        }, 2400);
-      }
+      // Force logout path — clear soft lock and re-click after releasing guard
+      window.__RS_FORCE_LOGOUT__ = true;
+      try {
+        if (window.RS_API && typeof RS_API.signOut === 'function') {
+          RS_API.signOut();
+          return;
+        }
+      } catch (e) {}
+      try {
+        sessionStorage.clear();
+      } catch (e2) {}
+      location.href = 'login.html';
     };
 
     document.addEventListener('click', function(e) {
       var target = e.target && e.target.closest && e.target.closest('.logout, [data-go="logout"], #sa-settings-logout');
-      if (!target || !window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      if (!target) return;
+      if (window.__RS_FORCE_LOGOUT__) {
+        window.__RS_FORCE_LOGOUT__ = false;
+        return;
+      }
+      if (!window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
+      // Soft warn on recent cloud errors only
+      if (!trulyOffline() && queueDepth() === 0 && hasRecentCloudFailure()) {
+        return; // allow logout after brief cloud blip
+      }
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -1530,29 +1824,100 @@
   })();
 </script>
 <script>
-  // Load versioned feature scripts in order without document.write.
-  // document.write blocks the HTML parser; this approach does not.
+  // Wave 2: critical path first (POS-ready), lazy-load secondary modules per tab.
   (function() {
-    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v39-20260709-pill-icon');
-    var srcs = [
+    var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || 'v49');
+    var parent = document.currentScript.parentNode;
+    var loaded = {};
+    var loading = {};
+
+    function loadScript(src) {
+      if (loaded[src]) return Promise.resolve();
+      if (loading[src]) return loading[src];
+      loading[src] = new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src + (src.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ver;
+        s.async = true;
+        s.onload = function() { loaded[src] = true; resolve(); };
+        s.onerror = function() { reject(new Error('Failed to load ' + src)); };
+        parent.appendChild(s);
+      });
+      return loading[src];
+    }
+
+    function loadSeq(srcs) {
+      return srcs.reduce(function(p, src) {
+        return p.then(function() { return loadScript(src); });
+      }, Promise.resolve());
+    }
+
+    // Wave 4: load order matters — dashboard/pos first, then receipt+ops bundle, then shell.
+    var pre = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
-      'assets/features-pos.js',
-      'assets/features-editor.js',
-      'assets/features-manage.js',
-      'assets/features-growth.js',
-      'assets/features-extra.js',
-      'src/dashboard/onboarding.js',
+      'assets/features-pos.js'
+    ];
+    var post = [
       'assets/features-shell.js'
     ];
-    // Load sequentially (async=false on a runtime-created script preserves order
-    // only for same-origin scripts — here they are all same-origin).
-    srcs.forEach(function(src) {
-      var s = document.createElement('script');
-      s.src = src + '?v=' + ver;
-      s.async = false;
-      document.currentScript.parentNode.appendChild(s);
-    });
+    var unbundledMid = [
+      'assets/receipt.js',
+      'assets/competitive-ops.js'
+    ];
+
+    // Secondary modules — loaded on first tab that needs them (or idle preload)
+    var TAB_MODULES = {
+      'editor-tab': ['assets/features-editor.js'],
+      'inventory-tab': ['assets/features-manage.js'],
+      'employees-tab': ['assets/features-manage.js'],
+      'aggregator-tab': ['assets/features-growth.js'],
+      'floor-tab': ['assets/features-growth.js'],
+      'customers-tab': ['assets/features-growth.js'],
+      'growth-hub-tab': ['assets/features-growth.js'],
+      'analytics-tab': ['assets/features-extra.js'],
+      'tax-tab': ['assets/features-extra.js'],
+      'reports-tab': ['assets/features-extra.js'],
+      'tokens-tab': ['assets/features-extra.js']
+    };
+
+    window.RS_ensureTabModules = function(tabId) {
+      var mods = TAB_MODULES[tabId] || [];
+      if (!mods.length) return Promise.resolve();
+      return loadSeq(mods);
+    };
+
+    function preloadRest() {
+      var rest = [
+        'assets/features-editor.js',
+        'assets/features-manage.js',
+        'assets/features-growth.js',
+        'assets/features-extra.js',
+        'src/dashboard/onboarding.js'
+      ];
+      rest.forEach(function(src, i) {
+        setTimeout(function() { loadScript(src).catch(function(){}); }, 800 + i * 400);
+      });
+    }
+
+    loadSeq(pre)
+      .then(function() {
+        return loadScript('assets/dist/critical.bundle.js').catch(function() {
+          return loadSeq(unbundledMid);
+        });
+      })
+      .then(function() {
+        // Always overlay latest sources so stale critical.bundle cannot win.
+        // receipt.js: preview HTML / fonts / time. competitive-ops.js: thermal = same layout.
+        return loadSeq(['assets/receipt.js', 'assets/competitive-ops.js']).catch(function() {});
+      })
+      .then(function() { return loadSeq(post); })
+      .then(function() {
+        if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 5000 });
+        else setTimeout(preloadRest, 2500);
+      })
+      .catch(function(e) {
+        console.error('[boot] critical scripts failed', e);
+      });
   })();
 </script>
 

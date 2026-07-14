@@ -1802,7 +1802,12 @@
           category: (m.cat || '').trim() || 'Uncategorized',
           description: m.description || '',
           image: m.image || '',
-          bestseller: !!m.bestseller
+          bestseller: !!m.bestseller,
+          isSpecial: !!(m.isSpecial || m.special),
+          isStaple: !!(m.isStaple || m.staple),
+          orderCount: Number(m.orderCount) || 0,
+          addons: Array.isArray(m.addons) ? m.addons : [],
+          pairWater: m.pairWater
         })),
         tenantName,
         currencySymbol: getCurrencySymbol ? getCurrencySymbol() : '\u20b9',

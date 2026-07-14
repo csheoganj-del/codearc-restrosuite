@@ -1,3 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RestroSuite POS</string>
+    <string name="app_tagline">Restaurant POS · Offline ready</string>
+    <string name="splash_subtitle">Cashier · Kitchen · Inventory</string>
 </resources>

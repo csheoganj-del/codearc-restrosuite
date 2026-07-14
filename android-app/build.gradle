@@ -2,4 +2,5 @@ plugins {
     id "com.android.application" version '9.2.1' apply false
 }
 
-// apply from: "gradle-temp-build-dir.gradle"
+// Use a temp build dir to avoid Windows file locks held by Android Studio's indexer.
+apply from: "gradle-temp-build-dir.gradle"

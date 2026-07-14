@@ -3,26 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#172033">
+    <meta name="theme-color" content="#FF4F00">
     <title>Page Not Found - RestroSuite</title>
     <link rel="icon" href="assets/restrosuite-mark.png?v=3" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --ink: #172033;
-            --ink-soft: #344054;
-            --muted: #667085;
-            --paper: #fffdfa;
+            --ink: #1A1714;
+            --ink-soft: #4A453F;
+            --muted: #6E675F;
+            --paper: #F3EFE8;
             --surface: #ffffff;
-            --surface-soft: #f7f8fa;
-            --brand: #f36f21;
-            --brand-dark: #c94f0b;
-            --accent: #4456d9;
-            --success: #16845b;
-            --border-color: #e5e7eb;
-            --shadow-lg: 0 28px 80px rgba(23, 32, 51, 0.14);
-            --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            --surface-soft: #F7F4EE;
+            --brand: #FF4F00;
+            --brand-dark: #D94300;
+            --accent: #5B6C8F;
+            --success: #1F8A5B;
+            --border-color: rgba(26,23,20,0.12);
+            --shadow-lg: 0 20px 48px rgba(40,30,20,0.12);
+            --transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         * {
@@ -32,10 +32,8 @@
         }
 
         body {
-            font-family: 'Inter', 'Segoe UI', sans-serif;
-            background: radial-gradient(circle at 10% 10%, rgba(243, 111, 33, 0.11), transparent 27%),
-                        radial-gradient(circle at 92% 12%, rgba(68, 86, 217, 0.10), transparent 24%),
-                        var(--paper);
+            font-family: 'DM Sans', system-ui, sans-serif;
+            background: var(--paper);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -48,35 +46,20 @@
             max-width: 600px;
             width: 100%;
             text-align: center;
-            animation: fadeInUp 0.6s ease;
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         .error-code {
-            font-family: 'Outfit', sans-serif;
-            font-size: clamp(80px, 20vw, 150px);
-            font-weight: 800;
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: clamp(80px, 20vw, 140px);
+            font-weight: 700;
             line-height: 1;
-            background: linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--brand);
             margin-bottom: 16px;
         }
 
         .title {
-            font-family: 'Outfit', sans-serif;
-            font-size: clamp(24px, 5vw, 36px);
+            font-family: 'Fraunces', Georgia, serif;
+            font-size: clamp(24px, 5vw, 34px);
             font-weight: 700;
             margin-bottom: 12px;
         }

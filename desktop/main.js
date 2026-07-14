@@ -105,6 +105,12 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: true,
+      // Hardening: no remote module, no insecure content, sandbox when possible
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      // DevTools only via explicit menu in development (see buildMenu)
+      devTools: !app.isPackaged || process.env.RS_ALLOW_DEVTOOLS === '1',
     },
   });
 
@@ -158,6 +164,23 @@ function createWindow() {
     }
   });
 
+  // Production: block DevTools keyboard shortcuts and context-menu inspect
+  if (app.isPackaged && process.env.RS_ALLOW_DEVTOOLS !== '1') {
+    win.webContents.on('before-input-event', (event, input) => {
+      const key = (input.key || '').toLowerCase();
+      if (input.type === 'keyDown') {
+        if (key === 'f12') event.preventDefault();
+        if (input.control && input.shift && (key === 'i' || key === 'j' || key === 'c')) {
+          event.preventDefault();
+        }
+        if (input.control && key === 'u') event.preventDefault();
+      }
+    });
+    win.webContents.on('context-menu', (e) => {
+      e.preventDefault();
+    });
+  }
+
   win.on('closed', () => { mainWindow = null; });
   mainWindow = win;
 }
@@ -181,7 +204,10 @@ function buildMenu() {
         { role: 'zoomOut' },
         { type: 'separator' },
         { role: 'togglefullscreen' },
-        { label: 'Toggle Developer Tools', accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', role: 'toggleDevTools' },
+        // DevTools only when unpackaged or RS_ALLOW_DEVTOOLS=1 (production EXE locked down)
+        ...(!app.isPackaged || process.env.RS_ALLOW_DEVTOOLS === '1'
+          ? [{ label: 'Toggle Developer Tools', accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', role: 'toggleDevTools' }]
+          : []),
       ],
     },
     {

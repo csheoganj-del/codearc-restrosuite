@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Brand colors -->
-    <color name="primary_brand">#111827</color>
-    <color name="primary_brand_dark">#111827</color>
-    <color name="accent_caramel">#F97316</color>
-    <color name="bg_cream">#F6F7F9</color>
+    <!-- RestroSuite brand -->
+    <color name="primary_brand">#141210</color>
+    <color name="primary_brand_dark">#0c0b0a</color>
+    <color name="accent_caramel">#FF4F00</color>
+    <color name="brand_orange">#FF4F00</color>
+    <color name="bg_cream">#F3EFE8</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
-    <!-- Adaptive launcher icon background (brand orange) -->
-    <color name="ic_launcher_background">#FF6B00</color>
+    <!-- Adaptive launcher icon background -->
+    <color name="ic_launcher_background">#F3EFE8</color>
 </resources>

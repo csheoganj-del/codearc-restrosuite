@@ -460,11 +460,103 @@
   /**
    * Wave 6/7: broader client filter — bill no, table, customer name/phone, pay method.
    */
+  let billsDateRange = 'today';
+  let billsCustomFrom = '';
+  let billsCustomTo = '';
+  try {
+    const saved = localStorage.getItem('rs_bills_date_range');
+    if (saved && /^(today|yesterday|7d|all|custom)$/.test(saved)) billsDateRange = saved;
+    billsCustomFrom = localStorage.getItem('rs_bills_date_from') || '';
+    billsCustomTo = localStorage.getItem('rs_bills_date_to') || '';
+  } catch (_) {}
+
+  function startOfLocalDay(d) {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  }
+
+  /** Parse bill timestamp from ISO or common POS display strings. */
+  function parseBillDate(b) {
+    const raw = b && (b.dateTime || b.time || b.created_at || b.createdAt || '');
+    if (!raw) return null;
+    let d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return d;
+    const s = String(raw).trim();
+    // "13 Jul, 11:18 am" / "13 Jul 2026, 11:18 am"
+    const m = s.match(
+      /^(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?,?\s*(\d{4})?(?:,?\s*(\d{1,2}):(\d{2})\s*(am|pm))?/i
+    );
+    if (m) {
+      const months = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+      };
+      const mon = months[String(m[2]).toLowerCase().slice(0, 3)];
+      if (mon != null) {
+        const year = m[3] ? Number(m[3]) : new Date().getFullYear();
+        let hour = m[4] != null ? Number(m[4]) : 12;
+        const min = m[5] != null ? Number(m[5]) : 0;
+        const ap = (m[6] || '').toLowerCase();
+        if (ap === 'pm' && hour < 12) hour += 12;
+        if (ap === 'am' && hour === 12) hour = 0;
+        d = new Date(year, mon, Number(m[1]), hour, min, 0, 0);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  }
+
+  function billInDateRange(b) {
+    const range = billsDateRange || 'today';
+    if (range === 'all') return true;
+    const d = parseBillDate(b);
+    if (!d) {
+      // Unparseable timestamps only show in All (avoids polluting Today stats)
+      return false;
+    }
+    const t = d.getTime();
+    const today0 = startOfLocalDay(new Date()).getTime();
+    const dayMs = 86400000;
+    if (range === 'today') return t >= today0 && t < today0 + dayMs;
+    if (range === 'yesterday') return t >= today0 - dayMs && t < today0;
+    if (range === '7d') return t >= today0 - 6 * dayMs && t < today0 + dayMs;
+    if (range === 'custom') {
+      let from = -Infinity;
+      let to = Infinity;
+      if (billsCustomFrom) {
+        const f = new Date(billsCustomFrom + 'T00:00:00');
+        if (!Number.isNaN(f.getTime())) from = startOfLocalDay(f).getTime();
+      }
+      if (billsCustomTo) {
+        const e = new Date(billsCustomTo + 'T00:00:00');
+        if (!Number.isNaN(e.getTime())) to = startOfLocalDay(e).getTime() + dayMs;
+      }
+      return t >= from && t < to;
+    }
+    return true;
+  }
+
+  function dateRangeLabels() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return { sales: "Yesterday's sales", count: 'Bills yesterday', refunds: 'Refunds yesterday' };
+      case '7d':
+        return { sales: '7-day sales', count: 'Bills (7 days)', refunds: 'Refunds (7 days)' };
+      case 'all':
+        return { sales: 'All-time sales', count: 'All bills', refunds: 'All refunds' };
+      case 'custom':
+        return { sales: 'Sales in range', count: 'Bills in range', refunds: 'Refunds in range' };
+      default:
+        return { sales: "Today's sales", count: "Today's bills", refunds: 'Refunds today' };
+    }
+  }
+
   function filterBills(bills, q, payFilter, statusFilter) {
     const needle = String(q || '').toLowerCase().trim();
-    let filtered = bills;
+    let filtered = (bills || []).filter(billInDateRange);
     if (needle) {
-      filtered = bills.filter((b) => {
+      filtered = filtered.filter((b) => {
         const hay = [
           b.no,
           b.orderId,
@@ -490,6 +582,14 @@
       filtered = filtered.filter((b) => b.status && String(b.status).toLowerCase() === sf);
     }
     return filtered;
+  }
+
+  function getFilteredBills() {
+    const q = ($('#bills-search') && $('#bills-search').value) || '';
+    const payFilter = ($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All';
+    const statusFilter = ($('#bills-status-filter') && $('#bills-status-filter').value) || 'All';
+    const localFiltered = filterBills(getBills(), q, payFilter, statusFilter);
+    return mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
   }
 
   /** Map cloud doppio_bills row → local bill shape used by the table. */
@@ -565,65 +665,1054 @@
     return Array.from(map.values());
   }
 
+  /** Human + Excel-friendly bill timestamp */
+  function formatBillTime(b) {
+    const raw = b && (b.dateTime || b.time || b.created_at || '');
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      try {
+        const loc =
+          typeof global.RS_getOutletLocale === 'function' ? RS_getOutletLocale() : 'en-IN';
+        const tz =
+          typeof global.RS_getOutletTimezone === 'function' ? RS_getOutletTimezone() : 'Asia/Kolkata';
+        return d.toLocaleString(loc, {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: tz,
+        });
+      } catch (_) {
+        return d.toLocaleString();
+      }
+    }
+    // Already formatted (e.g. "11 Jul, 3:30 pm")
+    return String(raw);
+  }
+
+  function formatBillTimeIsoExcel(b) {
+    const raw = b && (b.dateTime || b.time || b.created_at || '');
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return String(raw);
+    const pad = (n) => String(n).padStart(2, '0');
+    // Local wall time yyyy-mm-dd HH:mm:ss — Excel-friendly
+    return (
+      d.getFullYear() +
+      '-' +
+      pad(d.getMonth() + 1) +
+      '-' +
+      pad(d.getDate()) +
+      ' ' +
+      pad(d.getHours()) +
+      ':' +
+      pad(d.getMinutes()) +
+      ':' +
+      pad(d.getSeconds())
+    );
+  }
+
+  function lineItemsSummary(b) {
+    const items = Array.isArray(b._items) ? b._items : [];
+    if (items.length) {
+      return items
+        .map((i) => {
+          const q = Number(i.qty) || 1;
+          const name = String(i.name || 'Item').replace(/[;\n\r]+/g, ' ');
+          return q + 'x ' + name;
+        })
+        .join('; ');
+    }
+    if (b.items != null && b.items !== '') return String(b.items);
+    return '';
+  }
+
+  function csvEscape(value) {
+    const s = value == null ? '' : String(value);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function collectExportList() {
+    const q = ($('#bills-search') && $('#bills-search').value) || '';
+    const payFilter = ($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All';
+    const statusFilter = ($('#bills-status-filter') && $('#bills-status-filter').value) || 'All';
+    const all = getBills();
+    const localFiltered = filterBills(all, q, payFilter, statusFilter);
+    return mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
+  }
+
+  function exportRangeLabel() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return 'Yesterday';
+      case '7d':
+        return '7-days';
+      case 'all':
+        return 'All';
+      case 'custom': {
+        const a = billsCustomFrom || 'start';
+        const b = billsCustomTo || 'end';
+        return a + '_to_' + b;
+      }
+      default:
+        return 'Today';
+    }
+  }
+
+  function exportOutletSlug() {
+    const settings = global.RS_SETTINGS || {};
+    const sess = global.RS_API && RS_API.session ? RS_API.session() : null;
+    let name =
+      settings.set_restaurant_name ||
+      settings.set_outlet_name ||
+      (sess && (sess.tenant_name || sess.business_name)) ||
+      'RestroSuite';
+    return (
+      String(name)
+        .replace(/[^\w\-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 40) || 'RestroSuite'
+    );
+  }
+
+  function exportStamp() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+  }
+
+  function numOrBlank(v) {
+    if (v == null || v === '') return '';
+    const n = Number(v);
+    return Number.isFinite(n) ? n : '';
+  }
+
+  function paymentBreakdown(list) {
+    const map = {};
+    (list || []).forEach((b) => {
+      if (String(b.status || '').toLowerCase() === 'refunded') return;
+      if (Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach((t) => {
+          const method = t.method || b.pay || 'Cash';
+          map[method] = (map[method] || 0) + (Number(t.amount) || 0);
+        });
+      } else {
+        const method = b.pay || b.paymentMethod || 'Cash';
+        map[method] = (map[method] || 0) + (Number(b.amount) || Number(b.total) || 0);
+      }
+    });
+    return map;
+  }
+
+  /**
+   * Real Excel .xlsx — Summary + Bills + Line items sheets.
+   * Respects date range, search, payment, and status filters.
+   */
+  function exportBillsXlsx() {
+    const list = collectExportList();
+    if (!list.length) {
+      toast('No bills to export for this range', 'fa-circle-exclamation');
+      return false;
+    }
+    if (!global.RSXlsxLite || typeof RSXlsxLite.buildXlsx !== 'function') {
+      toast('Excel engine missing — exporting CSV instead', 'fa-circle-exclamation');
+      return exportBillsCsv();
+    }
+
+    const settings = global.RS_SETTINGS || {};
+    const taxLabel = settings.set_tax_label || 'GST';
+    const rangeLabel = exportRangeLabel();
+    const outlet = exportOutletSlug();
+    const paid = list.filter((b) => String(b.status || '').toLowerCase() === 'paid');
+    const refunded = list.filter((b) => String(b.status || '').toLowerCase() === 'refunded');
+    const sales = paid.reduce((s, b) => s + (Number(b.amount) || Number(b.total) || 0), 0);
+    const aov = paid.length ? Math.round(sales / paid.length) : 0;
+    const gstTotal = paid.reduce((s, b) => s + (Number(b.gst) || 0), 0);
+    const payMap = paymentBreakdown(list);
+    const now = new Date();
+
+    const summaryRows = [
+      ['RestroSuite Bill Export'],
+      ['Outlet', outlet.replace(/-/g, ' ')],
+      ['Range', rangeLabel.replace(/_/g, ' ')],
+      ['Exported at', now.toLocaleString('en-IN')],
+      [],
+      ['Metric', 'Value'],
+      ['Bills in export', list.length],
+      ['Paid bills', paid.length],
+      ['Refunded bills', refunded.length],
+      ['Sales (paid)', sales],
+      ['Avg order value', aov],
+      [taxLabel + ' (from bills)', gstTotal],
+      [],
+      ['Payment breakdown', 'Amount'],
+    ];
+    Object.keys(payMap)
+      .sort()
+      .forEach((k) => summaryRows.push([k, payMap[k]]));
+    if (!Object.keys(payMap).length) summaryRows.push(['—', 0]);
+    summaryRows.push([]);
+    summaryRows.push(['Notes']);
+    summaryRows.push(['Stats match the active Bills date range and filters.']);
+    summaryRows.push(['Open the Bills sheet for one row per bill; Line items for pivots.']);
+
+    const billHeaders = [
+      'Bill No',
+      'Date',
+      'Date Display',
+      'Table',
+      'Customer',
+      'Phone',
+      'Item Count',
+      'Line Items',
+      'Subtotal',
+      taxLabel,
+      'Discount',
+      'Total',
+      'Payment',
+      'Tenders',
+      'Status',
+      'Channel',
+      'Station',
+      'Shift',
+      'Cashier',
+      'Order Type',
+    ];
+    const billRows = [billHeaders];
+    list.forEach((b) => {
+      const tenders = Array.isArray(b.tenders)
+        ? b.tenders.map((t) => (t.method || '') + ':' + (Number(t.amount) || 0)).join(' | ')
+        : '';
+      const itemCount =
+        Array.isArray(b._items) && b._items.length
+          ? b._items.reduce((acc, i) => acc + (Number(i.qty) || 1), 0)
+          : numOrBlank(b.items);
+      billRows.push([
+        b.no || b.orderId || b.id || '',
+        formatBillTimeIsoExcel(b),
+        formatBillTime(b),
+        b.table || '',
+        b.customerName || b.customer || '',
+        b.customerPhone || '',
+        itemCount,
+        lineItemsSummary(b),
+        numOrBlank(b.subtotal),
+        numOrBlank(b.gst),
+        numOrBlank(b.discount != null ? b.discount : b.disc),
+        numOrBlank(b.amount != null ? b.amount : b.total),
+        b.pay || b.paymentMethod || '',
+        tenders,
+        b.status || '',
+        b.channel || b.channelCode || '',
+        b.stationLabel || b.stationId || '',
+        b.shiftId || '',
+        b.cashier || '',
+        b.orderType || '',
+      ]);
+    });
+
+    const lineHeaders = [
+      'Bill No',
+      'Date',
+      'Table',
+      'Customer',
+      'Payment',
+      'Status',
+      'Item',
+      'Qty',
+      'Unit Price',
+      'Line Total',
+      'Note',
+    ];
+    const lineRows = [lineHeaders];
+    list.forEach((b) => {
+      const billNo = b.no || b.orderId || b.id || '';
+      const date = formatBillTimeIsoExcel(b);
+      const table = b.table || '';
+      const cust = b.customerName || b.customer || '';
+      const pay = b.pay || b.paymentMethod || '';
+      const status = b.status || '';
+      const items = Array.isArray(b._items) ? b._items : [];
+      if (items.length) {
+        items.forEach((it) => {
+          const qty = Number(it.qty) || 1;
+          const price = Number(it.price) || 0;
+          lineRows.push([
+            billNo,
+            date,
+            table,
+            cust,
+            pay,
+            status,
+            it.name || 'Item',
+            qty,
+            price,
+            Math.round(qty * price * 100) / 100,
+            it.note || it.notes || '',
+          ]);
+        });
+      } else {
+        lineRows.push([
+          billNo,
+          date,
+          table,
+          cust,
+          pay,
+          status,
+          lineItemsSummary(b) || 'Bill total',
+          1,
+          numOrBlank(b.amount != null ? b.amount : b.total) || 0,
+          numOrBlank(b.amount != null ? b.amount : b.total) || 0,
+          '',
+        ]);
+      }
+    });
+
+    try {
+      const bytes = RSXlsxLite.buildXlsx([
+        { name: 'Summary', cols: [28, 22], rows: summaryRows },
+        {
+          name: 'Bills',
+          cols: [16, 18, 18, 14, 16, 14, 10, 28, 10, 10, 10, 10, 10, 16, 10, 10, 12, 12, 12, 12],
+          rows: billRows,
+        },
+        {
+          name: 'Line items',
+          cols: [16, 18, 14, 16, 10, 10, 24, 8, 10, 10, 16],
+          rows: lineRows,
+        },
+      ]);
+      const fname = outlet + '-Bills-' + rangeLabel + '-' + exportStamp() + '.xlsx';
+      RSXlsxLite.downloadXlsx(bytes, fname);
+      toast(
+        'Exported ' + list.length + ' bills · ' + rangeLabel.replace(/_/g, ' ') + ' · Excel',
+        'fa-file-excel'
+      );
+      return true;
+    } catch (e) {
+      console.warn('[BillsHistory] xlsx export failed', e);
+      toast('Excel export failed — try CSV', 'fa-circle-exclamation');
+      return false;
+    }
+  }
+
+  /**
+   * Export bills as Excel-friendly CSV (UTF-8 BOM).
+   * Respects current search / payment / status / date filters.
+   */
+  function exportBillsCsv() {
+    const prog =
+      global.RSProgress &&
+      RSProgress.open({
+        title: 'Exporting bills…',
+        sub: 'Building CSV for the selected range',
+        total: 0,
+        unit: 'bills',
+      });
+    try {
+      if (prog) prog.setIndeterminate('Preparing rows…');
+      const result = _exportBillsCsvInner(prog);
+      if (prog) prog.close();
+      return result;
+    } catch (e) {
+      if (prog) prog.close();
+      throw e;
+    }
+  }
+  function _exportBillsCsvInner(prog) {
+    const list = collectExportList();
+    if (!list.length) {
+      toast('No bills to export for this range', 'fa-circle-exclamation');
+      return false;
+    }
+    if (prog) prog.update({ total: list.length, done: 0, unit: 'bills', label: 'Writing rows…' });
+
+    const settings = global.RS_SETTINGS || {};
+    const taxLabel = settings.set_tax_label || 'GST';
+    const headers = [
+      'Bill No',
+      'Date (Excel)',
+      'Date (Display)',
+      'Table',
+      'Item Count',
+      'Line Items',
+      'Customer',
+      'Phone',
+      'Subtotal',
+      taxLabel,
+      'Discount',
+      'Total',
+      'Payment',
+      'Tenders',
+      'Status',
+      'Channel',
+      'Station',
+      'Shift',
+      'Cashier',
+      'Order Type',
+    ];
+
+    const rows = list.map((b, idx) => {
+      const tenders = Array.isArray(b.tenders)
+        ? b.tenders.map((t) => (t.method || '') + ':' + (Number(t.amount) || 0)).join('|')
+        : '';
+      const itemCount =
+        Array.isArray(b._items) && b._items.length
+          ? b._items.reduce((acc, i) => acc + (Number(i.qty) || 1), 0)
+          : b.items != null
+            ? b.items
+            : '';
+      if (prog && (idx % 25 === 0 || idx === list.length - 1)) prog.update({ done: idx + 1 });
+      return [
+        b.no || b.orderId || b.id || '',
+        formatBillTimeIsoExcel(b),
+        formatBillTime(b),
+        b.table || '',
+        itemCount,
+        lineItemsSummary(b),
+        b.customerName || b.customer || '',
+        b.customerPhone || '',
+        b.subtotal != null ? b.subtotal : '',
+        b.gst != null ? b.gst : '',
+        b.discount != null ? b.discount : b.disc != null ? b.disc : '',
+        b.amount != null ? b.amount : b.total != null ? b.total : '',
+        b.pay || b.paymentMethod || '',
+        tenders,
+        b.status || '',
+        b.channel || b.channelCode || '',
+        b.stationLabel || b.stationId || '',
+        b.shiftId || '',
+        b.cashier || '',
+        b.orderType || '',
+      ]
+        .map(csvEscape)
+        .join(',');
+    });
+
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const fname = exportOutletSlug() + '-Bills-' + exportRangeLabel() + '-' + exportStamp() + '.csv';
+
+    try {
+      if (global.RS && typeof RS.downloadFile === 'function') {
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', fname);
+      } else {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+      toast('Exported ' + list.length + ' bills · CSV', 'fa-file-csv');
+      return true;
+    } catch (e) {
+      console.warn('[BillsHistory] export failed', e);
+      toast('Export failed — try again', 'fa-circle-exclamation');
+      return false;
+    }
+  }
+
+  function wireExportButton() {
+    const btn = document.getElementById('btn-export-bills');
+    if (btn && btn.dataset.rsExportBound !== '1') {
+      btn.dataset.rsExportBound = '1';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        exportBillsXlsx();
+      });
+    }
+    const csvBtn = document.getElementById('btn-export-bills-csv');
+    if (csvBtn && csvBtn.dataset.rsExportBound !== '1') {
+      csvBtn.dataset.rsExportBound = '1';
+      csvBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        exportBillsCsv();
+      });
+    }
+  }
+
+  function rangeDisplayLabel() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return 'Yesterday';
+      case '7d':
+        return 'Last 7 days';
+      case 'all':
+        return 'All history';
+      case 'custom': {
+        const a = billsCustomFrom || '…';
+        const b = billsCustomTo || '…';
+        return a + ' → ' + b;
+      }
+      default:
+        return 'Today';
+    }
+  }
+
+  function reportTitleForRange() {
+    switch (billsDateRange) {
+      case 'yesterday':
+        return 'YESTERDAY SALES SUMMARY';
+      case '7d':
+        return '7-DAY SALES SUMMARY';
+      case 'all':
+        return 'FULL HISTORY SALES SUMMARY';
+      case 'custom':
+        return 'CUSTOM RANGE SALES SUMMARY';
+      default:
+        return 'DAILY SALES SUMMARY';
+    }
+  }
+
+  function formatShortDate(d) {
+    if (!d || Number.isNaN(d.getTime())) return '—';
+    try {
+      return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+    } catch (_) {
+      return d.toLocaleDateString();
+    }
+  }
+
+  function periodFromBills(list) {
+    let min = null;
+    let max = null;
+    (list || []).forEach((b) => {
+      const d = parseBillDate(b);
+      if (!d) return;
+      if (!min || d < min) min = d;
+      if (!max || d > max) max = d;
+    });
+    if (min && max) {
+      const a = formatShortDate(min);
+      const b = formatShortDate(max);
+      return a === b ? a : a + ' – ' + b;
+    }
+    return rangeDisplayLabel();
+  }
+
+  function money(n) {
+    return rs(Number(n) || 0);
+  }
+
+  /**
+   * 10/10 printable / PDF sales report for the active Bills range + filters.
+   * A4 layout with clean margins (no thermal-on-A4 empty page look).
+   */
+  function printSalesReport() {
+    const list = collectExportList();
+    if (!list.length) {
+      toast('No bills in this range to report', 'fa-circle-exclamation');
+      return false;
+    }
+
+    const settings = global.RS_SETTINGS || {};
+    const sess = global.RS_API && RS_API.session ? RS_API.session() : null;
+    let outletName =
+      settings.set_restaurant_name ||
+      settings.set_outlet_name ||
+      (sess && (sess.tenant_name || sess.business_name)) ||
+      'RestroSuite Outlet';
+    if (!outletName || /outlet name/i.test(outletName)) outletName = 'RestroSuite Outlet';
+
+    const taxLabel = settings.set_tax_label || 'GST';
+    const taxPct =
+      settings.set_tax_rate != null && settings.set_tax_rate !== ''
+        ? Number(settings.set_tax_rate)
+        : settings.set_gst_rate != null
+          ? Number(settings.set_gst_rate)
+          : null;
+
+    const paidBills = list.filter((b) => String(b.status || 'paid').toLowerCase() === 'paid');
+    const refundBills = list.filter((b) => {
+      const st = String(b.status || '').toLowerCase();
+      return st === 'refunded' || st === 'voided' || st === 'void';
+    });
+    const totalRevenue = paidBills.reduce(
+      (sum, b) => sum + (Number(b.amount) || Number(b.total) || 0),
+      0
+    );
+    const refundTotal = refundBills.reduce(
+      (sum, b) => sum + (Number(b.amount) || Number(b.total) || 0),
+      0
+    );
+    const totalOrders = paidBills.length;
+    const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    const gstFromBills = paidBills.reduce((sum, b) => sum + (Number(b.gst) || 0), 0);
+    const divisor = taxPct && taxPct > 0 ? 1 + taxPct / 100 : 1.05;
+    const gstCollected =
+      gstFromBills > 0
+        ? Math.round(gstFromBills * 100) / 100
+        : Math.round((totalRevenue - totalRevenue / divisor) * 100) / 100;
+    const netTaxableSales = Math.round((totalRevenue - gstCollected) * 100) / 100;
+    const taxPctLabel =
+      taxPct != null && Number.isFinite(taxPct) ? String(taxPct) + '%' : gstFromBills > 0 ? 'as billed' : 'est. 5%';
+
+    const paymentMethods = {};
+    paidBills.forEach((b) => {
+      if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
+        b.tenders.forEach((t) => {
+          const method = t.method || 'Cash';
+          paymentMethods[method] = (paymentMethods[method] || 0) + Number(t.amount || 0);
+        });
+      } else {
+        const method = b.pay || b.paymentMethod || 'Cash';
+        paymentMethods[method] =
+          (paymentMethods[method] || 0) + (Number(b.amount) || Number(b.total) || 0);
+      }
+    });
+
+    const payRows = Object.keys(paymentMethods)
+      .sort()
+      .map(
+        (method) =>
+          `<tr><td>${_e(method)}</td><td class="num">${_e(money(paymentMethods[method]))}</td></tr>`
+      )
+      .join('');
+
+    // Compact bill list (latest first-ish — keep list order)
+    const billListRows = list
+      .slice(0, 25)
+      .map((b) => {
+        const st = String(b.status || 'paid');
+        return `<tr>
+          <td>${_e(b.no || b.orderId || b.id || '—')}</td>
+          <td>${_e(formatBillTime(b) || '—')}</td>
+          <td>${_e(b.pay || b.paymentMethod || '—')}</td>
+          <td class="num">${_e(money(b.amount != null ? b.amount : b.total))}</td>
+          <td>${_e(st)}</td>
+        </tr>`;
+      })
+      .join('');
+    const moreNote =
+      list.length > 25
+        ? `<p class="note">Showing 25 of ${list.length} bills. Use Export Excel for the full list.</p>`
+        : '';
+
+    const now = new Date();
+    const printedAt = now.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const period = periodFromBills(list);
+    const rangeLabel = rangeDisplayLabel();
+    const title = reportTitleForRange();
+    const docTitle = 'Sales Report · ' + rangeLabel + ' · ' + outletName;
+
+    const staff =
+      (sess && (sess.display_name || sess.username || sess.email)) ||
+      sessionStorage.getItem('logged_in_user') ||
+      'Staff';
+
+    const html = `
+<div class="rs-sales-report">
+  <header class="sr-head">
+    <div class="sr-brand">
+      <div class="sr-outlet">${_e(outletName)}</div>
+      <div class="sr-title">${_e(title)}</div>
+    </div>
+    <div class="sr-meta">
+      <div><span>Period</span><strong>${_e(period)}</strong></div>
+      <div><span>Filter</span><strong>${_e(rangeLabel)}</strong></div>
+      <div><span>Printed</span><strong>${_e(printedAt)}</strong></div>
+      <div><span>By</span><strong>${_e(String(staff))}</strong></div>
+    </div>
+  </header>
+
+  <section class="sr-kpis">
+    <div class="kpi"><div class="k-l">Paid bills</div><div class="k-v">${totalOrders}</div></div>
+    <div class="kpi"><div class="k-l">Gross sales</div><div class="k-v">${_e(money(totalRevenue))}</div></div>
+    <div class="kpi"><div class="k-l">Avg order</div><div class="k-v">${_e(money(aov))}</div></div>
+    <div class="kpi"><div class="k-l">Refunds</div><div class="k-v">${refundBills.length} · ${_e(money(refundTotal))}</div></div>
+  </section>
+
+  <div class="sr-grid">
+    <section class="sr-card">
+      <h3>Payment breakdown</h3>
+      <table class="sr-table">
+        <thead><tr><th>Method</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          ${payRows || '<tr><td colspan="2">No paid tenders</td></tr>'}
+        </tbody>
+        <tfoot><tr><td>Total paid</td><td class="num">${_e(money(totalRevenue))}</td></tr></tfoot>
+      </table>
+    </section>
+    <section class="sr-card">
+      <h3>Tax &amp; totals</h3>
+      <table class="sr-table">
+        <tbody>
+          <tr><td>Net taxable sales</td><td class="num">${_e(money(netTaxableSales))}</td></tr>
+          <tr><td>${_e(taxLabel)} (${_e(taxPctLabel)})</td><td class="num">${_e(money(gstCollected))}</td></tr>
+          <tr><td>Refunds / voids</td><td class="num">${_e(money(refundTotal))}</td></tr>
+          <tr class="em"><td>Gross revenue (paid)</td><td class="num">${_e(money(totalRevenue))}</td></tr>
+          <tr><td>Net after refunds</td><td class="num">${_e(money(totalRevenue - refundTotal))}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <section class="sr-card">
+    <h3>Bills in this report (${list.length})</h3>
+    <table class="sr-table sr-bills">
+      <thead>
+        <tr>
+          <th>Bill No.</th>
+          <th>Time</th>
+          <th>Pay</th>
+          <th class="num">Amount</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${billListRows}</tbody>
+    </table>
+    ${moreNote}
+  </section>
+
+  <footer class="sr-foot">
+    <div>RestroSuite · Sales report · ${_e(rangeLabel)}</div>
+    <div>*** End of report ***</div>
+  </footer>
+</div>`;
+
+    const style = `
+      @page { size: A4; margin: 14mm 12mm; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0;
+        color: #111;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 12px;
+        background: #fff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .rs-sales-report { max-width: 720px; margin: 0 auto; }
+      .sr-head {
+        display: flex; justify-content: space-between; gap: 16px;
+        border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 14px;
+      }
+      .sr-outlet { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+      .sr-title { font-size: 11px; font-weight: 700; color: #555; margin-top: 4px; letter-spacing: 0.06em; }
+      .sr-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 11px; min-width: 220px; }
+      .sr-meta span { display: block; color: #777; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .sr-meta strong { font-weight: 700; }
+      .sr-kpis {
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px;
+      }
+      .kpi {
+        border: 1px solid #ddd; border-radius: 8px; padding: 10px 10px 8px;
+        background: #fafafa;
+      }
+      .k-l { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.04em; }
+      .k-v { font-size: 15px; font-weight: 800; margin-top: 4px; }
+      .sr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+      .sr-card {
+        border: 1px solid #e5e5e5; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;
+      }
+      .sr-card h3 {
+        margin: 0 0 8px; font-size: 12px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 0.05em; color: #333;
+      }
+      .sr-table { width: 100%; border-collapse: collapse; }
+      .sr-table th, .sr-table td {
+        text-align: left; padding: 5px 4px; border-bottom: 1px solid #eee; font-size: 11.5px;
+      }
+      .sr-table th { color: #666; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .sr-table .num, .sr-table td.num, .sr-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .sr-table tfoot td { font-weight: 800; border-top: 1px solid #ccc; border-bottom: 0; }
+      .sr-table tr.em td { font-weight: 800; font-size: 13px; border-top: 1px dashed #bbb; }
+      .sr-bills td { font-size: 11px; }
+      .note { margin: 8px 0 0; font-size: 10.5px; color: #777; }
+      .sr-foot {
+        margin-top: 16px; padding-top: 10px; border-top: 1px dashed #bbb;
+        display: flex; justify-content: space-between; font-size: 10px; color: #777;
+      }
+      @media print {
+        body { padding: 0; }
+        .sr-card, .kpi { break-inside: avoid; }
+      }
+      @media screen {
+        body { padding: 18px; background: #f3f3f3; }
+        .rs-sales-report {
+          background: #fff; padding: 22px 24px; border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,.08);
+        }
+      }
+      @media (max-width: 640px) {
+        .sr-kpis, .sr-grid, .sr-head { grid-template-columns: 1fr 1fr; display: grid; }
+        .sr-head { display: block; }
+        .sr-meta { margin-top: 10px; }
+      }
+    `;
+
+    const fullHtml =
+      '<!doctype html><html><head><meta charset="utf-8"><title>' +
+      _e(docTitle) +
+      '</title><style>' +
+      style +
+      '</style></head><body>' +
+      html +
+      '</body></html>';
+
+    try {
+      // Prefer iframe with our A4 styles (RSPrint forces thermal width)
+      const f = document.createElement('iframe');
+      f.setAttribute('title', docTitle);
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+      document.body.appendChild(f);
+      const w = f.contentWindow;
+      const d = w.document;
+      d.open();
+      d.write(fullHtml);
+      d.close();
+      const trigger = () => {
+        try {
+          w.focus();
+          w.print();
+        } catch (e) {
+          console.warn('[BillsHistory] print failed', e);
+        }
+        setTimeout(() => {
+          try {
+            f.remove();
+          } catch (_) {}
+        }, 1500);
+      };
+      // Wait for layout
+      setTimeout(trigger, 250);
+      toast('Opening sales report · ' + rangeLabel, 'fa-print');
+      return true;
+    } catch (e) {
+      console.warn('[BillsHistory] printSalesReport failed', e);
+      toast('Could not open print report', 'fa-circle-exclamation');
+      return false;
+    }
+  }
+
+  function wirePrintReportButton() {
+    const btn = document.getElementById('btn-print-day-report');
+    if (!btn || btn.dataset.rsPrintBound === '1') return;
+    btn.dataset.rsPrintBound = '1';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      printSalesReport();
+    });
+  }
+
+  /** Filter button focuses the inline Payment / Status selects (no dead control). */
+  function wireFilterButton() {
+    const btn = document.getElementById('btn-bills-filter');
+    if (!btn || btn.dataset.rsFilterBound === '1') return;
+    btn.dataset.rsFilterBound = '1';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pay = document.getElementById('bills-pay-filter');
+      const status = document.getElementById('bills-status-filter');
+      const bar = document.getElementById('bills-filter-hint');
+      if (bar) {
+        bar.hidden = false;
+        bar.setAttribute('aria-hidden', 'false');
+      }
+      [pay, status].forEach((el) => {
+        if (!el) return;
+        el.classList.add('bills-filter-flash');
+        setTimeout(() => el.classList.remove('bills-filter-flash'), 1600);
+      });
+      if (pay) {
+        try {
+          pay.focus();
+        } catch (_) {}
+      }
+      toast('Use date chips + Payment / Status filters', 'fa-filter');
+    });
+  }
+
+  function statusPillHtml(b) {
+    const st = String((b && b.status) || '').toLowerCase();
+    if (st === 'paid') return '<span class="pill pill-green" style="padding:3px 9px">Paid</span>';
+    if (st === 'refunded' || st === 'voided' || st === 'void')
+      return '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>';
+    return `<span class="pill" style="padding:3px 9px">${_e(b.status || '—')}</span>`;
+  }
+
+  function closeAllBillMoreMenus(except) {
+    document.querySelectorAll('.bills-more-menu').forEach((menu) => {
+      if (except && menu === except) return;
+      menu.hidden = true;
+    });
+    document.querySelectorAll('.bills-more.is-open').forEach((wrap) => {
+      if (except && wrap.contains(except)) return;
+      wrap.classList.remove('is-open');
+    });
+  }
+
   function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
     if (!body) return;
 
+    if (!filtered.length) {
+      const q = ($('#bills-search') && $('#bills-search').value) || '';
+      const hasFilter =
+        q.trim() ||
+        (($('#bills-pay-filter') && $('#bills-pay-filter').value) || 'All') !== 'All' ||
+        (($('#bills-status-filter') && $('#bills-status-filter').value) || 'All') !== 'All' ||
+        (billsDateRange && billsDateRange !== 'all');
+      const emptyTitle =
+        hasFilter
+          ? 'No bills match your filters'
+          : billsDateRange === 'today'
+            ? 'No bills yet today'
+            : 'No bills in this range';
+      const emptyHint = hasFilter
+        ? 'Try another date chip, clear search, or set Payment / Status to All.'
+        : 'Completed sales from POS appear here for reprint, export, and reports.';
+      body.innerHTML = `<tr class="bills-empty-row"><td colspan="9" style="padding:0;border:none">
+        <div class="sr-empty" style="padding:40px 20px">
+          <i class="fa-solid fa-file-invoice-dollar" style="font-size:24px;opacity:.4;display:block;margin-bottom:8px"></i>
+          <div style="font-weight:700;color:var(--text);margin-bottom:4px">${emptyTitle}</div>
+          <div style="color:var(--text-soft);font-size:13px;max-width:380px;margin:0 auto">${emptyHint}</div>
+        </div>
+      </td></tr>`;
+      return;
+    }
+
     body.innerHTML = filtered
-      .map(
-        (b) => `
+      .map((b) => {
+        const cust = b.customerName || b.customer || '';
+        const phone = b.customerPhone || '';
+        const custHtml = cust
+          ? `<div class="bc-name">${_e(cust)}</div>${phone ? `<div class="bc-phone">${_e(phone)}</div>` : ''}`
+          : phone
+            ? `<div class="bc-phone">${_e(phone)}</div>`
+            : `<span class="bc-empty">—</span>`;
+        const refunded = String(b.status || '').toLowerCase() === 'refunded';
+        return `
       <tr data-bill-no="${_e(b.no || b.orderId || b.id || '')}">
-        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td><td>${_e(b.time || b.dateTime || '-')}</td><td>${_e(b.table || '-')}</td><td>${_e(b.items)}</td>
-        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay)}</span></td>
+        <td><b>${_e(b.no || b.orderId || b.id || '-')}</b></td>
+        <td class="td-time" title="${_e(formatBillTimeIsoExcel(b) || '')}">${_e(formatBillTime(b) || '-')}</td>
+        <td>${_e(b.table || '-')}</td>
+        <td class="td-cust">${custHtml}</td>
+        <td>${_e(b.items)}</td>
+        <td><span class="pill ${payPill[b.pay] || ''}" style="padding:3px 9px">${_e(b.pay || '—')}</span></td>
         <td class="td-strong">${rs(b.amount)}</td>
-        <td>${b.status === 'paid' ? '<span class="pill pill-green" style="padding:3px 9px">Paid</span>' : '<span class="pill pill-red" style="padding:3px 9px">Voided</span>'}</td>
-        <td><div class="row-actions"><button class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button><button class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button><button class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button><button class="icon-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button><button class="icon-act danger refund-act" title="Void / refund" aria-label="Void bill ${_e(b.no || b.orderId || '')}" ${b.status === 'refunded' ? 'disabled style="opacity:.4"' : ''}><i class="fa-solid fa-ban"></i></button><button class="icon-act del-act" title="Delete bill" aria-label="Delete bill ${_e(b.no || b.orderId || '')}" style="color:#ef4444;"><i class="fa-solid fa-trash-can"></i></button></div></td>
-      </tr>`
-      )
+        <td>${statusPillHtml(b)}</td>
+        <td>
+          <div class="row-actions bills-row-actions">
+            <button type="button" class="icon-act go" title="Reprint preview" aria-label="Reprint bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-print"></i></button>
+            <button type="button" class="icon-act thermal-act" title="Thermal print" aria-label="Thermal print bill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-receipt"></i></button>
+            <button type="button" class="icon-act rebill-act" title="Rebill / load into POS" aria-label="Rebill ${_e(b.no || b.orderId || '')}"><i class="fa-solid fa-rotate"></i></button>
+            <button type="button" class="icon-act wa-act" title="Share on WhatsApp" aria-label="Share bill ${_e(b.no || b.orderId || '')}"><i class="fa-brands fa-whatsapp"></i></button>
+            <div class="bills-more">
+              <button type="button" class="icon-act more-act" title="More actions" aria-label="More actions" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
+              <div class="bills-more-menu" hidden role="menu">
+                <button type="button" class="bills-more-item refund-act" role="menuitem" ${refunded ? 'disabled' : ''}><i class="fa-solid fa-ban"></i> Void / refund</button>
+                <button type="button" class="bills-more-item del-act danger" role="menuitem"><i class="fa-solid fa-trash-can"></i> Delete bill</button>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+      })
       .join('');
 
     const visibleBills = filtered;
     if (body._rsBillActionHandler) body.removeEventListener('click', body._rsBillActionHandler, true);
     body._rsBillActionHandler = (e) => {
-      const btn = e.target.closest('.icon-act');
+      const moreBtn = e.target.closest('.more-act');
+      if (moreBtn && body.contains(moreBtn)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const wrap = moreBtn.closest('.bills-more');
+        const menu = wrap && wrap.querySelector('.bills-more-menu');
+        if (!menu) return;
+        const open = menu.hidden;
+        closeAllBillMoreMenus();
+        if (open) {
+          menu.hidden = false;
+          wrap.classList.add('is-open');
+          moreBtn.setAttribute('aria-expanded', 'true');
+        }
+        return;
+      }
+
+      const menuItem = e.target.closest('.bills-more-item');
+      const btn = menuItem || e.target.closest('.icon-act');
       if (!btn || !body.contains(btn) || btn.disabled) return;
+      if (btn.classList.contains('more-act')) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       const row = btn.closest('tr');
-      const bill = visibleBills[[...body.children].indexOf(row)];
+      const bill = visibleBills[[...body.querySelectorAll('tr')].indexOf(row)];
       if (!bill) return;
-      // Prefer live RS.BILLS object when present (mutations stick)
       const live = getBills().find(
         (x) => x === bill || String(x.no || x.orderId) === String(bill.no || bill.orderId)
       );
       const target = live || bill;
+      closeAllBillMoreMenus();
       if (btn.classList.contains('go')) return showBillReceipt(target);
       if (btn.classList.contains('thermal-act')) return printBillThermal(target);
       if (btn.classList.contains('rebill-act')) return rebillToPos(target);
       if (btn.classList.contains('refund-act')) return markBillRefunded(target);
       if (btn.classList.contains('del-act')) return deleteBill(target);
+      if (btn.classList.contains('wa-act')) return shareBillReceipt(target);
       return shareBillReceipt(target);
     };
     body.addEventListener('click', body._rsBillActionHandler, true);
+
+    if (!document._rsBillsMoreDocBound) {
+      document._rsBillsMoreDocBound = true;
+      document.addEventListener('click', (ev) => {
+        if (!ev.target.closest('.bills-more')) closeAllBillMoreMenus();
+      });
+    }
   }
 
   function renderBills() {
     const BILLS = getBills();
-    const paidBills = BILLS.filter((b) => b.status === 'paid');
-    const totalSales = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const count = BILLS.length;
+    // Stats always match the active date range (before search/pay/status filters)
+    const ranged = BILLS.filter(billInDateRange);
+    const paidBills = ranged.filter((b) => String(b.status || '').toLowerCase() === 'paid');
+    const totalSales = paidBills.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+    const countInRange = ranged.length;
     const aov = paidBills.length > 0 ? Math.round(totalSales / paidBills.length) : 0;
-    const refunds = BILLS.filter((b) => b.status === 'refunded').length;
+    const refunds = ranged.filter((b) => String(b.status || '').toLowerCase() === 'refunded').length;
+    const labels = dateRangeLabels();
 
     const salesEl = document.getElementById('bills-stat-sales');
     if (salesEl) salesEl.textContent = rs(totalSales);
     const countEl = document.getElementById('bills-stat-count');
-    if (countEl) countEl.textContent = count;
+    if (countEl) countEl.textContent = countInRange;
     const aovEl = document.getElementById('bills-stat-aov');
     if (aovEl) aovEl.textContent = rs(aov);
     const refundsEl = document.getElementById('bills-stat-refunds');
     if (refundsEl) refundsEl.textContent = refunds;
+    const salesLbl = document.getElementById('bills-stat-sales-label');
+    if (salesLbl) salesLbl.textContent = labels.sales;
+    const countLbl = document.getElementById('bills-stat-count-label');
+    if (countLbl) countLbl.textContent = labels.count;
+    const refundsLbl = document.getElementById('bills-stat-refunds-label');
+    if (refundsLbl) refundsLbl.textContent = labels.refunds;
+
+    syncDateChipsUi();
 
     const q = ($('#bills-search')?.value || '').toLowerCase();
     const payFilter = $('#bills-pay-filter')?.value || 'All';
@@ -633,14 +1722,25 @@
     const merged = mergeBillsForDisplay(localFiltered, _serverHits, q, payFilter, statusFilter);
     paintBillsTable(merged);
 
-    // Wave 7: async server search when query is long enough
+    const meta = document.getElementById('bills-result-meta');
+    if (meta) {
+      const n = merged.length;
+      const extraFilter =
+        (q && q.trim()) || payFilter !== 'All' || statusFilter !== 'All';
+      meta.textContent = extraFilter
+        ? `${n} of ${countInRange}`
+        : n
+          ? `${n} bill${n === 1 ? '' : 's'}`
+          : '';
+      meta.hidden = !n && !extraFilter;
+    }
+
     const gen = ++_searchGen;
     if (String(q || '').trim().length >= 2) {
       searchBillsServer(q, 50).then((rows) => {
         if (gen !== _searchGen) return;
         if (!rows) return;
         _serverHits = rows;
-        // Merge server rows into memory cache (non-destructive for local-only fields)
         const list = getBills();
         rows.forEach((r) => {
           const key = String(r.no || r.orderId || '');
@@ -659,6 +1759,93 @@
     }
   }
 
+  function syncDateChipsUi() {
+    const chips = document.getElementById('bills-date-chips');
+    if (chips) {
+      chips.querySelectorAll('[data-range]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-range') === billsDateRange);
+      });
+    }
+    const custom = document.getElementById('bills-custom-range');
+    if (custom) custom.hidden = billsDateRange !== 'custom';
+    const from = document.getElementById('bills-date-from');
+    const to = document.getElementById('bills-date-to');
+    if (from && billsCustomFrom) from.value = billsCustomFrom;
+    if (to && billsCustomTo) to.value = billsCustomTo;
+  }
+
+  function wireDateChips() {
+    const chips = document.getElementById('bills-date-chips');
+    if (chips && !chips.dataset.rsBound) {
+      chips.dataset.rsBound = '1';
+      chips.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-range]');
+        if (!btn || !chips.contains(btn)) return;
+        billsDateRange = btn.getAttribute('data-range') || 'today';
+        try {
+          localStorage.setItem('rs_bills_date_range', billsDateRange);
+        } catch (_) {}
+        if (billsDateRange === 'custom') {
+          syncDateChipsUi();
+          const from = document.getElementById('bills-date-from');
+          if (from) {
+            try {
+              from.focus();
+            } catch (_) {}
+          }
+          return;
+        }
+        renderBills();
+      });
+    }
+    const apply = document.getElementById('bills-date-apply');
+    if (apply && !apply.dataset.rsBound) {
+      apply.dataset.rsBound = '1';
+      apply.addEventListener('click', () => {
+        const from = document.getElementById('bills-date-from');
+        const to = document.getElementById('bills-date-to');
+        billsCustomFrom = (from && from.value) || '';
+        billsCustomTo = (to && to.value) || '';
+        billsDateRange = 'custom';
+        try {
+          localStorage.setItem('rs_bills_date_range', 'custom');
+          localStorage.setItem('rs_bills_date_from', billsCustomFrom);
+          localStorage.setItem('rs_bills_date_to', billsCustomTo);
+        } catch (_) {}
+        if (!billsCustomFrom && !billsCustomTo) {
+          toast('Pick a from and/or to date', 'fa-calendar');
+          return;
+        }
+        renderBills();
+      });
+    }
+  }
+
+  function wireFilterHint() {
+    const bar = document.getElementById('bills-filter-hint');
+    const dismiss = document.getElementById('bills-hint-dismiss');
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem('rs_bills_hint_dismissed') === '1';
+    } catch (_) {}
+    if (bar && !dismissed) {
+      bar.hidden = false;
+      bar.setAttribute('aria-hidden', 'false');
+    }
+    if (dismiss && !dismiss.dataset.rsBound) {
+      dismiss.dataset.rsBound = '1';
+      dismiss.addEventListener('click', () => {
+        if (bar) {
+          bar.hidden = true;
+          bar.setAttribute('aria-hidden', 'true');
+        }
+        try {
+          localStorage.setItem('rs_bills_hint_dismissed', '1');
+        } catch (_) {}
+      });
+    }
+  }
+
   function debounce(fn, wait) {
     let t;
     return function debounced() {
@@ -670,7 +1857,12 @@
   }
 
   function bindFilters() {
+    wireDateChips();
+    wireFilterHint();
     renderBills();
+    wireExportButton();
+    wirePrintReportButton();
+    wireFilterButton();
     const search = $('#bills-search');
     if (search && !search._rsListenerBound) {
       search._rsListenerBound = true;
@@ -698,10 +1890,22 @@
     renderBills,
     bindFilters,
     filterBills,
+    getFilteredBills,
+    billInDateRange,
+    parseBillDate,
     searchBillsServer,
     normalizeServerBill,
     showRefundModal,
     showDeleteConfirm,
+    exportBillsCsv,
+    exportBillsXlsx,
+    printSalesReport,
+    formatBillTime,
+    wireExportButton,
+    wirePrintReportButton,
+    wireFilterButton,
+    getDateRange: () => billsDateRange,
+    rangeDisplayLabel,
   };
 
   global.RSBillsHistory = api;
@@ -711,7 +1915,24 @@
     if (!global.RS) return;
     global.RS.renderBills = renderBills;
     global.RS.receiptPayloadFromBill = receiptPayloadFromBill;
+    global.RS.exportBillsCsv = exportBillsCsv;
+    global.RS.exportBillsXlsx = exportBillsXlsx;
+    global.RS.printSalesReport = printSalesReport;
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);
+  // Late-bind export if bills tab mounts after ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        wireExportButton();
+        wireFilterButton();
+      } catch (_) {}
+    });
+  } else {
+    try {
+      wireExportButton();
+      wireFilterButton();
+    } catch (_) {}
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

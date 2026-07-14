@@ -35,74 +35,268 @@
     }
 
     /* ===================== NOTIFICATIONS ===================== */
-    const bell = $('.tb-icon-btn[aria-label="Notifications"]');
-    if(bell){
+    const bell =
+      document.getElementById('tb-notif-btn') ||
+      $('.tb-icon-btn[aria-label="Notifications"]');
+    if (bell) {
       let NOTIFS = [];
-      const readKey = 'rs:notif-read';
+      // Dismissed = permanently removed from the panel list (not just "read" styling)
+      const dismissedKey = 'rs:notif-dismissed';
+      const readKey = 'rs:notif-read'; // legacy; still written for older clients
       let notifLoading = false;
       let notifReloadQueued = false;
       let notifCloudUnavailable = false;
-      const panel = document.createElement('div'); panel.className='notif-panel';
-      function readSet(){ try { return new Set(JSON.parse(localStorage.getItem(readKey) || '[]')); } catch(e){ return new Set(); } }
-      function saveRead(set){ try { localStorage.setItem(readKey, JSON.stringify([...set])); } catch(e){} }
-      function relTime(v){
+      const panel = document.createElement('div');
+      panel.className = 'notif-panel';
+      panel.id = 'rs-notif-panel';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', 'Notifications');
+      panel.setAttribute('aria-modal', 'false');
+
+      function loadIdSet(key) {
+        try {
+          const raw = JSON.parse(localStorage.getItem(key) || '[]');
+          return new Set(Array.isArray(raw) ? raw.map(String) : []);
+        } catch (e) {
+          return new Set();
+        }
+      }
+      function saveIdSet(key, set) {
+        try {
+          // Cap so localStorage never grows forever
+          const arr = [...set].slice(-400);
+          localStorage.setItem(key, JSON.stringify(arr));
+        } catch (e) {}
+      }
+      function dismissedSet() {
+        return loadIdSet(dismissedKey);
+      }
+      function markDismissed(ids) {
+        const set = dismissedSet();
+        const read = loadIdSet(readKey);
+        (Array.isArray(ids) ? ids : [ids]).forEach((id) => {
+          if (id == null || id === '') return;
+          const k = String(id);
+          set.add(k);
+          read.add(k);
+        });
+        saveIdSet(dismissedKey, set);
+        saveIdSet(readKey, read);
+      }
+      function relTime(v) {
         const t = v ? new Date(v).getTime() : 0;
-        if(!t || Number.isNaN(t)) return '';
+        if (!t || Number.isNaN(t)) return '';
         const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
-        if(mins < 1) return 'just now';
-        if(mins < 60) return mins + ' min ago';
+        if (mins < 1) return 'just now';
+        if (mins < 60) return mins + ' min ago';
         const hrs = Math.round(mins / 60);
-        if(hrs < 24) return hrs + ' hr ago';
-        return new Date(t).toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+        if (hrs < 24) return hrs + ' hr ago';
+        return new Date(t).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
       }
-      function iconFor(type){
-        if(type === 'warning') return ['fa-triangle-exclamation','var(--red-tint)','var(--red)'];
-        if(type === 'success') return ['fa-circle-check','var(--green-tint)','var(--green)'];
-        if(type === 'billing') return ['fa-receipt','var(--amber-tint)','var(--amber)'];
-        if(type === 'order') return ['fa-bowl-rice','var(--orange-tint)','var(--orange)'];
-        if(type === 'system') return ['fa-cloud-arrow-down','var(--violet-tint)','var(--violet-soft)'];
-        return ['fa-bell','var(--orange-tint)','var(--orange)'];
+      function iconFor(type) {
+        if (type === 'warning') return ['fa-triangle-exclamation', 'var(--red-tint)', 'var(--red)'];
+        if (type === 'success') return ['fa-circle-check', 'var(--green-tint)', 'var(--green)'];
+        if (type === 'billing') return ['fa-receipt', 'var(--amber-tint)', 'var(--amber)'];
+        if (type === 'order') return ['fa-bowl-rice', 'var(--orange-tint)', 'var(--orange)'];
+        if (type === 'system') return ['fa-cloud-arrow-down', 'var(--violet-tint)', 'var(--violet-soft)'];
+        if (type === 'waiter' || type === 'waiter_call') return ['fa-bell-concierge', 'var(--orange-tint)', 'var(--orange)'];
+        return ['fa-bell', 'var(--orange-tint)', 'var(--orange)'];
       }
-      async function loadNotifications(){
-        if(notifLoading){ notifReloadQueued = true; return; }
+      function actionLabel(n) {
+        const t = String(n.type || '').toLowerCase();
+        if (t === 'waiter' || t === 'waiter_call') return 'Open floor';
+        if (t === 'order') return 'Open orders';
+        if (t === 'billing') return 'Open bills';
+        if (t === 'warning' && String(n.id || '').startsWith('low-stock')) return 'Open inventory';
+        if (t === 'system' || String(n.id || '').startsWith('system-update')) return 'Apply update';
+        if (t === 'warning') return 'View';
+        return 'Open';
+      }
+      function positionPanel() {
+        try {
+          const r = bell.getBoundingClientRect();
+          const top = Math.max(8, r.bottom + 8);
+          const right = Math.max(8, window.innerWidth - r.right);
+          panel.style.top = top + 'px';
+          panel.style.right = right + 'px';
+          panel.style.left = 'auto';
+          panel.style.zIndex = '2147483000';
+        } catch (_) {}
+      }
+      function findNotif(id) {
+        const key = String(id == null ? '' : id);
+        return NOTIFS.find((x) => String(x.id) === key) || null;
+      }
+      /** Remove one item from the in-memory list + persist dismiss */
+      function dismissNotif(n) {
+        if (!n || n.id == null) return false;
+        const key = String(n.id);
+        markDismissed(key);
+        const before = NOTIFS.length;
+        NOTIFS = NOTIFS.filter((x) => String(x.id) !== key);
+        // Best-effort cloud flag
+        if (
+          window.RS_DB &&
+          !key.startsWith('low-stock-') &&
+          !key.startsWith('pending-order-') &&
+          !key.startsWith('refund-') &&
+          key !== 'cloud-sync-warning' &&
+          !key.startsWith('system-update')
+        ) {
+          try {
+            RS_DB.put('notifications', key, { ...n, isRead: true, dismissed: true }).catch(() => {});
+          } catch (_) {}
+        }
+        return before !== NOTIFS.length;
+      }
+      function markAllRead() {
+        const count = NOTIFS.length;
+        if (!count) {
+          RS.toast('Inbox is empty', 'fa-circle-check');
+          draw();
+          updateDot();
+          return;
+        }
+        markDismissed(NOTIFS.map((n) => n.id));
+        NOTIFS = [];
+        draw();
+        updateDot();
+        RS.toast(count === 1 ? '1 notification cleared' : count + ' notifications cleared', 'fa-check-double');
+      }
+      function openFromNotif(n) {
+        if (!n) return;
+        const id = String(n.id || '');
+        const type = String(n.type || '').toLowerCase();
+        // Remove from list immediately so "view" never leaves a ghost row
+        dismissNotif(n);
+        draw();
+        updateDot();
+        closePanel();
+
+        if (id.startsWith('system-update') || type === 'system') {
+          if (typeof window.RS_SHOW_UPDATE_DIALOG === 'function') {
+            window.RS_SHOW_UPDATE_DIALOG();
+          } else {
+            RS.toast(n.message || 'System update available', 'fa-cloud-arrow-down');
+          }
+          return;
+        }
+        if (type === 'waiter' || type === 'waiter_call' || /waiter|table/i.test(n.title || '')) {
+          if (RS.activateTab) RS.activateTab('floor-tab');
+          RS.toast(n.title || 'Opening floor', 'fa-bell-concierge');
+          return;
+        }
+        if (type === 'order' || id.startsWith('pending-order-')) {
+          if (RS.activateTab) RS.activateTab('aggregator-tab');
+          RS.toast(n.title || 'Opening online orders', 'fa-bowl-rice');
+          return;
+        }
+        if (type === 'billing' || id.startsWith('refund-')) {
+          if (RS.activateTab) RS.activateTab('bills-tab');
+          RS.toast(n.title || 'Opening bills', 'fa-receipt');
+          return;
+        }
+        if (id.startsWith('low-stock-') || (type === 'warning' && /stock/i.test(n.title || ''))) {
+          if (RS.activateTab) RS.activateTab('inventory-tab');
+          RS.toast(n.title || 'Opening inventory', 'fa-boxes-stacked');
+          return;
+        }
+        if (id === 'cloud-sync-warning') {
+          RS.toast(n.message || 'Cloud sync issue — data is safe locally', 'fa-cloud');
+          return;
+        }
+        RS.toast(n.title || 'Notification opened', 'fa-bell');
+      }
+      async function loadNotifications() {
+        if (notifLoading) {
+          notifReloadQueued = true;
+          return;
+        }
         notifLoading = true;
         try {
           const live = [];
-          if(Array.isArray(RS.INVENTORY)){
-            RS.INVENTORY.filter(i=>Number(i.stock) < Number(i.min)).slice(0,4).forEach(i=>{
-              live.push({ id:'low-stock-'+(i.id||i.name), type:'warning', title:`${i.name} is low on stock`, message:`${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`, timestamp:'' });
+          if (Array.isArray(RS.INVENTORY)) {
+            RS.INVENTORY.filter((i) => Number(i.stock) < Number(i.min))
+              .slice(0, 4)
+              .forEach((i) => {
+                live.push({
+                  id: 'low-stock-' + (i.id || i.name),
+                  type: 'warning',
+                  title: `${i.name} is low on stock`,
+                  message: `${i.stock || 0} ${i.unit || 'unit'} left, minimum ${i.min || 0}`,
+                  timestamp: '',
+                });
+              });
+          }
+          if (Array.isArray(RS.QR_ORDERS)) {
+            RS.QR_ORDERS.filter((o) => String(o.status || '').toLowerCase() === 'pending')
+              .slice(0, 4)
+              .forEach((o) => {
+                const id = 'pending-order-' + (o.id || o.orderId || o.table);
+                live.push({
+                  id,
+                  type: 'order',
+                  title: `New order${
+                    o.table
+                      ? ' · ' + (String(o.table).match(/^\d+$/) ? 'Table ' + o.table : o.table)
+                      : ''
+                  }`.trim(),
+                  message: `${o.table || 'Table'} - ${rs(o.total || 0)}`,
+                  timestamp: o.time || o.dateTime || '',
+                });
+              });
+          }
+          if (Array.isArray(RS.BILLS)) {
+            RS.BILLS.filter((b) => String(b.status || '').toLowerCase() === 'refunded')
+              .slice(0, 2)
+              .forEach((b) => {
+                const id = 'refund-' + (b.id || b.no);
+                live.push({
+                  id,
+                  type: 'billing',
+                  title: `Refund completed ${b.no || ''}`.trim(),
+                  message: `${rs(b.amount || 0)} refunded`,
+                  timestamp: b.time || '',
+                });
+              });
+          }
+          if (window.RS_LAST_CLOUD_ERROR) {
+            live.push({
+              id: 'cloud-sync-warning',
+              type: 'warning',
+              title: 'Cloud sync needs attention',
+              message:
+                window.RS_LAST_CLOUD_ERROR.message ||
+                'Latest change is saved locally until sync recovers.',
+              timestamp: window.RS_LAST_CLOUD_ERROR.time,
             });
           }
-          if(Array.isArray(RS.QR_ORDERS)){
-            RS.QR_ORDERS.filter(o=>String(o.status||'').toLowerCase()==='pending').slice(0,4).forEach(o=>{
-              const id = 'pending-order-'+(o.id||o.orderId||o.table);
-              live.push({ id, type:'order', title:`New order${o.table ? (' · ' + (String(o.table).match(/^\d+$/) ? ('Table ' + o.table) : o.table)) : ''}`.trim(), message:`${o.table || 'Table'} - ${rs(o.total || 0)}`, timestamp:o.time || o.dateTime || '' });
+          if (window.RS_APP_UPDATE) {
+            const notifId =
+              'system-update-' +
+              (window.RS_APP_UPDATE.signature
+                ? window.RS_APP_UPDATE.signature.substring(0, 8)
+                : 'latest');
+            const timestamp =
+              window.RS_APP_UPDATE.detectedAt || window.RS_APP_UPDATE.releaseInfo?.date || '';
+            const msg = window.RS_APP_UPDATE.isPatchOnly
+              ? 'System stability hotfix — tap to apply.'
+              : `Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} — tap to apply.`;
+            live.push({
+              id: notifId,
+              type: 'system',
+              title: 'System update is ready',
+              message: msg,
+              timestamp,
             });
-          }
-          if(Array.isArray(RS.BILLS)){
-            RS.BILLS.filter(b=>String(b.status||'').toLowerCase()==='refunded').slice(0,2).forEach(b=>{
-              const id = 'refund-'+(b.id||b.no);
-              live.push({ id, type:'billing', title:`Refund completed ${b.no || ''}`.trim(), message:`${rs(b.amount || 0)} refunded`, timestamp:b.time || '' });
-            });
-          }
-          if(window.RS_LAST_CLOUD_ERROR){
-            live.push({ id:'cloud-sync-warning', type:'warning', title:'Cloud sync needs attention', message:window.RS_LAST_CLOUD_ERROR.message || 'Latest change is saved locally until sync recovers.', timestamp:window.RS_LAST_CLOUD_ERROR.time });
-          }
-          if(window.RS_APP_UPDATE){
-            const notifId = 'system-update-' + (window.RS_APP_UPDATE.signature ? window.RS_APP_UPDATE.signature.substring(0, 8) : 'latest');
-            const timestamp = window.RS_APP_UPDATE.detectedAt || window.RS_APP_UPDATE.releaseInfo?.date || '';
-            const msg = window.RS_APP_UPDATE.isPatchOnly 
-              ? 'System stability hotfix - Click to apply.'
-              : `Version ${window.RS_APP_UPDATE.releaseInfo?.version || 'latest'} - Click to apply.`;
-            live.push({ id:notifId, type:'system', title:'System update is ready', message:msg, timestamp });
           }
           let saved = [];
-          if(window.RS_DB){
-            if(RS_DB.isCloud && RS_DB.listCloud && !notifCloudUnavailable) {
+          if (window.RS_DB) {
+            if (RS_DB.isCloud && RS_DB.listCloud && !notifCloudUnavailable) {
               try {
                 saved = await RS_DB.listCloud('notifications');
-                if(RS_DB.writeLocal) await RS_DB.writeLocal('notifications', saved || []);
-              } catch(e) {
+                if (RS_DB.writeLocal) await RS_DB.writeLocal('notifications', saved || []);
+              } catch (e) {
                 notifCloudUnavailable = true;
                 saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
               }
@@ -110,56 +304,224 @@
               saved = RS_DB.listLocal ? await RS_DB.listLocal('notifications') : [];
             }
           }
-          // Re-read localStorage AFTER all awaits so any mark-as-read
-          // that happened during the cloud fetch is not missed.
-          const read = readSet();
-          NOTIFS = [...saved, ...live].map(n=>{
-            const [ic,bg,c] = iconFor(n.type);
-            return { ...n, ic, bg, c, unread: !n.isRead && !read.has(String(n.id)), time:relTime(n.timestamp || n.createdAt) };
-          }).filter(n=>n.unread);
-          draw(); updateDot();
+          const gone = dismissedSet();
+          const seen = new Set();
+          const mapped = [];
+          [...(saved || []), ...live].forEach((n) => {
+            if (!n || n.id == null) return;
+            const key = String(n.id);
+            if (seen.has(key)) return;
+            seen.add(key);
+            // Dismissed items never reappear (until storage cleared)
+            if (gone.has(key) || n.dismissed || n.isDismissed) return;
+            const [ic, bg, c] = iconFor(n.type);
+            mapped.push({
+              ...n,
+              id: key,
+              ic,
+              bg,
+              c,
+              unread: true, // anything still in the inbox is actionable
+              time: relTime(n.timestamp || n.createdAt || n.created_at),
+              cta: actionLabel(n),
+            });
+          });
+          // Newest first when we have timestamps
+          mapped.sort((a, b) => {
+            const ta = new Date(a.timestamp || a.createdAt || a.created_at || 0).getTime() || 0;
+            const tb = new Date(b.timestamp || b.createdAt || b.created_at || 0).getTime() || 0;
+            return tb - ta;
+          });
+          NOTIFS = mapped.slice(0, 40);
+          draw();
+          updateDot();
+        } catch (err) {
+          console.warn('[notifications]', err);
+          draw();
         } finally {
           notifLoading = false;
-          if(notifReloadQueued){ notifReloadQueued = false; setTimeout(loadNotifications, 0); }
+          if (notifReloadQueued) {
+            notifReloadQueued = false;
+            setTimeout(loadNotifications, 0);
+          }
         }
       }
-      function draw(){
-        const list = NOTIFS.filter(n=>n.unread);
-        const unread = list.length;
-        panel.innerHTML = `<div class="notif-h"><h4>Notifications ${unread?`<span class="pill pill-orange" style="padding:2px 8px;font-size:11px">${unread} new</span>`:''}</h4><button class="btn btn-ghost btn-sm" id="notif-read">Mark all read</button></div>
-          <div class="notif-list">${list.length ? list.map(n=>`<div class="notif-item unread" data-id="${n.id}"><div class="notif-ic" style="background:${n.bg};color:${n.c}"><i class="fa-solid ${n.ic}"></i></div><div style="flex:1"><div class="nt">${safe(n.title)}</div><div class="nd">${safe(n.message)}</div><div class="ntime">${safe(n.time)}</div></div></div>`).join('') : '<div class="sr-empty">No live notifications right now.</div>'}</div>`;
-        const markRead = n => {
-          if(!n || !n.id) return;
-          n.unread = false; n.isRead = true;
-          const read = readSet(); read.add(String(n.id)); saveRead(read);
-          if(window.RS_DB && !String(n.id).startsWith('low-stock-') && !String(n.id).startsWith('pending-order-') && !String(n.id).startsWith('refund-') && n.id !== 'cloud-sync-warning' && !String(n.id).startsWith('system-update')) {
-            RS_DB.put('notifications', n.id, n).catch(()=>{});
-          }
-          if(String(n.id).startsWith('system-update') && typeof window.RS_SHOW_UPDATE_DIALOG === 'function') {
-            window.RS_SHOW_UPDATE_DIALOG();
-          }
-        };
-        panel.querySelector('#notif-read').onclick = ()=>{ NOTIFS.forEach(markRead); draw(); updateDot(); };
-        $$('.notif-item',panel).forEach(el=> el.onclick=()=>{
-          const id = el.dataset.id;
-          const target = NOTIFS.find(x => String(x.id) === String(id));
-          if(target) { markRead(target); draw(); updateDot(); }
-        });
+      function draw() {
+        const count = NOTIFS.length;
+        const list = NOTIFS;
+        panel.innerHTML = `
+          <div class="notif-h">
+            <div class="notif-h-title">
+              <h4>Notifications</h4>
+              ${
+                count
+                  ? `<span class="pill pill-orange notif-count">${count}</span>`
+                  : `<span class="notif-count-muted">Inbox clear</span>`
+              }
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm notif-mark-all" id="notif-mark-all-btn" data-action="mark-all" ${
+              count ? '' : 'disabled'
+            } title="${count ? 'Clear all notifications' : 'Nothing to clear'}">
+              <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+              <span>Mark all read</span>
+            </button>
+          </div>
+          <div class="notif-list" role="list">
+            ${
+              list.length
+                ? list
+                    .map((n) => {
+                      const idAttr = encodeURIComponent(String(n.id));
+                      return `<button type="button" class="notif-item unread" role="listitem" data-action="open-item" data-id="${idAttr}" title="${safe(
+                        n.cta || 'Open'
+                      )}">
+                        <div class="notif-ic" style="background:${n.bg};color:${n.c}" aria-hidden="true"><i class="fa-solid ${
+                          n.ic
+                        }"></i></div>
+                        <div class="notif-body">
+                          <div class="nt">${safe(n.title)}</div>
+                          <div class="nd">${safe(n.message)}</div>
+                          <div class="notif-meta">
+                            <span class="ntime">${safe(n.time || '')}</span>
+                            <span class="notif-cta">${safe(n.cta || 'Open')} <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></span>
+                          </div>
+                        </div>
+                        <span class="notif-unread-dot" aria-hidden="true"></span>
+                      </button>`;
+                    })
+                    .join('')
+                : `<div class="notif-empty">
+                    <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                    <strong>All clear</strong>
+                    <span>Waiter calls, new QR orders, low stock, and updates show up here.</span>
+                  </div>`
+            }
+          </div>`;
       }
-      function updateDot(){ const d=bell.querySelector('.dot-notif'); if(d) d.style.display = NOTIFS.some(n=>n.unread)?'':'none'; }
-      document.body.appendChild(panel); loadNotifications();
-      bell.addEventListener('click', e=>{ e.stopPropagation(); panel.classList.toggle('show'); });
-      document.addEventListener('click', e=>{ if(!panel.contains(e.target) && !bell.contains(e.target)) panel.classList.remove('show'); });
+      function updateDot() {
+        const d = bell.querySelector('.dot-notif');
+        const n = NOTIFS.length;
+        if (d) d.style.display = n ? '' : 'none';
+        bell.setAttribute('aria-label', n ? `Notifications (${n})` : 'Notifications');
+      }
+      function openPanel() {
+        positionPanel();
+        panel.classList.add('show');
+        panel.setAttribute('aria-hidden', 'false');
+        bell.setAttribute('aria-expanded', 'true');
+        draw();
+        loadNotifications();
+      }
+      function closePanel() {
+        panel.classList.remove('show');
+        panel.setAttribute('aria-hidden', 'true');
+        bell.setAttribute('aria-expanded', 'false');
+      }
+      function togglePanel(e) {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        if (panel.classList.contains('show')) closePanel();
+        else openPanel();
+      }
+
+      let lastActionAt = 0;
+      let lastActionKey = '';
+      function handlePanelAction(e) {
+        if (!panel.classList.contains('show')) return;
+        const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+        const target = e.target;
+        const inPanel =
+          panel.contains(target) ||
+          path.includes(panel) ||
+          (target && target.closest && target.closest('#rs-notif-panel'));
+        if (!inPanel) return;
+
+        const markAllBtn =
+          (target && target.closest && target.closest('[data-action="mark-all"]')) ||
+          path.find((el) => el && el.getAttribute && el.getAttribute('data-action') === 'mark-all');
+        if (markAllBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Debounce double-firing from capture + bubble / click + pointer
+          const now = Date.now();
+          if (lastActionKey === 'mark-all' && now - lastActionAt < 400) return;
+          lastActionKey = 'mark-all';
+          lastActionAt = now;
+          markAllRead();
+          return;
+        }
+
+        const itemEl =
+          (target && target.closest && target.closest('[data-action="open-item"]')) ||
+          path.find((el) => el && el.getAttribute && el.getAttribute('data-action') === 'open-item');
+        if (itemEl) {
+          e.preventDefault();
+          e.stopPropagation();
+          let id = itemEl.getAttribute('data-id') || '';
+          try {
+            id = decodeURIComponent(id);
+          } catch (_) {}
+          const now = Date.now();
+          const actionKey = 'open:' + id;
+          if (lastActionKey === actionKey && now - lastActionAt < 400) return;
+          lastActionKey = actionKey;
+          lastActionAt = now;
+          const targetNotif = findNotif(id);
+          if (targetNotif) openFromNotif(targetNotif);
+          else {
+            markDismissed(id);
+            NOTIFS = NOTIFS.filter((x) => String(x.id) !== String(id));
+            draw();
+            updateDot();
+            RS.toast('Notification cleared', 'fa-check');
+          }
+        }
+      }
+
+      // Capture-phase on panel so parent page handlers cannot steal the click
+      panel.addEventListener('click', handlePanelAction, true);
+
+      if (!document.body.contains(panel)) document.body.appendChild(panel);
+      panel.setAttribute('aria-hidden', 'true');
+      bell.setAttribute('aria-expanded', 'false');
+      bell.setAttribute('aria-haspopup', 'dialog');
+      draw();
+      loadNotifications();
+
+      bell.addEventListener('click', togglePanel);
+      bell.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') togglePanel(e);
+      });
+      document.addEventListener('click', (e) => {
+        if (!panel.classList.contains('show')) return;
+        if (panel.contains(e.target) || bell.contains(e.target)) return;
+        // Don't close if click was on mark-all / item (already handled)
+        closePanel();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && panel.classList.contains('show')) {
+          closePanel();
+          try {
+            bell.focus();
+          } catch (_) {}
+        }
+      });
+      window.addEventListener('resize', () => {
+        if (panel.classList.contains('show')) positionPanel();
+      });
       document.addEventListener('rs:hydrated', loadNotifications);
       document.addEventListener('rs:pending_orders_synced', loadNotifications);
       document.addEventListener('rs:collection_synced', loadNotifications);
       window.addEventListener('rs:cloud-fallback', loadNotifications);
       document.addEventListener('rs:app_update_available', loadNotifications);
       document.addEventListener('rs:render-inventory', loadNotifications);
+      window.RS_openNotifications = openPanel;
     }
 
     /* ===================== SETTINGS ===================== */
-    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp gateway','fa-whatsapp'],['payments','Payments','fa-indian-rupee-sign'],['security','Security & PIN','fa-shield-halved'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
+    const SET_NAV = [['profile','Outlet profile','fa-store'],['tax','Taxes & billing','fa-percent'],['printer','Printers & KOT','fa-print'],['gateway','WhatsApp','fa-whatsapp'],['payments','Payments','fa-indian-rupee-sign'],['security','Security & PIN','fa-shield-halved'],['team','Team & roles','fa-user-shield'],['plan','Plan & billing','fa-crown'],['danger','Danger Zone','fa-triangle-exclamation']];
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
     function field(label, val, ph){ return `<div><label class="fl">${label}</label><input class="form-input" data-skey="${skey(label)}" value="${val||''}" placeholder="${ph||''}"></div>`; }
     function sel(label, opts, cur){ return `<div><label class="fl">${label}</label><select class="form-input" data-skey="${skey(label)}">${opts.map(o=>`<option ${o===cur?'selected':''}>${o}</option>`).join('')}</select></div>`; }
@@ -198,7 +560,13 @@
         <div class="set-section">${field('Address','','Outlet address')}</div>
         <div class="set-section form-grid-2">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
         <div class="set-section form-grid-2">${field('GSTIN','','GSTIN if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
-        <div class="set-section form-grid-2" id="set-country-currency-row"></div>`,
+        <div class="set-section form-grid-2" id="set-country-currency-row"></div>
+        <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-mute);margin-bottom:8px">Guest QR cards</div>
+          <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">Cards already say <b>Order food</b> + <b>Call waiter</b>. Optional extras below — turn on/off when you print.</p>
+          <div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
+          <div style="margin-top:10px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>
+        </div>`,
       tax:`<div class="set-section form-grid-2">
           ${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
           ${field('Invoice prefix','INV-')}
@@ -211,7 +579,7 @@
         <div class="set-section form-grid-2" style="margin-top:8px">
           ${field('Service charge %','5','e.g. 5 or 10')}
         </div>
-        ${toggle('Round-off totals','Round bill total to nearest rupee',true)}
+        ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
         ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
         ${toggle('Inclusive pricing','Menu prices include GST',false)}
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
@@ -241,42 +609,57 @@
           </div>
           <p style="font-size:11.5px;color:var(--text-soft);margin:8px 0 0">Looks up active <code>offers</code> by code first; falls back to the demo code. Optional phone-locked offers check cart guest phone.</p>
         </div>`,
-      printer:`<div class="set-section form-grid-2">${field('Receipt printer','EPSON TM-T82 (USB)')}${sel('Paper size',['58 mm','80 mm'],'80 mm')}</div>
-        ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer)',false)}
+      printer:`<div class="set-section form-grid-2">
+          ${field('Preferred printer name','','Optional label e.g. Counter 80mm — leave blank to use system default')}
+          ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
+        </div>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:0 0 10px">Printers are detected by the <b>desktop app</b> or <b>Android bridge</b>. Browser-only mode prints via the system dialog — no fake device is assumed.</p>
+        ${toggle('Auto-print receipt','Thermal/ESC-POS print automatically after payment (uses preferred printer when bridge is connected)',false)}
         ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
         ${toggle('Open cash drawer on cash','Pulse cash drawer (ESC/POS) after a cash or cash-split payment',true)}
-        <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${sel('Kitchen printer',['Tandoor station','Main kitchen','Beverages'],'Main kitchen')}</div>
+        <div class="set-section form-grid-2">${sel('KOT copies',['1','2','3'],'2')}${field('Kitchen station label','Main kitchen','Optional name for kitchen routing notes')}</div>
         <div class="set-section form-grid-2" style="margin-top:12px">
           ${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}
         </div>
-        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Auto-print uses the same Thermal path as Bill settled. Cash drawer needs the desktop app or Android bridge.</p>
+        <p style="font-size:11.5px;color:var(--text-soft);margin:6px 0 0">Exact preview matches Bill settled. Fast thermal is lighter for slow devices. Cash drawer needs the desktop app or Android bridge.</p>
         <div class="set-section" style="margin-top:16px;border-top:1px solid var(--stroke-2);padding-top:16px">
           ${toggle('POS-only mode','Billing only -- no order goes to Kitchen Display or the waiter app. QR ordering still works, but every order lands only in your own POS/order dashboard, never the KDS or waiter screens. Manager/admin only.',false)}
         </div>`,
-      gateway:`<div id="outlet-gateway-status-container"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Configure your WhatsApp gateway for this outlet</div></div><span class="pill" style="padding:5px 12px; background: rgba(107, 114, 128, 0.1); color: #6B7280;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</span></div></div>
-        ${toggle('Auto-send receipts','WhatsApp the bill to customer after payment',true)}
-        ${sel('WhatsApp bill format',['Text receipt','Thermal PDF receipt'],'Thermal PDF receipt')}
-        ${toggle('Order updates','Notify customer when order is ready',true)}
-        ${toggle('Marketing broadcasts','Allow promotional campaigns',true)}
-        <div class="set-section"><label class="fl">Receipt message template</label><textarea class="form-input" rows="3">Thanks for dining with us. Your bill is attached.</textarea></div>
-        <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
-          <label class="fl" style="display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:8px;">
-            <span>Recent WhatsApp Activity Logs</span>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-refresh-client-logs" style="font-size:10px; padding:2px 8px; height:22px; cursor:pointer;"><i class="fa-solid fa-arrows-rotate"></i> Refresh</button>
-          </label>
-          <div id="client-gateway-logs" style="max-height:160px; overflow-y:auto; background:rgba(0,0,0,0.15); border:1px solid var(--stroke-2); border-radius:var(--r-sm); padding:10px; font-family:monospace; font-size:11px; line-height:1.5; color:var(--text-soft)">
-            <div style="text-align:center; padding:12px; color:var(--text-mute)">Loading activity logs...</div>
-          </div>
+      gateway:`
+        <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:var(--text-soft)">Send bills and “order ready” messages from <b style="color:var(--text)">your restaurant’s WhatsApp</b>.</p>
+
+        <div id="outlet-gateway-status-container" style="margin-bottom:12px">
+          <div class="set-row" style="margin:0"><div class="si"><div class="st">Connection</div><div class="sd">Checking…</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6B7280"><i class="fa-solid fa-spinner fa-spin"></i> …</span></div>
         </div>
-        <div class="set-section" style="margin-top:20px; border-top:1px solid var(--stroke-2); padding-top:16px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; width:100%;">
-            <div>
-              <div style="font-weight:700; font-size:13px; color:var(--text)">Troubleshoot Gateway</div>
-              <div style="font-size:11.5px; color:var(--text-soft); margin-top:2px;">If WhatsApp is stuck or not showing a new QR, you can force a fresh reset.</div>
-            </div>
-            <button type="button" class="btn btn-sm btn-danger" id="btn-gateway-troubleshoot-reset" style="background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); font-size:11px; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; white-space:nowrap; transition:all 0.2s">
-              <i class="fa-solid fa-triangle-exclamation"></i> Force Reset
-            </button>
+
+        <div class="set-section" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-test-send"><i class="fa-solid fa-paper-plane"></i> Send test</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-refresh-status"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-gateway-troubleshoot-reset" style="margin-left:auto;color:var(--text-soft)"><i class="fa-solid fa-qrcode"></i> New QR</button>
+        </div>
+
+        <p style="margin:0 0 20px;font-size:12px;line-height:1.45;color:var(--text-mute)"><i class="fa-solid fa-circle-info" style="margin-right:5px;opacity:.8"></i>Prefer a dedicated restaurant number when you can. Personal WhatsApp works too — avoid bulk promos.</p>
+
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 10px">Bill preferences</div>
+        ${toggle('Send bill after payment','WhatsApp the bill when payment is taken',true)}
+        ${sel('Bill format',['Simple text','PDF receipt (recommended)'],'PDF receipt (recommended)')}
+        ${toggle('Order ready alerts','Message customer when order is ready',true)}
+        ${toggle('Promotional messages','Allow offer campaigns (use sparingly)',false)}
+        <div class="set-section"><label class="fl">Message with the bill</label><textarea class="form-input" rows="2">Thanks for dining with us. Your bill is attached.</textarea></div>
+
+        <div class="set-section" style="margin-top:18px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 10px">Owner reports (your number)</div>
+          <p style="margin:0 0 12px;font-size:12.5px;line-height:1.45;color:var(--text-soft)">Daily sales, low-stock / out-of-stock alerts, and weekly/monthly P&amp;L PDFs sent to <b>your</b> WhatsApp.</p>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-owner-wa-reports"><i class="fa-brands fa-whatsapp"></i> Configure owner reports</button>
+        </div>
+
+        <div class="set-section" style="margin-top:22px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          <label class="fl" style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
+            <span>Recent activity</span>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-refresh-client-logs" style="font-size:10px;padding:2px 8px;height:22px"><i class="fa-solid fa-arrows-rotate"></i></button>
+          </label>
+          <div id="client-gateway-logs" style="max-height:140px;overflow-y:auto;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px;font-size:12px;line-height:1.5;color:var(--text-soft)">
+            <div style="text-align:center;padding:10px;color:var(--text-mute)">No activity yet</div>
           </div>
         </div>`,
       team:`<div class="set-row"><div class="si"><div class="st">Team members</div><div class="sd">Manage staff roles and permissions for this outlet</div></div><button class="btn btn-ghost btn-sm" id="set-team-go">Manage team</button></div>
@@ -331,6 +714,15 @@
             <span style="color:var(--stroke-2)">|</span>
             <span style="font-size:11.5px;color:var(--text-soft);">Forgotten PIN resets require a server-verified reset code from the account owner.</span>
           </div>` : ''}
+        </div>
+
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:16px 18px;margin-bottom:18px;">
+          <div style="font-weight:800;font-size:13.5px;margin-bottom:6px"><i class="fa-solid fa-shield-halved" style="color:var(--orange);margin-right:6px"></i>UI copy shield</div>
+          <p style="font-size:12px;color:var(--text-soft);line-height:1.45;margin:0 0 12px">${(window.RSSecurityShield && RSSecurityShield.disclaimer) || 'Blocks casual right-click and DevTools shortcuts on this console. Real security is auth + server rules — this is not unhackable.'}</p>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="checkbox" id="sec-ui-shield" ${(window.RSSecurityShield && RSSecurityShield.getConfig && RSSecurityShield.getConfig().enabled) ? 'checked' : 'checked'}>
+            Block right-click · F12 · Ctrl+Shift+I on dashboard
+          </label>
         </div>
 
         <!-- Always protected -->
@@ -407,6 +799,15 @@
         }
         RS.toast('Admin PIN removed','fa-lock-open');
         initSecurityPanel(body);
+      });
+
+      container.querySelector('#sec-ui-shield')?.addEventListener('change', (e) => {
+        const on = !!e.target.checked;
+        if (window.RSSecurityShield) {
+          RSSecurityShield.setEnabled(on);
+          if (on) RSSecurityShield.install();
+          RS.toast(on ? 'UI copy shield on' : 'UI copy shield off', 'fa-shield-halved');
+        }
       });
     }
 
@@ -872,6 +1273,49 @@
       const body = $('#set-body');
       let SET_STORE = {};
       let outletGatewayInterval = null;
+      async function requestFreshQr(tenantId, btn) {
+        if (window.__rsGatewayReady) {
+          if (!confirm('WhatsApp is already connected.\n\nGet a new QR code? This unlinks the current number until you scan again.')) {
+            return;
+          }
+        }
+        if (btn) {
+          btn.disabled = true;
+          const prev = btn.innerHTML;
+          btn.dataset.prevHtml = prev;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Getting QR…';
+        }
+        try {
+          await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
+          if (window.RS && RS.toast) RS.toast('Preparing a new QR code…', 'fa-qrcode');
+        } catch (e) {
+          if (window.RS && RS.toast) RS.toast('Could not start QR. Please try again.', 'fa-circle-exclamation');
+        }
+        if (outletGatewayInterval) {
+          clearInterval(outletGatewayInterval);
+          outletGatewayInterval = setInterval(pollOutletGateway, 2500);
+        }
+        setTimeout(() => {
+          pollOutletGateway();
+          if (btn) {
+            btn.disabled = false;
+            if (btn.dataset.prevHtml) btn.innerHTML = btn.dataset.prevHtml;
+          }
+        }, 2800);
+      }
+
+      function wireFreshQrButtons(container, tenantId) {
+        if (!container) return;
+        container.querySelectorAll('[data-wa-fresh-qr]').forEach((btn) => {
+          if (btn.dataset.bound === '1') return;
+          btn.dataset.bound = '1';
+          btn.onclick = () => requestFreshQr(tenantId, btn);
+        });
+      }
+
+      // Number tip lives once in the static settings layout (not repeated in status states)
+      const WA_NUM_TIP = '';
+
       async function pollOutletGateway() {
         const container = body.querySelector('#outlet-gateway-status-container');
         if (!container) {
@@ -879,141 +1323,107 @@
           return;
         }
         const sessionMeta = (window.RS_API && RS_API.session && RS_API.session()) || {};
-        const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_slug') || 'local-demo';
+        const tenantId = sessionMeta.tenant_id || sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local-demo';
         
         // 1. Poll Gateway Status
         try {
           const res = await RS_API.data({ operation: 'gateway_status', tenantId: tenantId });
           if (!res || res.error) {
-            container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd" style="color:#ef4444">Failed to fetch status: ${res ? res.error : 'Offline'}</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>`;
+            container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:20px;text-align:center;background:var(--panel)">
+              <div class="set-row" style="margin:0 0 14px;text-align:left"><div class="si"><div class="st">Connection</div><div class="sd" style="color:#ef4444">Could not check status</div></div><span class="pill pill-red" style="padding:5px 12px">Offline</span></div>
+              <button type="button" class="btn btn-primary" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
           } else if (res.status === 'ready') {
-            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Your WhatsApp account is active and connected.</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Ready</span></div><div style="display:flex;align-items:center;justify-content:space-between;background:var(--panel);border:1px solid var(--stroke);padding:12px;border-radius:8px"><div style="font-size:13px">Connected number: <strong>+${res.number || ''}</strong></div><button type="button" class="btn btn-sm btn-danger" id="btn-outlet-gateway-logout" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;cursor:pointer"><i class="fa-solid fa-power-off"></i> Disconnect</button></div></div>`;
+            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#22c55e 35%,var(--stroke));border-radius:14px;padding:16px 18px;background:color-mix(in srgb,#22c55e 6%,var(--panel))">
+              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Connection</div><div class="sd">Bills can be sent to customers</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Connected</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <div style="font-size:14px;color:var(--text)">Linked: <strong>+${res.number || '—'}</strong></div>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-outlet-gateway-logout" style="color:#ef4444"><i class="fa-solid fa-power-off"></i> Unlink</button>
+              </div>
+            </div>`;
             const logoutBtn = container.querySelector('#btn-outlet-gateway-logout');
             if (logoutBtn) {
               logoutBtn.onclick = async () => {
-                if (!confirm("Are you sure you want to disconnect this WhatsApp account? You will need to scan a new QR code to re-link it.")) return;
+                if (!confirm('Unlink WhatsApp from this outlet? You will need to scan a new QR code to connect again.')) return;
                 logoutBtn.disabled = true;
-                logoutBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Disconnecting...';
+                logoutBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Unlinking…';
                 try {
                   await RS_API.data({ operation: 'gateway_logout', tenantId: tenantId });
                   pollOutletGateway();
                   if (typeof window.updateTopbarWhatsAppStatus === 'function') window.updateTopbarWhatsAppStatus();
                 } catch (err) {
                   console.error(err);
-                  alert("Failed to disconnect: " + err.message);
+                  RS.toast('Could not unlink WhatsApp. Please try again.', 'fa-circle-exclamation');
                   logoutBtn.disabled = false;
-                  logoutBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Disconnect';
+                  logoutBtn.innerHTML = '<i class="fa-solid fa-power-off"></i> Unlink';
                 }
               };
             }
           } else if (res.status === 'qr') {
             if (res.qr) {
-              // Speed up polling while waiting for scan
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
-              container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px"><div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Scan the QR code below to connect your WhatsApp account.</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308"></span> Action Required</span></div><div style="display:flex;flex-direction:column;align-items:center;padding:20px 18px 18px;border:1.5px dashed var(--stroke);border-radius:var(--r-md);background:var(--panel);text-align:center"><img src="${res.qr}" alt="Scan QR Code" id="outlet-qr-img" style="width:170px;height:170px;border:4px solid #fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-bottom:12px;transition:opacity 0.4s"/><div style="font-size:12px;color:var(--text-soft);line-height:1.6">1. Open <strong>WhatsApp</strong> on your phone.<br>2. Go to <strong>Settings -> Linked Devices -> Link a Device</strong>.<br>3. Point your camera at this screen to scan the code.</div><div style="margin-top:10px;font-size:11px;color:var(--text-soft);opacity:0.6"><i class="fa-solid fa-rotate fa-spin" style="margin-right:4px"></i>Refreshing automatically...</div></div><div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid rgba(234,179,8,0.35);border-radius:var(--r-md);background:rgba(234,179,8,0.06);text-align:left"><div style="font-size:16px;color:#eab308;margin-top:1px"><i class="fa-solid fa-triangle-exclamation"></i></div><div style="flex:1;font-size:12px;color:var(--text-soft);line-height:1.55"><strong style="color:var(--text)">Avoid linking your personal number.</strong> Automated sending carries a small risk (~2&ndash;4%) of the number being banned by WhatsApp if customers report it as spam. We use human-like sending and daily limits to keep this low, but we recommend a separate business/SIM number. You <em>can</em> use your personal number &mdash; just know the risk before you scan.</div></div></div>`;
+              container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:18px;background:var(--panel)">
+                <div class="set-row" style="margin:0 0 14px"><div class="si"><div class="st">Connection</div><div class="sd">Scan with your phone to connect</div></div><span class="pill pill-amber" style="padding:5px 12px">Scan QR</span></div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+                  <img src="${res.qr}" alt="WhatsApp QR" style="width:176px;height:176px;border-radius:10px;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.12)"/>
+                  <ol style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft);line-height:1.65;text-align:left;max-width:300px">
+                    <li>Open <b>WhatsApp</b> on your phone</li>
+                    <li><b>Settings → Linked devices → Link a device</b></li>
+                    <li>Scan this code</li>
+                  </ol>
+                  <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr><i class="fa-solid fa-rotate-right"></i> New QR</button>
+                </div>
+              </div>`;
+              wireFreshQrButtons(container, tenantId);
             } else {
-              container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Generating QR code... please wait.</div></div><span class="pill pill-amber" style="padding:5px 12px"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Generating...</span></div>`;
+              container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:22px;text-align:center;background:var(--panel)">
+                <div style="font-size:13px;color:var(--text-soft);margin-bottom:12px"><i class="fa-solid fa-spinner fa-spin"></i> Preparing QR code…</div>
+                <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr>Taking long? Try again</button>
+              </div>`;
+              wireFreshQrButtons(container, tenantId);
             }
           } else if (res.status === 'syncing' || res.status === 'authenticated') {
-            // QR just scanned -- show animated syncing UI, speed up polling to catch 'ready'
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
-            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">QR scanned! Syncing your WhatsApp account...</div></div><span class="pill pill-amber" style="padding:5px 12px"><span class="dot dot-live" style="background:#eab308;animation:pulse 0.8s infinite alternate"></span> Syncing</span></div>
-              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 18px;border:1.5px solid rgba(234,179,8,0.3);border-radius:var(--r-md);background:linear-gradient(135deg,rgba(234,179,8,0.04),rgba(234,179,8,0.01));text-align:center">
-                <div style="position:relative;width:72px;height:72px">
-                  <svg viewBox="0 0 72 72" style="width:72px;height:72px;transform:rotate(-90deg)">
-                    <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(234,179,8,0.15)" stroke-width="5"/>
-                    <circle cx="36" cy="36" r="30" fill="none" stroke="#eab308" stroke-width="5" stroke-dasharray="188" stroke-dashoffset="50" stroke-linecap="round" style="animation:wa-spin-progress 1.8s linear infinite"/>
-                  </svg>
-                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:#eab308">
-                    <i class="fa-brands fa-whatsapp"></i>
-                  </div>
-                </div>
-                <div>
-                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Connecting your account...</div>
-                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp is verifying your device.<br>This usually takes 5-15 seconds.</div>
-                </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#22c55e;background:rgba(34,197,94,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(34,197,94,0.2)"><i class="fa-solid fa-check"></i> QR Scanned</span>
-                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#eab308;background:rgba(234,179,8,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(234,179,8,0.2)"><i class="fa-solid fa-spinner fa-spin"></i> Authenticating</span>
-                  <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-soft);background:var(--panel);padding:4px 10px;border-radius:20px;border:1px solid var(--stroke)"><i class="fa-solid fa-circle-dot"></i> Ready</span>
-                </div>
-                <div style="margin-top:4px;border-top:1px solid rgba(234,179,8,0.15);padding-top:14px;width:100%">
-                  <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Stuck? Connection not going through?</div>
-                  <button type="button" id="btn-gateway-force-newqr" style="display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.25);font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;cursor:pointer;transition:all 0.2s">
-                    <i class="fa-solid fa-rotate-right"></i> Force New QR
-                  </button>
-                </div>
-              </div>
-            </div>
-            <style>@keyframes wa-spin-progress{0%{stroke-dashoffset:188}100%{stroke-dashoffset:0}}</style>`;
-            // Wire the Force New QR button
-            const forceQrBtn = container.querySelector('#btn-gateway-force-newqr');
-            if (forceQrBtn) {
-              forceQrBtn.onclick = async () => {
-                forceQrBtn.disabled = true;
-                forceQrBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-                try {
-                  await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-                } catch(e) { /* ignore -- gateway restarts itself */ }
-                // Wait a moment for gateway to restart then resume normal polling
-                setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
-              };
-            }
-          } else if (res.status === 'auth_failure') {
-            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Authentication failed. Please try scanning the QR code again.</div></div><span class="pill" style="padding:5px 12px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2)"><i class="fa-solid fa-triangle-exclamation"></i> Auth Failed</span></div>
-              <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--r-md);background:rgba(239,68,68,0.03)">
-                <div style="font-size:22px;color:#ef4444"><i class="fa-solid fa-circle-xmark"></i></div>
-                <div style="flex:1;font-size:12.5px;color:var(--text-soft)">WhatsApp rejected the authentication attempt. This can happen if the QR code expired or was used from another device. Click <strong>Retry</strong> to generate a fresh QR code.</div>
-                <button type="button" class="btn btn-sm" id="btn-gateway-retry" style="background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2);font-size:11px;padding:6px 12px;border-radius:6px;white-space:nowrap"><i class="fa-solid fa-rotate-right"></i> Retry</button>
-              </div>
+            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#eab308 40%,var(--stroke));border-radius:14px;padding:28px 20px;text-align:center;background:var(--panel)">
+              <div style="font-size:22px;color:#eab308;margin-bottom:10px"><i class="fa-solid fa-spinner fa-spin"></i></div>
+              <div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">Almost ready…</div>
+              <div style="font-size:12.5px;color:var(--text-soft);margin-bottom:14px">Finishing setup — usually a few seconds.</div>
+              <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr>Taking long? New QR</button>
             </div>`;
-            const retryBtn = container.querySelector('#btn-gateway-retry');
-            if (retryBtn) retryBtn.onclick = () => pollOutletGateway();
-          } else if (res.status === 'connecting') {
-            // Speed up polling while gateway is starting
+            wireFreshQrButtons(container, tenantId);
+          } else if (res.status === 'auth_failure') {
+            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#ef4444 35%,var(--stroke));border-radius:14px;padding:24px 20px;text-align:center;background:var(--panel)">
+              <div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">Could not link</div>
+              <div style="font-size:12.5px;color:var(--text-soft);margin-bottom:14px">QR may have expired. Try a new code.</div>
+              <button type="button" class="btn btn-primary btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
+          } else if (res.status === 'connecting' || res.status === 'starting') {
             if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 2000); }
-            container.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px">
-              <div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Gateway is starting up -- this usually takes 15-45 seconds.</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin" style="margin-right:5px"></i> Starting up</span></div>
-              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 18px;border:1.5px solid rgba(107,114,128,0.2);border-radius:var(--r-md);background:rgba(107,114,128,0.03);text-align:center">
-                <div style="position:relative;width:56px;height:56px">
-                  <svg viewBox="0 0 56 56" style="width:56px;height:56px;transform:rotate(-90deg)">
-                    <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(107,114,128,0.15)" stroke-width="4"/>
-                    <circle cx="28" cy="28" r="22" fill="none" stroke="#6b7280" stroke-width="4" stroke-dasharray="138" stroke-dashoffset="138" stroke-linecap="round" style="animation:gw-conn-spin 1.5s linear infinite"/>
-                  </svg>
-                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;color:#6b7280"><i class="fa-brands fa-whatsapp"></i></div>
-                </div>
-                <div>
-                  <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">Initialising gateway...</div>
-                  <div style="font-size:12px;color:var(--text-soft);line-height:1.5">WhatsApp gateway is booting up.<br>A QR code will appear shortly.</div>
-                </div>
-                <div style="border-top:1px solid rgba(107,114,128,0.15);padding-top:14px;width:100%;text-align:center">
-                  <div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">Stuck on this screen? Try forcing a reset:</div>
-                  <button type="button" id="btn-gateway-conn-reset" style="display:inline-flex;align-items:center;gap:6px;background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.25);font-size:12px;font-weight:600;padding:7px 16px;border-radius:8px;cursor:pointer;transition:all 0.2s">
-                    <i class="fa-solid fa-rotate-right"></i> Force Reset
-                  </button>
-                </div>
-              </div>
-            </div>
-            <style>@keyframes gw-conn-spin{0%{stroke-dashoffset:138}100%{stroke-dashoffset:0}}</style>`;
-            const connResetBtn = container.querySelector('#btn-gateway-conn-reset');
-            if (connResetBtn) {
-              connResetBtn.onclick = async () => {
-                connResetBtn.disabled = true;
-                connResetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-                try {
-                  await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-                } catch(e) { /* ignore */ }
-                setTimeout(() => { if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); } pollOutletGateway(); }, 3000);
-              };
-            }
+            container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:28px 20px;text-align:center;background:var(--panel)">
+              <div style="font-size:22px;color:var(--text-mute);margin-bottom:10px"><i class="fa-solid fa-spinner fa-spin"></i></div>
+              <div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">Starting…</div>
+              <div style="font-size:12.5px;color:var(--text-soft);margin-bottom:14px">QR will appear here in a moment.</div>
+              <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr>Stuck? Try again</button>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
           } else {
-            container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd">Unknown status: ${res.status || 'N/A'}</div></div><span class="pill" style="padding:5px 12px;background:rgba(107,114,128,0.1);color:#6b7280"><i class="fa-solid fa-spinner fa-spin"></i> ${res.status ? res.status.toUpperCase() : 'CHECKING'}</span></div>`;
+            container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:28px 20px;text-align:center;background:var(--panel)">
+              <div style="width:48px;height:48px;margin:0 auto 12px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,#25d366 12%,var(--panel));color:#25d366;font-size:22px"><i class="fa-brands fa-whatsapp"></i></div>
+              <div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">Connect WhatsApp</div>
+              <div style="font-size:12.5px;color:var(--text-soft);line-height:1.5;max-width:320px;margin:0 auto 16px">Get a QR code, then scan it from WhatsApp → Linked devices.</div>
+              <button type="button" class="btn btn-primary" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
           }
         } catch (e) {
           console.warn('Failed to poll outlet gateway status:', e);
-          container.innerHTML = `<div class="set-row"><div class="si"><div class="st">Gateway status</div><div class="sd" style="color:#ef4444">Failed to fetch status: ${e.message}</div></div><span class="pill pill-red" style="padding:5px 12px"><span class="dot dot-live" style="background:#ef4444"></span> Offline</span></div>`;
+          container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:22px;text-align:center;background:var(--panel)">
+            <div style="font-size:13px;color:#ef4444;margin-bottom:12px">Could not reach WhatsApp right now.</div>
+            <button type="button" class="btn btn-primary btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
+          </div>`;
+          wireFreshQrButtons(container, tenantId);
         }
 
         // 2. Poll Gateway Activity Logs securely (for this tenant only)
@@ -1024,21 +1434,22 @@
             if (logsRes && logsRes.logs) {
               const logs = logsRes.logs.slice(0, 15);
               if (logs.length === 0) {
-                logsContainer.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-mute);">No recent activity logs found.</div>';
+                logsContainer.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-mute);">No recent WhatsApp activity yet.</div>';
               } else {
                 logsContainer.innerHTML = logs.map(log => {
                   const logDate = log.created_at ? new Date(log.created_at) : new Date();
-                  const timeStr = logDate.toTimeString().slice(0, 8);
-                  const msg = log.details?.message || log.details?.error || 'System event';
+                  const timeStr = logDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                  const msg = log.details?.message || log.details?.error || 'Update';
                   const cls = log.status === 'ok' ? 'color:#22c55e' : (log.status === 'warning' ? 'color:#eab308' : 'color:#ef4444');
-                  return `<div style="margin-bottom: 4px;"><span style="color:var(--text-mute);margin-right:8px;">${timeStr}</span><span style="${cls}">[${log.event.toUpperCase()}] ${msg}</span></div>`;
+                  const label = String(log.event || 'update').replace(/_/g, ' ');
+                  return `<div style="margin-bottom: 6px;"><span style="color:var(--text-mute);margin-right:8px;">${timeStr}</span><span style="${cls}">${label}</span> — ${String(msg).slice(0, 120)}</div>`;
                 }).join('');
               }
             } else {
-              logsContainer.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-mute);">Failed to retrieve logs.</div>';
+              logsContainer.innerHTML = '<div style="text-align: center; padding: 12px; color: var(--text-mute);">Activity is unavailable right now.</div>';
             }
           } catch (e) {
-            logsContainer.innerHTML = `<div style="text-align: center; padding: 12px; color: #ef4444;">Error loading logs: ${e.message}</div>`;
+            logsContainer.innerHTML = `<div style="text-align: center; padding: 12px; color: #ef4444;">Could not load activity. Please try again.</div>`;
           }
         }
 
@@ -1057,28 +1468,87 @@
           };
         }
 
-        // 4. Wire Troubleshoot Force Reset Button Click
+        // 3b. Test send + status refresh (cockpit)
+        const waRefresh = body.querySelector('#btn-wa-refresh-status');
+        if (waRefresh && !waRefresh.dataset.listenerBound) {
+          waRefresh.dataset.listenerBound = 'true';
+          waRefresh.onclick = async () => {
+            waRefresh.disabled = true;
+            try {
+              await pollOutletGateway();
+              if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
+              RS.toast('Connection updated', 'fa-rotate');
+            } catch (e) {
+              RS.toast('Could not refresh. Please try again.', 'fa-circle-exclamation');
+            } finally {
+              waRefresh.disabled = false;
+            }
+          };
+        }
+        const ownerRep = body.querySelector('#btn-owner-wa-reports');
+        if (ownerRep && !ownerRep._rsWired) {
+          ownerRep._rsWired = true;
+          ownerRep.onclick = () => {
+            if (window.RSOwnerReports && typeof RSOwnerReports.openSettingsModal === 'function') {
+              RSOwnerReports.openSettingsModal();
+            } else {
+              RS.toast('Owner reports module loading…', 'fa-circle-info');
+            }
+          };
+        }
+        const waTest = body.querySelector('#btn-wa-test-send');
+        if (waTest && !waTest.dataset.listenerBound) {
+          waTest.dataset.listenerBound = 'true';
+          waTest.onclick = async () => {
+            const linked = window.__rsGatewayNumber || '';
+            const phone = window.prompt(
+              'Send a test message to this number (with country code, e.g. 9198…):',
+              linked || ''
+            );
+            if (phone == null) return;
+            const digits = String(phone).replace(/\D/g, '');
+            if (digits.length < 10) {
+              RS.toast('Please enter a full mobile number with country code', 'fa-circle-exclamation');
+              return;
+            }
+            waTest.disabled = true;
+            waTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…';
+            try {
+              const outlet =
+                sessionStorage.getItem('tenant_name') ||
+                sessionMeta.tenant_name ||
+                'your restaurant';
+              await RS_API.data({
+                operation: 'gateway_send',
+                phone: digits,
+                message:
+                  'Test from ' +
+                  outlet +
+                  ' · ' +
+                  new Date().toLocaleTimeString() +
+                  '. If you received this, bill WhatsApp is working.',
+                tenantId: tenantId,
+              });
+              window.__rsGatewayReady = true;
+              RS.toast('Test message sent', 'fa-circle-check');
+              if (window.updateTopbarWhatsAppStatus) window.updateTopbarWhatsAppStatus();
+            } catch (err) {
+              console.error(err);
+              RS.toast('Test could not be sent. Make sure WhatsApp is connected.', 'fa-circle-exclamation');
+            } finally {
+              waTest.disabled = false;
+              waTest.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send test';
+            }
+          };
+        }
+
+        // 4. New QR / force refresh
         const troubleshootBtn = body.querySelector('#btn-gateway-troubleshoot-reset');
         if (troubleshootBtn && !troubleshootBtn.dataset.listenerBound) {
           troubleshootBtn.dataset.listenerBound = 'true';
-          troubleshootBtn.onclick = async () => {
-            if (!confirm("Are you sure you want to force reset the WhatsApp gateway? This will clear the current session and generate a new QR code. Any unsent messages in the queue may be lost.")) return;
-            troubleshootBtn.disabled = true;
-            const originalHtml = troubleshootBtn.innerHTML;
-            troubleshootBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
-            try {
-              await RS_API.data({ operation: 'gateway_reset', tenantId: tenantId });
-              toast('Gateway reset command sent', 'fa-circle-check');
-            } catch (err) {
-              console.error(err);
-              alert("Reset failed: " + err.message);
-            } finally {
-              setTimeout(() => {
-                troubleshootBtn.disabled = false;
-                troubleshootBtn.innerHTML = originalHtml;
-                pollOutletGateway();
-              }, 3000);
-            }
+          troubleshootBtn.onclick = () => {
+            if (!confirm('Get a new QR code?\n\nYou will scan it again from your phone (WhatsApp → Linked devices).')) return;
+            requestFreshQr(tenantId, troubleshootBtn);
           };
         }
       }
@@ -1295,7 +1765,7 @@
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
     }
-    RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & gateway configuration'];
+    RS.titles['settings-tab']=['Settings','Outlet, taxes, printer & WhatsApp'];
     RS.addRenderer('settings-tab', renderSettings);
     const openSet = $('#open-settings'); if(openSet) openSet.addEventListener('click', ()=>RS.activateTab('settings-tab'));
 
@@ -1309,15 +1779,16 @@
       let syncDoneTimer   = null;
       let errorClearTimer = null;
 
-      function setState(state, title, html) {
+      function setState(state, title, detail) {
         if (!pill) return;
-        pill.style.cssText = '';              // wipe any legacy inline styles
+        // Pill is screen-reader / offline-lock only — no chrome
         ALL_STATES.forEach(s => pill.classList.remove(s));
         if (state) pill.classList.add(state);
         document.body.classList.toggle('rs-offline-lock', ['local-only', 'offline', 'sync-error'].includes(state));
-        pill.setAttribute('data-tooltip', title);
-        pill.title = '';
-        pill.innerHTML = html;
+        pill.setAttribute('data-cloud-state', state || '');
+        pill.setAttribute('data-cloud-detail', detail || '');
+        pill.setAttribute('title', title || '');
+        pill.textContent = detail || state || '';
       }
 
       function updatePill() {
@@ -1330,61 +1801,49 @@
 
         if (!isSuperAdmin && (!isOnline || cloudFallbackActive)) {
           const title = !isOnline
-            ? 'Offline mode - bills and changes are saved locally and will sync to the cloud automatically when you reconnect.'
-            : 'Cloud is currently unavailable. Data is saved locally on this device and will retry sync automatically.';
-          setState('local-only',
-            title,
-            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
-          );
+            ? 'Offline — changes save on this device and sync when you reconnect.'
+            : 'Cloud temporarily unavailable — saved on this device, will retry.';
+          setState('local-only', title, 'Local only');
           return;
         }
 
         if (!isOnline) {
           setState('offline',
-            'You are offline — bills and changes are saved locally and will sync to the cloud automatically when you reconnect.',
-            `<i class="fa-solid fa-cloud"></i><span>Offline</span>`
+            'You are offline — changes save on this device and sync when you reconnect.',
+            'Offline'
           );
           return;
         }
         if (isSuperAdmin) {
           setState('superadmin-cloud',
-            'Super-Admin is connected to Supabase platform controls. Tenant data sync starts after opening a workspace.',
-            `<i class="fa-solid fa-cloud-bolt"></i><span>Cloud admin</span>`
+            'Platform admin connected to cloud controls.',
+            'Admin'
           );
           return;
         }
         if (!isCloud) {
           setState('local-only',
-            'Local mode — data is saved in this browser only. Log in to sync across devices and enable cloud backup.',
-            `<i class="fa-solid fa-cloud"></i><span>Local only</span>`
+            'Local mode — data stays in this browser until you use cloud login.',
+            'Local only'
           );
           return;
         }
-        // Signed in + online — check for recent error (within 30 s)
         const err = window.RS_LAST_CLOUD_ERROR;
         if (err && (Date.now() - err.time < 30000)) {
           setState('sync-error',
-            `Last sync failed: ${err.message}. Data is saved locally and will retry automatically.`,
-            `<i class="fa-solid fa-cloud"></i><span>Sync error</span>`
+            `Last sync failed: ${err.message}. Saved locally; will retry.`,
+            'Sync error'
           );
           clearTimeout(errorClearTimer);
           errorClearTimer = setTimeout(() => { window.RS_LAST_CLOUD_ERROR = null; updatePill(); }, 30000 - (Date.now() - err.time));
           return;
         }
-        setState('cloud',
-          'Connected to Supabase — all data syncs to the cloud instantly.',
-          `<i class="fa-solid fa-cloud"></i><span>Cloud</span>`
-        );
+        setState('cloud', 'Data is syncing to the cloud.', 'Connected');
       }
 
       function showSyncing() {
         if (!pill || !navigator.onLine || !(window.RS_DB && window.RS_DB.isCloud)) return;
-        ALL_STATES.forEach(s => pill.classList.remove(s));
-        pill.classList.add('syncing');
-        pill.style.cssText = '';
-        pill.setAttribute('data-tooltip', 'Syncing to cloud…');
-        pill.title = '';
-        pill.innerHTML = `<i class="fa-solid fa-cloud fa-pulse"></i><span>Syncing</span>`;
+        setState('syncing', 'Syncing to cloud…', 'Syncing…');
       }
 
       // ── Sync-event listeners (fired by db.js guard()) ─────────────────
@@ -1507,39 +1966,166 @@
     
     const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
     function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
-      const textEl = document.getElementById('topbar-whatsapp-status-text');
-      const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-      if (!textEl || !pillEl) return;
-      WA_BADGE_STATES.forEach(cls => pillEl.classList.remove(cls));
-      pillEl.classList.add(state);
-      pillEl.style.cssText = '';
-      textEl.innerHTML = `<i class="fa-brands fa-whatsapp${pulse ? ' fa-pulse' : ''}"></i><span class="tb-badge-label">${safe(label)}</span>`;
-      pillEl.setAttribute('data-tooltip', tooltip);
-      pillEl.title = '';
+      const pills = document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn');
+      if (!pills.length) return;
+
+      const spinning = !!(pulse || state === 'wa-starting' || state === 'wa-syncing' || state === 'wa-qr');
+
+      // Always-visible top-bar icon only (no ⋯ menu duplicate)
+      const icon = document.getElementById('tb-wa-icon');
+      const lab = document.getElementById('tb-wa-label');
+      if (icon) {
+        icon.className =
+          'fa-brands fa-whatsapp tb-wa-icon' + (spinning ? ' fa-spin' : '');
+        icon.style.display = 'inline-block';
+        icon.setAttribute('aria-hidden', 'true');
+      }
+      if (lab) {
+        const short =
+          state === 'wa-linked' ? (label && String(label).indexOf('+') === 0 ? label : 'On')
+          : state === 'wa-offline' || state === 'wa-auth-failure' ? 'Off'
+          : state === 'wa-qr' ? 'Scan'
+          : '…';
+        lab.textContent = short;
+      }
+
+      pills.forEach((pillEl) => {
+        WA_BADGE_STATES.forEach((cls) => pillEl.classList.remove(cls));
+        pillEl.classList.add(state);
+        pillEl.style.cssText = '';
+        pillEl.setAttribute('data-tooltip', tooltip || '');
+        pillEl.title = tooltip || label || 'Bill WhatsApp';
+        pillEl.setAttribute('aria-label', 'Bill WhatsApp: ' + (label || state));
+      });
+      window.__rsWaBadge = { state, label, tooltip };
     }
+
+    function openWhatsAppStatusPanel() {
+      const st = window.__rsGatewayLastStatus || 'unknown';
+      const ready = window.__rsGatewayReady === true;
+      const num = window.__rsGatewayNumber || '';
+      const tip = (window.__rsWaBadge && window.__rsWaBadge.tooltip) || '';
+      const stHuman =
+        ready ? 'Connected'
+          : st === 'qr' ? 'Scan QR to connect'
+          : (st === 'syncing' || st === 'authenticated') ? 'Almost ready'
+          : (st === 'connecting' || st === 'starting') ? 'Starting…'
+          : (st === 'disconnected' || st === 'offline' || st === 'close' || st === 'closed' || !st || st === 'unknown')
+            ? 'Not connected'
+            : 'Not connected';
+      const statusLine = ready
+        ? `<span style="color:var(--green);font-weight:800">Connected</span>${num ? ' · +' + safe(num) : ''}`
+        : st === 'qr'
+          ? `<span style="color:var(--amber);font-weight:800">Scan QR to connect</span>`
+          : `<span style="color:var(--red);font-weight:800">${safe(stHuman)}</span>`;
+      const body = `
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px;line-height:1.5;color:var(--text-soft)">
+          <div style="padding:12px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke-2)">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:4px">Bill WhatsApp</div>
+            <div style="color:var(--text);font-size:15px">${statusLine}</div>
+            ${tip ? `<div style="margin-top:6px;font-size:12.5px">${safe(tip)}</div>` : ''}
+          </div>
+          <p style="margin:0;font-size:12.5px">Bills are sent from <b>your</b> linked number to <b>your</b> customers.</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft)">
+            <li>Best for bills and “order ready” messages</li>
+            <li>Phone online · WhatsApp → Linked devices</li>
+            <li>If not connected: open Settings → WhatsApp and scan the QR</li>
+          </ul>
+          ${
+            window.RSWaSendQueue && RSWaSendQueue.count && RSWaSendQueue.count() > 0
+              ? `<div style="margin-top:4px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,#25d366 12%,var(--panel));border:1px solid color-mix(in srgb,#25d366 30%,var(--stroke));font-size:12.5px;color:var(--text)">
+                  <b>${RSWaSendQueue.count()}</b> bill(s) waiting — will send automatically when WhatsApp is connected.
+                </div>`
+              : ''
+          }
+        </div>`;
+      if (!window.RSModal) {
+        if (confirm((tip || 'WhatsApp: ' + stHuman) + '\n\nOpen WhatsApp settings?')) {
+          if (RS.activateTab) RS.activateTab('settings-tab');
+          setTimeout(() => {
+            const b = document.querySelector('.set-nav button[data-s="gateway"]');
+            if (b) b.click();
+          }, 200);
+        }
+        return;
+      }
+      RSModal.open({
+        title: 'WhatsApp',
+        sub: 'Bill delivery for this outlet',
+        icon: 'fa-brands fa-whatsapp',
+        size: 'sm',
+        body,
+        foot: `<button type="button" class="btn btn-ghost" id="wa-panel-refresh"><i class="fa-solid fa-rotate"></i> Check again</button>
+               ${
+                 window.RSWaSendQueue && RSWaSendQueue.count && RSWaSendQueue.count() > 0
+                   ? '<button type="button" class="btn btn-ghost" id="wa-panel-queue"><i class="fa-solid fa-clock"></i> Waiting bills</button>'
+                   : ''
+               }
+               <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1"><i class="fa-solid fa-gear"></i> Open settings</button>`,
+        onMount(modal, close) {
+          modal.querySelector('#wa-panel-refresh').onclick = async () => {
+            if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
+            if (window.RSWaSendQueue && RSWaSendQueue.processQueue) {
+              await RSWaSendQueue.processQueue({ force: false });
+            }
+            close();
+            setTimeout(openWhatsAppStatusPanel, 120);
+          };
+          const qBtn = modal.querySelector('#wa-panel-queue');
+          if (qBtn)
+            qBtn.onclick = () => {
+              close();
+              if (window.RSWaSendQueue && RSWaSendQueue.openQueuePanel) RSWaSendQueue.openQueuePanel();
+            };
+          modal.querySelector('#wa-panel-settings').onclick = () => {
+            close();
+            if (RS.activateTab) RS.activateTab('settings-tab');
+            setTimeout(() => {
+              const b = document.querySelector('.set-nav button[data-s="gateway"]');
+              if (b) b.click();
+            }, 180);
+          };
+        },
+      });
+    }
+
+    function wireWhatsAppStatusClicks() {
+      document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn').forEach((el) => {
+        if (el.dataset.waClickBound === '1') return;
+        el.dataset.waClickBound = '1';
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openWhatsAppStatusPanel();
+        });
+      });
+    }
+    wireWhatsAppStatusClicks();
+    document.addEventListener('DOMContentLoaded', wireWhatsAppStatusClicks);
     function gatewayReason(res, fallback) {
       const raw = (res && (res.error || res.reason || res.message || (res.details && res.details.reason))) || fallback || '';
       return humanizeGatewayReason(raw);
     }
     function humanizeGatewayReason(raw) {
       const s = String(raw || '').toLowerCase();
-      if (!s || s === 'not connected' || s === 'offline') {
-        return 'WhatsApp is not connected. Open Settings → Gateway to link.';
+      if (!s || s === 'not connected' || s === 'offline' || s === 'disconnected' || s === 'n/a') {
+        return 'WhatsApp is not connected. Open Settings → WhatsApp to link your number.';
       }
       if (s.includes('stream') || s.includes('conflict') || s.includes('disconnected')) {
-        return 'WhatsApp connection dropped. Reconnect in Settings → Gateway.';
+        return 'Connection dropped. Open Settings → WhatsApp and scan the QR again if needed.';
       }
       if (s.includes('timeout') || s.includes('timed out')) {
-        return 'Gateway took too long to respond. Check the PC running WhatsApp.';
+        return 'WhatsApp took too long to respond. Check that the RestroSuite computer is on.';
       }
       if (s.includes('auth') || s.includes('logged out') || s.includes('session')) {
-        return 'WhatsApp session expired. Scan the QR code again in Settings.';
+        return 'Link expired. Scan the QR code again in Settings → WhatsApp.';
       }
       if (s.includes('qr')) {
-        return 'Scan the WhatsApp QR code in Settings → Gateway to connect.';
+        return 'Scan the WhatsApp QR code in Settings → WhatsApp to connect.';
       }
       if (s.length > 90 || /[{}\[\]<>]|error code|errno|ECONN|status\s*\d/i.test(String(raw))) {
-        return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → Gateway.';
+        return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → WhatsApp.';
       }
       return String(raw);
     }
@@ -1556,27 +2142,36 @@
           : await RS_API.data({ operation: 'gateway_status' });
         window.__rsGatewayLastStatus = (res && res.status) || 'offline';
         window.__rsGatewayReady = false; // default -- only the 'ready' branch below flips this on
+        window.__rsGatewayNumber = (res && (res.number || res.phone || res.wa_number)) || window.__rsGatewayNumber || '';
+        window.__rsGatewayStatusRaw = res || null;
         if (res && res.status === 'ready') {
-          // Cached signal (refreshed every 15s) used by the checkout/receipt
-          // flow to decide, without an extra network round-trip, whether it's
-          // worth attempting a real PDF-attachment WhatsApp send via the
-          // gateway vs. going straight to the plain-text wa.me link.
+          // Cached signal used by checkout/receipt for PDF vs wa.me
           window.__rsGatewayReady = true;
-          setTopbarWhatsAppBadge('wa-linked', 'Linked', 'WhatsApp gateway linked', false);
+          const n = window.__rsGatewayNumber;
+          const short = n ? ('+' + String(n).slice(-4)) : 'On';
+          setTopbarWhatsAppBadge(
+            'wa-linked',
+            short,
+            n ? 'WhatsApp connected · +' + n + ' · bills send from your number' : 'WhatsApp connected · ready to send bills',
+            false
+          );
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          setTopbarWhatsAppBadge('wa-syncing', 'Syncing', 'WhatsApp gateway syncing', true);
+          setTopbarWhatsAppBadge('wa-syncing', '…', 'Almost ready — finishing WhatsApp setup', true);
         } else if (res && res.status === 'qr') {
-          setTopbarWhatsAppBadge('wa-qr', 'QR', 'Scan the WhatsApp QR code to connect', false);
+          setTopbarWhatsAppBadge('wa-qr', 'Scan QR', 'Open Settings → WhatsApp and scan the QR code', false);
         } else if (res && res.status === 'auth_failure') {
-          setTopbarWhatsAppBadge('wa-auth-failure', 'Auth', 'WhatsApp auth failed: ' + gatewayReason(res, 'session needs reconnect'), false);
+          setTopbarWhatsAppBadge('wa-auth-failure', 'Retry', gatewayReason(res, 'Please scan the QR code again'), false);
         } else if (res && (res.status === 'connecting' || res.status === 'starting')) {
-          setTopbarWhatsAppBadge('wa-starting', 'Starting', 'WhatsApp gateway starting', true);
+          setTopbarWhatsAppBadge('wa-starting', '…', 'Connecting WhatsApp…', true);
         } else {
-          setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + gatewayReason(res, 'not connected'), false);
+          setTopbarWhatsAppBadge('wa-offline', 'Off', gatewayReason(res, 'not connected'), false);
         }
+        wireWhatsAppStatusClicks();
       } catch(err) {
         window.__rsGatewayLastStatus = 'error';
-        setTopbarWhatsAppBadge('wa-offline', 'Offline', 'WhatsApp gateway offline: ' + (err && err.message ? err.message : 'status check failed'), false);
+        window.__rsGatewayReady = false;
+        setTopbarWhatsAppBadge('wa-offline', 'Off', 'Could not check WhatsApp. Try again in a moment.', false);
+        wireWhatsAppStatusClicks();
       }
     };
 
@@ -1618,19 +2213,7 @@
       window.stopTopbarWhatsAppPolling();
       topbarWhatsAppDelay = 15000;
       pollTopbarWhatsApp();
-
-      const pill = document.getElementById('topbar-whatsapp-status-pill');
-      if (pill) {
-        pill.onclick = () => {
-          if (window.RS && typeof RS.activateTab === 'function') {
-            RS.activateTab('settings-tab');
-          }
-          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-          if (gatewayBtn) {
-            gatewayBtn.click();
-          }
-        };
-      }
+      wireWhatsAppStatusClicks();
     };
     
     RS.syncPhoneCombosToSettings = function(customSettings) {
@@ -1672,9 +2255,16 @@
     } catch(e){}
 
     document.addEventListener('rs:hydrated', window.startTopbarWhatsAppPolling);
-    if (window.RS_DB && window.RS_DB.session) {
+    // Start polling as soon as shell boots (don't wait only for RS_DB.session)
+    try {
       window.startTopbarWhatsAppPolling();
+    } catch (e) {
+      console.warn('[WA topbar] poll start failed', e);
     }
+    // Re-bind WA click after late DOM injects
+    setTimeout(wireWhatsAppStatusClicks, 500);
+    setTimeout(wireWhatsAppStatusClicks, 2000);
   }
-  if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
+  if (window.RS) boot();
+  else document.addEventListener('rs:ready', boot, { once: true });
 })();

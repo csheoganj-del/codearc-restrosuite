@@ -91,6 +91,16 @@
                 <input class="form-input" id="ed-recipe-servings" type="number" min="1" step="1" value="1" title="Ingredient quantities below are for this many servings">
               </div>
             </div>
+            <div style="display:flex;flex-wrap:wrap;gap:14px 18px;padding:10px 12px;border:1px solid var(--stroke-2);border-radius:12px;background:var(--glass)">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-bestseller"> Best seller</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-special"> Today&rsquo;s special</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-staple"> Staple (roti/rice)</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600"><input type="checkbox" id="ed-pair-water"> Offer water with this</label>
+            </div>
+            <div>
+              <label class="fl">Add-ons <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">extra ghee, butter… one per line: Name, Price</span></label>
+              <textarea class="form-input" id="ed-addons" rows="2" placeholder="Extra ghee, 20&#10;Extra butter, 15" style="resize:vertical;font-size:13px"></textarea>
+            </div>
             <div><label class="fl">Uses from store room (recipe) <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">qty + unit · optional</span></label><div class="ing-chips" id="ed-ings"></div></div>
             <div id="ed-costline" style="font-size:12.5px;color:var(--text-mute)"></div>
             <button class="btn btn-primary btn-block" id="ed-save"><i class="fa-solid fa-circle-check"></i> Save item</button>
@@ -239,6 +249,19 @@
           }
         }
 
+        function parseAddonsText(raw) {
+          return String(raw || '')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+              const parts = line.split(/[,|]/);
+              const an = (parts[0] || '').trim();
+              const ap = parseFloat(String(parts[1] || '0').replace(/[^0-9.]/g, '')) || 0;
+              return an ? { name: an, price: ap } : null;
+            })
+            .filter(Boolean);
+        }
         const data = { 
           name, 
           price, 
@@ -249,6 +272,11 @@
           ingredients: draftIngs.slice(),
           serveUnit: ($('#ed-serve-unit') && $('#ed-serve-unit').value) || 'plate',
           recipeServings: Math.max(1, Number($('#ed-recipe-servings') && $('#ed-recipe-servings').value) || 1),
+          bestseller: !!(document.getElementById('ed-bestseller') && document.getElementById('ed-bestseller').checked),
+          isSpecial: !!(document.getElementById('ed-special') && document.getElementById('ed-special').checked),
+          isStaple: !!(document.getElementById('ed-staple') && document.getElementById('ed-staple').checked),
+          pairWater: !!(document.getElementById('ed-pair-water') && document.getElementById('ed-pair-water').checked),
+          addons: parseAddonsText(document.getElementById('ed-addons') && document.getElementById('ed-addons').value),
         };
         
         try {
@@ -279,9 +307,18 @@
       };
       // expose for edit
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
+        try { window.buildFormLoad = buildForm._load; } catch (_) {}
         $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg';
         if ($('#ed-serve-unit')) $('#ed-serve-unit').value = m.serveUnit || 'plate';
         if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = Math.max(1, Number(m.recipeServings) || 1);
+        if (document.getElementById('ed-bestseller')) document.getElementById('ed-bestseller').checked = !!m.bestseller;
+        if (document.getElementById('ed-special')) document.getElementById('ed-special').checked = !!(m.isSpecial || m.special);
+        if (document.getElementById('ed-staple')) document.getElementById('ed-staple').checked = !!(m.isStaple || m.staple);
+        if (document.getElementById('ed-pair-water')) document.getElementById('ed-pair-water').checked = m.pairWater === true || (!!m.isStaple && m.pairWater !== false);
+        if (document.getElementById('ed-addons')) {
+          const ads = Array.isArray(m.addons) ? m.addons : [];
+          document.getElementById('ed-addons').value = ads.map(a => (a.name || '') + ', ' + (a.price != null ? a.price : 0)).join('\n');
+        }
         const edGst = $('#ed-gst');
         
         // Resolve slab percentage from m.taxCategory if missing or stale
@@ -318,6 +355,11 @@
         $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0;
         if ($('#ed-serve-unit')) $('#ed-serve-unit').value = 'plate';
         if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = 1;
+        if (document.getElementById('ed-bestseller')) document.getElementById('ed-bestseller').checked = false;
+        if (document.getElementById('ed-special')) document.getElementById('ed-special').checked = false;
+        if (document.getElementById('ed-staple')) document.getElementById('ed-staple').checked = false;
+        if (document.getElementById('ed-pair-water')) document.getElementById('ed-pair-water').checked = false;
+        if (document.getElementById('ed-addons')) document.getElementById('ed-addons').value = '';
         draftIngs=[]; renderIngs(); }
       renderIngs();
     }

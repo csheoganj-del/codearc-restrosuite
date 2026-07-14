@@ -166,10 +166,11 @@
         const root = RS.getModalRoot();
         const ov = document.createElement('div');
         ov.className = 'rs-overlay';
-        const head = opts.title!=null ? `<div class="rs-mhead">${opts.icon?`<div class="mh-ic"><i class="fa-solid ${opts.icon}"></i></div>`:''}<div><h3>${opts.title}</h3>${opts.sub?`<div class="sub">${opts.sub}</div>`:''}</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>` : '';
+        const icCls = ['mh-ic', opts.iconClass || ''].filter(Boolean).join(' ');
+        const head = opts.title!=null ? `<div class="rs-mhead">${opts.icon?`<div class="${icCls}"${opts.iconId?` id="${opts.iconId}"`:''}><i class="fa-solid ${opts.icon}"></i></div>`:''}<div class="rs-mhead-text"><h3>${opts.title}</h3>${opts.sub?`<div class="sub">${opts.sub}</div>`:''}</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>` : '';
         const body = opts.bare ? (opts.body||'') : `<div class="rs-mbody ${opts.bodyClass||''}">${opts.body||''}</div>`;
         const foot = opts.foot ? `<div class="rs-mfoot">${opts.foot}</div>` : '';
-        ov.innerHTML = `<div class="rs-modal ${opts.size||'md'}">${head}${body}${foot}</div>`;
+        ov.innerHTML = `<div class="rs-modal ${opts.size||'md'} ${opts.modalClass||''}">${head}${body}${foot}</div>`;
         root.appendChild(ov);
         const close = ()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),300); document.removeEventListener('keydown', esc); };
         const esc = e=>{ if(e.key==='Escape') close(); };
@@ -186,24 +187,41 @@
 
     /* ---------------- print helper ---------------- */
     window.RSPrint = function(innerHTML, title){
+      // Prefer shared bridge (same formatted CSS as Bill settled / thermal)
+      if (window.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
+        RSPrintBridge.printHtml(innerHTML, title || 'Print').catch(function () {});
+        return;
+      }
       const paperSize = (window.RS_SETTINGS && window.RS_SETTINGS.set_paper_size) || '80 mm';
-      const maxW = paperSize === '58 mm' ? '200px' : '300px';
+      const maxW = paperSize === '58 mm' ? '220px' : '300px';
       const style = `
         <style>
-          *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif;}
-          body{padding:10px;color:#111;}
-          body > div { max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important; }
-          .rcp-center{text-align:center}.rcp-logo{font-weight:700;font-size:20px}
-          .rcp-sub{font-size:11px;color:#666;margin-top:2px}.rcp-hr{border:0;border-top:1px dashed #aaa;margin:10px 0}
-          .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:12px;padding:2px 0}
-          .rcp-line .q{color:#666}.rcp-tot{display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:6px}
-          .rcp-foot{text-align:center;font-size:11px;color:#666;margin-top:12px}
+          @page{margin:0;size:auto}
+          *{margin:0;padding:0;box-sizing:border-box}
+          body{padding:6px 4px 10px;color:#16151c;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          body > div,.receipt-paper{max-width:${maxW}!important;width:100%!important;margin:0 auto!important}
+          .receipt-paper{background:#fbfaf7;padding:10px 8px 14px}
+          .rcp-center{text-align:center}
+          .rcp-logo{font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:18px;letter-spacing:-.02em;color:#16151c}
+          .rcp-sub{font-size:10.5px;color:#4a4842;margin-top:2px}
+          .rcp-hr{border:0;border-top:1px dashed #8a877c;margin:10px 0}
+          .rcp-meta,.rcp-line{display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;gap:6px;color:#16151c}
+          .rcp-meta{color:#4a4842;font-size:11px}
+          .rcp-line .q{color:#6b6960}
+          .rcp-tot{display:flex;justify-content:space-between;font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:15px;margin-top:6px}
+          .rcp-foot{text-align:center;font-size:10.5px;color:#6b6960;margin-top:12px}
+          .rcp-foot b{color:#16151c}
+          .rcp-qr-wrap{width:100%!important;margin:14px 0 0!important;border-collapse:collapse!important;border-top:1px dashed #8a877c!important;table-layout:fixed!important}
+          .rcp-qr-wrap td{width:100%!important;text-align:center!important;padding:12px 0 0!important}
+          .rcp-qr-wrap img{width:110px!important;height:110px!important;display:block!important;margin:0 auto!important;float:none!important}
+          .rcp-qr-label{display:block!important;width:100%!important;text-align:center!important;font-size:10px!important;color:#6b6960!important;margin-top:6px!important}
+          .rcp-foot{text-align:center!important;width:100%!important;display:block!important}
           .kot-h{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
           .kot-h .kt{font-weight:700;font-size:18px}
           .kot-item{display:flex;gap:10px;padding:6px 0;border-bottom:1px dashed #ccc;font-size:15px}
           .kot-item .kq{font-weight:700;min-width:28px}.kot-item .kno{font-size:11px;color:#8a4b00}
         </style>`;
-      const fullHtml = `<!doctype html><html><head><title>${title||'Print'}</title>${style}</head><body>${innerHTML}</body></html>`;
+      const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${title||'Print'}</title>${style}</head><body>${innerHTML}</body></html>`;
 
       if (window.AndroidInterface && typeof window.AndroidInterface.printReceipt === 'function') {
         try {
@@ -749,12 +767,13 @@
       }
       RSModal.open({
         title: 'Connect WhatsApp',
-        sub: 'Send bill PDFs instantly',
+        sub: 'Your outlet number · bills only',
         icon: 'fa-brands fa-whatsapp',
         size: 'sm',
         body: `<div style="padding:4px 2px 8px;line-height:1.55;font-size:13.5px;color:var(--text-soft)">
           <p style="margin:0 0 12px;color:var(--text)">${esc(msg)}</p>
-          <p style="margin:0">Link a business WhatsApp number in <b>Settings → Gateway</b>, then bills send as the same PDF you see in Bill settled.</p>
+          <p style="margin:0 0 10px">Link <b>this outlet’s</b> WhatsApp in <b>Settings → Gateway</b> (Linked devices → scan QR). Bills still save if WhatsApp is offline.</p>
+          <p style="margin:0;font-size:12.5px">Meanwhile: share PDF from Bill settled, or open WhatsApp Web with the text bill.</p>
         </div>`,
         foot: `<button class="btn btn-ghost" id="wa-cta-later">Later</button>
                <button class="btn btn-primary" id="wa-cta-connect"><i class="fa-brands fa-whatsapp"></i> Connect now</button>`,
@@ -772,6 +791,109 @@
       });
     }
 
+    /** When gateway send fails: queue / retry / wa.me / download PDF / connect */
+    function openWaOfflineFallback(bill, phone, errMsg, alreadyQueued) {
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      const rawWhy = String(errMsg || window.__rsLastWaError || '').slice(0, 100);
+      const why =
+        !rawWhy || /gateway|disconnected|offline|econn|timeout|not ready|unavailable/i.test(rawWhy)
+          ? 'WhatsApp is not connected right now.'
+          : rawWhy;
+      const goSettings = () => {
+        if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
+        setTimeout(() => {
+          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+          if (gatewayBtn) gatewayBtn.click();
+        }, 180);
+      };
+      // Ensure queued for auto-send when Ready
+      let queued = !!alreadyQueued;
+      if (!queued && window.RSWaSendQueue && RSWaSendQueue.enqueue) {
+        try {
+          const q = RSWaSendQueue.enqueue({
+            phone: cleanPhone,
+            bill,
+            message: typeof receiptText === 'function' ? receiptText(bill) : '',
+            lastError: why,
+          });
+          queued = !!(q && q.ok);
+        } catch (_) {}
+      }
+      if (!window.RSModal) {
+        RS.toast(
+          queued ? 'Saved — will send when WhatsApp is connected' : 'WhatsApp offline — opening chat to send manually',
+          'fa-whatsapp'
+        );
+        if (!queued) {
+          try {
+            const text = receiptText(bill);
+            window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+          } catch (_) {}
+        }
+        return;
+      }
+      RSModal.open({
+        title: 'Could not send on WhatsApp',
+        sub: queued ? 'We saved it — will send when connected' : 'Bill is saved — you can still share it',
+        icon: 'fa-brands fa-whatsapp',
+        size: 'sm',
+        body: `<div style="font-size:13.5px;line-height:1.5;color:var(--text-soft)">
+          <p style="margin:0 0 10px;color:var(--text)">Your bill is safe. WhatsApp could not send it automatically right now.</p>
+          <p style="margin:0 0 8px;font-size:12.5px;padding:8px 10px;background:var(--glass);border-radius:8px">${esc(why)}</p>
+          ${
+            queued
+              ? `<p style="margin:0 0 8px;font-size:12.5px;color:var(--green);font-weight:700"><i class="fa-solid fa-clock"></i> This bill is waiting — it will send automatically when WhatsApp is connected again.</p>`
+              : ''
+          }
+          <p style="margin:0;font-size:12.5px">You can also open chat, download the PDF, or reconnect WhatsApp in Settings.</p>
+        </div>`,
+        foot: `<button type="button" class="btn btn-ghost btn-sm" id="wa-fb-retry"><i class="fa-solid fa-rotate"></i> Try again</button>
+               <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-web"><i class="fa-brands fa-whatsapp"></i> Open chat</button>
+               <button type="button" class="btn btn-ghost btn-sm" id="wa-fb-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+               <button type="button" class="btn btn-primary btn-sm" id="wa-fb-connect">Reconnect</button>`,
+        onMount(modal, close) {
+          modal.querySelector('#wa-fb-retry').onclick = () => {
+            close();
+            shareReceiptViaWhatsApp(bill);
+          };
+          modal.querySelector('#wa-fb-web').onclick = () => {
+            try {
+              const text = receiptText(bill);
+              window.open(
+                `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`,
+                '_blank',
+                'noopener,noreferrer'
+              );
+              RS.toast('WhatsApp Web opened — tap Send', 'fa-whatsapp');
+            } catch (e) {
+              RS.toast('Could not open WhatsApp Web', 'fa-circle-exclamation');
+            }
+            close();
+          };
+          modal.querySelector('#wa-fb-pdf').onclick = async () => {
+            try {
+              const dataUri =
+                window.RSReceiptEngine && RSReceiptEngine.toPDF
+                  ? await RSReceiptEngine.toPDF(bill)
+                  : await compilePreviewPDF(bill);
+              const a = document.createElement('a');
+              a.href = dataUri;
+              a.download = 'bill-' + (bill.no || bill.orderId || 'receipt') + '.pdf';
+              a.click();
+              RS.toast('PDF downloaded — share from phone files', 'fa-file-pdf');
+            } catch (e) {
+              RS.toast('PDF download failed', 'fa-circle-exclamation');
+            }
+            close();
+          };
+          modal.querySelector('#wa-fb-connect').onclick = () => {
+            close();
+            goSettings();
+          };
+        },
+      });
+    }
+
     async function shareReceiptViaWhatsApp(bill) {
       const key = bill && (bill.no || bill.orderId || bill.id);
       if (key && _waSendingBills.has(key)) return;
@@ -784,7 +906,7 @@
       if (!phone || phone.trim() === '' || phone === 'null') {
         phone = await new Promise(resolve => {
           const ov = document.createElement('div');
-          ov.className = 'rs-overlay';
+          ov.className = 'rs-overlay show';
           ov.innerHTML = `<div class="rs-modal sm">
             <div class="rs-mhead"><span class="rs-mtitle"><i class="fa-brands fa-whatsapp"></i> WhatsApp Number</span><button class="rs-mclose icon-btn"><i class="fa-solid fa-xmark"></i></button></div>
             <div class="rs-mbody" style="padding:18px 20px 8px">
@@ -795,6 +917,7 @@
             <div class="rs-mfoot"><button class="rs-mcancel btn-ghost">Cancel</button><button class="rs-mok btn-primary"><i class="fa-brands fa-whatsapp"></i> Send</button></div>
           </div>`;
           document.body.appendChild(ov);
+          requestAnimationFrame(function () { ov.classList.add('show'); });
           const inp = ov.querySelector('#wa-phone-input');
           const ok  = ov.querySelector('.rs-mok');
           const cancel = ov.querySelector('.rs-mcancel');
@@ -874,35 +997,31 @@
             return;
           }
           if (result.mode === 'wa.me') {
-            RS.toast(
-              result.warning
-                ? 'Opened WhatsApp Web (gateway: ' + String(result.warning).slice(0, 50) + ')'
-                : 'Opened WhatsApp Web — paste/send the message',
-              'fa-whatsapp'
+            // Gateway path failed — queue + structured fallback
+            openWaOfflineFallback(
+              normalized,
+              cleanPhone,
+              result.warning ||
+                (!ready
+                  ? st === 'qr'
+                    ? 'Scan QR in Settings → Gateway'
+                    : 'WhatsApp not linked / offline'
+                  : 'Gateway send failed'),
+              !!result.queued
             );
-            return;
-          }
-          if (result.mode === 'wa.me') {
-            RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
-            // Only prompt connect when gateway is clearly not linked
-            if (!ready && (st === 'offline' || st === 'error' || st === 'qr' || st === 'auth_failure' || !st)) {
-              setTimeout(() => openGatewayConnectCTA(
-                st === 'qr'
-                  ? 'Scan the WhatsApp QR in Settings → Gateway for one-tap PDF bills.'
-                  : 'Connect WhatsApp in Settings → Gateway for automatic PDF bills.'
-              ), 400);
-            }
             return;
           }
         } catch (err) {
           console.warn('[Receipt] engine send failed:', err && err.message);
+          openWaOfflineFallback(normalized, cleanPhone, err && err.message);
+          return;
         }
       }
 
       // Manual fallback (engine missing or failed hard)
       try {
         const text = receiptText(normalized);
-        if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function') {
+        if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function' && ready) {
           const pdfDataUri = await compilePreviewPDF(normalized);
           const base64 = String(pdfDataUri || '').includes(',') ? String(pdfDataUri).split(',')[1] : String(pdfDataUri || '');
           if (base64 && base64.length > 100) {
@@ -923,12 +1042,10 @@
             return;
           }
         }
-        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-        RS.toast('Open WhatsApp to send (gateway PDF unavailable)', 'fa-whatsapp');
+        openWaOfflineFallback(normalized, cleanPhone, !ready ? 'WhatsApp offline' : 'PDF unavailable');
       } catch (e) {
         console.warn(e);
-        RS.toast('Could not send WhatsApp receipt', 'fa-circle-exclamation');
-        if (!ready) openGatewayConnectCTA();
+        openWaOfflineFallback(normalized, cleanPhone, e && e.message);
       }
     }
 
@@ -954,70 +1071,295 @@
       });
     }
 
-    async function showReceipt(bill) {
-      const qrDataUri = await generateReceiptQrDataUri(bill);
-      const printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qrDataUri)}</div>`;
-      const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
-      const waLabel = gwReady ? 'WhatsApp' : 'WhatsApp';
-      const st = bill.syncStatus || 'synced';
-      const syncBanner = st === 'pending' || st === 'local' || st === 'saving'
-        ? `<div style="margin:0 0 10px;padding:8px 11px;border-radius:10px;border:1px solid rgba(234,179,8,.35);background:rgba(234,179,8,.1);font-size:12px;line-height:1.45;color:var(--text-soft);display:flex;gap:8px;align-items:center">
-            <i class="fa-solid fa-cloud-arrow-up" style="color:#ca8a04"></i>
-            <span><b style="color:var(--text)">Saved on this device</b> — cloud sync ${st === 'saving' ? 'in progress' : 'pending'}. Bill is safe; will upload when online.</span>
-          </div>`
-        : `<div style="margin:0 0 10px;padding:6px 10px;border-radius:10px;border:1px solid rgba(34,197,94,.28);background:rgba(34,197,94,.08);font-size:11.5px;color:var(--text-soft);display:flex;gap:8px;align-items:center">
-            <i class="fa-solid fa-circle-check" style="color:#16a34a"></i>
-            <span>Bill synced · ${esc(bill.no || '')}</span>
+    /** Manual WhatsApp backup: always opens WhatsApp chat with bill text (no gateway required). */
+    async function openManualWhatsAppBill(bill) {
+      let phone = bill.customerPhone;
+      if (!phone || String(phone).trim() === '' || phone === 'null') {
+        phone = await new Promise((resolve) => {
+          const ov = document.createElement('div');
+          ov.className = 'rs-overlay show';
+          ov.innerHTML = `<div class="rs-modal sm">
+            <div class="rs-mhead"><div class="mh-ic" style="background:rgba(37,211,102,.15);color:#128C7E"><i class="fa-brands fa-whatsapp"></i></div><div><h3>Send on WhatsApp</h3><div class="sub">Manual backup - opens chat so you can send</div></div><button type="button" class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="rs-mbody" style="padding:16px 20px 8px">
+              <label class="field-label">Customer WhatsApp (with country code)</label>
+              <input id="wa-phone-input" class="form-input" type="tel" inputmode="numeric" placeholder="e.g. 919876543210" style="margin-top:6px" autocomplete="tel">
+              <p style="font-size:12px;color:var(--text-mute);margin-top:8px">Include country code without +. Example: 91 for India. Use this when automatic send is offline.</p>
+            </div>
+            <div class="rs-mfoot">
+              <button type="button" class="btn btn-ghost rs-mcancel">Cancel</button>
+              <button type="button" class="btn rc-btn-wa rs-mok"><i class="fa-brands fa-whatsapp"></i> Open WhatsApp</button>
+            </div>
           </div>`;
+          document.body.appendChild(ov);
+          requestAnimationFrame(() => ov.classList.add('show'));
+          const inp = ov.querySelector('#wa-phone-input');
+          const ok = ov.querySelector('.rs-mok');
+          const cancel = ov.querySelector('.rs-mcancel');
+          const closeBtn = ov.querySelector('.rs-mclose');
+          if (inp) inp.focus();
+          const finish = (val) => {
+            try { ov.remove(); } catch (_) {}
+            resolve(val);
+          };
+          if (ok) ok.onclick = () => finish((inp && inp.value.trim()) || null);
+          if (cancel) cancel.onclick = () => finish(null);
+          if (closeBtn) closeBtn.onclick = () => finish(null);
+          if (inp) {
+            inp.onkeydown = (e) => {
+              if (e.key === 'Enter' && ok) ok.click();
+              if (e.key === 'Escape') finish(null);
+            };
+          }
+        });
+        if (phone === null) return;
+      }
+      const cleanPhone = String(phone || '').replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 10) {
+        RS.toast('Enter a valid WhatsApp number with country code', 'fa-circle-exclamation');
+        return;
+      }
+      bill.customerPhone = cleanPhone;
+      const text = typeof receiptText === 'function' ? receiptText(bill) : (`Bill ${bill.no || ''}\nTotal ${rs(bill.grand)}`);
+      try {
+        window.open(
+          `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
+        RS.toast('WhatsApp opened - review the bill and tap Send', 'fa-whatsapp');
+      } catch (e) {
+        RS.toast('Could not open WhatsApp', 'fa-circle-exclamation');
+      }
+    }
+
+    function isBillSyncPending(st) {
+      return st === 'pending' || st === 'local' || st === 'saving';
+    }
+
+    function billSyncChipHtml(st) {
+      if (isBillSyncPending(st)) {
+        return `<span class="rc-sync-chip pending" id="rc-sync-chip" title="Uploading to cloud">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Saving…
+        </span>`;
+      }
+      return `<span class="rc-sync-chip ok" id="rc-sync-chip" title="Saved to cloud">
+        <i class="fa-solid fa-circle-check"></i> Bill synced
+      </span>`;
+    }
+
+    function paintBillSettledSync(modal, st) {
+      if (!modal) return;
+      const pending = isBillSyncPending(st);
+      const chip = modal.querySelector('#rc-sync-chip');
+      if (chip) {
+        chip.className = 'rc-sync-chip ' + (pending ? 'pending' : 'ok');
+        chip.innerHTML = pending
+          ? '<i class="fa-solid fa-cloud-arrow-up"></i> Saving…'
+          : '<i class="fa-solid fa-circle-check"></i> Bill synced';
+        chip.title = pending ? 'Uploading to cloud' : 'Saved to cloud';
+      }
+      const ic = modal.querySelector('#rc-settle-ic');
+      if (ic) {
+        ic.classList.toggle('mh-ic-sync', pending);
+        ic.classList.toggle('mh-ic-ok', !pending);
+      }
+    }
+
+    async function showReceipt(bill) {
+      // Open modal immediately — never await QR/PDF (both freeze main-thread scroll)
+      const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
+      const st0 = bill.syncStatus || 'synced';
+      const pending0 = isBillSyncPending(st0);
+      let liveQr = null;
+      let printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, null)}</div>`;
+      window.__rsSettleModalOpen = true;
+
       const connectBanner = !gwReady
-        ? `<div id="rc-wa-cta" style="margin:0 0 12px;padding:10px 12px;border-radius:10px;border:1px solid rgba(37,211,102,.28);background:rgba(37,211,102,.08);display:flex;gap:10px;align-items:flex-start;cursor:pointer">
-            <i class="fa-brands fa-whatsapp" style="color:#25d366;font-size:18px;margin-top:1px"></i>
-            <div style="flex:1;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
-              <b style="color:var(--text)">Connect WhatsApp</b> to send this exact bill as a PDF in one tap.
-              <span style="color:var(--orange);font-weight:600"> Open Gateway →</span>
+        ? `<div id="rc-wa-cta" class="rc-wa-banner">
+            <i class="fa-brands fa-whatsapp"></i>
+            <div class="rc-wa-banner-text">
+              <b>Connect WhatsApp</b> for automatic PDF send. Green icon below opens manual chat backup.
+              <span class="rc-wa-banner-link"> Open Gateway -&gt;</span>
             </div>
           </div>`
         : '';
-      const waBtn = `<button class="btn btn-ghost" id="rc-wa" style="flex:1"><i class="fa-brands fa-whatsapp"></i> ${waLabel}</button>`;
-      RSModal.open({
+
+      const settle = RSModal.open({
         title: 'Bill settled',
-        sub: `${bill.no} \u00b7 ${rs(bill.grand)}`,
+        sub: `<span class="rc-bill-meta">${esc(bill.no || '')} | ${rs(bill.grand)}</span>${billSyncChipHtml(st0)}`,
         icon: 'fa-circle-check',
+        iconClass: pending0 ? 'mh-ic-sync' : 'mh-ic-ok',
+        iconId: 'rc-settle-ic',
         size: 'sm',
-        body: `${syncBanner}${connectBanner}<div class="receipt-paper">${receiptHTML(bill, qrDataUri)}</div>`,
-        foot: `${waBtn}
-              <button class="btn btn-ghost" id="rc-thermal" style="flex:1" title="ESC/POS thermal printer"><i class="fa-solid fa-receipt"></i> Thermal</button>
-              <button class="btn btn-ghost" id="rc-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
-              <button class="btn btn-primary" id="rc-new" style="flex:1"><i class="fa-solid fa-check"></i> New order</button>`,
+        modalClass: 'rc-settle-modal',
+        bodyClass: 'rc-settle-body',
+        body: `${connectBanner}<div class="receipt-paper" id="rc-paper">${receiptHTML(bill, null)}</div>`,
+        foot: `<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">
+              <button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i>
+              </button>
+              <button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print receipt (thermal when available, otherwise browser)" aria-label="Print">
+                <i class="fa-solid fa-print"></i>
+              </button>
+              <button type="button" class="rc-icon-btn rc-new" id="rc-new" title="New order" aria-label="New order">
+                <i class="fa-solid fa-plus"></i>
+              </button>
+            </div>`,
         onMount(modal, close) {
-          modal.querySelector('#rc-print').onclick = () => RSPrint(printHtml, 'Receipt ' + bill.no);
-          const thEl = modal.querySelector('#rc-thermal');
-          if (thEl) {
-            thEl.onclick = () => {
+          let syncTimer = null;
+          let closed = false;
+          const mbody = modal.querySelector('.rs-mbody');
+          if (mbody) {
+            mbody.style.overflowY = 'auto';
+            mbody.style.webkitOverflowScrolling = 'touch';
+            mbody.style.touchAction = 'pan-y';
+            mbody.style.overscrollBehavior = 'contain';
+          }
+
+          const finishSettle = (opts) => {
+            if (closed) return;
+            closed = true;
+            window.__rsSettleModalOpen = false;
+            try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+            syncTimer = null;
+            try { close(); } catch (_) {}
+            const goPos = !opts || opts.goPos !== false;
+            if (goPos) {
+              try {
+                if (window.RS && typeof RS.clearCart === 'function') RS.clearCart();
+              } catch (_) {}
+              try {
+                if (window.RS && typeof RS.activateTab === 'function') RS.activateTab('pos-tab');
+              } catch (_) {}
+              try {
+                if (window.RS && typeof RS.toast === 'function') RS.toast('Ready for new order', 'fa-plus');
+              } catch (_) {}
+            }
+          };
+
+          // Single Print control: prefers thermal bridge when present, else browser print.
+          // (Previously two buttons often ran the same path — confusing.)
+          const printBtn = modal.querySelector('#rc-print');
+          if (printBtn) {
+            printBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
               if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
                 RSOps.printBillThermal(bill);
-              } else if (window.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-                RSPrintBridge.printBillEscPos(bill, engineOutlet(), {}).catch(() => RSPrint(printHtml, 'Receipt ' + bill.no));
               } else {
                 RSPrint(printHtml, 'Receipt ' + bill.no);
               }
             };
           }
           const waEl = modal.querySelector('#rc-wa');
-          if (waEl && waEl.tagName === 'BUTTON') {
-            waEl.onclick = () => RSReceipt.share(bill);
+          if (waEl) {
+            waEl.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openManualWhatsAppBill(bill);
+            };
           }
           const cta = modal.querySelector('#rc-wa-cta');
-          if (cta) cta.onclick = () => openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
-          modal.querySelector('#rc-new').onclick = close;
-          // Warm PDF cache while cashier reads the bill (instant WhatsApp)
-          if (window.RSReceiptEngine && RSReceiptEngine.toPDF) {
-            const warm = () => RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() }).catch(() => {});
-            if (window.requestIdleCallback) requestIdleCallback(warm, { timeout: 2500 });
-            else setTimeout(warm, 400);
+          if (cta) {
+            cta.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
+            };
           }
+          // Plus = close + new order (POS). Must never throw before close().
+          const newBtn = modal.querySelector('#rc-new');
+          if (newBtn) {
+            newBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              finishSettle({ goPos: true });
+            };
+          }
+          const xBtn = modal.querySelector('.rs-mclose');
+          if (xBtn) {
+            xBtn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              finishSettle({ goPos: false });
+            }, { once: true });
+          }
+
+          // Soft QR inject: print-safe centered table block (never left/sideways)
+          const injectQr = (qr) => {
+            if (!qr || !modal.isConnected || closed) return;
+            liveQr = qr;
+            printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qr)}</div>`;
+            const paper = modal.querySelector('#rc-paper');
+            if (!paper || paper.querySelector('.rcp-qr-wrap')) return;
+            const y = mbody ? mbody.scrollTop : 0;
+            const block =
+              (window.RSReceiptEngine && typeof RSReceiptEngine.qrBlockHtml === 'function')
+                ? RSReceiptEngine.qrBlockHtml(qr)
+                : (
+                  '<table class="rcp-qr-wrap" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:14px 0 0;border-collapse:collapse;border-top:1px dashed #8a877c;table-layout:fixed;">' +
+                  '<tr><td align="center" style="width:100%;text-align:center;padding-top:12px;">' +
+                  '<img src="' + qr + '" width="110" height="110" alt="Digital bill QR" crossorigin="anonymous" style="display:block;margin:0 auto;width:110px;height:110px;float:none;" />' +
+                  '<div class="rcp-qr-label" style="display:block;width:100%;text-align:center;font-size:10px;color:#6b6960;margin-top:6px;">Scan to view digital bill</div>' +
+                  '</td></tr></table>'
+                );
+            const footEl = paper.querySelector('.rcp-foot');
+            const holder = document.createElement('div');
+            holder.innerHTML = block.trim();
+            const node = holder.firstElementChild;
+            if (node) {
+              if (footEl) paper.insertBefore(node, footEl);
+              else paper.appendChild(node);
+            }
+            if (mbody) mbody.scrollTop = y;
+          };
+          setTimeout(() => {
+            if (!modal.isConnected || closed) return;
+            generateReceiptQrDataUri(bill).then(injectQr).catch(() => {});
+          }, 600);
+
+          paintBillSettledSync(modal, st0);
+          let ticks = 0;
+          syncTimer = setInterval(() => {
+            ticks += 1;
+            if (closed || ticks > 40 || !modal.isConnected) {
+              try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+              syncTimer = null;
+              return;
+            }
+            let st = bill.syncStatus || 'synced';
+            try {
+              if (window.RS && Array.isArray(RS.BILLS)) {
+                const hit = RS.BILLS.find((b) => b && (b.no === bill.no || b.id === bill.id || b.orderId === bill.no));
+                if (hit && hit.syncStatus) st = hit.syncStatus;
+              }
+            } catch (_) {}
+            if (!isBillSyncPending(st)) {
+              bill.syncStatus = 'synced';
+              paintBillSettledSync(modal, 'synced');
+              try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+              syncTimer = null;
+            } else if (ticks % 2 === 0) {
+              paintBillSettledSync(modal, st);
+            }
+          }, 700);
         }
       });
+      // Backdrop / Escape close — clear flag (do not force POS)
+      if (settle && settle.el) {
+        const ov = settle.el;
+        const markClosed = () => { window.__rsSettleModalOpen = false; };
+        ov.addEventListener('click', (e) => {
+          if (e.target === ov) markClosed();
+        });
+        const obs = new MutationObserver(() => {
+          if (!ov.isConnected || !ov.classList.contains('show')) {
+            markClosed();
+            obs.disconnect();
+          }
+        });
+        obs.observe(ov, { attributes: true, attributeFilter: ['class'], childList: true });
+      }
     }
 
     // PDF compilers: preview HTML capture (preferred for WhatsApp) + thermal jsPDF
@@ -1040,7 +1382,8 @@
     };
 
     /* ---------------- inline cart payment ---------------- */
-    const paymentState = { method: 'Cash' };
+    // Default UPI (India counter) — cash pad only when Cash is chosen (calmer cart)
+    const paymentState = { method: 'UPI' };
     let kotSentKey = '';
     let isSplitPaymentActive = false;
     const orderType = () => (document.querySelector('.order-type-btn.active')?.textContent || 'Takeaway').trim();
@@ -1083,7 +1426,7 @@
       return { method, received: totals.grand, change: 0, valid: totals.count > 0 };
     }
     function resetPayment(){
-      paymentState.method = 'Cash';
+      paymentState.method = 'UPI';
       kotSentKey = '';
       const splitCash = document.getElementById('split-cash');
       const splitUpi = document.getElementById('split-upi');
@@ -1214,17 +1557,43 @@
     }
 
     function openDrawer(drawerId) {
-      const backdrop = document.getElementById('cpay-drawer-backdrop');
-      const drawer   = document.getElementById(drawerId);
+      const drawer = document.getElementById(drawerId);
       if (!drawer) return;
-      document.querySelectorAll('.cpay-side-drawer').forEach(d => d.classList.remove('csd-open'));
+
+      // Cash / Split: expand inline under pay methods (no floating side tab)
+      if (drawer.classList.contains('cart-tender-panel')) {
+        document.querySelectorAll('.cart-tender-panel').forEach((d) => {
+          d.classList.remove('csd-open');
+          d.hidden = true;
+        });
+        drawer.hidden = false;
+        drawer.classList.add('csd-open');
+        // Keep cart lines visible — scroll tender into view only if needed
+        try {
+          drawer.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } catch (_) {}
+        return;
+      }
+
+      const backdrop = document.getElementById('cpay-drawer-backdrop');
+      document.querySelectorAll('.cpay-side-drawer').forEach((d) => d.classList.remove('csd-open'));
       drawer.classList.add('csd-open');
       if (backdrop) backdrop.style.display = 'block';
     }
     function closeAllDrawers() {
-      document.querySelectorAll('.cpay-side-drawer').forEach(d => d.classList.remove('csd-open'));
+      document.querySelectorAll('.cpay-side-drawer').forEach((d) => d.classList.remove('csd-open'));
+      document.querySelectorAll('.cart-tender-panel').forEach((d) => {
+        d.classList.remove('csd-open');
+        d.hidden = true;
+      });
       const backdrop = document.getElementById('cpay-drawer-backdrop');
       if (backdrop) backdrop.style.display = 'none';
+    }
+    function hideTenderPanels() {
+      document.querySelectorAll('.cart-tender-panel').forEach((d) => {
+        d.classList.remove('csd-open');
+        d.hidden = true;
+      });
     }
 
     /* --- Draggable drawer system ---------------------------------------------
@@ -1615,7 +1984,7 @@
       if(note) note.textContent = paymentState.method;
       checkoutBtn.disabled = totals.count < 1;
 
-      // Only open / close drawers when user explicitly triggered (e.g. clicking Cash/Split btn)
+      // Inline tenders: show cash/split panels in the cart foot (never floating side tabs)
       if (paymentState.method === 'Cash') {
         const receivedInput = document.getElementById('inline-cash-received');
         if (receivedInput) {
@@ -1626,10 +1995,10 @@
             delete receivedInput.dataset.userInteracted;
           }
         }
-        if (allowOpen) {
-          openDrawer('cash-drawer');
-        }
+        // Always keep cash tender visible while Cash is selected (compact, in-cart)
+        openDrawer('cash-drawer');
         updateInlineChange();
+        isSplitPaymentActive = false;
       } else if (paymentState.method === 'Split') {
         const splitCash = document.getElementById('split-cash');
         const splitUpi  = document.getElementById('split-upi');
@@ -1646,14 +2015,21 @@
           if (splitDue)  splitDue.value  = '';
         }
         isSplitPaymentActive = true;
-        if (allowOpen) {
-          openDrawer('split-drawer');
-        }
+        openDrawer('split-drawer');
         updateSplitChange();
       } else {
-        closeAllDrawers();
+        hideTenderPanels();
         isSplitPaymentActive = false;
       }
+      // Keep cash notes pad collapsed after method switch (preserves cart height)
+      const densGrid = document.getElementById('cash-denominations-grid');
+      const densToggle = document.getElementById('cash-dens-toggle');
+      if (densGrid) densGrid.hidden = true;
+      if (densToggle) {
+        densToggle.setAttribute('aria-expanded', 'false');
+        densToggle.innerHTML = '<i class="fa-solid fa-ellipsis"></i>';
+      }
+      void allowOpen;
     }
 
     function wirePaymentPanel(){
@@ -1663,27 +2039,49 @@
           const btn = e.target.closest('[data-pay-method]');
           if(!btn) return;
           paymentState.method = btn.dataset.payMethod;
-          // Pass allowOpen:true so the drawer opens on explicit user click
+          // Collapse customer overlay so it never blocks cart qty controls (live UX bug)
+          try {
+            if (window.RSPosUI && typeof RSPosUI.setCartCustomerPanelOpen === 'function') {
+              RSPosUI.setCartCustomerPanelOpen(false);
+            }
+          } catch (_) {}
           refreshPaymentPanel({ allowOpen: true });
         });
       }
 
-      // Close drawer buttons
+      // Cash quick-notes pad is collapsed by default (saves ~170px cart height)
+      const densToggle = document.getElementById('cash-dens-toggle');
+      const densGrid = document.getElementById('cash-denominations-grid');
+      if (densToggle && densGrid && densToggle.dataset.bound !== '1') {
+        densToggle.dataset.bound = '1';
+        densToggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const open = densGrid.hidden;
+          densGrid.hidden = !open;
+          densToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          densToggle.innerHTML = open
+            ? '<i class="fa-solid fa-minus"></i>'
+            : '<i class="fa-solid fa-ellipsis"></i>';
+        });
+      }
+
+      // Collapse tender panels (method stays selected — panel is optional chrome)
       const cashClose = document.getElementById('cash-drawer-close');
       cashClose?.addEventListener('click', () => {
-        closeAllDrawers();
+        hideTenderPanels();
       });
 
       const splitClose = document.getElementById('split-drawer-close');
       splitClose?.addEventListener('click', () => {
-        closeAllDrawers();
-        isSplitPaymentActive = false;
+        hideTenderPanels();
       });
 
-      // Backdrop click-outside close with animation (CSS handles it)
+      // Backdrop for floating drawers only (customer insights etc.)
       const backdrop = document.getElementById('cpay-drawer-backdrop');
       backdrop?.addEventListener('click', () => {
-        closeAllDrawers();
+        document.querySelectorAll('.cpay-side-drawer').forEach((d) => d.classList.remove('csd-open'));
+        if (backdrop) backdrop.style.display = 'none';
       });
 
       // Wire cash received input
@@ -1712,9 +2110,11 @@
         });
       }
 
-      // Wire denomination buttons
-      const inlineDenButtons = document.querySelectorAll('#cash-denominations-grid .btn-den');
+      // Wire denomination / Exact buttons (may live on cash row or dens grid)
+      const inlineDenButtons = document.querySelectorAll('#cash-drawer .btn-den, #cash-denominations-grid .btn-den');
       inlineDenButtons.forEach(btn => {
+        if (btn.dataset.denBound === '1') return;
+        btn.dataset.denBound = '1';
         btn.onclick = (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1741,11 +2141,7 @@
         };
       });
 
-      // -- Initialise drag-to-reposition + resize for both drawers --
-      makeDrawerDraggable(document.getElementById('cash-drawer'));
-      makeDrawerDraggable(document.getElementById('split-drawer'));
-      makeDrawerResizable(document.getElementById('cash-drawer'));
-      makeDrawerResizable(document.getElementById('split-drawer'));
+      // Cash/split are inline cart panels — no drag/resize floating chrome
 
       refreshPaymentPanel();
     }
@@ -1877,10 +2273,14 @@
           pax: custSnap.covers || 0,
           subtotal: totals.sub, gst: totals.gst, cgst: gstHalf, sgst: (totals.gst || 0) - gstHalf,
           _items: itemsSnap.map(i => ({
+            id: i.id,
             name: i.name, qty: i.qty, price: i.price,
             cat: i.cat || i.category || '', taxCategory: i.taxCategory || i.tax_category,
             note: i.note || i.notes || '',
             notes: i.note || i.notes || '',
+            // Portion size for stock: half=0.5, full=1, double=2
+            portion: i.portion != null ? i.portion : 1,
+            servings: i.servings != null ? i.servings : (i.portion != null ? i.portion : 1),
           })),
           taxSummary: totals.taxSummary, channel: totals.channel, taxProfile: totals.taxProfile,
           liquorTaxAmount: totals.liquorTax,
@@ -1896,6 +2296,32 @@
           promoOfferId: totals.promoOfferId || null,
         };
         if (window.RSOps && RSOps.decorateBillMeta) RSOps.decorateBillMeta(billRow, bill);
+
+        // Commission partner (who brought this customer)
+        try {
+          const partnerId =
+            (window.RSCommission && typeof RSCommission.getSelectedPartnerId === 'function'
+              ? RSCommission.getSelectedPartnerId()
+              : '') ||
+            (document.getElementById('cart-commission-partner') || {}).value ||
+            '';
+          if (partnerId && window.RSCommission && typeof RSCommission.recordSale === 'function') {
+            RSCommission.recordSale(partnerId, {
+              no: bill.no,
+              grand: bill.grand,
+              total: bill.grand,
+              customer: bill.customer,
+              customerName: bill.customer,
+            });
+          }
+          document.dispatchEvent(
+            new CustomEvent('rs:bill-settled', {
+              detail: { bill: billRow, partnerId: partnerId || '' },
+            })
+          );
+        } catch (commErr) {
+          console.warn('[Commission] record failed', commErr);
+        }
 
         // 1) Memory + DURABLE local/cloud put BEFORE clearing cart (money integrity)
         RS.BILLS.unshift(billRow);
@@ -2466,29 +2892,49 @@
 
     // Update held counts for all order types
     function updateHeldCount() {
-      // Update each type's count and blinking state
+      // Update each type's count and blinking state (legacy/hidden type buttons)
       Object.keys(heldOrders).forEach(key => {
         const count = heldOrders[key].length;
-        // Update desktop button badge
         const countEl = document.getElementById(`held-count-${key}`);
         if (countEl) countEl.textContent = count ? `(${count})` : '';
-        // Update mobile button badge
         const countElM = document.getElementById(`held-count-${key}-m`);
         if (countElM) countElM.textContent = count ? `(${count})` : '';
-        // Toggle blinking animation
         const btn = document.getElementById(`btn-hold-${key}`);
         if (btn) btn.classList.toggle('hold-btn-blinking', count > 0);
         const btnM = document.getElementById(`btn-m-hold-${key}`);
         if (btnM) btnM.classList.toggle('hold-btn-blinking', count > 0);
       });
 
+      // Primary single Hold button (current order type + total held)
+      const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
+      const curKey = typeof getCurrentOrderTypeKey === 'function' ? getCurrentOrderTypeKey() : 'takeaway';
+      const curCount = (heldOrders[curKey] || []).length;
+      // Compact badge number only (label is "Hold" on the button)
+      const badgeText = totalHeld
+        ? (curCount && curCount !== totalHeld ? String(curCount) : String(totalHeld))
+        : '';
+      const countCur = document.getElementById('held-count-current');
+      if (countCur) {
+        countCur.textContent = badgeText;
+        countCur.hidden = !badgeText;
+      }
+      const countCurM = document.getElementById('held-count-current-m');
+      if (countCurM) countCurM.textContent = totalHeld ? `(${totalHeld})` : '';
+      const btnCur = document.getElementById('btn-hold-current');
+      if (btnCur) {
+        btnCur.classList.toggle('hold-btn-blinking', totalHeld > 0);
+        btnCur.title = totalHeld
+          ? `${totalHeld} held · click to hold current or open list when cart empty`
+          : 'Hold current order (uses selected order type)';
+      }
+      const btnCurM = document.getElementById('btn-m-hold-current');
+      if (btnCurM) btnCurM.classList.toggle('hold-btn-blinking', totalHeld > 0);
+
       // Show/hide mobile hold buttons group
-      const hasAnyHeld = Object.values(heldOrders).some(arr => arr.length > 0);
+      const hasAnyHeld = totalHeld > 0;
       const mobileHoldGroup = document.getElementById('pos-m-hold-buttons');
       if (mobileHoldGroup) mobileHoldGroup.style.display = hasAnyHeld ? 'flex' : 'none';
 
-      // Total holds badge on POS quick tools (if present)
-      const totalHeld = Object.values(heldOrders).reduce((a, arr) => a + arr.length, 0);
       window.__rsHeldOrderCount = totalHeld;
       let holdBadge = document.getElementById('rs-held-total-badge');
       if (!holdBadge) {
@@ -2578,10 +3024,14 @@
           const dc = document.getElementById('delivery-charge');
           const dr = document.getElementById('delivery-rider');
           
+          const tableLabel = cust.table || 'Held order';
           const dbRow = {
             id: id,
             draftId: draftId,
-            draftName: cust.table || 'Held order',
+            draftName: tableLabel,
+            name: tableLabel,
+            table: tableLabel,
+            tableNumber: tableLabel,
             customerName: cust.name || '',
             customerPhone: cust.phone || '',
             customerGst: cust.gst || '',
@@ -2592,9 +3042,39 @@
             orderType: orderTypeKey,
             deliveryAddress: da ? da.value : '',
             deliveryCharge: dc ? dc.value : '',
-            deliveryRider: dr ? dr.value : ''
+            deliveryRider: dr ? dr.value : '',
+            time: newHeld.time,
           };
           await RS_DB.put('drafts', id, dbRow);
+
+          // Floor must not keep empty "DineIn Active" seat tickets after Hold,
+          // or the card stays Dining and never shows Held.
+          try {
+            const pend = await RS_DB.list('pending_orders').catch(() => []);
+            const dig = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
+            const tableDig = dig(tableLabel);
+            for (const r of pend || []) {
+              const tn = String(r.tableNumber || r.table || '');
+              const same =
+                tn === tableLabel ||
+                tn.toLowerCase() === String(tableLabel).toLowerCase() ||
+                (Number.isFinite(tableDig) && dig(tn) === tableDig);
+              if (!same) continue;
+              const items = Array.isArray(r.items) ? r.items : [];
+              const empty =
+                items.length === 0 && !(Number(r.total) > 0);
+              const seatLike =
+                r.source === 'floor_seat' ||
+                r.status === 'DineIn Active' ||
+                empty;
+              // Only remove empty seat placeholders — never kill kitchen tickets with items
+              if (empty && seatLike) {
+                await RS_DB.del('pending_orders', r.id).catch(() => {});
+              }
+            }
+          } catch (e2) {
+            console.warn('hold: clear empty seat tickets failed', e2);
+          }
         } catch (e) {
           console.warn("Failed to save draft to database", e);
         }
@@ -2623,6 +3103,9 @@
         typeLabel + ' held · ' + heldOrders[orderTypeKey].length + ' parked · tap Hold again to resume',
         'fa-pause'
       );
+      try {
+        document.dispatchEvent(new Event('rs:tables-updated'));
+      } catch (_) {}
       // Update table grid to reflect occupied status
       await renderPosTableGrid();
     }
@@ -2744,46 +3227,42 @@
         }});
     }
 
-    // Add click listeners to hold buttons (will add them to HTML next)
+    // Single Hold: hold current cart using active order type; open drafts when empty
     document.addEventListener('click', async (e) => {
-      const btnHoldTakeaway = document.getElementById('btn-hold-takeaway');
-      const btnHoldDinein = document.getElementById('btn-hold-dinein');
-      const btnHoldDelivery = document.getElementById('btn-hold-delivery');
-      const btnMHoldTakeaway = document.getElementById('btn-m-hold-takeaway');
-      const btnMHoldDinein = document.getElementById('btn-m-hold-dinein');
-      const btnMHoldDelivery = document.getElementById('btn-m-hold-delivery');
-
-      // Handle hold current order
+      if (e.target.closest('#btn-hold-current')) {
+        const key = getCurrentOrderTypeKey();
+        if (RS.getCart && RS.getCart().length) holdCurrent();
+        else openDrafts(key);
+        return;
+      }
+      // Legacy type buttons (hidden) — keep working if re-enabled
       if (e.target.closest('#btn-hold-takeaway')) {
-        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('takeaway');
-        }
+        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) holdCurrent();
+        else openDrafts('takeaway');
       }
       if (e.target.closest('#btn-hold-dinein')) {
-        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('dinein');
-        }
+        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) holdCurrent();
+        else openDrafts('dinein');
       }
       if (e.target.closest('#btn-hold-delivery')) {
-        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) {
-          holdCurrent();
-        } else {
-          openDrafts('delivery');
-        }
+        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) holdCurrent();
+        else openDrafts('delivery');
       }
 
-      // Handle mobile hold buttons
+      // Mobile: open held list for current type
+      if (e.target.closest('#btn-m-hold-current')) openDrafts(getCurrentOrderTypeKey());
       if (e.target.closest('#btn-m-hold-takeaway')) openDrafts('takeaway');
       if (e.target.closest('#btn-m-hold-dinein')) openDrafts('dinein');
       if (e.target.closest('#btn-m-hold-delivery')) openDrafts('delivery');
     });
 
-    // Add contextmenu listeners to hold buttons to always open drafts
+    // Right-click Hold → always open held drafts for that type
     document.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('#btn-hold-current')) {
+        e.preventDefault();
+        openDrafts(getCurrentOrderTypeKey());
+        return;
+      }
       if (e.target.closest('#btn-hold-takeaway')) {
         e.preventDefault();
         openDrafts('takeaway');
@@ -2976,12 +3455,15 @@
         if (!currentPhone) {
           nameInput.value = '';
           phoneInput.value = '';
-          triggerText.innerText = 'Walk-in';
-          insightsPanel.style.display = 'none';
+          if (triggerText) triggerText.innerText = 'Walk-in';
+          if (insightsPanel) insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
           paintDuesBanner(null);
           try {
             if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(null);
+          } catch (_) {}
+          try {
+            if (window.RSPosUI && RSPosUI.syncCartCustomerChrome) RSPosUI.syncCartCustomerChrome();
           } catch (_) {}
           return;
         }
@@ -2997,26 +3479,33 @@
         if (c) {
           nameInput.value = c.name || '';
           phoneInput.value = c.phone || '';
-          triggerText.innerText = c.name || c.phone;
+          if (triggerText) triggerText.innerText = c.name || c.phone;
           
           const visits = c.visits || 0;
           const spend = c.spend || 0;
           const dues = Number(c.dues) || 0;
           const favorite = await getFavoriteItem(c);
           
-          document.getElementById('insight-visits').innerText = visits;
-          document.getElementById('insight-spend').innerText = '₹' + spend;
+          const iv = document.getElementById('insight-visits');
+          const is = document.getElementById('insight-spend');
+          const ifav = document.getElementById('insight-favorite');
+          if (iv) iv.innerText = visits;
+          if (is) is.innerText = '₹' + spend;
           const duesEl = document.getElementById('insight-dues');
           if (duesEl) {
             duesEl.innerText = '₹' + dues;
             duesEl.style.color = dues > 0 ? 'var(--orange)' : '';
           }
-          document.getElementById('insight-favorite').innerText = favorite;
-          insightsPanel.style.display = 'grid';
+          if (ifav) ifav.innerText = favorite;
+          // Insights stay in drawer only when user opens it — don't force-open over menu
+          if (insightsPanel) insightsPanel.style.display = 'grid';
           if (actionRow) actionRow.style.display = 'none';
           paintDuesBanner(c);
           try {
             if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(c);
+          } catch (_) {}
+          try {
+            if (window.RSPosUI && RSPosUI.syncCartCustomerChrome) RSPosUI.syncCartCustomerChrome();
           } catch (_) {}
         } else {
           // Check if temp option exists
@@ -3024,8 +3513,8 @@
           const name = opt ? (opt.getAttribute('data-name') || '') : '';
           nameInput.value = name;
           phoneInput.value = currentPhone.startsWith('temp-') ? '' : currentPhone;
-          triggerText.innerText = name || currentPhone;
-          insightsPanel.style.display = 'none';
+          if (triggerText) triggerText.innerText = name || currentPhone;
+          if (insightsPanel) insightsPanel.style.display = 'none';
           paintDuesBanner(null);
           try {
             if (window.RSLoyalty && RSLoyalty.paintBanner) RSLoyalty.paintBanner(null);
@@ -3036,28 +3525,43 @@
           } else {
             if (actionRow) actionRow.style.display = 'none';
           }
+          try {
+            if (window.RSPosUI && RSPosUI.syncCartCustomerChrome) RSPosUI.syncCartCustomerChrome();
+          } catch (_) {}
         }
       }
       
-      // Toggle dropdown on inputs click/focus
-      nameInput.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
-      nameInput.addEventListener('focus', () => {
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
-      phoneInput.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
-      phoneInput.addEventListener('focus', () => {
-        dropdown.classList.add('csd-open');
-        widgetContainer.classList.add('active');
-      });
+      const searchPopover = document.getElementById('cust-search-popover');
+
+      function hideCustomerSearchPopover() {
+        if (searchPopover) {
+          searchPopover.style.display = 'none';
+          searchPopover.innerHTML = '';
+        }
+        if (searchResults) searchResults.style.display = 'none';
+      }
+
+      function collapseCustomerPanel() {
+        try {
+          if (window.RSPosUI && typeof RSPosUI.setCartCustomerPanelOpen === 'function') {
+            RSPosUI.setCartCustomerPanelOpen(false);
+          } else if (window.RSPosUI && typeof RSPosUI.syncCartCustomerChrome === 'function') {
+            RSPosUI.syncCartCustomerChrome();
+          }
+        } catch (_) {}
+      }
+
+      function paintCustomerChrome() {
+        try {
+          if (window.RSPosUI && typeof RSPosUI.syncCartCustomerChrome === 'function') {
+            RSPosUI.syncCartCustomerChrome();
+          }
+        } catch (_) {}
+      }
+
+      // Typing focuses search only — do not open the floating insights drawer over the menu
+      nameInput.addEventListener('click', (e) => e.stopPropagation());
+      phoneInput.addEventListener('click', (e) => e.stopPropagation());
 
       if (trigger) {
         trigger.addEventListener('click', (e) => {
@@ -3075,31 +3579,35 @@
       }
       
       // Prevent closing when clicking inside the dropdown
-      dropdown.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
+      if (dropdown) {
+        dropdown.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
       
-      // Close dropdown when clicking outside
+      // Close floating drawer / search when clicking outside
       document.addEventListener('click', (e) => {
         if (widgetContainer && !widgetContainer.contains(e.target)) {
-          dropdown.classList.remove('csd-open');
+          if (dropdown) dropdown.classList.remove('csd-open');
           widgetContainer.classList.remove('active');
+          hideCustomerSearchPopover();
         }
       });
       
-      // Live search input handling
+      // Live search → inline popover inside cart (not over the menu grid)
       const handleInput = async () => {
         const nameVal = nameInput.value.trim();
         const phoneVal = phoneInput.value.trim();
         
         updateTemporaryCustomer(nameVal, phoneVal);
+        paintCustomerChrome();
         
         const duesBannerLive = document.getElementById('cart-customer-dues-banner');
         if (!nameVal && !phoneVal) {
-          searchResults.style.display = 'none';
-          insightsPanel.style.display = 'none';
+          hideCustomerSearchPopover();
+          if (insightsPanel) insightsPanel.style.display = 'none';
           if (actionRow) actionRow.style.display = 'none';
-          triggerText.innerText = 'Walk-in';
+          if (triggerText) triggerText.innerText = 'Walk-in';
           if (duesBannerLive) {
             duesBannerLive.style.display = 'none';
             duesBannerLive.innerHTML = '';
@@ -3107,15 +3615,18 @@
           return;
         }
         
-        triggerText.innerText = nameVal || phoneVal;
+        if (triggerText) triggerText.innerText = nameVal || phoneVal;
         
         const allCustomers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
         const cleanPhoneVal = phoneVal.replace(/\D/g, '');
         const matches = allCustomers.filter(c => {
           const matchName = nameVal ? (c.name || '').toLowerCase().includes(nameVal.toLowerCase()) : true;
           const matchPhone = cleanPhoneVal ? (c.phone || '').replace(/\D/g, '').includes(cleanPhoneVal) : true;
+          // When only name typed, still match; when only phone, match phone
+          if (nameVal && !phoneVal) return matchName;
+          if (!nameVal && phoneVal) return matchPhone;
           return matchName && matchPhone;
-        });
+        }).slice(0, 8);
 
         // Live dues banner when phone uniquely matches CRM (or first exact phone hit)
         if (duesBannerLive) {
@@ -3141,17 +3652,18 @@
             duesBannerLive.innerHTML = '';
           }
         }
-        
-        if (matches.length > 0) {
-          searchResults.innerHTML = matches.map(c => `
-            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}">
+
+        const target = searchPopover || searchResults;
+        if (matches.length > 0 && target) {
+          target.innerHTML = matches.map(c => `
+            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}" role="option">
               <span class="res-name">${esc(c.name)}${Number(c.dues) > 0 ? ' · Due ₹' + Number(c.dues) : ''}</span>
               <span class="res-phone">${esc(c.phone)}</span>
             </div>
           `).join('');
-          searchResults.style.display = 'flex';
+          target.style.display = 'flex';
           
-          searchResults.querySelectorAll('.search-result-item').forEach(item => {
+          target.querySelectorAll('.search-result-item').forEach(item => {
             item.onclick = async () => {
               const selectedPhone = item.dataset.phone;
               const selectedName = item.dataset.name;
@@ -3164,20 +3676,22 @@
                 sel.appendChild(opt);
               }
               
-              // Remove temporary option if exists
               const tempOpt = sel.querySelector('option[data-temp="true"]');
               if (tempOpt) tempOpt.remove();
               
               sel.value = selectedPhone;
               sel.dispatchEvent(new Event('change'));
               
-              searchResults.style.display = 'none';
+              hideCustomerSearchPopover();
               await syncWidgetWithHiddenSelect();
+              // Chip mode: collapse form after pick
+              collapseCustomerPanel();
+              paintCustomerChrome();
             };
           });
         } else {
-          searchResults.style.display = 'none';
-          insightsPanel.style.display = 'none';
+          hideCustomerSearchPopover();
+          if (insightsPanel) insightsPanel.style.display = 'none';
         }
         
         const exactMatch = allCustomers.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhoneVal);

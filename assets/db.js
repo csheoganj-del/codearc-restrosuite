@@ -161,6 +161,14 @@
           recipeServings: num(specs.recipeServings != null ? specs.recipeServings : specs.servings) || 1,
           serveUnit: specs.serveUnit || specs.serve_unit || 'plate',
           taxCategory: r.tax_category || 'IN_REST_5',
+          bestseller: !!(r.bestseller || specs.bestseller),
+          isSpecial: !!(specs.isSpecial || specs.special),
+          isStaple: !!(specs.isStaple || specs.staple),
+          pairWater: specs.pairWater,
+          addons: Array.isArray(specs.addons) ? specs.addons : [],
+          orderCount: num(specs.orderCount) || 0,
+          recipePending: !!specs.recipePending,
+          description: r.description || specs.description || '',
         };
       },
       to: o => ({
@@ -169,6 +177,8 @@
         category: o.cat,
         price: num(o.price),
         available: o.stock !== 'out',
+        bestseller: !!o.bestseller,
+        description: o.description || '',
         recipe_specs: {
           veg: !!o.veg,
           ingredients: (o.ingredients || []).map((g) => ({
@@ -179,6 +189,14 @@
           })),
           recipeServings: Math.max(1, num(o.recipeServings != null ? o.recipeServings : o.servings) || 1),
           serveUnit: o.serveUnit || o.serve_unit || 'plate',
+          isSpecial: !!o.isSpecial,
+          isStaple: !!o.isStaple,
+          bestseller: !!o.bestseller,
+          pairWater: o.pairWater,
+          addons: Array.isArray(o.addons) ? o.addons : [],
+          orderCount: num(o.orderCount) || 0,
+          recipePending: !!o.recipePending,
+          description: o.description || '',
         },
         tax_category: o.taxCategory || 'IN_REST_5',
       })
@@ -360,9 +378,145 @@
     },
     employees: {
       table:'doppio_employees', pk:'id', clientId:true,
-      from: r => ({ id:r.id, name:r.name, role:r.role, rc:'r-'+String(r.role||'').toLowerCase(),
-                    email:r.contact, baseSalary:num(r.base_salary), shift:r.shift }),
-      to: o => ({ id:o.id, name:o.name, role:o.role, contact:o.email||'', base_salary:num(o.baseSalary), shift:o.shift||'Morning', daily_rate:0 })
+      from: r => {
+        const role = r.role || r.role_key || 'staff';
+        const roleKey = String(r.role_key || r.roleKey || role).toLowerCase().replace(/\s+/g, '_');
+        const pay = num(r.payroll != null ? r.payroll : r.base_salary != null ? r.base_salary : r.baseSalary);
+        const phone = r.phone || r.contact || '';
+        const leaves = r.leaves && typeof r.leaves === 'object' ? r.leaves : {};
+        return {
+          id: r.id,
+          name: r.name,
+          role: typeof role === 'string' && role.length < 40 ? role : roleKey,
+          roleKey,
+          rc: 'r-' + roleKey,
+          email: r.email || r.contact || '',
+          phone: phone,
+          whatsapp: r.whatsapp || phone,
+          baseSalary: pay,
+          payroll: pay > 0 ? String(pay) : '',
+          shift: r.shift || 'Day',
+          pin: r.pin || '',
+          leaves: leaves,
+          casualLeave: num(leaves.casual != null ? leaves.casual : leaves.casualLeave) || 12,
+          sickLeave: num(leaves.sick != null ? leaves.sick : leaves.sickLeave) || 6,
+          earnedLeave: num(leaves.earned != null ? leaves.earned : leaves.earnedLeave) || 15,
+          status: r.status || 'active',
+          staffUserId: r.staff_user_id || r.staffUserId || null,
+        };
+      },
+      to: o => {
+        const pay = num(o.baseSalary != null ? o.baseSalary : String(o.payroll || '').replace(/[^0-9.]/g, ''));
+        const leaves = Object.assign(
+          { casual: 12, sick: 6, earned: 15 },
+          o.leaves && typeof o.leaves === 'object' ? o.leaves : {},
+          {
+            casual: num(o.casualLeave != null ? o.casualLeave : (o.leaves && o.leaves.casual)) || 12,
+            sick: num(o.sickLeave != null ? o.sickLeave : (o.leaves && o.leaves.sick)) || 6,
+            earned: num(o.earnedLeave != null ? o.earnedLeave : (o.leaves && o.leaves.earned)) || 15,
+          }
+        );
+        return {
+          id: o.id,
+          name: o.name,
+          role: o.role || o.roleKey || 'staff',
+          role_key: o.roleKey || String(o.role || 'staff').toLowerCase(),
+          contact: o.email || o.phone || '',
+          phone: o.phone || o.whatsapp || '',
+          base_salary: pay,
+          payroll: pay,
+          shift: o.shift || 'Day',
+          leaves,
+          status: o.status || 'active',
+          daily_rate: 0,
+        };
+      },
+    },
+    salary_advances: {
+      table: 'doppio_salary_advances', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, employeeId: r.employee_id, employeeName: r.employee_name,
+        amount: num(r.amount), remaining: num(r.remaining != null ? r.remaining : r.amount),
+        recover: r.recover || 'next_payroll', note: r.note || '',
+        status: r.status || 'paid', paidAt: r.paid_at || r.created_at,
+      }),
+      to: o => ({
+        id: o.id, employee_id: o.employeeId, employee_name: o.employeeName || '',
+        amount: num(o.amount), remaining: num(o.remaining != null ? o.remaining : o.amount),
+        recover: o.recover || 'next_payroll', note: o.note || '',
+        status: o.status || 'paid', paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    salary_payments: {
+      table: 'doppio_salary_payments', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, employeeId: r.employee_id, employeeName: r.employee_name, month: r.month,
+        base: num(r.base), advanceDeducted: num(r.advance_deducted), net: num(r.net),
+        paidAt: r.paid_at,
+      }),
+      to: o => ({
+        id: o.id, employee_id: o.employeeId, employee_name: o.employeeName || '',
+        month: o.month || '', base: num(o.base), advance_deducted: num(o.advanceDeducted),
+        net: num(o.net), paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    commission_partners: {
+      table: 'doppio_commission_partners', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, name: r.name, phone: r.phone || '',
+        type: r.rate_type || r.type || 'percent', rate: num(r.rate),
+        active: r.active !== false, notes: r.notes || '',
+      }),
+      to: o => ({
+        id: o.id, name: o.name, phone: o.phone || '',
+        rate_type: o.type || o.rate_type || 'percent', rate: num(o.rate),
+        active: o.active !== false, notes: o.notes || '',
+      }),
+    },
+    commission_events: {
+      table: 'doppio_commission_events', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, partnerId: r.partner_id, partnerName: r.partner_name,
+        billNo: r.bill_no, billGrand: num(r.bill_grand), commission: num(r.commission),
+        customer: r.customer || '', paidOut: !!r.paid_out, at: r.at || r.created_at,
+      }),
+      to: o => ({
+        id: o.id, partner_id: o.partnerId, partner_name: o.partnerName || '',
+        bill_no: o.billNo || '', bill_grand: num(o.billGrand), commission: num(o.commission),
+        customer: o.customer || '', paid_out: !!o.paidOut, at: o.at || new Date().toISOString(),
+      }),
+    },
+    commission_payouts: {
+      table: 'doppio_commission_payouts', pk: 'id', clientId: true,
+      from: r => ({
+        id: r.id, partnerId: r.partner_id, partnerName: r.partner_name,
+        amount: num(r.amount), period: r.period || 'monthly', paidAt: r.paid_at,
+      }),
+      to: o => ({
+        id: o.id, partner_id: o.partnerId, partner_name: o.partnerName || '',
+        amount: num(o.amount), period: o.period || 'monthly',
+        paid_at: o.paidAt || new Date().toISOString(),
+      }),
+    },
+    owner_report_prefs: {
+      table: 'doppio_owner_report_prefs', pk: 'tenant_id', clientId: false,
+      from: r => ({
+        id: r.tenant_id, tenantId: r.tenant_id, enabled: r.enabled !== false,
+        ownerPhone: r.owner_phone || '', dailySales: r.daily_sales !== false,
+        dailySalesHour: num(r.daily_sales_hour) || 22, stockAlerts: r.stock_alerts !== false,
+        stockAlertHour: num(r.stock_alert_hour) || 10, weeklyPL: r.weekly_pl !== false,
+        weeklyPLDay: num(r.weekly_pl_day) || 1, monthlyPL: r.monthly_pl !== false,
+        monthlyPLDay: num(r.monthly_pl_day) || 1,
+      }),
+      to: o => ({
+        tenant_id: o.tenantId || o.id,
+        enabled: o.enabled !== false, owner_phone: o.ownerPhone || '',
+        daily_sales: o.dailySales !== false, daily_sales_hour: num(o.dailySalesHour) || 22,
+        stock_alerts: o.stockAlerts !== false, stock_alert_hour: num(o.stockAlertHour) || 10,
+        weekly_pl: o.weeklyPL !== false, weekly_pl_day: num(o.weeklyPLDay) || 1,
+        monthly_pl: o.monthlyPL !== false, monthly_pl_day: num(o.monthlyPLDay) || 1,
+        updated_at: new Date().toISOString(),
+      }),
     },
     drafts: {
       table:'doppio_draft_orders', pk:'id', clientId:true,
@@ -462,8 +616,49 @@
     },
     leave_requests: {
       table:'doppio_leave_requests', pk:'id', clientId:true,
-      from: r => ({ id:r.id, employeeId:r.employee_id, employeeName:r.employee_name, type:r.type, startDate:r.start_date, endDate:r.end_date, reason:r.reason, status:r.status, days:num(r.days) }),
-      to: o => ({ id:o.id, employee_id:o.employeeId, employee_name:o.employeeName, type:o.type, start_date:o.startDate, end_date:o.endDate, reason:o.reason||'', status:o.status||'Pending', days:num(o.days) })
+      from: r => {
+        const start = r.start_date || r.startDate || r.from || '';
+        const end = r.end_date || r.endDate || r.to || start;
+        const st = String(r.status || 'Pending');
+        return {
+          id: r.id,
+          employeeId: r.employee_id || r.employeeId,
+          employeeName: r.employee_name || r.employeeName,
+          type: r.type || 'casual',
+          startDate: start,
+          endDate: end,
+          from: start,
+          to: end,
+          reason: r.reason || '',
+          status: st.toLowerCase() === 'pending' ? 'pending' : st.toLowerCase() === 'approved' ? 'approved' : st.toLowerCase() === 'rejected' ? 'rejected' : st,
+          days: num(r.days) || 1,
+          createdAt: r.created_at || r.createdAt,
+        };
+      },
+      to: o => {
+        const start = o.startDate || o.from;
+        const end = o.endDate || o.to || start;
+        let days = num(o.days);
+        if (!days && start && end) {
+          try {
+            days = Math.max(1, Math.round((new Date(end) - new Date(start)) / 86400000) + 1);
+          } catch (_) { days = 1; }
+        }
+        const stRaw = String(o.status || 'pending').toLowerCase();
+        const status =
+          stRaw === 'approved' ? 'Approved' : stRaw === 'rejected' ? 'Rejected' : 'Pending';
+        return {
+          id: o.id,
+          employee_id: o.employeeId,
+          employee_name: o.employeeName,
+          type: o.type || 'Casual',
+          start_date: start,
+          end_date: end,
+          reason: o.reason || '',
+          status,
+          days: days || 1,
+        };
+      },
     },
     reservations: {
       table:'doppio_reservations', pk:'id', clientId:false, uuidPK:true,

@@ -16,8 +16,8 @@ android {
         // IMPORTANT: bump versionCode by at least 1 (and versionName to match)
         // on every Play Store release. versionCode is per applicationId, so
         // this fresh package can start at 1 — keep bumping on each upload.
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "2.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -60,6 +60,11 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    // Required on AGP 8+/9 — BuildConfig is opt-in
+    buildFeatures {
+        buildConfig true
+    }
 }
 
 // Tell Android Studio's file indexer to exclude the build output directory.
@@ -81,6 +86,10 @@ task forceCleanDexIntermediates {
         def targets = [
             "${buildDir}/intermediates/project_dex_archive",
             "${buildDir}/intermediates/desugar_graph",
+            "${buildDir}/intermediates/merged_res",
+            "${buildDir}/intermediates/merged_res_blame_folder",
+            "${buildDir}/intermediates/incremental/debug/mergeDebugResources",
+            "${buildDir}/intermediates/incremental/packageDebugResources",
         ]
         targets.each { path ->
             if (file(path).exists()) {
@@ -102,6 +111,9 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     // Offline-lease: encrypted at-rest storage for the license token.
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    // Secure local asset serving (https://appassets.androidplatform.net/...)
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'androidx.annotation:annotation:1.7.1'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

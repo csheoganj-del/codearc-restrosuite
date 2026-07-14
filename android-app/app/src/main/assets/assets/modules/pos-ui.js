@@ -29,6 +29,177 @@
   function getMenu() {
     return (global.RS && Array.isArray(RS.MENU) ? RS.MENU : []) || [];
   }
+
+  /** Calm cart chrome: hide pay/KOT/hold until there is at least one line */
+  function updatePosCartChrome(isEmpty) {
+    const cartEl = document.querySelector('#pos-tab .pos-cart') || document.querySelector('.pos-cart');
+    const zone = document.getElementById('cart-pay-zone');
+    const hint = document.getElementById('cart-empty-hint');
+    const more = document.getElementById('cart-more-opts');
+    if (cartEl) cartEl.classList.toggle('pos-cart-empty', !!isEmpty);
+    if (zone) {
+      zone.hidden = !!isEmpty;
+      zone.setAttribute('aria-hidden', isEmpty ? 'true' : 'false');
+      zone.style.display = isEmpty ? 'none' : '';
+    }
+    if (hint) {
+      hint.hidden = !isEmpty;
+      hint.style.display = isEmpty ? 'block' : 'none';
+    }
+    if (more) {
+      // Keep discount/tip collapsed chrome quiet when empty
+      if (isEmpty) more.open = false;
+    }
+    document.getElementById('pos-tab')?.classList.toggle('pos-cart-is-empty', !!isEmpty);
+  }
+
+  function maskPhoneForChip(phone) {
+    const d = String(phone || '').replace(/\D/g, '');
+    if (d.length < 4) return phone || '';
+    if (d.length <= 10) return '··' + d.slice(-4);
+    return '··' + d.slice(-4);
+  }
+
+  function syncCartCustomerChrome() {
+    const btn = document.getElementById('cart-cust-toggle');
+    const panel = document.getElementById('cart-cust-direct-inputs');
+    const label = document.getElementById('cart-cust-toggle-label');
+    const clearBtn = document.getElementById('cart-cust-clear');
+    if (!btn || !panel) return;
+    const name = ((document.getElementById('cust-input-name') || {}).value || '').trim();
+    const phone = ((document.getElementById('cust-input-phone') || {}).value || '').trim();
+    const hasCust = !!(name || phone);
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.classList.toggle('has-customer', hasCust);
+    btn.classList.toggle('is-walkin', !hasCust);
+    btn.classList.toggle('is-open', open);
+    const hint = btn.querySelector('.cart-cust-hint');
+    if (hint) hint.style.display = hasCust ? 'none' : '';
+    if (label) {
+      if (hasCust) {
+        const phoneBit = phone ? maskPhoneForChip(phone) : '';
+        label.textContent = (name || 'Guest') + (phoneBit ? ' · ' + phoneBit : '');
+      } else {
+        label.textContent = open ? 'Add details' : 'Walk-in';
+      }
+    }
+    if (clearBtn) {
+      clearBtn.hidden = !hasCust;
+      clearBtn.style.display = hasCust ? '' : 'none';
+    }
+  }
+
+  function setCartCustomerPanelOpen(open) {
+    const btn = document.getElementById('cart-cust-toggle');
+    const panel = document.getElementById('cart-cust-direct-inputs');
+    if (!btn || !panel) return;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      panel.hidden = false;
+      panel.removeAttribute('hidden');
+      panel.classList.add('is-open');
+      panel.style.display = '';
+      panel.style.pointerEvents = 'auto';
+      panel.style.visibility = 'visible';
+    } else {
+      panel.hidden = true;
+      panel.setAttribute('hidden', '');
+      panel.classList.remove('is-open');
+      panel.style.display = '';
+      panel.style.pointerEvents = 'none';
+      panel.style.visibility = 'hidden';
+      const pop = document.getElementById('cust-search-popover');
+      if (pop) {
+        pop.style.display = 'none';
+        pop.innerHTML = '';
+      }
+      // Blur phone widgets so country picker cannot keep intercepting cart clicks
+      try {
+        document.getElementById('cust-input-name')?.blur();
+        document.getElementById('cust-input-phone')?.blur();
+      } catch (_) {}
+    }
+    btn.classList.toggle('is-open', open);
+    syncCartCustomerChrome();
+  }
+
+  function clearCartCustomer() {
+    const sel = document.getElementById('cart-customer-sel');
+    const nameEl = document.getElementById('cust-input-name');
+    const phoneEl = document.getElementById('cust-input-phone');
+    if (nameEl) nameEl.value = '';
+    if (phoneEl) phoneEl.value = '';
+    if (sel) {
+      const tempOpt = sel.querySelector('option[data-temp="true"]');
+      if (tempOpt) tempOpt.remove();
+      sel.value = '';
+      try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    }
+    const banner = document.getElementById('cart-customer-dues-banner');
+    if (banner) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    }
+    setCartCustomerPanelOpen(false);
+    syncCartCustomerChrome();
+  }
+
+  function wireCartCustomerToggle() {
+    const btn = document.getElementById('cart-cust-toggle');
+    const panel = document.getElementById('cart-cust-direct-inputs');
+    if (!btn || !panel || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+
+    // Ensure clear control sits beside toggle (chip row)
+    if (!document.getElementById('cart-cust-clear')) {
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.id = 'cart-cust-clear';
+      clear.className = 'cart-cust-clear';
+      clear.title = 'Clear customer';
+      clear.setAttribute('aria-label', 'Clear customer');
+      clear.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      clear.hidden = true;
+      clear.style.display = 'none';
+      const row = btn.closest('.cart-cust-row') || btn.parentElement;
+      if (row) row.appendChild(clear);
+      else btn.insertAdjacentElement('afterend', clear);
+      clear.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearCartCustomer();
+        toast('Walk-in customer', 'fa-user');
+      });
+    }
+
+    btn.addEventListener('click', () => {
+      const open = btn.getAttribute('aria-expanded') !== 'true';
+      setCartCustomerPanelOpen(open);
+      if (open) setTimeout(() => document.getElementById('cust-input-name')?.focus(), 40);
+    });
+    ['cust-input-name', 'cust-input-phone'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', syncCartCustomerChrome);
+    });
+    // Clicking cart lines / pay foot closes customer so phone picker never blocks qty
+    if (!document.body.dataset.cartCustOutsideBound) {
+      document.body.dataset.cartCustOutsideBound = '1';
+      document.addEventListener(
+        'pointerdown',
+        (e) => {
+          const t = e.target;
+          if (!t || !t.closest) return;
+          if (t.closest('#custom-customer-widget')) return;
+          if (t.closest('#cart-items, .cart-foot, #pos-grid, .order-type-btn')) {
+            const open = btn.getAttribute('aria-expanded') === 'true';
+            if (open) setCartCustomerPanelOpen(false);
+          }
+        },
+        true
+      );
+    }
+    // Stay collapsed by default (walk-in path).
+    setCartCustomerPanelOpen(false);
+  }
   function catColor(c) {
     if (global.RS && typeof RS.catColor === 'function') return RS.catColor(c);
     return 'var(--orange)';
@@ -117,37 +288,162 @@ const renderPOS = () => {
   const grid = $('#pos-grid');
   if (!grid) return;
   const q = ($('#pos-search-input')?.value||'').toLowerCase();
-  const items = getMenu().filter(m=>{
+  const sortMode = ($('#pos-sort-select') && $('#pos-sort-select').value) || 'popular';
+  let items = getMenu().filter(m=>{
     const mc = ((m.cat || '').trim() || 'Uncategorized').toLowerCase();
+    if (activeCat === '__specials__') {
+      return !!(m.isSpecial || m.special) && (m.name||'').toLowerCase().includes(q);
+    }
+    if (activeCat === '__staples__') {
+      const staple = !!(m.isStaple || m.staple) || /roti|chapati|naan|rice|paratha/i.test(String(m.name||''));
+      return staple && (m.name||'').toLowerCase().includes(q);
+    }
     return (activeCat==='All'||mc===String(activeCat).toLowerCase()) && (m.name||'').toLowerCase().includes(q);
   });
+  if (global.RSMenuIntel && typeof RSMenuIntel.sortMenu === 'function') {
+    items = RSMenuIntel.sortMenu(items, sortMode);
+  } else if (sortMode === 'popular' || sortMode === 'default') {
+    items = items.slice().sort((a, b) => (Number(b.orderCount)||0) - (Number(a.orderCount)||0) || String(a.name||'').localeCompare(String(b.name||'')));
+  } else if (sortMode === 'name-asc') {
+    items = items.slice().sort((a, b) => String(a.name||'').localeCompare(String(b.name||'')));
+  } else if (sortMode === 'name-desc') {
+    items = items.slice().sort((a, b) => String(b.name||'').localeCompare(String(a.name||'')));
+  } else if (sortMode === 'price-asc') {
+    items = items.slice().sort((a, b) => (Number(a.price)||0) - (Number(b.price)||0));
+  } else if (sortMode === 'price-desc') {
+    items = items.slice().sort((a, b) => (Number(b.price)||0) - (Number(a.price)||0));
+  } else if (sortMode === 'veg-first') {
+    items = items.slice().sort((a, b) => (b.veg?1:0) - (a.veg?1:0));
+  } else if (sortMode === 'nonveg-first') {
+    items = items.slice().sort((a, b) => (a.veg?1:0) - (b.veg?1:0));
+  }
+  // Search miss → always offer custom item
+  const showCustomCta = !!q && !items.length;
   const hh = isHappyHourActive();
-  grid.innerHTML = items.map(m=>{
+  // 10/10 card: veg + name + price. Category only on All/search. Stock only low/out.
+  const showCat = activeCat === 'All' || activeCat === '__specials__' || activeCat === '__staples__' || !!q;
+  grid.innerHTML = (showCustomCta
+    ? `<div class="pos-item" id="pos-custom-miss" style="border:1.5px dashed var(--orange);grid-column:1/-1;min-height:72px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer">
+        <i class="fa-solid fa-pen-to-square" style="color:var(--orange)"></i>
+        <span style="font-weight:700">No match for “${_e(q)}” — add custom item with price</span>
+      </div>`
+    : '') + items.map(m=>{
     const inCart = cart.find(c=>String(c.id)===String(m.id));
     const base = Number(m.price) || 0;
     const eff = effectiveMenuPrice(m);
-    const priceHtml = hh && eff < base
-      ? `<span class="pprice" style="color:var(--orange)">${rs(eff)} <small style="text-decoration:line-through;opacity:.55;font-weight:600;color:var(--text-mute)">${rs(base)}</small></span>`
+    const stock = m.stock || 'ok';
+    const deal = hh && eff < base;
+    const showStock = stock === 'low' || stock === 'out';
+    const priceHtml = deal
+      ? `<span class="pprice pprice-deal">${rs(eff)} <small class="pprice-was">${rs(base)}</small></span>`
       : `<span class="pprice">${rs(base)}</span>`;
+    const badges = [
+      m.isSpecial || m.special ? '<span class="pos-hh-chip" style="background:#7c3aed">Special</span>' : '',
+      m.bestseller ? '<span class="pos-hh-chip">Best</span>' : '',
+      m.isStaple || m.staple ? '<span class="pos-hh-chip" style="background:#0891b2">Staple</span>' : '',
+    ].join('');
     return `
-    <div class="pos-item ${m.stock==='out'?'out':''} ${inCart?'in-cart':''}${hh && eff < base ? ' hh-deal' : ''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
-      ${inCart ? `<div class="pos-item-qty-badge bounce-scale">${inCart.qty}</div>` : ''}
-      ${hh && eff < base ? `<div style="position:absolute;top:6px;right:6px;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--orange);padding:2px 5px;border-radius:4px">HH</div>` : ''}
-      <div class="pi-top"><span class="veg ${m.veg?'':'nonveg'}"></span><span class="picat">${_e(m.cat || 'Uncategorized')}</span></div>
+    <div class="pos-item ${stock==='out'?'out':''} ${inCart?'in-cart':''}${deal ? ' hh-deal' : ''}" data-id="${_e(m.id)}" style="--cc:${catColor(m.cat)}">
+      ${inCart ? `<div class="pos-item-qty-badge bounce-scale" aria-label="${inCart.qty} in cart">${inCart.qty}</div>` : ''}
+      <div class="pi-top">
+        <span class="veg ${m.veg ? '' : 'nonveg'}" title="${m.veg ? 'Veg' : 'Non-veg'}" aria-hidden="true"></span>
+        ${showCat ? `<span class="picat">${_e(m.cat || 'Uncategorized')}</span>` : ''}
+      </div>
       <div class="pname">${_e(m.name)}</div>
-      <div class="prow">${priceHtml}<span class="stock-dot ${stockClsMap()[m.stock]}">${stockLabelMap()[m.stock]}</span></div>
+      <div class="prow">
+        ${priceHtml}
+        ${showStock ? `<span class="stock-dot ${stockClsMap()[stock]}">${stockLabelMap()[stock]}</span>` : ''}
+        ${deal ? `<span class="pos-hh-chip">HH</span>` : ''}
+        ${badges}
+      </div>
     </div>`;
   }).join('');
-  $$('.pos-item', grid).forEach(el=> el.addEventListener('click', ()=> addToCart(el.dataset.id)));
+  $$('.pos-item', grid).forEach(el=> {
+    if (el.id === 'pos-custom-miss') {
+      el.addEventListener('click', () => {
+        if (global.RSMenuIntel && RSMenuIntel.openCustomCartItem) {
+          RSMenuIntel.openCustomCartItem({ name: q });
+        }
+      });
+      return;
+    }
+    el.addEventListener('click', ()=> addToCartSmart(el.dataset.id));
+  });
 };
+async function addToCartSmart(id) {
+  const m = getMenu().find(x => String(x.id) === String(id));
+  if (!m) return;
+  // Add-ons
+  let addons = [];
+  try {
+    if (global.RSMenuIntel && RSMenuIntel.itemAddons && RSMenuIntel.itemAddons(m).length) {
+      addons = await RSMenuIntel.promptAddons(m);
+    }
+  } catch (_) {}
+  addToCart(id);
+  // Attach add-on lines
+  if (addons && addons.length) {
+    addons.forEach((a) => {
+      cart.push({
+        id: 'addon-' + id + '-' + a.name,
+        name: a.name + ' (add-on)',
+        price: Number(a.price) || 0,
+        qty: 1,
+        veg: true,
+        cat: 'Add-on',
+        isAddon: true,
+        parentId: id,
+        stock: 'ok',
+      });
+    });
+    renderCart();
+  }
+  // Water pairing for roti/chapati etc.
+  try {
+    if (sessionStorage.getItem('rs_skip_water_prompt') === '1') return;
+    if (global.RSMenuIntel && RSMenuIntel.promptWaterPairing) {
+      const w = await RSMenuIntel.promptWaterPairing(m);
+      if (w) {
+        if (w.free || !(Number(w.price) > 0)) {
+          // complimentary — note on line only
+          const line = cart.find(c => String(c.id) === String(id));
+          if (line) {
+            line.note = (line.note ? line.note + ' · ' : '') + 'Normal water';
+            renderCart();
+          }
+        } else {
+          cart.push({
+            id: 'water-bottle-' + Date.now(),
+            name: w.name,
+            price: Number(w.price) || 0,
+            qty: 1,
+            veg: true,
+            cat: 'Beverages',
+            isWater: true,
+            stock: 'ok',
+          });
+          renderCart();
+          toast(w.name + ' added', 'fa-glass-water');
+        }
+      }
+    }
+  } catch (_) {}
+}
 function refreshPosCats(){
   const catsEl = $('#pos-cats');
   if (!catsEl) return;
-  const liveCats = ['All'].concat(Array.from(new Set(
-    getMenu().map(m => (m.cat || '').trim() || 'Uncategorized')
-  )).sort((a, b) => a.localeCompare(b)));
-  if (!liveCats.some(c => c.toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
-  catsEl.innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${c.toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(c)}</button>`).join('');
+  const menu = getMenu();
+  const hasSpecials = menu.some(m => m.isSpecial || m.special);
+  const hasStaples = menu.some(m => m.isStaple || m.staple || /roti|chapati|naan|rice|paratha/i.test(String(m.name||'')));
+  const liveCats = ['All']
+    .concat(hasSpecials ? ['__specials__'] : [])
+    .concat(hasStaples ? ['__staples__'] : [])
+    .concat(Array.from(new Set(
+      menu.map(m => (m.cat || '').trim() || 'Uncategorized')
+    )).sort((a, b) => a.localeCompare(b)));
+  const catLabel = (c) => c === '__specials__' ? '★ Specials' : c === '__staples__' ? '🍚 Staples' : c;
+  if (!liveCats.some(c => String(c).toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
+  catsEl.innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${String(c).toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(catLabel(c))}</button>`).join('');
   $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
     activeCat=b.dataset.cat;
     $$('#pos-cats .pos-cat-btn').forEach(x=>x.classList.toggle('active',x===b));
@@ -216,41 +512,110 @@ function bindMobileCartBar(){
     if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
   });
 }
-function addToCart(id){
+function addToCart(id, opts){
+  opts = opts || {};
   const m=getMenu().find(x=>String(x.id)===String(id));
   if (!m) return;
-  // Wave 3: soft stock/recipe warning before add
+  const portion = opts.portion != null ? Number(opts.portion) : 1; // 0.5 half · 1 full · 2 double
+  const pFactor = portion > 0 ? portion : 1;
+  // Harder recipe/cost/stock checks
   try {
+    const health =
+      global.RSRecipeUnits && RSRecipeUnits.recipeHealth
+        ? RSRecipeUnits.recipeHealth(m, INVENTORY)
+        : null;
+    if (health && !health.ok) {
+      if (health.code === 'no_recipe') {
+        if (global.RSKitchenLinkCoach && typeof RSKitchenLinkCoach.posUnlinkedHint === 'function') {
+          RSKitchenLinkCoach.posUnlinkedHint(m.name);
+        } else {
+          toast('“' + m.name + '” has no recipe — stock will not reduce', 'fa-link');
+        }
+      } else if (health.code === 'no_cost') {
+        toast('Recipe cost incomplete — set unit costs on stock', 'fa-indian-rupee-sign');
+      } else if (health.code === 'missing_stock') {
+        toast('Recipe stock missing: ' + (health.missing || []).slice(0, 2).join(', '), 'fa-triangle-exclamation');
+      }
+    }
     if (Array.isArray(m.ingredients) && m.ingredients.length && INVENTORY.length) {
       const short = m.ingredients.filter(ing => {
+        let need = Number(ing.qty) || 0;
+        if (global.RSRecipeUnits && RSRecipeUnits.deductQtyForIngredient) {
+          need = RSRecipeUnits.deductQtyForIngredient(ing, m, 1, pFactor, INVENTORY);
+        } else {
+          const base = Math.max(1, Number(m.recipeServings) || 1);
+          need = (need / base) * pFactor;
+        }
         const inv = INVENTORY.find(i => i.name === ing.name);
-        return inv && (Number(inv.stock) || 0) < (Number(ing.qty) || 0);
+        return inv && (Number(inv.stock) || 0) < need;
       });
       if (short.length) {
         toast(`Low stock for ${short.map(s => s.name).slice(0,2).join(', ')}`, 'fa-triangle-exclamation');
       }
-    } else if (!m.ingredients || !m.ingredients.length) {
-      // silent — competitive-ops banner covers cart-level
     }
   } catch (_) {}
-  const basePrice = Number(m.price) || 0;
-  const price = effectiveMenuPrice(m);
-  const hh = isHappyHourActive() && price < basePrice;
-  const line=cart.find(c=>String(c.id)===String(id) && Number(c.price)===price);
-  if(line) line.qty++;
+  const listPrice = Number(m.price) || 0;
+  const effFull = effectiveMenuPrice(m);
+  const basePrice = listPrice;
+  const price = Math.round(effFull * pFactor * 100) / 100;
+  const hh = isHappyHourActive() && effFull < listPrice;
+  // Match same dish + same portion + same unit price
+  const line = cart.find(
+    (c) =>
+      String(c.id) === String(id) &&
+      Number(c.portion || 1) === pFactor &&
+      Number(c.price) === price
+  );
+  if (line) line.qty++;
   else {
     cart.push({
       ...m,
       qty: 1,
       price,
       basePrice,
+      fullPrice: effFull,
+      portion: pFactor,
+      servings: pFactor, // inventory deduction multiplier
       happyHour: hh,
     });
   }
   renderCart();
-  toast(hh ? `${m.name} · Happy Hour ${rs(price)}` : `${m.name} added`, hh ? 'fa-bolt' : 'fa-plus');
+  const pLab = pFactor === 0.5 ? '½' : pFactor === 2 ? '×2' : '';
+  toast(
+    hh
+      ? `${m.name} · Happy Hour ${rs(price)}`
+      : `${m.name}${pLab ? ' ' + pLab : ''} added`,
+    hh ? 'fa-bolt' : 'fa-plus'
+  );
 }
-function changeQty(id,d){ const line=cart.find(c=>String(c.id)===String(id)); if(!line)return; line.qty+=d; if(line.qty<=0) cart=cart.filter(c=>String(c.id)!==String(id)); renderCart(); }
+function changeQty(id,d){
+  // Prefer line matching data-line-key if present via event — fallback first match by id
+  const line = cart.find((c) => String(c.id) === String(id));
+  if (!line) return;
+  line.qty += d;
+  if (line.qty <= 0) cart = cart.filter((c) => c !== line);
+  renderCart();
+}
+function setLinePortion(lineKey, portion) {
+  const p = Number(portion);
+  if (!(p > 0)) return;
+  const line =
+    cart.find((c) => cartLineKey(c) === String(lineKey)) ||
+    cart.find((c) => String(c.id) === String(lineKey));
+  if (!line) return;
+  const full = Number(line.fullPrice != null ? line.fullPrice : line.basePrice != null ? line.basePrice : line.price) || 0;
+  line.portion = p;
+  line.servings = p;
+  line.price = Math.round(full * p * 100) / 100;
+  renderCart();
+  toast(
+    (line.name || 'Item') + (p === 0.5 ? ' · half' : p === 2 ? ' · double' : ' · full'),
+    'fa-utensils'
+  );
+}
+function cartLineKey(c) {
+  return String(c.id) + '|' + String(c.portion || 1) + '|' + String(c.price);
+}
 function setLineNote(id, note) {
   const line = cart.find((c) => String(c.id) === String(id));
   if (!line) return false;
@@ -331,42 +696,49 @@ function openLineNoteEditor(id) {
 }
 function renderCart(){
   const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
-  $('#cart-count').textContent = count+(count===1?' item':' items');
+  const countEl = $('#cart-count');
+  // Symbol chrome: show count number only (title has "items")
+  if (countEl) {
+    countEl.textContent = String(count);
+    countEl.parentElement && countEl.parentElement.setAttribute('title', count + (count === 1 ? ' item' : ' items'));
+  }
+  try { syncTablePaxForOrderType(); } catch (_) {}
 
   const totals = getTotals();
   const isIncl = totals.taxProfile.inclusive_pricing;
   const taxLabel = totals.taxProfile.tax_system || 'GST';
   const settings = window.RS_SETTINGS || {};
   
-  let metaHTML = `<span>Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
+  // Plain labels — Sub / Tax / Total always scannable (10/10 readability)
+  let metaHTML = `<span title="Subtotal">Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
   if (totals.disc > 0) {
-    metaHTML += `<span style="color:var(--orange)">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
+    metaHTML += `<span style="color:var(--orange)" title="Discount">Disc <b id="t-disc">- ${rs(totals.disc)}</b></span>`;
   }
   if (totals.promo > 0) {
-    metaHTML += `<span style="color:var(--orange)">Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''} <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
+    metaHTML += `<span style="color:var(--orange)" title="Promo${totals.promoCode ? ' ' + _e(totals.promoCode) : ''}">Promo <b id="t-promo">- ${rs(totals.promo)}</b></span>`;
   }
   if (totals.serviceCharge > 0) {
-    metaHTML += `<span>SC ${totals.serviceChargePct || 5}% <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
+    metaHTML += `<span title="Service charge">SC <b id="t-sc">${rs(totals.serviceCharge)}</b></span>`;
   }
   if (totals.tip > 0) {
-    metaHTML += `<span style="color:var(--green)">Tip <b id="t-tip">${rs(totals.tip)}</b></span>`;
+    metaHTML += `<span style="color:var(--green)" title="Tip">Tip <b id="t-tip">${rs(totals.tip)}</b></span>`;
   }
   if (totals.deliveryCharge > 0) {
-    metaHTML += `<span>Delivery <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
+    metaHTML += `<span title="Delivery">Del <b id="t-del">${rs(totals.deliveryCharge)}</b></span>`;
   }
   if (totals.loyaltyRedeem > 0) {
-    metaHTML += `<span style="color:var(--violet-soft)">Loyalty <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
+    metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty">Pts <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
   }
   
-  // Ireland handles composition differently (not applicable)
   if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
-    metaHTML += `<span style="font-size:10px;color:var(--text-mute)">Composition Scheme</span>`;
+    metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
   } else {
-    metaHTML += `<span>${taxLabel}${isIncl ? ' (Incl.)' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+    const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
+    metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
   }
   
   if (totals.liquorTax > 0) {
-    metaHTML += `<span>Liquor VAT <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
+    metaHTML += `<span title="Liquor tax">Liquor <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
   }
   
   const metaDiv = document.querySelector('.totals-meta');
@@ -379,15 +751,45 @@ function renderCart(){
   updateMobileCartBar(count, totals);
 
   if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
-  else { wrap.innerHTML = cart.map(c=>`
-    <div class="cart-line">
+  else { wrap.innerHTML = cart.map(c=>{
+    const p = Number(c.portion || 1);
+    const lk = cartLineKey(c);
+    const noRec = !Array.isArray(c.ingredients) || !c.ingredients.length;
+    return `
+    <div class="cart-line${c.note ? ' has-note' : ''}${noRec ? ' cart-line-norecipe' : ''}" data-line-id="${_e(c.id)}" data-line-key="${_e(lk)}" title="Long-press for kitchen note">
       <div class="cdot" style="--cc:${catColor(c.cat)}"></div>
-      <div class="cinfo"><div class="cn">${_e(c.name)}${c.happyHour ? ' <span style="font-size:10px;color:var(--orange);font-weight:800">HH</span>' : ''}</div><div class="cp">${rs(c.price)} each${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' · was ' + rs(c.basePrice) : ''}</div>${c.note ? `<div class="cnote" style="font-size:11px;color:var(--orange);font-weight:600;margin-top:2px;line-height:1.3"><i class="fa-solid fa-comment" style="font-size:9px;opacity:.85"></i> ${_e(c.note)}</div>` : ''}</div>
-      <button type="button" class="btn btn-ghost btn-sm cart-line-note" data-note-id="${_e(c.id)}" title="Kitchen note" style="height:28px;width:28px;padding:0;flex-shrink:0;opacity:${c.note ? '1' : '.65'};color:${c.note ? 'var(--orange)' : 'var(--text-soft)'}"><i class="fa-solid fa-comment" style="font-size:11px"></i></button>
-      <div class="qty"><button data-d="-1" data-id="${_e(c.id)}"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button data-d="1" data-id="${_e(c.id)}"><i class="fa-solid fa-plus"></i></button></div>
-      <div style="font-weight:700;font-size:13px;min-width:54px;text-align:right">${rs(c.price*c.qty)}</div>
-    </div>`).join('');
-    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',()=>changeQty(b.dataset.id,+b.dataset.d)));
+      <div class="cinfo">
+        <div class="cn-row">
+          <span class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}${noRec ? ' <span class="cart-nr" title="No recipe — stock won\'t move">⚠</span>' : ''}</span>
+          <span class="cp" title="Unit price">${rs(c.price)}${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' <s class="cp-was">' + rs(c.basePrice) + '</s>' : ''}</span>
+        </div>
+        <div class="cart-portion" role="group" aria-label="Portion size">
+          <button type="button" class="cart-p-btn${p===0.5?' active':''}" data-portion="0.5" data-lk="${_e(lk)}" title="Half portion · half stock">½</button>
+          <button type="button" class="cart-p-btn${p===1?' active':''}" data-portion="1" data-lk="${_e(lk)}" title="Full">Full</button>
+          <button type="button" class="cart-p-btn${p===2?' active':''}" data-portion="2" data-lk="${_e(lk)}" title="Double · 2× stock">×2</button>
+        </div>
+        ${c.note ? `<button type="button" class="cnote cart-line-note" data-note-id="${_e(c.id)}" title="Edit kitchen note"><i class="fa-solid fa-comment" aria-hidden="true"></i> ${_e(c.note)}</button>` : ''}
+      </div>
+      <div class="qty"><button type="button" data-d="-1" data-id="${_e(c.id)}" data-lk="${_e(lk)}" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button><span class="qn">${c.qty}</span><button type="button" data-d="1" data-id="${_e(c.id)}" data-lk="${_e(lk)}" aria-label="Increase"><i class="fa-solid fa-plus"></i></button></div>
+      <div class="cline-total">${rs(c.price*c.qty)}</div>
+    </div>`;
+  }).join('');
+    $$('#cart-items .qty button').forEach(b=> b.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      const lk = b.getAttribute('data-lk');
+      const line = lk ? cart.find((c) => cartLineKey(c) === lk) : cart.find((c) => String(c.id) === String(b.dataset.id));
+      if (!line) return;
+      line.qty += +b.dataset.d;
+      if (line.qty <= 0) cart = cart.filter((c) => c !== line);
+      renderCart();
+    }));
+    $$('#cart-items .cart-p-btn').forEach((b) =>
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setLinePortion(b.getAttribute('data-lk'), b.getAttribute('data-portion'));
+      })
+    );
     $$('#cart-items .cart-line-note').forEach((b) =>
       b.addEventListener('click', (e) => {
         e.preventDefault();
@@ -395,10 +797,38 @@ function renderCart(){
         openLineNoteEditor(b.getAttribute('data-note-id'));
       })
     );
+    // Long-press / double-click line body → kitchen note (keeps default row clean)
+    $$('#cart-items .cart-line').forEach((row) => {
+      let pressTimer = null;
+      const id = row.getAttribute('data-line-id');
+      const startPress = (e) => {
+        if (e.target.closest('.qty, .cart-line-note')) return;
+        pressTimer = setTimeout(() => {
+          pressTimer = null;
+          openLineNoteEditor(id);
+        }, 480);
+      };
+      const clearPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      };
+      row.addEventListener('pointerdown', startPress);
+      row.addEventListener('pointerup', clearPress);
+      row.addEventListener('pointerleave', clearPress);
+      row.addEventListener('pointercancel', clearPress);
+      row.addEventListener('dblclick', (e) => {
+        if (e.target.closest('.qty, .cart-line-note')) return;
+        e.preventDefault();
+        openLineNoteEditor(id);
+      });
+    });
   }
 
   try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
   wireCartActions();
+  try { updatePosCartChrome(cart.length === 0); } catch (e) {}
 
   // Refresh POS Grid to update card badges
   try { renderPOS(); } catch (e) {}
@@ -780,7 +1210,28 @@ function wireCartActions(){
   if (checkoutBtn) checkoutBtn.onclick = null;
 }
 // POS init (static parts present in HTML, wire them)
+function syncTablePaxForOrderType() {
+  const active = document.querySelector('.order-type-btn.active');
+  const t = (active && active.textContent || '').toLowerCase();
+  const dineIn = t.includes('dine');
+  const delivery = t.includes('deliv');
+  const cartEl = document.querySelector('.pos-cart');
+  if (cartEl) {
+    cartEl.classList.toggle('is-dinein', dineIn);
+    cartEl.classList.toggle('is-delivery', delivery);
+  }
+  const row = document.getElementById('cart-table-pax-row');
+  if (row) {
+    // Takeaway/delivery: hide table+pax clutter (walk-in default)
+    row.style.display = dineIn ? 'grid' : 'none';
+    row.classList.toggle('is-visible', dineIn);
+  }
+}
+
 function initPOS(){
+  try { wireCartCustomerToggle(); } catch (_) {}
+  try { updatePosCartChrome(!cart || cart.length === 0); } catch (_) {}
+  try { syncTablePaxForOrderType(); } catch (_) {}
   // Refresh happy-hour banner periodically (window can start/end mid-shift)
   if (!global.__rsHappyHourTick) {
     global.__rsHappyHourTick = true;
@@ -902,7 +1353,52 @@ function initPOS(){
   // Category chips are derived from the live menu, including custom categories.
   refreshPosCats();
   $('#pos-search-input').addEventListener('input', renderPOS);
-  $('#pos-sort-select').addEventListener('change', renderPOS);
+  if ($('#pos-sort-select')) $('#pos-sort-select').addEventListener('change', renderPOS);
+  // Manual / off-menu cart item
+  (function wireCustomItemBtn() {
+    const head = document.querySelector('.cart-head-actions') || document.querySelector('.pos-toolbar-secondary');
+    if (!head || document.getElementById('btn-custom-cart-item')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'btn-custom-cart-item';
+    btn.className = 'btn btn-ghost btn-sm';
+    btn.title = 'Add custom item not on menu';
+    btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (global.RSMenuIntel && RSMenuIntel.openCustomCartItem) RSMenuIntel.openCustomCartItem();
+      else toast('Custom item module loading…', 'fa-circle-info');
+    });
+    head.insertBefore(btn, head.firstChild);
+  })();
+  // Expose cart helpers for menu-intelligence custom lines
+  function setCart(next) {
+    cart = Array.isArray(next) ? next : cart;
+    renderCart();
+  }
+  function addCustomLine(line) {
+    if (!line) return;
+    cart.push(line);
+    renderCart();
+  }
+  global.RSPOS = Object.assign(global.RSPOS || {}, {
+    setCart,
+    addCustomLine,
+    getCart: () => cart.slice(),
+    renderCart,
+  });
+  if (global.RS) {
+    global.RS.getCart = () => cart.slice();
+    global.RS.setCart = setCart;
+    global.RS.renderCart = renderCart;
+  }
+  document.addEventListener('rs:ready', () => {
+    if (global.RS) {
+      global.RS.getCart = () => cart.slice();
+      global.RS.setCart = setCart;
+      global.RS.renderCart = renderCart;
+    }
+  });
   $$('.order-type-btn').forEach(b=> b.addEventListener('click',()=>{
     // Snapshot the outgoing tab's cart to localStorage before the active class changes,
     // so the per-tab fallback always has the latest data even without RS_DB.
@@ -965,6 +1461,7 @@ function initPOS(){
       console.error('[Order Type Switch Error]', e);
     }
     $$('.order-type-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    try { syncTablePaxForOrderType(); } catch (_) {}
   }));
   let lastAuthorizedDiscount = 0;
   function wireTipControls() {
@@ -1164,6 +1661,10 @@ function initPOS(){
     initPOS,
     refreshPosCats,
     getCart,
+    updatePosCartChrome,
+    syncCartCustomerChrome,
+    setCartCustomerPanelOpen,
+    clearCartCustomer,
     setCart,
     setDiscountPct,
     getDiscountPct,

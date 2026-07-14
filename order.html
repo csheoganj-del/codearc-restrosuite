@@ -1174,12 +1174,18 @@
       description: i.description || i.desc || '',
       image: i.image || i.image_url || i.photo || '',
       bestseller: !!i.bestseller,
+      isSpecial: !!(i.isSpecial || i.special),
+      isStaple: !!(i.isStaple || i.staple),
+      orderCount: parseFloat(i.orderCount) || 0,
+      addons: Array.isArray(i.addons) ? i.addons : [],
+      pairWater: i.pairWater,
       available: i.available !== false && i.enabled !== false,
       stock: i.stock || '',
       veg: i.veg,
       isVeg: i.isVeg,
       diet: i.diet
     };
+    if (!row.isStaple && /roti|chapati|naan|rice|paratha/i.test(row.name)) row.isStaple = true;
     row.dietKind = inferDiet(row);
     row.soldOut = isSoldOut(row);
     return row;
@@ -1310,10 +1316,14 @@
       return;
     }
     var cats = ['ALL'];
+    var hasSpecials = items.some(function(i){ return i.isSpecial; });
+    var hasStaples = items.some(function(i){ return i.isStaple; });
+    if (hasSpecials) cats.push('SPECIALS');
+    if (hasStaples) cats.push('STAPLES');
     items.forEach(function(i){ if(cats.indexOf(i.category)===-1) cats.push(i.category); });
     var chipsHtml = cats.map(function(c){
-      return '<button class="chip'+(c==='ALL'?' on':'')+'" onclick="setC(\''+c+'\',this)">'+
-        (c==='ALL'?'All':c.charAt(0).toUpperCase()+c.slice(1).toLowerCase())+'</button>';
+      var label = c==='ALL' ? 'All' : c==='SPECIALS' ? '★ Specials' : c==='STAPLES' ? 'Staples' : (c.charAt(0).toUpperCase()+c.slice(1).toLowerCase());
+      return '<button class="chip'+(c==='ALL'?' on':'')+'" onclick="setC(\''+c+'\',this)">'+label+'</button>';
     }).join('');
     document.getElementById('main').innerHTML =
       (waiterMode ? '<div class="mode-banner"><i class="fa-solid fa-user-tie"></i><span>Waiter mode: orders go to KOT/KDS. Payment stays in POS.</span></div>' : '') +
@@ -1360,6 +1370,8 @@
     var grid = document.getElementById('grid');
     if(!grid) return;
     var list = items.filter(function(i){
+      if (cat === 'SPECIALS') return !!i.isSpecial;
+      if (cat === 'STAPLES') return !!i.isStaple;
       if (cat!=='ALL' && i.category!==cat) return false;
       if (dietF === 'veg' && i.dietKind === 'nv') return false;
       if (dietF === 'nv' && i.dietKind === 'veg') return false;
@@ -1368,6 +1380,12 @@
         if (!(i.name||'').toLowerCase().includes(qq) && !(i.description||'').toLowerCase().includes(qq)) return false;
       }
       return true;
+    });
+    // Same popularity order as POS main menu
+    list = list.slice().sort(function(a,b){
+      var as = (a.isSpecial?1e9:0) + (a.bestseller?1e6:0) + (a.isStaple?1e5:0) + (a.orderCount||0);
+      var bs = (b.isSpecial?1e9:0) + (b.bestseller?1e6:0) + (b.isStaple?1e5:0) + (b.orderCount||0);
+      return bs - as || String(a.name||'').localeCompare(String(b.name||''));
     });
     if(!list.length){
       grid.innerHTML = '<div class="empty"><i class="fa-solid fa-magnifying-glass"></i><p>'+escHtml(t('empty'))+'</p></div>';
@@ -1379,10 +1397,16 @@
       var sn  = escHtml(item.name);
       var sold = !!item.soldOut;
       var dietCls = item.dietKind === 'veg' ? 'veg' : (item.dietKind === 'nv' ? 'nv' : '');
+      var tag = '';
+      if (!sold) {
+        if (item.isSpecial) tag = '<span class="best-tag" style="background:#7c3aed">Special</span>';
+        else if (item.bestseller) tag = '<span class="best-tag">Best Seller</span>';
+        else if (item.isStaple) tag = '<span class="best-tag" style="background:#0891b2">Staple</span>';
+      }
       return '<div class="card'+(sold?' sold-out':'')+'" '+(sold?'':'onclick="addItem(\''+sn+'\')"')+'>'+
         '<div class="card-bar"></div>'+
         (item.image ? '<img class="card-img show" src="'+escHtml(item.image)+'" alt="'+escHtml(item.name)+'" loading="lazy" onerror="this.style.display=\'none\'">' : '')+
-        (item.bestseller && !sold ? '<span class="best-tag">Best Seller</span>' : '')+
+        tag+
         '<div class="card-body">'+
           '<div class="card-name">'+(dietCls?'<span class="diet-mark '+dietCls+'"></span>':'')+escHtml(item.name)+'</div>'+
           (item.description ? '<div class="card-desc">'+escHtml(item.description)+'</div>' : '')+
@@ -1410,6 +1434,33 @@
     if(!item || item.soldOut) return;
     var ex = cart.find(function(c){ return c.name===name; });
     if(ex){ ex.qty++; } else { cart.push({name:item.name,price:item.price,qty:1,category:item.category,note:''}); }
+    // Bread staples → optional water (normal free / bottle charged)
+    try {
+      var isBread = item.pairWater === true || /roti|chapati|naan|paratha|kulcha|phulka/i.test(item.name||'');
+      if (isBread && item.pairWater !== false) {
+        var bottlePrice = 20;
+        var wantBottle = window.confirm(
+          item.name + ' added.\n\nAdd bottled water (+' + (window.currencySymbol||'₹') + bottlePrice + ')?\n\nOK = bottled water\nCancel = complimentary normal water'
+        );
+        if (wantBottle) {
+          var bw = cart.find(function(c){ return c.name === 'Bottled water'; });
+          if (bw) bw.qty++; else cart.push({ name:'Bottled water', price:bottlePrice, qty:1, category:'Beverages', note:'' });
+        } else {
+          var line = cart.find(function(c){ return c.name===item.name; });
+          if (line) line.note = (line.note ? line.note + ' · ' : '') + 'Normal water';
+        }
+      }
+    } catch(e) {}
+    // Simple add-on prompt for first add only
+    try {
+      if (!ex && Array.isArray(item.addons) && item.addons.length) {
+        var names = item.addons.map(function(a){ return a.name + ' (+' + (window.currencySymbol||'₹') + (a.price||0) + ')'; }).join('\n');
+        if (window.confirm('Add-ons available:\n' + names + '\n\nAdd first add-on?')) {
+          var a0 = item.addons[0];
+          cart.push({ name: a0.name + ' (add-on)', price: parseFloat(a0.price)||0, qty:1, category:'Add-on', note:'' });
+        }
+      }
+    } catch(e) {}
     updateFloat(); renderGrid(); bop();
   };
   window.chQty = function(name,d){

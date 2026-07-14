@@ -647,6 +647,12 @@
         ${toggle('Promotional messages','Allow offer campaigns (use sparingly)',false)}
         <div class="set-section"><label class="fl">Message with the bill</label><textarea class="form-input" rows="2">Thanks for dining with us. Your bill is attached.</textarea></div>
 
+        <div class="set-section" style="margin-top:18px;border-top:1px solid var(--stroke-2);padding-top:16px">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin:0 0 10px">Owner reports (your number)</div>
+          <p style="margin:0 0 12px;font-size:12.5px;line-height:1.45;color:var(--text-soft)">Daily sales, low-stock / out-of-stock alerts, and weekly/monthly P&amp;L PDFs sent to <b>your</b> WhatsApp.</p>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-owner-wa-reports"><i class="fa-brands fa-whatsapp"></i> Configure owner reports</button>
+        </div>
+
         <div class="set-section" style="margin-top:22px;border-top:1px solid var(--stroke-2);padding-top:16px">
           <label class="fl" style="display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:8px">
             <span>Recent activity</span>
@@ -708,6 +714,15 @@
             <span style="color:var(--stroke-2)">|</span>
             <span style="font-size:11.5px;color:var(--text-soft);">Forgotten PIN resets require a server-verified reset code from the account owner.</span>
           </div>` : ''}
+        </div>
+
+        <div style="border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:16px 18px;margin-bottom:18px;">
+          <div style="font-weight:800;font-size:13.5px;margin-bottom:6px"><i class="fa-solid fa-shield-halved" style="color:var(--orange);margin-right:6px"></i>UI copy shield</div>
+          <p style="font-size:12px;color:var(--text-soft);line-height:1.45;margin:0 0 12px">${(window.RSSecurityShield && RSSecurityShield.disclaimer) || 'Blocks casual right-click and DevTools shortcuts on this console. Real security is auth + server rules — this is not unhackable.'}</p>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="checkbox" id="sec-ui-shield" ${(window.RSSecurityShield && RSSecurityShield.getConfig && RSSecurityShield.getConfig().enabled) ? 'checked' : 'checked'}>
+            Block right-click · F12 · Ctrl+Shift+I on dashboard
+          </label>
         </div>
 
         <!-- Always protected -->
@@ -784,6 +799,15 @@
         }
         RS.toast('Admin PIN removed','fa-lock-open');
         initSecurityPanel(body);
+      });
+
+      container.querySelector('#sec-ui-shield')?.addEventListener('change', (e) => {
+        const on = !!e.target.checked;
+        if (window.RSSecurityShield) {
+          RSSecurityShield.setEnabled(on);
+          if (on) RSSecurityShield.install();
+          RS.toast(on ? 'UI copy shield on' : 'UI copy shield off', 'fa-shield-halved');
+        }
       });
     }
 
@@ -1458,6 +1482,17 @@
               RS.toast('Could not refresh. Please try again.', 'fa-circle-exclamation');
             } finally {
               waRefresh.disabled = false;
+            }
+          };
+        }
+        const ownerRep = body.querySelector('#btn-owner-wa-reports');
+        if (ownerRep && !ownerRep._rsWired) {
+          ownerRep._rsWired = true;
+          ownerRep.onclick = () => {
+            if (window.RSOwnerReports && typeof RSOwnerReports.openSettingsModal === 'function') {
+              RSOwnerReports.openSettingsModal();
+            } else {
+              RS.toast('Owner reports module loading…', 'fa-circle-info');
             }
           };
         }

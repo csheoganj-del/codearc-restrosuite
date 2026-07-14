@@ -186,11 +186,16 @@
     }
     try {
       if (!window.RS_API || !RS_API.impersonateTenant) throw new Error('Impersonation is not available.');
+      const status = String(tenant.status || '').toLowerCase();
+      if (status && status !== 'approved' && status !== 'active') {
+        throw new Error('Only active workspaces can be opened. Current status: ' + status);
+      }
       await RS_API.impersonateTenant(tenant);
       toast(`Opening ${tenant.name || tenant.tenant_name || tenant.slug || 'workspace'} dashboard...`, 'fa-arrow-right-to-bracket');
-      location.href = 'dashboard.html#pos-tab';
-      location.reload();
+      // Full navigation (not href+reload race) so the client shell loads cleanly
+      location.assign('dashboard.html?appv=' + encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__ || '') + '#pos-tab');
     } catch (err) {
+      console.error('[openTenantDashboard]', err);
       toast('Could not open workspace: ' + (err.message || err), 'fa-circle-exclamation');
       if (button) {
         button.disabled = false;
@@ -198,6 +203,8 @@
       }
     }
   }
+  // Super-admin module (separate IIFE) calls this — must be global
+  window.openTenantDashboard = openTenantDashboard;
 
   const titles = {
     'pos-tab':['Point of Sale','Ring up takeaway & dine-in orders'],
@@ -306,24 +313,59 @@
       activateTab('pos-tab');
     }
   }
-  $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
+  $$('.sidebar-link, .mnav-link').forEach(l=> l.addEventListener('click', e=>{
+    e.preventDefault();
+    // Kitchen Setup is a coach modal, not a page tab
+    if (l.id === 'klc-sidebar-setup' || l.getAttribute('data-klc-nav') === 'setup') {
+      if (window.RSKitchenLinkCoach && RSKitchenLinkCoach.openSetupChecklist) {
+        RSKitchenLinkCoach.openSetupChecklist();
+      } else if (typeof activateTab === 'function') {
+        activateTab('inventory-tab');
+      }
+      return;
+    }
+    if (!l.dataset.tab) return;
+    activateTab(l.dataset.tab);
+  }));
   document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=> l.addEventListener('click', e=>{ e.preventDefault(); activateTab(l.dataset.tab); }));
 
-  /* ---------- SUPPORT DROPDOWN ---------- */
-  const supportTrigger = $('#support-trigger');
-  const supportDropdown = supportTrigger ? supportTrigger.closest('.support-dropdown') : null;
-  if (supportTrigger && supportDropdown) {
-    supportTrigger.addEventListener('click', (e) => {
+  /* ---------- SUPPORT (Call + WhatsApp) ---------- */
+  (function wireSupportMenu() {
+    const wrap = document.getElementById('tb-support-wrap');
+    const btn = document.getElementById('tb-call-support');
+    const menu = document.getElementById('tb-support-menu');
+    if (!wrap || !btn || !menu) return;
+
+    function close() {
+      menu.hidden = true;
+      wrap.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    function open() {
+      menu.hidden = false;
+      wrap.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    function toggle(e) {
       e.preventDefault();
       e.stopPropagation();
-      supportDropdown.classList.toggle('active');
+      if (menu.hidden) open();
+      else close();
+    }
+
+    btn.addEventListener('click', toggle);
+    menu.addEventListener('click', (e) => {
+      // Let links navigate; close after choosing
+      const a = e.target && e.target.closest && e.target.closest('a');
+      if (a) setTimeout(close, 80);
     });
     document.addEventListener('click', (e) => {
-      if (!supportDropdown.contains(e.target)) {
-        supportDropdown.classList.remove('active');
-      }
+      if (!wrap.contains(e.target)) close();
     });
-  }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  })();
 
   /* ---------- TOAST ---------- */
   let toastT;
@@ -370,15 +412,68 @@
   }
   window.withToast = withToast;
 
-  const appVersion = window.__RESTROSUITE_ASSET_VERSION__ || 'v36-20260708';
-  // Show version in topbar
-  (function(){
+  const appVersion = (function resolveDisplayedAppVersion() {
+    const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
+    if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
+    return 'v189-20260713-qr-center';
+  })();
+  const appVersionShort = String(appVersion).split('-')[0] || appVersion;
+
+  // Quiet, trustworthy version chip — never show Systempatch; click copies build tag
+  (function wireVersionPill() {
     const el = document.getElementById('app-version-pill');
-    if(el) {
-      el.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>' + appVersion.split('-')[0] + '</span>';
-      el.setAttribute('data-tooltip', 'App Version: ' + appVersion);
-      el.title = '';
-    }
+    if (!el) return;
+    const tip = 'RestroSuite ' + appVersionShort + ' · full build ' + appVersion + ' · click to copy';
+    el.textContent = appVersionShort;
+    el.classList.add('tb-version', 'tb-version-live');
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', 'App version ' + appVersionShort + '. Click to copy full build id.');
+    el.setAttribute('data-tooltip', tip);
+    el.title = tip;
+    el.dataset.fullVersion = appVersion;
+
+    const copyVersion = async () => {
+      const text = appVersion;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        if (typeof toast === 'function') toast('Copied ' + appVersionShort, 'fa-copy');
+      } catch (_) {
+        if (typeof toast === 'function') toast(appVersionShort, 'fa-circle-info');
+      }
+    };
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      copyVersion();
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        copyVersion();
+      }
+    });
+
+    // Second-pass URL hygiene after JS loads (covers late navigations / hash routes)
+    try {
+      const url = new URL(location.href);
+      const cur = String(url.searchParams.get('appv') || '').trim();
+      if (cur && (!/^v\d+/i.test(cur) || /system\s*patch/i.test(cur))) {
+        url.searchParams.set('appv', appVersionShort);
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+      }
+    } catch (_) {}
   })();
   const updateSignatureKey = 'rs_update_signature';
   const updateSnapshotKey = 'rs_pre_update_snapshot';
@@ -653,15 +748,35 @@
     return parts.join('|');
   }
 
+  function isRealAppVersionTag(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    if (/system\s*patch/i.test(raw)) return false;
+    return /^v\d+/i.test(raw);
+  }
+
+  function resolveAppvForReload(preferred) {
+    // Always prefer the live short build tag so Save & Update never re-pins an old v151.
+    const toShort = (v) => {
+      const raw = String(v || '').trim().replace(/[^a-zA-Z0-9._-]/g, '');
+      if (!isRealAppVersionTag(raw)) return '';
+      return raw.split('-')[0] || raw;
+    };
+    const live = toShort(appVersion) || toShort(appVersionShort);
+    if (live) return live;
+    return toShort(preferred) || ('v' + Date.now());
+  }
+
   function showUpdateDialog(releaseInfo, signature) {
     if (document.getElementById('app-update-dialog')) return;
     let info = releaseInfo || {};
     let highlights = Array.isArray(info.highlights) ? info.highlights : [];
 
-    // Fallback to generic system patch details ONLY if releaseInfo is missing title or version
-    if (!info.title || !info.version) {
+    // Patch-only updates pass null releaseInfo. Keep the real build tag for display
+    // and for ?appv= so the version pill never becomes "Systempatch".
+    if (!info.title || !info.version || !isRealAppVersionTag(info.version)) {
       info = {
-        version: 'System patch',
+        version: isRealAppVersionTag(appVersion) ? appVersion : ('v' + Date.now()),
         date: new Date().toLocaleDateString('en-CA'),
         title: 'System stability hotfix',
         summary: 'This update applies under-the-hood code improvements to enhance security, responsiveness, and dashboard stability.'
@@ -747,7 +862,7 @@
         }
 
         const url = new URL(window.location.href);
-        url.searchParams.set('appv', (info.version || Date.now()).toString().replace(/[^a-zA-Z0-9._-]/g, ''));
+        url.searchParams.set('appv', resolveAppvForReload(info && info.version));
         
         // Fail-safe reload fallback (triggers after 1.5 seconds if location.replace hangs)
         setTimeout(() => {
@@ -990,27 +1105,33 @@
           replaceArr(KDS, mappedKds);
         }
 
-        // 2. Update QR_ORDERS
+        // 2. Update QR_ORDERS — keep dateTime so UI can live-refresh relative ages
         const activeQr = rows.filter(r => r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready');
-        const mappedQr = activeQr.map(r => ({
-          id: r.id,
-          orderId: r.orderId,
-          table: r.tableNumber,
-          customerName: r.customerName || '',
-          customerPhone: r.customerPhone || '',
-          orderType: r.orderType || 'Dine-in',
-          time: getRelativeTime(r.dateTime),
-          status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-          items: (r.items || []).map(it => ({
-            id: it.id,
-            name: it.name || 'Item',
-            qty: Number(it.qty || 1),
-            price: Number(it.price || 0),
-            taxCategory: it.taxCategory || it.tax_category,
-            notes: it.notes || ''
-          })),
-          total: r.total
-        }));
+        const mappedQr = activeQr.map(r => {
+          const ts = parseOrderTimestamp(r.dateTime);
+          return {
+            id: r.id,
+            orderId: r.orderId,
+            table: r.tableNumber,
+            customerName: r.customerName || '',
+            customerPhone: r.customerPhone || '',
+            orderType: r.orderType || 'Dine-in',
+            dateTime: r.dateTime || null,
+            start: ts || Date.now(),
+            time: getRelativeTime(r.dateTime),
+            status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
+            items: (r.items || []).map(it => ({
+              id: it.id,
+              name: it.name || 'Item',
+              qty: Number(it.qty || 1),
+              price: Number(it.price || 0),
+              taxCategory: it.taxCategory || it.tax_category,
+              notes: it.notes || '',
+              cat: it.cat || it.category || it.station || ''
+            })),
+            total: r.total
+          };
+        });
         replaceArr(QR_ORDERS, mappedQr);
 
         // Re-render KDS and QR boards
@@ -1095,26 +1216,37 @@
     const bar = document.getElementById('rs-gateway-offline-banner');
     if (bar) bar.style.display = 'none';
 
-    const textEl = document.getElementById('topbar-whatsapp-status-text');
-    const pillEl = document.getElementById('topbar-whatsapp-status-pill');
-    if (textEl && pillEl) {
-      textEl.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span>Offline</span>';
-      const friendly = (function (raw) {
-        const s = String(raw || '').toLowerCase();
-        if (!s) return 'WhatsApp is not connected. Open Settings → Gateway to link.';
-        if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → Gateway.';
-        if (s.includes('timeout')) return 'Gateway took too long to respond. Check the PC running WhatsApp.';
-        if (s.includes('auth')) return 'WhatsApp session expired. Scan the QR code again.';
-        if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
-          return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → Gateway.';
-        }
-        return 'WhatsApp is offline: ' + raw;
-      })(reason);
-      pillEl.setAttribute('data-tooltip', friendly);
-      pillEl.title = '';
-      pillEl.style.background = 'var(--red-tint)';
-      pillEl.style.color = 'var(--red)';
-      pillEl.style.border = '1px solid color-mix(in srgb, var(--red) 28%, transparent)';
+    // Prefer shell badge updater (keeps More menu + compact pill consistent)
+    if (typeof window.updateTopbarWhatsAppStatus === 'function') {
+      // fall through — shell polling will set offline; also set immediate UI
+    }
+    if (window.setTopbarWhatsAppBadge) {
+      // not exported — use DOM detail
+    }
+    const tbIcon = document.getElementById('tb-wa-icon');
+    const tbLabel = document.getElementById('tb-wa-label');
+    const friendly = (function (raw) {
+      const s = String(raw || '').toLowerCase();
+      if (!s) return 'WhatsApp is not connected. Open Settings → WhatsApp to link.';
+      if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → WhatsApp.';
+      if (s.includes('timeout')) return 'WhatsApp took too long to respond. Try again in a moment.';
+      if (s.includes('auth')) return 'Link expired. Scan the QR code again in Settings → WhatsApp.';
+      if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
+        return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → WhatsApp.';
+      }
+      return 'WhatsApp is offline.';
+    })(reason);
+    if (tbIcon) {
+      tbIcon.className = 'fa-brands fa-whatsapp tb-wa-icon';
+      tbIcon.style.display = 'inline-block';
+    }
+    if (tbLabel) tbLabel.textContent = 'Off';
+    const tbBtn = document.getElementById('tb-wa-status-btn');
+    if (tbBtn) {
+      tbBtn.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
+      tbBtn.classList.add('wa-offline');
+      tbBtn.title = friendly;
+      tbBtn.setAttribute('data-tooltip', friendly);
     }
   }
   function hideGatewayOfflineBanner() {
@@ -1488,7 +1620,12 @@
     getCurrencySymbol,
     dbMode:()=> (window.RS_DB && window.RS_DB.mode) || 'local',
     downloadFile(content, mimeType, filename) {
-      const blob = new Blob([content], { type: mimeType });
+      const blob =
+        content instanceof Blob
+          ? content
+          : content instanceof ArrayBuffer || ArrayBuffer.isView(content)
+            ? new Blob([content], { type: mimeType || 'application/octet-stream' })
+            : new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1665,7 +1802,12 @@
           category: (m.cat || '').trim() || 'Uncategorized',
           description: m.description || '',
           image: m.image || '',
-          bestseller: !!m.bestseller
+          bestseller: !!m.bestseller,
+          isSpecial: !!(m.isSpecial || m.special),
+          isStaple: !!(m.isStaple || m.staple),
+          orderCount: Number(m.orderCount) || 0,
+          addons: Array.isArray(m.addons) ? m.addons : [],
+          pairWater: m.pairWater
         })),
         tenantName,
         currencySymbol: getCurrencySymbol ? getCurrencySymbol() : '\u20b9',
@@ -1841,9 +1983,21 @@
   const sess = window.RS_API ? RS_API.session() : null;
   const isSuper = sess && sess.role === 'superadmin';
   const isBrandAdmin = sess && sess.role === 'brand_admin';
+  // Keep html + body in sync (html is stamped early in dashboard.html <head>)
+  document.documentElement.classList.toggle('rs-role-superadmin', !!isSuper);
+  document.documentElement.classList.toggle('rs-role-brandadmin', !!isBrandAdmin);
+  document.documentElement.classList.toggle('rs-role-client', !isSuper && !isBrandAdmin);
+  document.documentElement.setAttribute('data-rs-shell', isSuper ? 'superadmin' : (isBrandAdmin ? 'brandadmin' : 'client'));
   document.body.classList.toggle('rs-role-superadmin', !!isSuper);
   document.body.classList.toggle('rs-role-brandadmin', !!isBrandAdmin);
   document.body.classList.toggle('rs-role-client', !isSuper && !isBrandAdmin);
+  if (isSuper) {
+    try {
+      document.title = 'RestroSuite Platform · Super-Admin';
+      const brandName = document.querySelector('.brand-name');
+      // Soft brand cue only — full lockdown is CSS shell + later block
+    } catch (_) {}
+  }
   renderImpersonationBanner();
 
   // -- Role-based tab access map ----------------------------------------------
@@ -1919,7 +2073,7 @@
     $$('.brandadmin-only').forEach(el => el.style.display = 'none');
   }
 
-  // ── Apply superadmin-specific UI lockdown before first render ──
+  // ── Super-admin platform shell (CSS already hides client chrome from first paint) ──
   if (isSuper) {
     // 1. Show superadmin-only elements (sidebar links, mobile nav, section labels)
     $$('.superadmin-only').forEach(el => {
@@ -1953,98 +2107,82 @@
     // 6. Hide non-superadmin header elements
     const headerCenter = document.querySelector('.header-center-metrics');
     if (headerCenter) headerCenter.style.display = 'none';
-    // 7. Turn on the role switch toggle
+    // 7. Role switch is client-only demo control
     const rsSwitch = $('#role-switch');
-    if (rsSwitch) {
-      rsSwitch.classList.add('on');
-      const label = $('#role-switch-label');
-      if (label) label.textContent = 'Super-Admin';
-    }
-    // 8. Hide Settings button — not relevant in super-admin mode
-    setTimeout(() => {
-      const openSet = document.getElementById('open-settings');
-      if (openSet) openSet.style.display = 'none';
-      // 9. Wire topbar search to tenant text filter (Wave 9: RSSuperAdmin)
-      const tbSearchInput = document.querySelector('.tb-search input');
-      if (tbSearchInput) {
-        tbSearchInput.placeholder = 'Search tenants…';
+    if (rsSwitch) rsSwitch.style.display = 'none';
+    // Wire platform controls ASAP (no 300ms delay — that window caused client flash)
+    const openSet = document.getElementById('open-settings');
+    if (openSet) openSet.style.display = 'none';
+    const tbSearchInput = document.querySelector('.tb-search input');
+    if (tbSearchInput) {
+      tbSearchInput.placeholder = 'Search tenants…';
+      if (!tbSearchInput.dataset.saWired) {
+        tbSearchInput.dataset.saWired = '1';
         tbSearchInput.addEventListener('input', () => {
           if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(tbSearchInput.value);
         });
       }
-      // 10. Wire inline tenant search input (above table)
-      const inlineSearch = document.getElementById('tenant-search-input');
-      if (inlineSearch) {
-        inlineSearch.addEventListener('input', () => {
-          const tbSearchInput2 = document.querySelector('.tb-search input');
-          if (tbSearchInput2) tbSearchInput2.value = inlineSearch.value;
-          if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(inlineSearch.value);
-        });
-      }
-      // 11. Cloud status pill — show informative popover on click
-      const cloudPill = document.getElementById('db-mode-pill');
-      if (cloudPill && !cloudPill.dataset.saasClick) {
-        cloudPill.dataset.saasClick = '1';
-        cloudPill.style.cursor = 'pointer';
-        cloudPill.title = 'Click to check cloud sync status';
-        cloudPill.addEventListener('click', () => {
-          const mode = cloudPill.textContent.trim();
-          const detail = window.RS_LAST_CLOUD_ERROR ? `⚠️ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : '✅ No recent sync errors.';
-          toast(`Cloud status: ${mode} — ${detail}`, 'fa-cloud');
-        });
-      }
-      // 12. Profile card click — show superadmin info
-      const userPill = document.querySelector('.user-pill');
-      if (userPill && !userPill.dataset.saasClick) {
-        userPill.dataset.saasClick = '1';
-        userPill.style.cursor = 'pointer';
-        userPill.title = 'View session info';
-        userPill.addEventListener('click', () => {
-          const s = window.RS_API ? RS_API.session() : null;
-          const uname = (s && s.username) || 'codearc-superadmin';
-          const role = (s && s.role) || 'superadmin';
-          const tenantCount =
-            window.RSSuperAdmin && typeof RSSuperAdmin.getTenantCount === 'function'
-              ? RSSuperAdmin.getTenantCount()
-              : 0;
-          toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
-        });
-      }
-      // 13. Hide Help & Setup button — irrelevant in super-admin context
-      const helpBtn = document.getElementById('open-product-guide-btn');
-      if (helpBtn) helpBtn.style.display = 'none';
-      // 16. Wire New Workspace button (Wave 9: RSSuperAdmin)
-      const newTenantBtn = document.getElementById('btn-create-tenant');
-      if (newTenantBtn && !newTenantBtn.dataset.wired) {
-        newTenantBtn.dataset.wired = '1';
-        newTenantBtn.addEventListener('click', () => {
-          if (window.RSSuperAdmin && RSSuperAdmin.openCreateTenantModal) RSSuperAdmin.openCreateTenantModal();
-        });
-      }
-      // 17. Wire bulk approve button
-      const bulkBtn = document.getElementById('sa-bulk-approve-btn');
-      if (bulkBtn && !bulkBtn.dataset.wired) {
-        bulkBtn.dataset.wired = '1';
-        bulkBtn.addEventListener('click', () => {
-          if (window.RSSuperAdmin && RSSuperAdmin.bulkApproveAllPending) RSSuperAdmin.bulkApproveAllPending();
-        });
-      }
-      // 18. Hide only the role-switch toggle button (not the whole sb-foot)
-      const saToggle = document.getElementById('role-switch');
-      if (saToggle) saToggle.style.display = 'none';
-      // 14. Hide version number pill — developer noise, not useful for super-admin
-      const versionPill = document.getElementById('app-version-pill');
-      if (versionPill) versionPill.style.display = 'none';
-      // 15. Hide Support dropdown — super-admin doesn't need client support links
-      const supportDrop = document.querySelector('.support-dropdown');
-      if (supportDrop) supportDrop.style.display = 'none';
-      // 19. Hide POS station chip (ST-xxxx) — irrelevant on platform console
-      const stationChip = document.getElementById('rs-station-chip');
-      if (stationChip) stationChip.style.display = 'none';
-      // 20. Prefer one search: hide global topbar search; table search is enough
-      const tbSearch = document.querySelector('.tb-search');
-      if (tbSearch) tbSearch.style.display = 'none';
-    }, 300);
+    }
+    const inlineSearch = document.getElementById('tenant-search-input');
+    if (inlineSearch && !inlineSearch.dataset.saWired) {
+      inlineSearch.dataset.saWired = '1';
+      inlineSearch.addEventListener('input', () => {
+        const tbSearchInput2 = document.querySelector('.tb-search input');
+        if (tbSearchInput2) tbSearchInput2.value = inlineSearch.value;
+        if (window.RSSuperAdmin && RSSuperAdmin.setSearch) RSSuperAdmin.setSearch(inlineSearch.value);
+      });
+    }
+    const cloudPill = document.getElementById('db-mode-pill');
+    if (cloudPill && !cloudPill.dataset.saasClick) {
+      cloudPill.dataset.saasClick = '1';
+      cloudPill.style.cursor = 'pointer';
+      cloudPill.title = 'Click to check cloud sync status';
+      cloudPill.addEventListener('click', () => {
+        const mode = cloudPill.textContent.trim();
+        const detail = window.RS_LAST_CLOUD_ERROR ? `⚠️ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : '✅ No recent sync errors.';
+        toast(`Cloud status: ${mode} — ${detail}`, 'fa-cloud');
+      });
+    }
+    const userPill = document.querySelector('.user-pill');
+    if (userPill && !userPill.dataset.saasClick) {
+      userPill.dataset.saasClick = '1';
+      userPill.style.cursor = 'pointer';
+      userPill.title = 'View session info';
+      userPill.addEventListener('click', () => {
+        const s = window.RS_API ? RS_API.session() : null;
+        const uname = (s && s.username) || 'codearc-superadmin';
+        const role = (s && s.role) || 'superadmin';
+        const tenantCount =
+          window.RSSuperAdmin && typeof RSSuperAdmin.getTenantCount === 'function'
+            ? RSSuperAdmin.getTenantCount()
+            : 0;
+        toast(`Logged in as ${uname} · Role: ${role} · ${tenantCount} tenants loaded`, 'fa-user-shield');
+      });
+    }
+    const helpBtn = document.getElementById('open-product-guide-btn');
+    if (helpBtn) helpBtn.style.display = 'none';
+    const newTenantBtn = document.getElementById('btn-create-tenant');
+    if (newTenantBtn && !newTenantBtn.dataset.wired) {
+      newTenantBtn.dataset.wired = '1';
+      newTenantBtn.addEventListener('click', () => {
+        if (window.RSSuperAdmin && RSSuperAdmin.openCreateTenantModal) RSSuperAdmin.openCreateTenantModal();
+      });
+    }
+    const bulkBtn = document.getElementById('sa-bulk-approve-btn');
+    if (bulkBtn && !bulkBtn.dataset.wired) {
+      bulkBtn.dataset.wired = '1';
+      bulkBtn.addEventListener('click', () => {
+        if (window.RSSuperAdmin && RSSuperAdmin.bulkApproveAllPending) RSSuperAdmin.bulkApproveAllPending();
+      });
+    }
+    const versionPill = document.getElementById('app-version-pill');
+    if (versionPill) versionPill.style.display = 'none';
+    const supportWrap = document.getElementById('tb-support-wrap');
+    if (supportWrap) supportWrap.style.display = 'none';
+    const stationChip = document.getElementById('rs-station-chip');
+    if (stationChip) stationChip.style.display = 'none';
+    const tbSearch = document.querySelector('.tb-search');
+    if (tbSearch) tbSearch.style.display = 'none';
   } else {
     // Hide superadmin-only elements
     $$('.superadmin-only').forEach(el => {
@@ -2205,6 +2343,55 @@
       }
     }
 
+    function csvEscapeCell(v) {
+      return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    }
+    function buildCsv(headers, rows) {
+      return (
+        '\uFEFF' +
+        [headers.map(csvEscapeCell).join(','), ...rows.map((row) => row.map(csvEscapeCell).join(','))].join('\r\n')
+      );
+    }
+
+    // 1a. Menu Export (live catalog)
+    const btnExportMenu = document.getElementById('btn-export-menu');
+    if (btnExportMenu && !btnExportMenu.dataset.rsExportBound) {
+      btnExportMenu.dataset.rsExportBound = '1';
+      btnExportMenu.onclick = () => {
+        const list = Array.isArray(MENU) ? MENU : [];
+        if (!list.length) {
+          toast('No menu items to export', 'fa-circle-info');
+          return;
+        }
+        setOperationStatus('Exporting menu CSV...');
+        const headers = [
+          'Name',
+          'Category',
+          'Price',
+          'Description',
+          'Type',
+          'Available',
+          'Stock',
+          'GST',
+          'Id',
+        ];
+        const rows = list.map((m) => [
+          m.name || '',
+          m.cat || m.category || '',
+          m.price != null ? m.price : '',
+          m.description || m.desc || '',
+          m.veg === false || m.type === 'nonveg' ? 'Non-veg' : 'Veg',
+          m.stock === 'out' ? 'NO' : 'YES',
+          m.stock || 'ok',
+          m.gst || m.tax || m.taxSlab || '',
+          m.id || '',
+        ]);
+        RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `menu-export-${fileDate()}.csv`);
+        finishOperationStatus('Menu exported');
+        toast('Menu CSV · ' + list.length + ' items', 'fa-file-export');
+      };
+    }
+
     // 1. Menu Download Template
     const btnDownloadMenu = document.getElementById('btn-download-menu-template');
     if (btnDownloadMenu) {
@@ -2348,21 +2535,75 @@
       };
     }
 
-    // 3. Inventory Download Template
+    // 3a. Inventory Export (full stock list — re-importable columns)
+    const btnExportInventory = document.getElementById('btn-export-inventory');
+    if (btnExportInventory && !btnExportInventory.dataset.rsExportBound) {
+      btnExportInventory.dataset.rsExportBound = '1';
+      btnExportInventory.onclick = () => {
+        const list = Array.isArray(INVENTORY) ? INVENTORY : [];
+        if (!list.length) {
+          toast('No stock items to export', 'fa-circle-info');
+          return;
+        }
+        setOperationStatus('Exporting inventory CSV...');
+        const headers = [
+          'IngredientName',
+          'Category',
+          'CurrentStock',
+          'MinLevel',
+          'Unit',
+          'UnitCost',
+          'Supplier',
+          'IngredientKey',
+          'Id',
+        ];
+        const rows = list.map((i) => [
+          i.name || i.label || '',
+          i.cat || i.category || '',
+          i.stock != null ? i.stock : '',
+          i.min != null ? i.min : '',
+          i.unit || 'unit',
+          i.cost != null ? i.cost : '',
+          i.supplier || i.vendor || '',
+          i.key ||
+            String(i.name || '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_'),
+          i.id || '',
+        ]);
+        RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `inventory-export-${fileDate()}.csv`);
+        finishOperationStatus('Inventory exported');
+        toast('Stock CSV · ' + list.length + ' items', 'fa-file-export');
+      };
+    }
+
+    // 3. Inventory Download Template (matches import field names)
     const btnDownloadInventory = document.getElementById('btn-download-inventory-template');
     if (btnDownloadInventory) {
       btnDownloadInventory.onclick = () => {
         setOperationStatus('Preparing inventory CSV template...');
-        const headers = ['IngredientKey', 'IngredientName', 'Category', 'CurrentStock', 'MaxStock', 'Unit', 'ReorderLevelPercent', 'ExpiryDate'];
-        const sampleRows = [
-          ['espresso_shot', 'Espresso Shot', 'drinks', '3000', '6000', 'ml', '20', ''],
-          ['milk', 'Milk', 'drinks', '6000', '10000', 'ml', '25', '2026-06-16'],
-          ['bread', 'Bread', 'food', '60', '100', 'slices', '20', '2026-06-13']
+        const headers = [
+          'IngredientName',
+          'Category',
+          'CurrentStock',
+          'MinLevel',
+          'Unit',
+          'UnitCost',
+          'Supplier',
+          'IngredientKey',
         ];
-        const csv = [
-          headers.join(','),
-          ...sampleRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-        ].join('\n');
+        const sampleRows = [
+          ['Espresso Shot', 'drinks', '3000', '600', 'ml', '0.8', 'Bean Bros', 'espresso_shot'],
+          ['Milk', 'dairy', '6000', '1000', 'ml', '0.06', 'Local Dairy', 'milk'],
+          ['Hoagie Roll', 'food', '50', '25', 'pcs', '8', 'Bakery Co', 'hoagie_roll'],
+          ['Takeaway box', 'Packaging', '200', '50', 'pcs', '3', 'Pack Co', 'takeaway_box'],
+        ];
+        const csv =
+          '\uFEFF' +
+          [
+            headers.join(','),
+            ...sampleRows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+          ].join('\r\n');
         RS.downloadFile(csv, 'text/csv;charset=utf-8;', `inventory-template-${fileDate()}.csv`);
         finishOperationStatus('Inventory template downloaded');
         toast('Inventory CSV template downloaded', 'fa-circle-check');
@@ -2434,23 +2675,52 @@
               const records = [];
               const skipped = [];
               rows.forEach((row, index) => {
-                const name = getValue(row, ['ingredientname', 'ingredient', 'name', 'item', 'ingredientkey']);
-                if(!name) { skipped.push(`Row ${index + 2}: missing ingredient name`); return; }
+                const prettyName = getValue(row, [
+                  'ingredientname',
+                  'ingredient_name',
+                  'name',
+                  'item',
+                  'ingredient',
+                ]);
+                const keyVal = getValue(row, ['ingredientkey', 'ingredient_key', 'key', 'sku']);
+                const name = prettyName || keyVal;
+                if (!name) {
+                  skipped.push(`Row ${index + 2}: missing ingredient name`);
+                  return;
+                }
                 const cat = getValue(row, ['category', 'cat', 'itemcategory']) || 'General';
-                const parsedStock = cleanNumber(getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity']));
-                const parsedMin = cleanNumber(getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevelpercent']));
-                const parsedCost = cleanNumber(getValue(row, ['unitcost', 'cost', 'price', 'sellingprice']));
+                const parsedStock = cleanNumber(
+                  getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity'])
+                );
+                // Prefer absolute min level — do not treat "reorder %" as min units
+                const parsedMin = cleanNumber(
+                  getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevel', 'minstock'])
+                );
+                const parsedCost = cleanNumber(
+                  getValue(row, ['unitcost', 'cost', 'price', 'unit_cost'])
+                );
                 const unit = getValue(row, ['unit', 'unitofmeasure']) || 'unit';
-                
-                const existing = INVENTORY.find(x => String(x.name).toLowerCase() === String(name).toLowerCase() || String(x.key).toLowerCase() === String(name).toLowerCase());
+                const supplier = getValue(row, ['supplier', 'vendor']) || '';
+                const keyNorm = String(keyVal || name)
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '_');
+
+                const existing = INVENTORY.find(
+                  (x) =>
+                    String(x.name).toLowerCase() === String(name).toLowerCase() ||
+                    String(x.key || '').toLowerCase() === keyNorm ||
+                    String(x.id || '').toLowerCase() === 'inv_' + keyNorm
+                );
                 const item = {
-                  id: existing ? existing.id : 'inv_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_'),
-                  name: String(name),
+                  id: existing ? existing.id : 'inv_' + keyNorm,
+                  name: String(prettyName || name),
+                  key: keyNorm,
                   cat: String(cat),
-                  stock: Number.isFinite(parsedStock) ? parsedStock : 0,
-                  min: Number.isFinite(parsedMin) ? parsedMin : 10,
-                  cost: Number.isFinite(parsedCost) ? parsedCost : 0,
-                  unit: String(unit)
+                  stock: Number.isFinite(parsedStock) ? parsedStock : existing ? Number(existing.stock) || 0 : 0,
+                  min: Number.isFinite(parsedMin) ? parsedMin : existing ? Number(existing.min) || 10 : 10,
+                  cost: Number.isFinite(parsedCost) ? parsedCost : existing ? Number(existing.cost) || 0 : 0,
+                  unit: String(unit),
+                  supplier: String(supplier || (existing && existing.supplier) || ''),
                 };
                 records.push(item);
               });
@@ -2487,186 +2757,27 @@
       };
     }
 
-    // 5. Bills Export Excel
+    // 5. Bills Export Excel (.xlsx) / CSV — primary wiring lives in bills-history.js
+    // (dashboard only fills a last-resort fallback if the module is missing).
     const btnExportBills = document.getElementById('btn-export-bills');
-    if (btnExportBills) {
-      btnExportBills.onclick = () => {
-        if (!BILLS || !BILLS.length) return toast('No bills to export', 'fa-circle-exclamation');
-        
-        const steps = ['Compiling billing data...', 'Formatting Excel spreadsheet...', 'Triggering secure download...'];
-        window.RS_ProgressOverlay.show('Exporting Bills', steps);
-        window.RS_ProgressOverlay.update(0, 33);
-        
-        setTimeout(() => {
-          window.RS_ProgressOverlay.update(1, 66);
-          
-          setTimeout(() => {
-            window.RS_ProgressOverlay.update(2, 90);
-            
-            const settings = window.RS_SETTINGS || {};
-            const taxLabel = settings.set_tax_label || 'GST';
-            const headers = [
-              'Bill No', 'Date', 'Table', 'Items', 'Customer', 'Phone',
-              'Subtotal', taxLabel, 'Discount', 'Total', 'Payment', 'Tenders',
-              'Status', 'Channel', 'Station', 'Shift', 'Cashier', 'Order Type',
-            ];
-            const rows = BILLS.map((b) => {
-              const tenders = Array.isArray(b.tenders)
-                ? b.tenders.map((t) => (t.method || '') + ':' + (t.amount || 0)).join('|')
-                : '';
-              return [
-                b.no || b.orderId || b.id || '',
-                b.dateTime || b.time || '',
-                b.table || '',
-                b.items || '',
-                b.customerName || '',
-                b.customerPhone || '',
-                b.subtotal != null ? b.subtotal : '',
-                b.gst != null ? b.gst : '',
-                b.discount != null ? b.discount : (b.disc != null ? b.disc : ''),
-                b.amount != null ? b.amount : b.total || '',
-                b.pay || b.paymentMethod || '',
-                tenders,
-                b.status || '',
-                b.channel || b.channelCode || '',
-                b.stationLabel || b.stationId || '',
-                b.shiftId || '',
-                b.cashier || b.refundedBy || '',
-                b.orderType || '',
-              ]
-                .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-                .join(',');
-            });
-            const csv = [headers.join(','), ...rows].join('\n');
-            RS.downloadFile(csv, 'text/csv;charset=utf-8;', `bills-${fileDate()}.csv`);
-            
-            window.RS_ProgressOverlay.update(3, 100);
-            window.RS_ProgressOverlay.hide();
-            toast('Bills exported successfully', 'fa-circle-check');
-          }, 600);
-        }, 600);
-      };
-    }
-
-    // 5b. Print Day Report
-    const btnPrintDayReport = document.getElementById('btn-print-day-report');
-    if (btnPrintDayReport) {
-      btnPrintDayReport.onclick = () => {
-        const paidBills = BILLS.filter(b => b.status === 'paid');
-        if (!paidBills.length) return toast('No sales data for day report', 'fa-circle-exclamation');
-
-        const outletName = document.getElementById('manage-tenant-name')?.textContent || 'RestroSuite Outlet';
-        
-        // Calculate stats
-        const totalRevenue = paidBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-        const totalOrders = paidBills.length;
-        const aov = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-        
-        // Estimate GST collected (assume 5% average)
-        const netTaxableSales = Math.round(totalRevenue / 1.05);
-        const gstCollected = totalRevenue - netTaxableSales;
-
-        // Payment Breakdown
-        const paymentMethods = {};
-        paidBills.forEach(b => {
-          if (b.tenders && Array.isArray(b.tenders) && b.tenders.length) {
-            b.tenders.forEach(t => {
-              const method = t.method || 'Cash';
-              paymentMethods[method] = (paymentMethods[method] || 0) + Number(t.amount || 0);
-            });
-          } else {
-            const method = b.pay || b.paymentMethod || 'Cash';
-            paymentMethods[method] = (paymentMethods[method] || 0) + (b.amount || 0);
-          }
-        });
-
-        const paymentBreakdownHtml = Object.entries(paymentMethods).map(([method, amount]) => `
-          <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-            <span>${method}:</span>
-            <span>${rs(amount)}</span>
-          </div>
-        `).join('');
-
-        const now = new Date();
-        const formattedDate = now.toLocaleDateString('en-IN');
-        const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-        const html = `
-          <div style="font-family: 'DM Sans', monospace; max-width: 280px; margin: 0 auto; color: #111; font-size: 13px; line-height: 1.4;">
-            <div style="text-align: center; margin-bottom: 10px;">
-              <h2 style="font-family: var(--font-body), system-ui, sans-serif; font-weight: 800; font-size: 18px; margin: 0;">${outletName}</h2>
-              <p style="font-size: 11px; color: #555; margin-top: 2px;">DAILY SALES SUMMARY</p>
-            </div>
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #555; margin-bottom: 8px;">
-              <span>Date: ${formattedDate}</span>
-              <span>Time: ${formattedTime}</span>
-            </div>
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Total Bills:</span>
-                <strong>${totalOrders}</strong>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Avg Order Value (AOV):</span>
-                <strong>${rs(aov)}</strong>
-              </div>
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; padding: 2px 0; font-weight: 600;">
-                <span>PAYMENT BREAKDOWN</span>
-                <span>AMOUNT</span>
-              </div>
-              ${paymentBreakdownHtml}
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="margin-bottom: 10px;">
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Net Taxable Sales:</span>
-                <span>${rs(netTaxableSales)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 2px 0;">
-                <span>Total GST (5%):</span>
-                <span>${rs(gstCollected)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; font-weight: 800; font-family: var(--font-body), system-ui, sans-serif; border-top: 1px dashed #ccc; margin-top: 4px;">
-                <span>GROSS REVENUE:</span>
-                <span>${rs(totalRevenue)}</span>
-              </div>
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed #aaa; margin: 10px 0;">
-            
-            <div style="text-align: center; font-size: 11px; color: #777; margin-top: 15px;">
-              *** End of Report ***
-            </div>
-          </div>
-        `;
-
-        if (typeof window.RSPrint === 'function') {
-          window.RSPrint(html, 'Daily Sales Report');
-        } else {
-          const f = document.createElement('iframe');
-          f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-          document.body.appendChild(f);
-          const d = f.contentWindow.document;
-          d.open();
-          d.write(`<!doctype html><html><head><title>Daily Sales Report</title></head><body>${html}</body></html>`);
-          d.close();
-          f.contentWindow.focus();
-          f.contentWindow.print();
-          setTimeout(() => f.remove(), 800);
+    if (btnExportBills && !btnExportBills.dataset.rsExportDashBound) {
+      btnExportBills.dataset.rsExportDashBound = '1';
+      btnExportBills.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (window.RSBillsHistory && typeof RSBillsHistory.exportBillsXlsx === 'function') {
+          RSBillsHistory.exportBillsXlsx();
+          return;
         }
-        toast('Day report sent to printer', 'fa-print');
-      };
+        if (window.RSBillsHistory && typeof RSBillsHistory.exportBillsCsv === 'function') {
+          RSBillsHistory.exportBillsCsv();
+          return;
+        }
+        toast('Bills export module not loaded', 'fa-circle-exclamation');
+      });
     }
+
+    // 5b. Print sales report is wired in assets/modules/bills-history.js
+    // (printSalesReport — A4/PDF, range-aware). Do not double-bind here.
 
     // 6. GSTR Download
     const btnGSTR = document.getElementById('btn-download-gstr');
@@ -2711,7 +2822,21 @@
           const csv = [
             headers.join(','),
             ...tenants.map(t => {
-              return `"${t.id || ''}","${(t.name || t.tenant_name || '').replace(/"/g, '""')}","${t.slug || ''}","${t.outlet_type || ''}","${t.email || ''}","${t.phone || ''}","${t.username || ''}","${t.status || ''}","${t.plan_code || ''}",tus || ''}",${t.mrr || 0},"${t.created_at || ''}"`;
+              const escCsv = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+              return [
+                escCsv(t.id),
+                escCsv(t.name || t.tenant_name),
+                escCsv(t.slug),
+                escCsv(t.outlet_type),
+                escCsv(t.email),
+                escCsv(t.phone),
+                escCsv(t.username),
+                escCsv(t.status),
+                escCsv(t.plan_code),
+                escCsv(t.subscription_status),
+                Number(t.mrr) || 0,
+                escCsv(t.created_at),
+              ].join(',');
             })
           ].join('\n');
           RS.downloadFile(csv, 'text/csv;charset=utf-8;', `tenants-export-${fileDate()}.csv`);

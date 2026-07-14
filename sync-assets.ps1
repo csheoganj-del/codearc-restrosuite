@@ -1,16 +1,16 @@
-# RestroSuite Android POS Assets Synchronisation Script
-# Run this script whenever you update your web files to sync them with the Android App assets.
+# RestroSuite Android POS — full asset synchronisation
+# Run after any web change, before building the APK.
+# Usage:  powershell -ExecutionPolicy Bypass -File .\sync-assets.ps1
 
+$ErrorActionPreference = "Stop"
 $SourceDir = $PSScriptRoot
 $DestDir = Join-Path $SourceDir "android-app\app\src\main\assets"
 
-# Create destination assets directory if it doesn't exist
 if (-not (Test-Path $DestDir)) {
     New-Item -ItemType Directory -Force -Path $DestDir | Out-Null
     Write-Host "Created Android assets directory." -ForegroundColor Green
 }
 
-# List of files to copy
 $FilesToCopy = @(
     "index.html",
     "dashboard.html",
@@ -25,7 +25,6 @@ $FilesToCopy = @(
     "bill.html",
     "app-update.json",
     "config.js",
-    "supabase_migration.sql",
     "styles.css",
     "script.js",
     "recipes.json",
@@ -46,40 +45,68 @@ $DirectoriesToCopy = @(
     "assets"
 )
 
-# Copy individual files
+Write-Host "Syncing RestroSuite -> android-app assets..." -ForegroundColor Yellow
+
 foreach ($File in $FilesToCopy) {
     $SrcFile = Join-Path $SourceDir $File
     $DstFile = Join-Path $DestDir $File
-    
     if (Test-Path $SrcFile) {
         Copy-Item -Path $SrcFile -Destination $DstFile -Force
-        Write-Host "Synced: $File -> android-app" -ForegroundColor Cyan
+        Write-Host "  file  $File" -ForegroundColor Cyan
     } else {
-        Write-Warning "Source file not found: $File"
+        Write-Warning "Missing source: $File"
     }
 }
 
 foreach ($Directory in $DirectoriesToCopy) {
     $SrcDirectory = Join-Path $SourceDir $Directory
-    $DstDirectory = Join-Path $DestDir $Directory
-
     if (Test-Path $SrcDirectory) {
+        # Wipe dest first so deleted web files don't linger offline
+        $DstDirectory = Join-Path $DestDir $Directory
+        if (Test-Path $DstDirectory) {
+            Remove-Item -Path $DstDirectory -Recurse -Force
+        }
         Copy-Item -Path $SrcDirectory -Destination $DestDir -Recurse -Force
-        Write-Host "Synced directory: $Directory -> android-app" -ForegroundColor Cyan
+        Write-Host "  dir   $Directory/" -ForegroundColor Cyan
     } else {
-        Write-Warning "Source directory not found: $Directory"
+        Write-Warning "Missing directory: $Directory"
     }
 }
 
-# Copy images folder if exists
 $SrcImages = Join-Path $SourceDir "images"
 $DstImages = Join-Path $DestDir "images"
 if (Test-Path $SrcImages) {
-    if (-not (Test-Path $DstImages)) {
-        New-Item -ItemType Directory -Force -Path $DstImages | Out-Null
-    }
-    Copy-Item -Path "$SrcImages\*" -Destination $DstImages -Recurse -Force
-    Write-Host "Synced images directory." -ForegroundColor Cyan
+    if (Test-Path $DstImages) { Remove-Item $DstImages -Recurse -Force }
+    Copy-Item -Path $SrcImages -Destination $DstImages -Recurse -Force
+    Write-Host "  dir   images/" -ForegroundColor Cyan
 }
 
-Write-Host "`nAssets sync completed successfully! Build your Android app in Android Studio or compile using Gradle." -ForegroundColor Green
+# Remove stale root-level duplicates that used to confuse offline shell
+$StaleRoot = @(
+    "dashboard.js",
+    "features-pos.js",
+    "features-shell.js",
+    "saas-core.js",
+    "theme-luxe.css",
+    "supabase_migration.sql",
+    "vercel.json"
+)
+foreach ($s in $StaleRoot) {
+    $p = Join-Path $DestDir $s
+    if (Test-Path $p) {
+        Remove-Item $p -Force
+        Write-Host "  clean $s" -ForegroundColor DarkGray
+    }
+}
+
+# Stamp sync time for diagnostics
+$stamp = @{
+    syncedAt = (Get-Date).ToUniversalTime().ToString("o")
+    source   = "sync-assets.ps1"
+    version  = "2.0.0"
+} | ConvertTo-Json
+Set-Content -Path (Join-Path $DestDir "android-sync.json") -Value $stamp -Encoding UTF8
+
+Write-Host "`nAndroid assets sync complete. Build with:" -ForegroundColor Green
+Write-Host "  .\scripts\build-android.ps1" -ForegroundColor White
+Write-Host "  or Android Studio -> Build APK" -ForegroundColor White

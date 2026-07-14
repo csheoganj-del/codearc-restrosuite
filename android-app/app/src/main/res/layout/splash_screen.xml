@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/primary_brand">
+    android:background="@color/bg_cream">
 
     <LinearLayout
         android:layout_width="wrap_content"
@@ -16,28 +16,46 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <ImageView
-            android:layout_width="110dp"
-            android:layout_height="110dp"
-            android:src="@drawable/ic_launcher_foreground"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/splash_logo"
             android:contentDescription="@string/app_name" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
             android:text="@string/app_name"
-            android:textColor="@color/white"
-            android:textSize="36sp"
+            android:textColor="@color/primary_brand"
+            android:textSize="28sp"
             android:textStyle="bold"
-            android:letterSpacing="0.1" />
+            android:letterSpacing="0.02" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Cashier POS Control Terminal"
-            android:textColor="#88FFFFFF"
-            android:textSize="12sp"
-            android:layout_marginTop="24dp" />
+            android:layout_marginTop="8dp"
+            android:text="@string/splash_subtitle"
+            android:textColor="#886b6570"
+            android:textSize="13sp" />
 
+        <ProgressBar
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginTop="28dp"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/brand_orange" />
     </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="28dp"
+        android:text="@string/app_tagline"
+        android:textColor="#668a8490"
+        android:textSize="11sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

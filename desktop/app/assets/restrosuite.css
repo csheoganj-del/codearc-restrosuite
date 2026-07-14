@@ -391,3 +391,23 @@ img { max-width: 100%; display: block; }
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ===== v81 UX: tablet / thumb targets ===== */
+@media (max-width: 1024px) {
+  .btn, .btn-sm, .hold-btn, .pos-cat-btn, .order-type-btn,
+  .cpay-methods button, #btn-kot, #btn-checkout {
+    min-height: var(--touch-min, 44px);
+  }
+  .cart-line .qty button,
+  .cart-line-note {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .sidebar-link {
+    min-height: 44px;
+  }
+  .cart-more-opts summary {
+    min-height: 44px;
+  }
+}
+.cart-more-opts summary::-webkit-details-marker { display: none; }

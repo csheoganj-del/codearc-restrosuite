@@ -1,12 +1,11 @@
 {
-  "version": "v36-20260708",
-  "date": "2026-07-08",
-  "title": "Logical Numbering & Update Reliability Fix",
-  "summary": "This update replaces timestamp-style visible numbers with short daily sequence numbers, refreshes update-release text so old notes are not reused, and widens the POS guest name and phone fields.",
+  "version": "v189-20260713-qr-center",
+  "date": "2026-07-13",
+  "title": "QR centered on receipt for screen and print",
+  "summary": "Browser print ignores flex centering, so QR sat left/sideways. QR is now a full-width table with centered cell and inline styles so it sits in the middle bottom of the paper.",
   "highlights": [
-    "Short daily numbers: Bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable sequences such as RS-260708-001 or KOT-260708-001.",
-    "Update dialog fix: Patch-only updates no longer show stale release notes from an older release.",
-    "Current release history: Update history now starts with the latest release instead of falling back to June release text.",
-    "POS cart cleanup: Guest name and phone inputs now use the full cart width and remain readable on desktop, tablet, and mobile."
+    "QR dead-center under payment lines",
+    "Works in Chrome print / Save as PDF",
+    "Label under QR, thank-you still centered"
   ]
 }

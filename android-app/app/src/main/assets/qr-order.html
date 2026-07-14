@@ -67,6 +67,18 @@
       position: relative;
       overflow: hidden;
     }
+    .portal-hint {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 4px;
+      max-width: 280px;
+    }
+    #menu-btn {
+      border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+      box-shadow: 0 8px 20px rgba(255, 79, 0, 0.08);
+    }
+    #menu-btn .card-icon { background: var(--brand); color: #fff; }
 
     .portal-header::before {
       content: '';
@@ -497,15 +509,16 @@
       <div class="table-badge">
         <i class="fa-solid fa-chair"></i> <span id="table-label">Table --</span>
       </div>
+      <p class="portal-hint" id="portal-hint">No app · free Wi‑Fi · food comes to your table</p>
     </div>
 
     <!-- Grid Actions -->
     <div class="portal-grid">
-      <!-- Menu Order -->
+      <!-- Menu Order — primary guest action -->
       <a href="#" class="portal-card" id="menu-btn">
         <div class="card-icon"><i class="fa-solid fa-utensils"></i></div>
         <div class="card-title">View Menu & Order</div>
-        <div class="card-desc">Browse dishes, customize and send orders to kitchen</div>
+        <div class="card-desc">Browse dishes and send straight to the kitchen</div>
       </a>
 
       <!-- Call Waiter (customer mode only -- ringing the bell is for guests) -->
@@ -641,7 +654,15 @@
 
       // Configure Menu Button Redirect
       document.getElementById('menu-btn').href = `order.html?tenant=${slug}&table=${table}${waiterMode ? '&mode=waiter' : ''}`;
-      document.getElementById('table-label').textContent = table ? `Table ${table.padStart(2, '0')}` : 'Takeaway';
+      const tablePad = table && /^\d+$/.test(String(table)) ? String(table).padStart(2, '0') : (table || '');
+      document.getElementById('table-label').textContent = tablePad ? `Table ${tablePad}` : 'Takeaway';
+      // Instant brand from slug (API overwrites when ready) — never leave RESTRONAME
+      const brandGuess = slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const brandEl0 = document.getElementById('brand-logo');
+      if (brandEl0 && (!brandEl0.textContent || brandEl0.textContent === 'RESTRONAME')) {
+        brandEl0.textContent = brandGuess;
+      }
+      document.title = (tablePad ? 'Table ' + tablePad + ' · ' : '') + brandGuess;
 
       if (waiterMode) {
         // Hide guest-only actions; waiter punches KOTs and settles at the POS.
@@ -694,27 +715,40 @@
 
         if (status === 'active') return;
 
-        let title = 'Table Session Closed';
-        let desc = 'This table does not have an active session. Please contact staff or scan the QR code again once seated.';
-        let icon = 'fa-power-off';
-        let color = '#ef4444';
+        const tableTxt = table
+          ? 'Table ' + (/^\d+$/.test(String(table)) ? String(table).padStart(2, '0') : table)
+          : 'This table';
+        const brandEl = document.getElementById('brand-logo');
+        const outletTxt =
+          (brandEl && brandEl.textContent && brandEl.textContent !== 'RESTRONAME'
+            ? brandEl.textContent
+            : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())) || 'Restaurant';
+
+        let title = 'Almost ready';
+        let desc =
+          tableTxt +
+          ' is not open for phone ordering yet. Ask your host to open the table, then tap Refresh.';
+        let icon = 'fa-mug-hot';
+        let tip = 'You scanned the correct code — staff open the session from the floor map.';
 
         if (status === 'paused') {
-          title = 'QR Ordering Paused';
-          desc = 'Ordering is temporarily paused for this table. Please ask staff for assistance.';
+          title = 'Ordering paused';
+          desc = tableTxt + ' is paused. Ask staff to resume, then refresh.';
           icon = 'fa-pause';
-          color = 'var(--orange)';
+          tip = 'Host can resume QR ordering without reprinting the card.';
         }
 
         const overlayHtml = `
-          <div id="session-status-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; font-family:sans-serif; color:#fff;">
-            <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); padding:40px 30px; border-radius:24px; max-width:400px; box-shadow:0 20px 40px rgba(0,0,0,0.5);">
-              <i class="fa-solid ${icon}" style="font-size:64px; color:${color}; margin-bottom:20px;"></i>
-              <h2 style="font-size:24px; font-weight:800; margin:0 0 12px 0;">${title}</h2>
-              <p style="font-size:14px; line-height:1.6; color:#a1a1aa; margin:0 0 24px 0;">${desc}</p>
-              <button onclick="window.location.reload();" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:12px; font-size:14px;">
-                <i class="fa-solid fa-rotate-right" style="margin-right:6px;"></i> Refresh Page
-              </button>
+          <div id="session-status-overlay" role="alertdialog" aria-modal="true" style="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(165deg,#1A1714,#2C241C);font-family:inherit">
+            <div style="width:100%;max-width:380px;background:#fff;color:var(--text);border-radius:20px;padding:28px 22px;text-align:center;box-shadow:0 24px 48px rgba(0,0,0,.3)">
+              <div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:rgba(255,79,0,.12);display:flex;align-items:center;justify-content:center">
+                <i class="fa-solid ${icon}" style="font-size:28px;color:var(--brand)"></i>
+              </div>
+              <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">${escHtml(outletTxt)} · ${escHtml(tableTxt)}</div>
+              <h2 style="font-size:22px;font-weight:800;margin:0 0 10px">${title}</h2>
+              <p style="font-size:14px;line-height:1.55;color:var(--text-muted);margin:0 0 12px">${desc}</p>
+              <p style="font-size:12px;line-height:1.45;color:var(--text-muted);margin:0 0 18px;padding:10px;background:var(--bg);border-radius:10px;border:1px solid var(--border)">${tip}</p>
+              <button type="button" class="btn" onclick="window.location.reload()"><i class="fa-solid fa-rotate-right" style="margin-right:6px"></i> I'm ready — refresh</button>
             </div>
           </div>
         `;
