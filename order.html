@@ -733,16 +733,18 @@
       phone: 'Phone (optional)', track: 'Track my order', more: 'Order more', home: 'Table home',
       help: 'Need help?', sold: 'Sold out', note: 'Kitchen note', notePh: 'e.g. No onion, less spicy',
       water: 'Water', cutlery: 'Cutlery', clear: 'Clear table', waiter: 'Call waiter', bill: 'Request bill',
-      sent: 'Request sent to staff', empty: 'No items match your filters'
+      sent: 'Request sent to staff', empty: 'No items match your filters', viewCart: 'View cart',
+      table: 'Table', items: 'items'
     },
     hi: {
-      browse: 'मेनू देखें और ऑर्डर करें', heroSub: 'फ़ोन से ऑर्डर करें — खाना टेबल पर आएगा। ऐप नहीं चाहिए।',
+      browse: 'अपनी टेबल पर ऑर्डर', heroSub: 'डिश चुनें, ऑर्डर भेजें — किचन तुरंत पकाएगा। ऐप डाउनलोड नहीं।',
       search: 'डिश खोजें…', all: 'सभी', veg: 'वेज', nonveg: 'नॉन-वेज',
-      cart: 'आपका ऑर्डर', place: 'ऑर्डर करें', nameReq: 'नाम (ज़रूरी)',
+      cart: 'आपका ऑर्डर', place: 'ऑर्डर भेजें', nameReq: 'नाम (ज़रूरी)',
       phone: 'फ़ोन (वैकल्पिक)', track: 'ऑर्डर ट्रैक करें', more: 'और ऑर्डर', home: 'टेबल होम',
       help: 'मदद चाहिए?', sold: 'खत्म', note: 'किचन नोट', notePh: 'जैसे: प्याज नहीं, कम मसाला',
       water: 'पानी', cutlery: 'कटलरी', clear: 'टेबल साफ़', waiter: 'वेटर बुलाएँ', bill: 'बिल माँगें',
-      sent: 'स्टाफ़ को भेज दिया', empty: 'फ़िल्टर से कोई आइटम नहीं'
+      sent: 'स्टाफ़ को भेज दिया', empty: 'कोई डिश नहीं मिली', viewCart: 'कार्ट देखें',
+      table: 'टेबल', items: 'आइटम'
     }
   };
   function t(k){ return (STR[uiLang] && STR[uiLang][k]) || STR.en[k] || k; }
@@ -763,6 +765,10 @@
     }
     var hs = document.getElementById('hero-sub');
     if (hs && !waiterMode) hs.textContent = t('heroSub');
+    var hk = document.querySelector('.hero-kicker');
+    if (hk && !waiterMode) {
+      hk.innerHTML = '<span></span> ' + (uiLang === 'hi' ? 'टेबल सर्विस' : 'Table service');
+    }
     var st = document.getElementById('svc-sheet-title');
     if (st) st.textContent = t('help');
     var tr = document.getElementById('btn-track-orders');
@@ -775,6 +781,25 @@
     if (ni && !waiterMode) ni.placeholder = t('nameReq');
     var pi = document.getElementById('cust-phone');
     if (pi && !waiterMode) pi.placeholder = t('phone');
+    var si = document.getElementById('si');
+    if (si) si.placeholder = t('search');
+    // Table pill label
+    try {
+      var tp = document.getElementById('table-pill-txt');
+      var tNum = (typeof window.__rsTableNum === 'string' ? window.__rsTableNum : null)
+        || (new URLSearchParams(location.search).get('table') || new URLSearchParams(location.search).get('t'));
+      if (tp && tNum) {
+        var pad = /^\d+$/.test(String(tNum)) ? String(parseInt(tNum, 10)).padStart(2, '0') : String(tNum);
+        tp.textContent = t('table') + ' ' + pad;
+      }
+    } catch (_) {}
+    // Re-paint diet chips if present
+    document.querySelectorAll('#diet-filters .fchip').forEach(function(btn){
+      var d = btn.getAttribute('data-diet');
+      if (d === 'all') btn.innerHTML = escHtml(t('all'));
+      else if (d === 'veg') btn.innerHTML = '<span class="vegdot"></span> ' + escHtml(t('veg'));
+      else if (d === 'nv') btn.innerHTML = '<span class="nvdot"></span> ' + escHtml(t('nonveg'));
+    });
   }
   function pad2(v){ return String(v).padStart(2,'0'); }
   function shortDateKey(d){
@@ -834,9 +859,10 @@
     var pad = /^\d+$/.test(String(tNum))
       ? String(parseInt(tNum, 10)).padStart(2, '0')
       : String(tNum);
-    document.getElementById('table-pill-txt').textContent = 'Table '+pad;
-    document.getElementById('table-pill').style.display = 'flex';
-    document.getElementById('drawer-tag').textContent = 'Table '+pad;
+    window.__rsTableNum = String(tNum);
+    document.getElementById('table-pill-txt').textContent = t('table') + ' ' + pad;
+    document.getElementById('table-pill').style.display = 'inline-flex';
+    document.getElementById('drawer-tag').textContent = t('table') + ' ' + pad;
   } else {
     document.getElementById('drawer-tag').textContent = 'Takeaway';
   }
@@ -1732,8 +1758,12 @@
     if(tq>0){
       btn.classList.add('show');
       document.getElementById('float-lbl').textContent = uiLang==='hi'
-        ? (tq + ' आइटम')
-        : (tq+' item'+(tq>1?'s':''));
+        ? (tq + ' ' + t('items'))
+        : (tq + ' ' + t('items') + (tq === 1 ? '' : ''));
+      // EN: "2 items" / HI: "2 आइटम"
+      if (uiLang !== 'hi') {
+        document.getElementById('float-lbl').textContent = tq + (tq === 1 ? ' item' : ' items');
+      }
       document.getElementById('float-tot').textContent = (window.currencySymbol || '\u20b9')+fmt(tt);
     } else {
       btn.classList.remove('show');
