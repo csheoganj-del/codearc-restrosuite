@@ -3735,6 +3735,9 @@
     const tierCls = { vip: 'tier-vip', gold: 'tier-gold', silver: 'tier-silver' };
     let _crmFilter = 'all';
     let _crmSort = 'recent';
+    let _crmView = (function () {
+      try { return localStorage.getItem('rs_crm_view') || 'list'; } catch (e) { return 'list'; }
+    })();
 
     /** National mobile key for matching (+353 85… and 85… become the same). */
     function normPhone(p) {
@@ -3752,9 +3755,11 @@
     }
     function formatPhoneDisplay(p) {
       const raw = String(p == null ? '' : p).trim();
-      if (!raw) return '—';
+      if (!raw || /^walk-?in|dine-?in|n\/a|none$/i.test(raw)) return '—';
       const d = raw.replace(/\D/g, '');
       const nat = normPhone(raw);
+      // Incomplete junk like "91" or "+91"
+      if (nat.length > 0 && nat.length < 8) return '—';
       // Ireland: national 8xxxxxxxx (9 digits)
       if (d.startsWith('353') || (nat.length === 9 && nat.charAt(0) === '8')) {
         const n = nat.length === 9 ? nat : d.replace(/^3530?/, '');
@@ -3767,7 +3772,7 @@
       if (raw.startsWith('+') && d.length >= 10) {
         return '+' + d;
       }
-      return nat || raw;
+      return nat.length >= 8 ? nat : '—';
     }
     function phonesMatch(a, b) {
       const na = normPhone(a);
@@ -3952,17 +3957,17 @@
       sec.innerHTML = `
         <div class="stat-row">
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Customers</div><div class="sd">${withVisits} with orders</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div><div class="sd">Among guests with visits</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(Math.round(totalSpend / total))}</div><div class="sl">Avg lifetime spend</div><div class="sd">${rs(totalSpend)} total</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div><div class="sd">Guests with 2+ visits</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(Math.round(totalSpend / total))}</div><div class="sl">Avg spend</div><div class="sd">${rs(totalSpend)} lifetime</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a" style="background:rgba(255,79,0,.1);color:var(--orange)"><i class="fa-solid fa-hand-holding-dollar"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Outstanding dues</div><div class="sd">${duesCount} guest${duesCount === 1 ? '' : 's'}</div></div></div>
         </div>
-        <div class="toolbar-row" style="flex-wrap:wrap;gap:10px">
-          <div class="pos-search grow" style="max-width:min(100%,360px);padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name, phone, notes…" autocomplete="off"></div>
+        <div class="crm-toolbar">
+          <div class="pos-search grow" style="max-width:min(100%,340px);padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone" autocomplete="off"></div>
           <div class="grow"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-crm-broadcast"><i class="fa-brands fa-whatsapp"></i> Broadcast</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-file-csv"></i> Export</button>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-download"></i> Export</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-plus"></i> Add customer</button>
         </div>
         <div class="crm-filters" id="crm-filters">
           <button type="button" class="chip-btn ${_crmFilter === 'all' ? 'active' : ''}" data-crm-f="all">All</button>
@@ -3970,15 +3975,19 @@
           <button type="button" class="chip-btn ${_crmFilter === 'vip' ? 'active' : ''}" data-crm-f="vip">VIP${vipCount ? ' · ' + vipCount : ''}</button>
           <button type="button" class="chip-btn ${_crmFilter === 'gold' ? 'active' : ''}" data-crm-f="gold">Gold</button>
           <button type="button" class="chip-btn ${_crmFilter === 'repeat' ? 'active' : ''}" data-crm-f="repeat">Repeat</button>
+          <div class="crm-view-toggle" role="group" aria-label="View mode">
+            <button type="button" class="crm-view-btn ${_crmView === 'list' ? 'active' : ''}" data-crm-view="list" title="Line view"><i class="fa-solid fa-list"></i> List</button>
+            <button type="button" class="crm-view-btn ${_crmView === 'cards' ? 'active' : ''}" data-crm-view="cards" title="Card view"><i class="fa-solid fa-grip"></i> Cards</button>
+          </div>
           <select class="crm-sort" id="crm-sort" aria-label="Sort customers">
-            <option value="recent" ${_crmSort === 'recent' ? 'selected' : ''}>Sort: recent</option>
-            <option value="spend" ${_crmSort === 'spend' ? 'selected' : ''}>Sort: spend</option>
-            <option value="dues" ${_crmSort === 'dues' ? 'selected' : ''}>Sort: dues</option>
-            <option value="name" ${_crmSort === 'name' ? 'selected' : ''}>Sort: name</option>
-            <option value="visits" ${_crmSort === 'visits' ? 'selected' : ''}>Sort: visits</option>
+            <option value="recent" ${_crmSort === 'recent' ? 'selected' : ''}>Recent first</option>
+            <option value="spend" ${_crmSort === 'spend' ? 'selected' : ''}>Highest spend</option>
+            <option value="dues" ${_crmSort === 'dues' ? 'selected' : ''}>Highest dues</option>
+            <option value="name" ${_crmSort === 'name' ? 'selected' : ''}>Name A–Z</option>
+            <option value="visits" ${_crmSort === 'visits' ? 'selected' : ''}>Most visits</option>
           </select>
         </div>
-        <div class="crm-grid" id="crm-grid"></div>`;
+        <div class="crm-body ${_crmView === 'list' ? 'is-list' : 'is-cards'}" id="crm-grid"></div>`;
 
       const grid = $('#crm-grid');
 
@@ -4031,95 +4040,147 @@
           return;
         }
 
-        grid.innerHTML = list
-          .map((c) => {
-            const i = CUSTOMERS.indexOf(c);
-            const tier = normalizeCustTier(c.tier);
-            const lastLabel = esc(formatVisitLabel(c.last));
-            const merged = (c._mergedCount || 0) > 1;
-            const initials = RS.initials
-              ? RS.initials(c.name)
-              : String(c.name || '?')
-                  .split(/\s+/)
-                  .map((w) => w[0] || '')
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase() || '?';
-            return `
-          <div class="crm-card ${c.dues > 0 ? 'has-dues' : ''}" data-i="${i}" role="button" tabindex="0">
+        function rowMeta(c) {
+          const i = CUSTOMERS.indexOf(c);
+          const tier = normalizeCustTier(c.tier);
+          const lastLabel = formatVisitLabel(c.last);
+          const phoneLabel = c.phoneDisplay || formatPhoneDisplay(c.phone);
+          const phoneOk = phoneLabel && phoneLabel !== '—' && phoneLabel !== '+91' && normPhone(c.phone).length >= 8;
+          const initials = RS.initials
+            ? RS.initials(c.name)
+            : String(c.name || '?')
+                .split(/\s+/)
+                .map((w) => w[0] || '')
+                .join('')
+                .slice(0, 2)
+                .toUpperCase() || '?';
+          return { i, tier, lastLabel, phoneLabel: phoneOk ? phoneLabel : (c.phone ? String(c.phone) : 'No phone'), initials, merged: (c._mergedCount || 0) > 1 };
+        }
+
+        if (_crmView === 'list') {
+          grid.className = 'crm-body is-list';
+          grid.innerHTML = `
+            <div class="crm-list" role="table" aria-label="Customers">
+              <div class="crm-list-head" role="row">
+                <span class="cl-guest">Guest</span>
+                <span class="cl-phone">Phone</span>
+                <span class="cl-tier">Tier</span>
+                <span class="cl-num">Visits</span>
+                <span class="cl-num">Spent</span>
+                <span class="cl-num">Dues</span>
+                <span class="cl-last">Last order</span>
+                <span class="cl-acts">Actions</span>
+              </div>
+              ${list.map((c) => {
+                const m = rowMeta(c);
+                return `
+                <div class="crm-list-row ${c.dues > 0 ? 'has-dues' : ''}" data-i="${m.i}" role="row" tabindex="0">
+                  <span class="cl-guest">
+                    <span class="crm-av sm" style="background:${avColor(c.name)}">${esc(m.initials)}</span>
+                    <span class="cl-name-wrap">
+                      <span class="cl-name">${esc(c.name || 'Guest')}</span>
+                      ${m.merged ? `<span class="crm-dup-hint inline">merged</span>` : ''}
+                    </span>
+                  </span>
+                  <span class="cl-phone">${esc(m.phoneLabel)}</span>
+                  <span class="cl-tier"><span class="tier-badge ${esc(tierCls[m.tier] || 'tier-silver')}">${esc(m.tier)}</span></span>
+                  <span class="cl-num">${c.visits || 0}</span>
+                  <span class="cl-num">${rs(c.spend || 0)}</span>
+                  <span class="cl-num ${c.dues > 0 ? 'due' : ''}">${c.dues > 0 ? rs(c.dues) : '—'}</span>
+                  <span class="cl-last">${esc(m.lastLabel)}</span>
+                  <span class="cl-acts">
+                    <button type="button" class="btn btn-ghost btn-sm icon-only" data-crm-wa data-i="${m.i}" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+                    ${c.dues > 0
+                      ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${m.i}" style="background:var(--orange);border-color:var(--orange)">Settle</button>`
+                      : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${m.i}">Profile</button>`}
+                  </span>
+                </div>`;
+              }).join('')}
+            </div>`;
+        } else {
+          grid.className = 'crm-body is-cards crm-grid';
+          grid.innerHTML = list
+            .map((c) => {
+              const m = rowMeta(c);
+              return `
+          <div class="crm-card ${c.dues > 0 ? 'has-dues' : ''}" data-i="${m.i}" role="button" tabindex="0">
             <div class="crm-top">
-              <div class="crm-av" style="background:${avColor(c.name)}">${esc(initials)}</div>
+              <div class="crm-av" style="background:${avColor(c.name)}">${esc(m.initials)}</div>
               <div class="crm-name-block">
                 <div class="crm-name">
                   <span>${esc(c.name || 'Guest')}</span>
-                  <span class="tier-badge ${esc(tierCls[tier] || 'tier-silver')}">${esc(tier)}</span>
+                  <span class="tier-badge ${esc(tierCls[m.tier] || 'tier-silver')}">${esc(m.tier)}</span>
                   ${c.dues > 0 ? `<span class="crm-due-pill">Due ${rs(c.dues)}</span>` : ''}
                 </div>
-                <div class="crm-phone"><i class="fa-solid fa-phone"></i>${esc(c.phoneDisplay || formatPhoneDisplay(c.phone))}</div>
-                ${merged ? `<div class="crm-dup-hint">Merged ${c._mergedCount} saved profiles</div>` : ''}
+                <div class="crm-phone"><i class="fa-solid fa-phone"></i>${esc(m.phoneLabel)}</div>
+                ${m.merged ? `<div class="crm-dup-hint">Merged ${c._mergedCount} saved profiles</div>` : ''}
               </div>
             </div>
             <div class="crm-stats">
               <div class="cs"><div class="csv">${c.visits || 0}</div><div class="csl">Visits</div></div>
               <div class="cs"><div class="csv">${rs(c.spend || 0)}</div><div class="csl">Spent</div></div>
-              <div class="cs"><div class="csv" style="font-size:12px;font-weight:600">${lastLabel}</div><div class="csl">Last order</div></div>
+              <div class="cs"><div class="csv" style="font-size:12px;font-weight:600">${esc(m.lastLabel)}</div><div class="csl">Last order</div></div>
             </div>
             <div class="crm-card-actions">
-              <button type="button" class="btn btn-ghost btn-sm" data-crm-wa data-i="${i}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-crm-wa data-i="${m.i}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
               ${
                 c.dues > 0
-                  ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${i}" style="background:var(--orange);border-color:var(--orange)"><i class="fa-solid fa-indian-rupee-sign"></i> Settle</button>`
-                  : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${i}"><i class="fa-solid fa-user"></i> Profile</button>`
+                  ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${m.i}" style="background:var(--orange);border-color:var(--orange)"><i class="fa-solid fa-indian-rupee-sign"></i> Settle</button>`
+                  : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${m.i}"><i class="fa-solid fa-user"></i> Profile</button>`
               }
             </div>
           </div>`;
-          })
-          .join('');
+            })
+            .join('');
+        }
 
-        $$('.crm-card', grid).forEach((el) => {
-          const open = () => {
-            const c = CUSTOMERS[+el.dataset.i];
-            if (c) customerModal(c);
-          };
-          el.onclick = (e) => {
-            if (e.target.closest('[data-crm-wa],[data-crm-settle],[data-crm-open]')) return;
-            open();
-          };
-          el.onkeydown = (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+        function wireRows() {
+          $$('.crm-card, .crm-list-row', grid).forEach((el) => {
+            const open = () => {
+              const c = CUSTOMERS[+el.dataset.i];
+              if (c) customerModal(c);
+            };
+            el.onclick = (e) => {
+              if (e.target.closest('[data-crm-wa],[data-crm-settle],[data-crm-open]')) return;
               open();
-            }
-          };
-        });
-        $$('[data-crm-wa]', grid).forEach((btn) => {
-          btn.onclick = (e) => {
-            e.stopPropagation();
-            const c = CUSTOMERS[+btn.dataset.i];
-            if (!c) return;
-            const d = waDigits(c.phone);
-            if (!d) return RS.toast('No phone number', 'fa-circle-exclamation');
-            window.open(
-              `https://wa.me/${d}?text=${encodeURIComponent('Hi ' + (c.name || '') + ', thank you for dining with us!')}`,
-              '_blank',
-              'noopener,noreferrer'
-            );
-          };
-        });
-        $$('[data-crm-settle]', grid).forEach((btn) => {
-          btn.onclick = (e) => {
-            e.stopPropagation();
-            const c = CUSTOMERS[+btn.dataset.i];
-            if (c) showSettleDuesModal(c);
-          };
-        });
-        $$('[data-crm-open]', grid).forEach((btn) => {
-          btn.onclick = (e) => {
-            e.stopPropagation();
-            const c = CUSTOMERS[+btn.dataset.i];
-            if (c) customerModal(c);
-          };
-        });
+            };
+            el.onkeydown = (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open();
+              }
+            };
+          });
+          $$('[data-crm-wa]', grid).forEach((btn) => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const c = CUSTOMERS[+btn.dataset.i];
+              if (!c) return;
+              const d = waDigits(c.phone);
+              if (!d || d.length < 10) return RS.toast('No valid phone number', 'fa-circle-exclamation');
+              window.open(
+                `https://wa.me/${d}?text=${encodeURIComponent('Hi ' + (c.name || '') + ', thank you for dining with us!')}`,
+                '_blank',
+                'noopener,noreferrer'
+              );
+            };
+          });
+          $$('[data-crm-settle]', grid).forEach((btn) => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const c = CUSTOMERS[+btn.dataset.i];
+              if (c) showSettleDuesModal(c);
+            };
+          });
+          $$('[data-crm-open]', grid).forEach((btn) => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const c = CUSTOMERS[+btn.dataset.i];
+              if (c) customerModal(c);
+            };
+          });
+        }
+        wireRows();
       }
 
       draw();
@@ -4129,6 +4190,14 @@
         btn.onclick = () => {
           _crmFilter = btn.getAttribute('data-crm-f') || 'all';
           $$('[data-crm-f]', sec).forEach((b) => b.classList.toggle('active', b === btn));
+          draw(searchEl ? searchEl.value : '');
+        };
+      });
+      $$('[data-crm-view]', sec).forEach((btn) => {
+        btn.onclick = () => {
+          _crmView = btn.getAttribute('data-crm-view') === 'cards' ? 'cards' : 'list';
+          try { localStorage.setItem('rs_crm_view', _crmView); } catch (e) {}
+          $$('[data-crm-view]', sec).forEach((b) => b.classList.toggle('active', b === btn));
           draw(searchEl ? searchEl.value : '');
         };
       });

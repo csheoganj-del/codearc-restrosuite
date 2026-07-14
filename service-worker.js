@@ -1,6 +1,6 @@
 ﻿// Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260714-crm-ui-v9";
+const CACHE_NAME = "restrosuite-shell-v20260714-crm-list-cards-v10";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",

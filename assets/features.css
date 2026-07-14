@@ -631,10 +631,193 @@ table.rcp-qr-wrap {
   align-items: center;
   margin-bottom: 14px;
 }
+.crm-body.is-cards,
 .crm-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
+}
+.crm-body.is-list {
+  display: block;
+}
+.crm-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  margin-left: 4px;
+}
+.crm-view-btn {
+  border: 0;
+  background: transparent;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 650;
+  font-family: inherit;
+  color: var(--text-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.01em;
+}
+.crm-view-btn + .crm-view-btn { border-left: 1px solid var(--stroke); }
+.crm-view-btn.active {
+  background: #1A1714;
+  color: #fff;
+}
+.crm-view-btn i { font-size: 11px; }
+
+/* Line / list view — one row per guest */
+.crm-list {
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.crm-list-head,
+.crm-list-row {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 1.6fr)
+    minmax(120px, 1.1fr)
+    72px
+    64px
+    88px
+    80px
+    minmax(100px, 1fr)
+    minmax(120px, 0.9fr);
+  gap: 8px;
+  align-items: center;
+  padding: 0 14px;
+  min-height: 48px;
+}
+.crm-list-head {
+  min-height: 40px;
+  background: rgba(26, 23, 20, 0.03);
+  border-bottom: 1px solid var(--stroke);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-mute);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.crm-list-row {
+  border-bottom: 1px solid rgba(26, 23, 20, 0.06);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition: background .12s ease;
+}
+.crm-list-row:last-child { border-bottom: 0; }
+.crm-list-row:hover { background: rgba(26, 23, 20, 0.025); }
+.crm-list-row.has-dues { background: linear-gradient(90deg, rgba(255,79,0,.04), transparent 40%); }
+.crm-list-row .cl-guest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.crm-av.sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cl-name-wrap { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cl-name {
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crm-dup-hint.inline {
+  font-size: 10px;
+  margin: 0;
+  font-weight: 600;
+  color: #B45309;
+}
+.cl-phone {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-align: right;
+}
+.cl-num.due { color: var(--orange); }
+.cl-last {
+  color: var(--text-soft);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  align-items: center;
+}
+.cl-acts .btn {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.cl-acts .btn.icon-only {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+@media (max-width: 1100px) {
+  .crm-list-head .cl-tier,
+  .crm-list-row .cl-tier,
+  .crm-list-head .cl-last,
+  .crm-list-row .cl-last { display: none; }
+  .crm-list-head,
+  .crm-list-row {
+    grid-template-columns:
+      minmax(140px, 1.4fr)
+      minmax(100px, 1fr)
+      56px
+      72px
+      72px
+      minmax(110px, 0.9fr);
+  }
+}
+@media (max-width: 720px) {
+  .crm-list-head { display: none; }
+  .crm-list-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "guest acts"
+      "meta acts";
+    gap: 6px 10px;
+    padding: 12px 12px;
+    min-height: 0;
+  }
+  .crm-list-row .cl-guest { grid-area: guest; }
+  .crm-list-row .cl-acts { grid-area: acts; align-self: center; }
+  .crm-list-row .cl-phone,
+  .crm-list-row .cl-num,
+  .crm-list-row .cl-tier,
+  .crm-list-row .cl-last {
+    display: none;
+  }
+  .crm-list-row .cl-guest::after {
+    /* meta shown via name only on very small screens */
+  }
 }
 .crm-card {
   border-radius: 14px;
