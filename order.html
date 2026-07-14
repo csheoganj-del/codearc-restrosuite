@@ -1757,13 +1757,9 @@
     var btn = document.getElementById('float-btn');
     if(tq>0){
       btn.classList.add('show');
-      document.getElementById('float-lbl').textContent = uiLang==='hi'
-        ? (tq + ' ' + t('items'))
-        : (tq + ' ' + t('items') + (tq === 1 ? '' : ''));
-      // EN: "2 items" / HI: "2 आइटम"
-      if (uiLang !== 'hi') {
-        document.getElementById('float-lbl').textContent = tq + (tq === 1 ? ' item' : ' items');
-      }
+      document.getElementById('float-lbl').textContent = uiLang === 'hi'
+        ? (tq + ' आइटम · ' + t('viewCart'))
+        : (tq + (tq === 1 ? ' item' : ' items') + ' · View cart');
       document.getElementById('float-tot').textContent = (window.currencySymbol || '\u20b9')+fmt(tt);
     } else {
       btn.classList.remove('show');
