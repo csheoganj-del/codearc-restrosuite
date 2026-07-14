@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v189-20260713-qr-center';
+    return 'v190-20260714-settings-dropdowns';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -1798,9 +1798,11 @@
       const payload = {
         menu: MENU.filter(m => m.stock !== 'out').map(m => ({
           name: m.name,
+          nameHi: m.nameHi || m.name_hi || '',
           price: Number(m.price) || 0,
           category: (m.cat || '').trim() || 'Uncategorized',
           description: m.description || '',
+          descriptionHi: m.descriptionHi || m.description_hi || '',
           image: m.image || '',
           bestseller: !!m.bestseller,
           isSpecial: !!(m.isSpecial || m.special),

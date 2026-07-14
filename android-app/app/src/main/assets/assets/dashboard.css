@@ -754,7 +754,8 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
 .custom-dropdown-widget.active .dropdown-menu {
   display: flex;
 }
-.custom-dropdown-widget .dropdown-item {
+.custom-dropdown-widget .dropdown-item,
+body > .dropdown-menu.is-portaled .dropdown-item {
   padding: 8px 12px;
   font-size: 13.5px;
   font-weight: 500;
@@ -766,11 +767,13 @@ html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
   align-items: center;
   justify-content: space-between;
 }
-.custom-dropdown-widget .dropdown-item:hover {
+.custom-dropdown-widget .dropdown-item:hover,
+body > .dropdown-menu.is-portaled .dropdown-item:hover {
   background: var(--orange-tint);
   color: var(--orange);
 }
-.custom-dropdown-widget .dropdown-item.active {
+.custom-dropdown-widget .dropdown-item.active,
+body > .dropdown-menu.is-portaled .dropdown-item.active {
   background: var(--orange);
   color: #fff;
   font-weight: 600;

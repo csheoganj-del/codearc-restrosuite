@@ -429,22 +429,63 @@
     menu.className = 'dropdown-menu';
     menu.setAttribute('role', 'listbox');
 
+    // Search input (optional) — kept as a stable node; items re-render below it
+    let searchInput = null;
+    let searchWrap = null;
+    let itemsHost = document.createElement('div');
+    itemsHost.className = 'dropdown-items-host';
+    itemsHost.style.cssText = 'display:flex;flex-direction:column;gap:2px;min-height:0;';
+
+    if (options.searchable) {
+      searchWrap = document.createElement('div');
+      searchWrap.style.cssText = 'padding:6px 8px 2px;flex:none;';
+      searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.placeholder = 'Search...';
+      searchInput.autocomplete = 'off';
+      searchInput.style.cssText = 'width:100%;padding:7px 10px;border:1px solid var(--stroke-2,rgba(255,255,255,.12));border-radius:8px;background:var(--glass,rgba(255,255,255,.04));color:var(--text,#fff);font-size:13px;outline:none;font-family:inherit;box-sizing:border-box;';
+      searchInput.addEventListener('input', () => renderMenuItems(searchInput.value));
+      searchInput.addEventListener('click', (e) => e.stopPropagation());
+      searchInput.addEventListener('pointerdown', (e) => e.stopPropagation());
+      searchWrap.appendChild(searchInput);
+      menu.appendChild(searchWrap);
+    }
+    menu.appendChild(itemsHost);
+
     const renderMenuItems = (filter) => {
-      menu.innerHTML = '';
+      itemsHost.innerHTML = '';
       const items = buildItems();
       const q = (filter || '').toLowerCase();
       let shown = 0;
       items.forEach(item => {
         if (q && !item.label.toLowerCase().includes(q)) return;
-        const li = document.createElement('li');
+        const li = document.createElement('div');
         li.className = 'dropdown-item' + (item.value === nativeSel.value || item.label === currentLabel() ? ' active' : '');
         li.setAttribute('role', 'option');
         li.setAttribute('data-val', item.value);
         li.textContent = item.label;
-        li.addEventListener('mousedown', (e) => {
+        li.style.cssText = 'padding:8px 12px;font-size:13.5px;font-weight:500;color:var(--text-soft, #c4bbb0);border-radius:8px;cursor:pointer;display:flex;align-items:center;';
+        if (li.classList.contains('active')) {
+          li.style.background = 'var(--orange, #FF4F00)';
+          li.style.color = '#fff';
+          li.style.fontWeight = '600';
+        }
+        li.addEventListener('mouseenter', () => {
+          if (!li.classList.contains('active')) {
+            li.style.background = 'var(--orange-tint, rgba(255,79,0,.12))';
+            li.style.color = 'var(--orange, #FF4F00)';
+          }
+        });
+        li.addEventListener('mouseleave', () => {
+          if (!li.classList.contains('active')) {
+            li.style.background = '';
+            li.style.color = 'var(--text-soft, #c4bbb0)';
+          }
+        });
+        li.addEventListener('pointerdown', (e) => {
           e.preventDefault();
+          e.stopPropagation();
           nativeSel.value = item.value;
-          // If value not set (option text = value), find by text
           if (nativeSel.value !== item.value) {
             for (let i = 0; i < nativeSel.options.length; i++) {
               if (nativeSel.options[i].text === item.label) {
@@ -457,63 +498,134 @@
           nativeSel.dispatchEvent(new Event('change', { bubbles: true }));
           closeMenu();
         });
-        menu.appendChild(li);
+        itemsHost.appendChild(li);
         shown++;
       });
       if (shown === 0) {
-        const li = document.createElement('li');
+        const li = document.createElement('div');
         li.className = 'dropdown-item';
-        li.style.color = 'var(--text-mute)';
-        li.style.fontStyle = 'italic';
+        li.style.cssText = 'padding:10px 12px;color:var(--text-mute,#8f867b);font-style:italic;font-size:13px;';
         li.textContent = 'No results';
-        menu.appendChild(li);
+        itemsHost.appendChild(li);
       }
     };
 
-    // Search input (optional)
-    let searchInput = null;
-    if (options.searchable) {
-      const searchWrap = document.createElement('div');
-      searchWrap.style.cssText = 'padding:6px 8px 2px;';
-      searchInput = document.createElement('input');
-      searchInput.type = 'text';
-      searchInput.placeholder = 'Search...';
-      searchInput.style.cssText = 'width:100%;padding:7px 10px;border:1px solid var(--stroke-2);border-radius:var(--r-xs);background:var(--glass);color:var(--text);font-size:13px;outline:none;font-family:inherit;';
-      searchInput.addEventListener('input', () => renderMenuItems(searchInput.value));
-      searchInput.addEventListener('focus', () => { searchInput.style.borderColor = 'var(--orange)'; });
-      searchInput.addEventListener('blur',  () => { searchInput.style.borderColor = 'var(--stroke-2)'; });
-      searchWrap.appendChild(searchInput);
-      menu.appendChild(searchWrap);
-    }
+    // Portal menus to <body> with position:fixed + inline display so Settings
+    // overflow (set-main / set-body / set-block) can never clip the list, and
+    // we don't depend on CSS load order for visibility.
+    let menuPortaled = false;
+    let scrollCloseBound = null;
+    let suppressDocCloseUntil = 0;
+
+    const placeMenu = () => {
+      if (!wrapper.classList.contains('active')) return;
+      const tRect = trigger.getBoundingClientRect();
+      const maxH = 280;
+      const gap = 6;
+      const spaceBelow = window.innerHeight - tRect.bottom - 12;
+      const spaceAbove = tRect.top - 12;
+      const openUp = spaceBelow < Math.min(maxH, 140) && spaceAbove > spaceBelow;
+      const width = Math.max(tRect.width, 180);
+      let left = tRect.left;
+      if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
+      if (left < 8) left = 8;
+
+      // Inline styles beat any stylesheet display:none / overflow clipping
+      menu.style.cssText = [
+        'display:flex',
+        'flex-direction:column',
+        'gap:2px',
+        'position:fixed',
+        'left:' + left + 'px',
+        openUp
+          ? 'top:auto;bottom:' + (window.innerHeight - tRect.top + gap) + 'px'
+          : 'top:' + (tRect.bottom + gap) + 'px;bottom:auto',
+        'width:' + width + 'px',
+        'min-width:' + width + 'px',
+        'max-height:' + Math.max(140, Math.min(maxH, openUp ? spaceAbove : spaceBelow)) + 'px',
+        'overflow-y:auto',
+        'z-index:2147483646',
+        'margin:0',
+        'padding:6px',
+        'list-style:none',
+        'box-sizing:border-box',
+        'background:var(--panel-solid, var(--panel, #1e1c19))',
+        'border:1px solid var(--stroke-2, rgba(255,255,255,.12))',
+        'border-radius:12px',
+        'box-shadow:0 16px 40px rgba(0,0,0,.28)',
+        'pointer-events:auto',
+        'visibility:visible',
+        'opacity:1',
+      ].join(';');
+    };
+
+    const unbindScrollClose = () => {
+      if (!scrollCloseBound) return;
+      window.removeEventListener('scroll', scrollCloseBound, true);
+      window.removeEventListener('resize', scrollCloseBound);
+      scrollCloseBound = null;
+    };
+
+    menu.__rsOwner = wrapper;
 
     const openMenu = () => {
-      // Close all other open dropdowns
-      document.querySelectorAll('.custom-dropdown-widget.active').forEach(d => {
+      // Close any other portaled / active dropdowns first
+      document.querySelectorAll('body > .dropdown-menu.is-portaled').forEach((m) => {
+        if (m === menu) return;
+        const owner = m.__rsOwner;
+        m.classList.remove('is-portaled');
+        m.style.cssText = '';
+        if (owner) {
+          owner.classList.remove('active');
+          owner.appendChild(m);
+        } else {
+          m.remove();
+        }
+      });
+      document.querySelectorAll('.custom-dropdown-widget.active').forEach((d) => {
         if (d !== wrapper) d.classList.remove('active');
       });
       if (searchInput) { searchInput.value = ''; }
-      renderMenuItems('');
+      renderMenuItems(searchInput ? searchInput.value : '');
+      // Move menu to body so overflow:hidden ancestors cannot clip it
+      if (menu.parentElement !== document.body) {
+        document.body.appendChild(menu);
+        menuPortaled = true;
+      }
       wrapper.classList.add('active');
-      if (searchInput) setTimeout(() => searchInput.focus(), 60);
-      // Ensure menu opens upward if near bottom of viewport
-      setTimeout(() => {
-        const rect = menu.getBoundingClientRect();
-        if (rect.bottom > window.innerHeight - 20) {
-          menu.style.top = 'auto';
-          menu.style.bottom = 'calc(100% + 6px)';
-        } else {
-          menu.style.top = 'calc(100% + 6px)';
-          menu.style.bottom = 'auto';
+      menu.classList.add('is-portaled');
+      placeMenu();
+      requestAnimationFrame(placeMenu);
+      // Opening click must not immediately count as "outside" and close the menu
+      suppressDocCloseUntil = Date.now() + 120;
+      if (searchInput) setTimeout(() => { try { searchInput.focus(); } catch (_) {} }, 60);
+      unbindScrollClose();
+      scrollCloseBound = () => {
+        const r = trigger.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) {
+          closeMenu();
+          return;
         }
-      }, 0);
+        placeMenu();
+      };
+      window.addEventListener('scroll', scrollCloseBound, true);
+      window.addEventListener('resize', scrollCloseBound);
     };
 
     const closeMenu = () => {
       wrapper.classList.remove('active');
+      menu.classList.remove('is-portaled');
       if (searchInput) searchInput.value = '';
+      unbindScrollClose();
+      if (menuPortaled || menu.parentElement === document.body) {
+        wrapper.appendChild(menu);
+        menuPortaled = false;
+      }
+      menu.style.cssText = '';
     };
 
     trigger.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       if (wrapper.classList.contains('active')) closeMenu(); else openMenu();
     });
@@ -523,8 +635,11 @@
       if (e.key === 'Escape') closeMenu();
     });
 
-    document.addEventListener('click', (e) => {
-      if (!wrapper.contains(e.target)) closeMenu();
+    document.addEventListener('pointerdown', (e) => {
+      if (Date.now() < suppressDocCloseUntil) return;
+      if (!wrapper.classList.contains('active')) return;
+      // Menu may be portaled on body — still treat it as "inside" this dropdown
+      if (!wrapper.contains(e.target) && !menu.contains(e.target)) closeMenu();
     }, true);
 
     // Keep widget label in sync if native value is changed programmatically

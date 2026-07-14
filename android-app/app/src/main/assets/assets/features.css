@@ -1209,7 +1209,8 @@ table.rcp-qr-wrap {
   border: 1px solid var(--stroke);
   border-radius: var(--r-md, 14px);
   background: var(--panel);
-  overflow: hidden;
+  /* visible so native fallbacks aren't clipped; custom menus portal to body */
+  overflow: visible;
 }
 .set-pane-head {
   padding: 18px 22px 14px;
@@ -1236,19 +1237,29 @@ table.rcp-qr-wrap {
   padding: 18px 22px 8px;
   overflow: auto;
   min-height: 200px;
+  /* isolation only — do not create a stacking trap that kills fixed menus */
+  position: relative;
+  z-index: 1;
 }
 .set-body .set-pane.active {
   max-width: 760px; /* comfortable reading / form width on large screens */
+  /* avoid transform animation creating a containing block for fixed menus */
+  animation: none;
 }
 .set-pane { display: none; }
-.set-pane.active { display: block; animation: rsFade .28s var(--ease, ease); }
+.set-pane.active { display: block; }
 /* Content blocks */
 .set-block {
   border: 1px solid var(--stroke-2);
   border-radius: 12px;
   background: color-mix(in srgb, var(--glass) 40%, var(--panel));
   margin-bottom: 14px;
-  overflow: hidden;
+  overflow: visible; /* allow selects; menus also portal to body */
+  position: relative;
+  z-index: 1;
+}
+.set-block:has(.custom-dropdown-widget.active) {
+  z-index: 5;
 }
 .set-block:last-child { margin-bottom: 4px; }
 .set-block-head {
@@ -1492,6 +1503,43 @@ table.rcp-qr-wrap {
   margin-bottom: 4px;
 }
 .set-tip-banner strong { color: var(--orange); }
+
+/* Portaled custom-dropdown menus live on <body> so Settings overflow cannot clip them */
+body > .dropdown-menu.is-portaled {
+  display: flex !important;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  box-sizing: border-box;
+  background: var(--panel-solid, var(--panel));
+  border: 1px solid var(--stroke-2);
+  border-radius: var(--r-md, 12px);
+  box-shadow: var(--shadow-lg, 0 16px 40px rgba(0,0,0,.18));
+  color: var(--text);
+}
+body > .dropdown-menu.is-portaled .dropdown-item {
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-soft);
+  border-radius: var(--r-sm, 8px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background .15s ease, color .15s ease;
+}
+body > .dropdown-menu.is-portaled .dropdown-item:hover {
+  background: var(--orange-tint);
+  color: var(--orange);
+}
+body > .dropdown-menu.is-portaled .dropdown-item.active {
+  background: var(--orange);
+  color: #fff;
+  font-weight: 600;
+}
 
 /* ---------------- NOTIFICATIONS PANEL ---------------- */
 .notif-panel {

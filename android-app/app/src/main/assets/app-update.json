@@ -1,11 +1,11 @@
 {
-  "version": "v189-20260713-qr-center",
-  "date": "2026-07-13",
-  "title": "QR centered on receipt for screen and print",
-  "summary": "Browser print ignores flex centering, so QR sat left/sideways. QR is now a full-width table with centered cell and inline styles so it sits in the middle bottom of the paper.",
+  "version": "v190-20260714-settings-dropdowns",
+  "date": "2026-07-14",
+  "title": "Settings dropdowns fixed + force refresh",
+  "summary": "Custom dropdown menus in Settings were clipped by overflow containers. Menus now open on the document body with fixed positioning and inline styles so lists always show. App version bumped to v190 so clients load the new JS/CSS.",
   "highlights": [
-    "QR dead-center under payment lines",
-    "Works in Chrome print / Save as PDF",
-    "Label under QR, thank-you still centered"
+    "Settings Country / Currency / Cuisine / Paper size lists open fully",
+    "Dropdowns portal above overflow cards",
+    "Version pill shows v190 after refresh"
   ]
 }
