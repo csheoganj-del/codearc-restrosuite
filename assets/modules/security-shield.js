@@ -1,38 +1,89 @@
 /* ============================================================
    RestroSuite — System UI shield (devtools / right-click / inspect)
    ------------------------------------------------------------
-   Always-on for staff surfaces. Not user-configurable in Settings.
+   Always-on for restaurant staff. Only SaaS Super-Admin can
+   enable/disable (Super-Admin Settings). Outlet Settings never
+   expose this control.
+
    Raises the bar against casual copy / Inspect in the browser UI.
    Real security remains auth, encryption, RLS, and lease signatures.
-   DevTools can still be opened from outside the page (browser menu).
 
-   Escape hatch for developers only: ?debug=1 or session rs_debug_ui=1
-   (session-only; never saved as a restaurant setting).
+   Dev escape (session only): ?debug=1 or sessionStorage rs_debug_ui=1
    ============================================================ */
 (function (global) {
   'use strict';
 
+  var SA_PREF_KEY = 'rs_security_shield_sa_v1';
   var DEFAULTS = {
     enabled: true,
     blockContextMenu: true,
     blockDevShortcuts: true,
-    blockSelect: false, // keep false so POS can select phone numbers etc.
+    blockSelect: false, // POS may select phone numbers etc.
     warnOnDevtools: false,
   };
 
   var cfg = Object.assign({}, DEFAULTS);
 
-  // Developer escape only — session/query, never a Settings toggle or localStorage flag
-  try {
-    if (new URLSearchParams(location.search).get('debug') === '1') cfg.enabled = false;
-    if (sessionStorage.getItem('rs_debug_ui') === '1') cfg.enabled = false;
-  } catch (_) {}
+  function isSuperAdmin() {
+    try {
+      var s = global.RS_API && typeof global.RS_API.session === 'function' && global.RS_API.session();
+      var role = String((s && s.role) || '').toLowerCase().trim();
+      return role === 'superadmin' || role === 'super_admin';
+    } catch (_) {
+      return false;
+    }
+  }
 
-  // Clear any legacy "user turned shield off" preference so staff cannot leave it disabled
+  /** Superadmin-only local preference. null = use default (on). */
+  function loadSaPref() {
+    try {
+      var raw = localStorage.getItem(SA_PREF_KEY);
+      if (raw === '0' || raw === 'false' || raw === 'off') return false;
+      if (raw === '1' || raw === 'true' || raw === 'on') return true;
+    } catch (_) {}
+    return null;
+  }
+
+  function saveSaPref(on) {
+    try {
+      localStorage.setItem(SA_PREF_KEY, on ? '1' : '0');
+    } catch (_) {}
+  }
+
+  function hasDevBypass() {
+    try {
+      if (new URLSearchParams(location.search).get('debug') === '1') return true;
+      if (sessionStorage.getItem('rs_debug_ui') === '1') return true;
+    } catch (_) {}
+    return false;
+  }
+
+  /**
+   * Policy:
+   * - Non-superadmin staff: always ON (ignore any stored pref / legacy flags)
+   * - Superadmin: default ON; can turn off via Super-Admin Settings
+   * - ?debug=1 / rs_debug_ui: off for that session (dev only)
+   */
+  function resolveEnabled() {
+    if (hasDevBypass()) return false;
+    if (!isSuperAdmin()) return true;
+    var pref = loadSaPref();
+    if (pref === null) return true;
+    return !!pref;
+  }
+
+  function refreshEnabled() {
+    cfg.enabled = resolveEnabled();
+    return cfg.enabled;
+  }
+
+  // Drop legacy restaurant-user toggles so staff cannot leave shield off
   try {
     localStorage.removeItem('rs_security_shield_v1');
     localStorage.removeItem('rs_security_shield_off');
   } catch (_) {}
+
+  refreshEnabled();
 
   function isEditableTarget(t) {
     if (!t || !t.tagName) return false;
@@ -43,23 +94,21 @@
   }
 
   function onContextMenu(e) {
-    if (!cfg.enabled || !cfg.blockContextMenu) return;
+    if (!resolveEnabled() || !cfg.blockContextMenu) return;
     if (isEditableTarget(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
   }
 
   function onKeyDown(e) {
-    if (!cfg.enabled || !cfg.blockDevShortcuts) return;
+    if (!resolveEnabled() || !cfg.blockDevShortcuts) return;
     var key = e.key || '';
     var code = e.keyCode || e.which;
-    // F12
     if (key === 'F12' || code === 123) {
       e.preventDefault();
       e.stopPropagation();
       return;
     }
-    // Ctrl+Shift+I / J / C · Ctrl+U · Ctrl+S (save page)
     if (e.ctrlKey || e.metaKey) {
       var k = key.toLowerCase();
       if (e.shiftKey && (k === 'i' || k === 'j' || k === 'c' || k === 'k')) {
@@ -68,7 +117,6 @@
         return;
       }
       if (k === 'u' || k === 's') {
-        // Allow Ctrl+S only if an input is focused (staff may save drafts in forms via browser)
         if (k === 's' && isEditableTarget(e.target)) return;
         e.preventDefault();
         e.stopPropagation();
@@ -77,9 +125,8 @@
   }
 
   function onSelectStart(e) {
-    if (!cfg.enabled || !cfg.blockSelect) return;
+    if (!resolveEnabled() || !cfg.blockSelect) return;
     if (isEditableTarget(e.target)) return;
-    // Allow selection inside receipt / tables for ops
     if (e.target && e.target.closest && e.target.closest('.receipt-paper, .data-table, .rs-sales-report, pre, code')) return;
     e.preventDefault();
   }
@@ -88,42 +135,54 @@
   function install() {
     if (installed) return;
     installed = true;
+    refreshEnabled();
     document.addEventListener('contextmenu', onContextMenu, true);
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('selectstart', onSelectStart, true);
     document.addEventListener(
       'dragstart',
       function (e) {
-        if (!cfg.enabled) return;
+        if (!resolveEnabled()) return;
         if (e.target && e.target.tagName === 'IMG') e.preventDefault();
       },
       true
     );
   }
 
-  // setEnabled is a no-op for turning off — system policy is always on for staff.
-  // Kept for API compatibility; only re-enables if something called setEnabled(true).
+  /**
+   * Super-Admin only. Restaurant roles cannot disable the shield.
+   * @returns {boolean} true if preference was applied
+   */
   function setEnabled(on) {
-    if (on) cfg.enabled = true;
+    if (!isSuperAdmin()) {
+      cfg.enabled = true;
+      return false;
+    }
+    var next = !!on;
+    saveSaPref(next);
+    cfg.enabled = next;
+    return true;
   }
 
   function configure(partial) {
-    // Ignore attempts to disable core protections from app code
     var next = Object.assign({}, partial || {});
-    delete next.enabled;
-    cfg = Object.assign(cfg, next, { enabled: cfg.enabled });
+    delete next.enabled; // never allow silent disable via configure
+    cfg = Object.assign(cfg, next);
+    refreshEnabled();
   }
 
   global.RSSecurityShield = {
     install: install,
     setEnabled: setEnabled,
     configure: configure,
+    refresh: refreshEnabled,
+    isSuperAdminOnly: true,
+    canToggle: isSuperAdmin,
     getConfig: function () {
-      return Object.assign({}, cfg);
+      return Object.assign({}, cfg, { enabled: resolveEnabled() });
     },
-    /** Internal note — not shown in Settings UI */
     disclaimer:
-      'System UI shield is always active on staff consoles. Real protection is auth, encryption, and server rules.',
+      'System UI shield is always on for restaurants. Only Super-Admin can toggle it.',
   };
 
   // Auto-install on staff surfaces only (never on guest QR / public order pages)
