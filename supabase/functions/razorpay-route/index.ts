@@ -119,18 +119,35 @@ function json(body: unknown, status = 200, req?: Request) {
   });
 }
 
-// ── Auth: validate staff JWT and return tenant row ────────────────────────────
+// ── Auth: app HMAC session (primary) or legacy Supabase Auth JWT ─────────────
+// Dashboard login issues custom HMAC tokens via tenant-access (session_token).
+// get_plans / create_subscription already use verifyAppSession; get_account and
+// onboard_account must accept the same tokens or the Payments panel always fails.
+
+async function loadTenantRow(tenantId: string) {
+  const { data: tenant } = await supabase
+    .from("saas_tenants")
+    .select("id, slug, name, razorpay_account_id, razorpay_route_enabled, razorpay_kyc_status")
+    .eq("id", tenantId)
+    .maybeSingle();
+  return tenant || null;
+}
 
 async function getTenantFromAuth(req: Request): Promise<{ id: string; slug: string; name: string; razorpay_account_id: string | null; razorpay_route_enabled: boolean; razorpay_kyc_status: string } | null> {
+  // 1) Primary path — signed app session used by the dashboard (RS_API.session().token)
+  const appSession = await verifyAppSession(req);
+  if (appSession?.tenant_id) {
+    return await loadTenantRow(appSession.tenant_id);
+  }
+
+  // 2) Legacy fallback — Supabase Auth JWT mapped via doppio_staff
   const authHeader = req.headers.get("authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
 
-  // Verify the JWT is a valid staff session
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return null;
 
-  // Map user to tenant via doppio_staff
   const { data: staff } = await supabase
     .from("doppio_staff")
     .select("tenant_id")
@@ -138,13 +155,7 @@ async function getTenantFromAuth(req: Request): Promise<{ id: string; slug: stri
     .maybeSingle();
   if (!staff?.tenant_id) return null;
 
-  const { data: tenant } = await supabase
-    .from("saas_tenants")
-    .select("id, slug, name, razorpay_account_id, razorpay_route_enabled, razorpay_kyc_status")
-    .eq("id", staff.tenant_id)
-    .maybeSingle();
-
-  return tenant || null;
+  return await loadTenantRow(staff.tenant_id);
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────

@@ -699,7 +699,7 @@
           ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`),
       plan: setBlock('Subscription', 'Current plan, renewals, and upgrades',
           `<div id="rs-plan-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div></div>`),
-      payments: setBlock('Card &amp; UPI settlement', 'Route guest card/UPI payments to your bank account',
+      payments: setBlock('Card &amp; UPI settlement', 'Optional — auto bank settlement when Razorpay / Stripe is enabled',
           `<div id="rzp-route-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking payment status…</div></div>`),
       security: `<div id="rs-security-panel" class="set-security-host"></div>`,
       danger:
@@ -897,12 +897,58 @@
       const country = (window.RS_SETTINGS && RS_SETTINGS.set_country) || 'India';
       const isStripe = (country.toLowerCase() === 'ireland' || country.toLowerCase() === 'ie' || country.toLowerCase() !== 'india');
 
-      function renderError(msg) {
-        container.innerHTML = `<div style="padding:14px;border:1px solid rgba(239,68,68,0.25);border-radius:var(--r-sm);background:rgba(239,68,68,0.04);color:#ef4444;font-size:13px;">${msg}</div>`;
-      }
-
       function pill(text, color) {
         return `<span class="pill" style="padding:5px 12px;background:rgba(${color},0.12);color:rgb(${color})"><span class="dot" style="background:rgb(${color})"></span>${text}</span>`;
+      }
+
+      /** Calm empty / not-ready state — not a scary red error. */
+      function renderNotEnabled(opts) {
+        const title = opts.title || 'Online settlement';
+        const provider = opts.provider || 'Razorpay';
+        const detail = opts.detail || '';
+        const isAuth = !!opts.needSignIn;
+        container.innerHTML = `
+          <div class="set-row" style="margin-bottom:14px">
+            <div class="si">
+              <div class="st">${title}</div>
+              <div class="sd">Guest card / UPI auto-settlement to your bank (optional)</div>
+            </div>
+            ${pill(isAuth ? 'Sign in required' : 'Not enabled yet', isAuth ? '239, 68, 68' : '107, 114, 128')}
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.7;color:var(--text);">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <i class="fa-solid ${isAuth ? 'fa-lock' : 'fa-circle-info'}" style="color:var(--orange);margin-top:3px"></i>
+              <div>
+                <div style="font-weight:700;margin-bottom:6px">${isAuth
+                  ? 'Please sign in again to check settlement status.'
+                  : `${provider} settlement is not set up for this outlet yet.`}</div>
+                <div style="color:var(--text-soft);font-size:12.5px">
+                  ${detail || (isAuth
+                    ? 'Log out and sign back in, then return to this page.'
+                    : `You do not need this to run the restaurant. Take payments as usual with <strong>Cash</strong> and <strong>UPI at the counter</strong>. When ${provider} is enabled for your workspace, bank settlement for online card/UPI can be connected here.`)}
+                </div>
+                ${opts.hint ? `<div style="margin-top:10px;font-size:12px;color:var(--text-soft)">${opts.hint}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          ${opts.retry ? `<div style="margin-top:12px"><button type="button" class="btn btn-ghost btn-sm" id="btn-pay-status-retry"><i class="fa-solid fa-rotate"></i> Try again</button></div>` : ''}
+        `;
+        if (opts.retry) {
+          container.querySelector('#btn-pay-status-retry')?.addEventListener('click', () => {
+            container.innerHTML = `<div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking payment status…</div>`;
+            initRazorpayRoutePanel(body);
+          });
+        }
+      }
+
+      function renderSoftError(msg) {
+        renderNotEnabled({
+          title: isStripe ? 'Stripe Connect' : 'Razorpay Route',
+          provider: isStripe ? 'Stripe' : 'Razorpay',
+          detail: msg || 'We could not check settlement status right now. Your POS cash and counter UPI still work normally.',
+          hint: 'If this keeps happening after a refresh, contact RestroSuite support — no action is required to keep selling.',
+          retry: true,
+        });
       }
 
       const supabaseUrl = window.__SUPABASE_URL__ || '';
@@ -910,7 +956,7 @@
       const session = window.RS_API && RS_API.session && RS_API.session();
       const token   = session && (session.access_token || session.token);
       if (!supabaseUrl || !token) {
-        renderError('Not authenticated');
+        renderNotEnabled({ needSignIn: true, title: isStripe ? 'Stripe Connect' : 'Razorpay Route', provider: isStripe ? 'Stripe' : 'Razorpay' });
         return;
       }
 
@@ -927,9 +973,20 @@
             },
             body: JSON.stringify({ action: 'get_account' }),
           });
-          status = await res.json();
+          status = await res.json().catch(() => ({}));
+          if (!res.ok || status.error) {
+            // Platform not ready / not applied — calm message, not a hard failure
+            renderNotEnabled({
+              title: 'Stripe Connect',
+              provider: 'Stripe',
+              detail: 'Card settlement via Stripe is not enabled for this workspace yet. Counter payments (cash / card terminal) still work as usual.',
+              hint: 'RestroSuite has not finished Stripe onboarding for this account. You can keep operating without this step.',
+              retry: true,
+            });
+            return;
+          }
         } catch(e) {
-          renderError('Could not load Stripe Connect status. Please refresh and try again.');
+          renderSoftError('Could not reach settlement services. Check your connection and try again when convenient.');
           return;
         }
 
@@ -1024,51 +1081,13 @@
           return;
         }
 
-        // -- Not connected --
-        container.innerHTML = `
-          <div class="set-row" style="margin-bottom:16px">
-            <div class="si">
-              <div class="st">Stripe Connect</div>
-              <div class="sd">Configure card payments for your outlet. Settles directly to your bank account via Stripe.</div>
-            </div>
-            ${pill('Not connected', '107, 114, 128')}
-          </div>
-          <div style="background:rgba(255,107,0,0.04);border:1px solid rgba(255,107,0,0.2);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--text-soft);line-height:1.6;margin-bottom:18px;">
-            <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-right:6px"></i>
-            <strong style="color:var(--text)">Direct Settlements.</strong> QR order card payments go straight to your Stripe Connected account. RestroSuite never touches your funds.
-          </div>
-          <button class="btn btn-primary" id="btn-stripe-connect" style="min-width:180px;">
-            <i class="fa-brands fa-stripe"></i> Connect Stripe Account
-          </button>
-        `;
-        container.querySelector('#btn-stripe-connect').onclick = async function() {
-          const btn = this;
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting Stripe...';
-          try {
-            const res = await fetch(`${supabaseUrl}/functions/v1/stripe-connect`, {
-              method: 'POST',
-              headers: {
-                'Content-Type':  'application/json',
-                'apikey':        supabaseKey,
-                'Authorization': 'Bearer ' + token,
-              },
-              body: JSON.stringify({ action: 'onboard_account', country: 'IE' }),
-            });
-            const data = await res.json();
-            if (data.onboarding_url) {
-              window.location.href = data.onboarding_url;
-            } else {
-              toast('Error: ' + (data.error || 'onboarding failed'), 'fa-circle-exclamation');
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Connect Stripe Account';
-            }
-          } catch(err) {
-            toast('Network error. Please try again.', 'fa-circle-exclamation');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Connect Stripe Account';
-          }
-        };
+        // -- Not connected / not enabled on this outlet --
+        renderNotEnabled({
+          title: 'Stripe Connect',
+          provider: 'Stripe',
+          detail: 'Card settlement via Stripe is not connected for this outlet yet. You can keep taking payments at the counter as usual.',
+          hint: 'When RestroSuite enables Stripe for your workspace, you will connect your bank account from this page.',
+        });
         return;
       }
 
@@ -1084,9 +1103,20 @@
           },
           body: JSON.stringify({ action: 'get_account' }),
         });
-        status = await res.json();
+        status = await res.json().catch(() => ({}));
+        if (!res.ok || status.error) {
+          // Platform has not applied / keys missing / auth not ready — calm UX
+          renderNotEnabled({
+            title: 'Razorpay Route',
+            provider: 'Razorpay',
+            detail: 'Razorpay settlement is not set up for this workspace yet. You do not need to apply or enter bank details here right now.',
+            hint: 'Keep using Cash and counter UPI in POS. When RestroSuite enables Razorpay Route, online card/UPI can settle straight to your bank from this page.',
+            retry: true,
+          });
+          return;
+        }
       } catch(e) {
-        renderError('Could not load payment status. Please refresh and try again.');
+        renderSoftError('Could not reach settlement services. Check your connection and try again when convenient.');
         return;
       }
 
@@ -1122,132 +1152,13 @@
         return;
       }
 
-      // -- Not set up yet -- show onboarding form --------------------------------
-      container.innerHTML = `
-        <div class="set-row" style="margin-bottom:16px">
-          <div class="si">
-            <div class="st">Razorpay Route</div>
-            <div class="sd">Link your bank account so customer payments settle directly to you -- no UTR codes, no cashier verification.</div>
-          </div>
-          ${pill('Not connected', '107, 114, 128')}
-        </div>
-
-        <div style="background:rgba(255,107,0,0.04);border:1px solid rgba(255,107,0,0.2);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--text-soft);line-height:1.6;margin-bottom:18px;">
-          <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-right:6px"></i>
-          <strong style="color:var(--text)">One-time setup.</strong> After connecting, all future QR order payments go directly to your bank via Razorpay. RestroSuite never holds your money.
-        </div>
-
-        <div class="form-grid-2" style="gap:12px;" id="rzp-onboard-form">
-          <div><label class="fl">Legal Business Name *</label><input class="form-input" id="rzp-biz-name" placeholder="As on PAN card"></div>
-          <div><label class="fl">Business Type *</label>
-            <select class="form-input" id="rzp-biz-type">
-              <option value="restaurant">Restaurant (Proprietorship)</option>
-              <option value="individual">Individual</option>
-              <option value="partnership">Partnership</option>
-              <option value="private_limited">Private Limited</option>
-              <option value="public_limited">Public Limited</option>
-              <option value="llp">LLP</option>
-            </select>
-          </div>
-          <div><label class="fl">Contact Person Name *</label><input class="form-input" id="rzp-contact-name" placeholder="Owner / Director name"></div>
-          <div><label class="fl">Contact Email *</label><input class="form-input" type="email" id="rzp-contact-email" placeholder="business@email.com"></div>
-          <div><label class="fl">Mobile Number *</label><input class="form-input" type="tel" id="rzp-contact-mobile" placeholder="10-digit mobile"></div>
-          <div><label class="fl">PAN *</label><input class="form-input" id="rzp-pan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase"></div>
-          <div><label class="fl">Bank Account Number *</label><input class="form-input" id="rzp-bank-acc" placeholder="Your business bank account number"></div>
-          <div><label class="fl">IFSC Code *</label><input class="form-input" id="rzp-ifsc" placeholder="e.g. HDFC0001234" maxlength="11" style="text-transform:uppercase"></div>
-          <div style="grid-column:1/-1"><label class="fl">Account Holder Name *</label><input class="form-input" id="rzp-bank-name" placeholder="Name on bank account"></div>
-          <div><label class="fl">City</label><input class="form-input" id="rzp-city" placeholder="City"></div>
-          <div><label class="fl">State</label><input class="form-input" id="rzp-state" placeholder="State"></div>
-          <div><label class="fl">PIN Code</label><input class="form-input" id="rzp-pin" placeholder="6-digit PIN" maxlength="6"></div>
-          <div style="grid-column:1/-1"><label class="fl">Street Address</label><input class="form-input" id="rzp-street" placeholder="Outlet registered address"></div>
-        </div>
-
-        <div style="margin-top:18px;display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--stroke-2);">
-          <button class="btn btn-primary" id="btn-rzp-submit" style="min-width:160px;">
-            <i class="fa-brands fa-razorpay"></i> Connect & Submit KYC
-          </button>
-          <span style="font-size:11.5px;color:var(--text-soft);">Your details are sent directly to Razorpay over HTTPS. RestroSuite does not store your PAN or bank credentials.</span>
-        </div>
-        <div id="rzp-submit-result" style="margin-top:12px"></div>
-      `;
-
-      // Submit handler
-      container.querySelector('#btn-rzp-submit').onclick = async function() {
-        const btn = this;
-        const result = container.querySelector('#rzp-submit-result');
-
-        const getValue = id => (container.querySelector('#' + id)?.value || '').trim();
-        const required = ['rzp-biz-name','rzp-contact-name','rzp-contact-email','rzp-contact-mobile','rzp-pan','rzp-bank-acc','rzp-ifsc','rzp-bank-name'];
-        const missing  = required.filter(id => !getValue(id));
-        if (missing.length) {
-          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Please fill all required (*) fields.</p>`;
-          return;
-        }
-        if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(getValue('rzp-pan').toUpperCase())) {
-          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Invalid PAN format (e.g. ABCDE1234F).</p>`;
-          return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay...';
-        result.innerHTML = '';
-
-        try {
-          const supabaseUrl = window.__SUPABASE_URL__ || '';
-          const supabaseKey = window.__SUPABASE_ANON_KEY__ || '';
-          const session = window.RS_API && RS_API.session && RS_API.session();
-          const token   = session && (session.access_token || session.token);
-
-          const payload = {
-            action:               'onboard_account',
-            legal_business_name:  getValue('rzp-biz-name'),
-            business_type:        container.querySelector('#rzp-biz-type')?.value || 'restaurant',
-            contact_name:         getValue('rzp-contact-name'),
-            contact_email:        getValue('rzp-contact-email'),
-            contact_mobile:       getValue('rzp-contact-mobile'),
-            pan:                  getValue('rzp-pan').toUpperCase(),
-            bank_account_number:  getValue('rzp-bank-acc'),
-            bank_ifsc:            getValue('rzp-ifsc').toUpperCase(),
-            bank_beneficiary_name: getValue('rzp-bank-name'),
-            address_street:       getValue('rzp-street'),
-            address_city:         getValue('rzp-city'),
-            address_state:        getValue('rzp-state'),
-            address_pin:          getValue('rzp-pin'),
-          };
-
-          const res = await fetch(`${supabaseUrl}/functions/v1/razorpay-route`, {
-            method: 'POST',
-            headers: {
-              'Content-Type':  'application/json',
-              'apikey':        supabaseKey,
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json();
-
-          if (data.success) {
-            container.innerHTML = `
-              <div style="text-align:center;padding:30px 20px;">
-                <div style="width:52px;height:52px;border-radius:50%;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><i class="fa-solid fa-circle-check" style="font-size:24px;color:#10b981"></i></div>
-                <div style="font-weight:800;font-size:15px;margin-bottom:6px;">KYC Submitted Successfully</div>
-                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1-2 business days</strong>. RestroSuite will automatically activate Route payments once approved -- no further action needed.</p>
-                <div style="margin-top:14px;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;display:inline-block;">
-                  Account ID: <strong>${data.account_id}</strong>
-                </div>
-              </div>
-            `;
-          } else {
-            result.innerHTML = `<p style="color:#ef4444;font-size:13px;">${data.error || 'Submission failed. Please try again.'}</p>`;
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-brands fa-razorpay"></i> Connect & Submit KYC';
-          }
-        } catch(e) {
-          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Network error. Please try again.</p>`;
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-brands fa-razorpay"></i> Connect & Submit KYC';
-        }
-      };
+      // -- Not set up yet (platform has not enabled Razorpay for this outlet) ---
+      renderNotEnabled({
+        title: 'Razorpay Route',
+        provider: 'Razorpay',
+        detail: 'Razorpay settlement is not connected for this outlet yet. No bank or PAN details are required from you right now.',
+        hint: 'POS Cash and counter UPI work as normal. When RestroSuite enables Razorpay Route, you can link settlement from this page.',
+      });
     }
 
     function settingsRole(){
