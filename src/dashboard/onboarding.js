@@ -521,44 +521,66 @@
       <div class="product-guide-backdrop" data-guide-close></div>
       <section class="product-guide-panel" role="dialog" aria-modal="true" aria-labelledby="product-guide-title">
         <header class="product-guide-header">
-          <div class="product-guide-header-copy">
-            <span class="product-guide-eyebrow">HELP &amp; SETUP</span>
-            <h2 id="product-guide-title">Workspace Guide</h2>
-            <p>Get live fast: finish setup, then learn only the features your plan unlocks.</p>
+          <div class="product-guide-brand">
+            <div class="product-guide-brand-ic" aria-hidden="true"><i class="fa-solid fa-life-ring"></i></div>
+            <div class="product-guide-header-copy">
+              <h2 id="product-guide-title">Workspace Guide</h2>
+              <p>Finish launch setup, then open any feature — filtered to your plan and role.</p>
+            </div>
           </div>
-          <button type="button" class="product-guide-close" data-guide-close aria-label="Close help guide"><i class="fa-solid fa-xmark"></i></button>
+          <div class="product-guide-header-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="guide-view-updates"><i class="fa-solid fa-clock-rotate-left"></i> What's new</button>
+            <button type="button" class="btn btn-primary btn-sm" id="guide-start-tour"><i class="fa-solid fa-compass"></i> Tour</button>
+            <button type="button" class="product-guide-close" data-guide-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+          </div>
         </header>
 
-        <div class="product-guide-toolbar">
-          <button type="button" class="btn btn-primary" id="guide-start-tour"><i class="fa-solid fa-compass"></i> Guided tour</button>
-          <button type="button" class="btn btn-ghost product-guide-secondary-btn" id="guide-view-updates"><i class="fa-solid fa-clock-rotate-left"></i> What's new</button>
-          <div class="product-guide-search-wrap">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="search" id="guide-search" placeholder="Search features…" aria-label="Search enabled features" autocomplete="off">
-          </div>
-        </div>
+        <div class="product-guide-body">
+          <div id="guide-next-cta" class="pg-next" hidden></div>
 
-        <div id="guide-next-cta" class="product-guide-next-cta" hidden></div>
-        <div id="guide-setup-summary"></div>
+          <section class="pg-block" id="guide-setup-block">
+            <header class="pg-block-head">
+              <div>
+                <h3>Launch checklist</h3>
+                <p id="guide-setup-sub">Checking your workspace…</p>
+              </div>
+              <div class="pg-progress-ring" id="guide-progress-label" aria-live="polite">—</div>
+            </header>
+            <div class="pg-block-body">
+              <div class="pg-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="guide-progress-bar"><i style="width:0%"></i></div>
+              <div id="guide-setup-summary" class="pg-task-list"></div>
+            </div>
+          </section>
 
-        <div class="product-guide-section-heading">
-          <div>
-            <span>FEATURE GUIDE</span>
-            <h3>Your enabled workspace</h3>
-          </div>
-          <span id="guide-feature-count" class="product-guide-count"></span>
+          <section class="pg-block">
+            <header class="pg-block-head">
+              <div>
+                <h3>Features on this workspace</h3>
+                <p>Only modules enabled for you are shown.</p>
+              </div>
+              <span id="guide-feature-count" class="pg-pill">0</span>
+            </header>
+            <div class="pg-block-body">
+              <div class="pg-tools">
+                <div id="guide-group-filters" class="pg-chips" role="tablist" aria-label="Filter by area"></div>
+                <label class="pg-search">
+                  <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                  <input type="search" id="guide-search" placeholder="Search features…" aria-label="Search features" autocomplete="off">
+                </label>
+              </div>
+              <div id="guide-feature-grid" class="pg-feature-grid"></div>
+            </div>
+          </section>
         </div>
-        <div id="guide-group-filters" class="product-guide-filters" role="tablist" aria-label="Filter features by area"></div>
-        <div id="guide-feature-grid" class="product-guide-grid"></div>
 
         <footer class="product-guide-footer">
-          <div>
-            <strong>Need a hand?</strong>
-            <span>Email support with your outlet name — we help with setup and training.</span>
+          <div class="product-guide-footer-text">
+            <strong>Need help?</strong>
+            <span>We’ll set up training with your outlet name.</span>
           </div>
           <div class="product-guide-footer-actions">
             <a class="btn btn-ghost btn-sm" href="mailto:support@codearc.co.in?subject=RestroSuite%20setup%20help"><i class="fa-solid fa-envelope"></i> support@codearc.co.in</a>
-            <span class="product-guide-version-pill">${escGuide(ver)}</span>
+            <span class="pg-pill pg-pill-mute">${escGuide(ver)}</span>
           </div>
         </footer>
       </section>
@@ -583,6 +605,13 @@
 
   let guideFilterGroup = 'all';
 
+  function runTask(task) {
+    closeGuide();
+    if (!task) return;
+    if (typeof task.action === 'function') task.action();
+    else if (task.tabId) activateTab(task.tabId);
+  }
+
   async function renderGuide(search = '') {
     injectGuide();
     const query = String(search).trim().toLowerCase();
@@ -590,8 +619,12 @@
     const summary = document.getElementById('guide-setup-summary');
     const nextCta = document.getElementById('guide-next-cta');
     const grid = document.getElementById('guide-feature-grid');
+    const setupSub = document.getElementById('guide-setup-sub');
+    const progressLabel = document.getElementById('guide-progress-label');
+    const progressBar = document.getElementById('guide-progress-bar');
+
     if (summary) {
-      summary.innerHTML = `<div class="product-guide-setup product-guide-setup-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking your workspace…</div>`;
+      summary.innerHTML = `<div class="pg-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking live workspace data…</div>`;
     }
 
     let tasks = [];
@@ -608,34 +641,43 @@
     const nextTask = remaining[0] || null;
     const allDone = tasks.length > 0 && remaining.length === 0;
 
+    if (setupSub) {
+      setupSub.textContent = allDone
+        ? 'All set — use this guide to train new staff anytime.'
+        : `${completed} of ${tasks.length} done · progress updates from your live data`;
+    }
+    if (progressLabel) progressLabel.textContent = `${percent}%`;
+    if (progressBar) {
+      progressBar.setAttribute('aria-valuenow', String(percent));
+      const fill = progressBar.querySelector('i');
+      if (fill) fill.style.width = `${percent}%`;
+    }
+
     if (nextCta) {
       if (allDone) {
         nextCta.hidden = false;
-        nextCta.className = 'product-guide-next-cta is-complete';
+        nextCta.className = 'pg-next is-done';
         nextCta.innerHTML = `
-          <div class="product-guide-next-icon"><i class="fa-solid fa-circle-check"></i></div>
-          <div class="product-guide-next-copy">
-            <strong>Setup complete — you're ready for service</strong>
-            <span>Take the guided tour anytime, or open a feature below to go deeper.</span>
+          <div class="pg-next-ic"><i class="fa-solid fa-circle-check"></i></div>
+          <div class="pg-next-text">
+            <div class="pg-next-kicker">Ready for service</div>
+            <div class="pg-next-title">Launch checklist complete</div>
+            <div class="pg-next-desc">Take a short tour of enabled features, or jump into any module below.</div>
           </div>
-          <button type="button" class="btn btn-primary btn-sm" id="guide-cta-tour"><i class="fa-solid fa-compass"></i> Tour features</button>`;
+          <button type="button" class="btn btn-primary btn-sm" id="guide-cta-tour"><i class="fa-solid fa-compass"></i> Start tour</button>`;
         nextCta.querySelector('#guide-cta-tour')?.addEventListener('click', () => { closeGuide(); startTour(); });
       } else if (nextTask) {
         nextCta.hidden = false;
-        nextCta.className = 'product-guide-next-cta';
+        nextCta.className = 'pg-next';
         nextCta.innerHTML = `
-          <div class="product-guide-next-icon"><i class="fa-solid fa-bolt"></i></div>
-          <div class="product-guide-next-copy">
-            <span class="product-guide-next-label">Recommended next</span>
-            <strong>${escGuide(nextTask.label)}</strong>
-            <span>${escGuide(nextTask.detail)}${nextTask.eta ? ` · ~${escGuide(nextTask.eta)}` : ''}</span>
+          <div class="pg-next-ic"><i class="fa-solid fa-arrow-right"></i></div>
+          <div class="pg-next-text">
+            <div class="pg-next-kicker">Up next${nextTask.eta ? ` · ${escGuide(nextTask.eta)}` : ''}</div>
+            <div class="pg-next-title">${escGuide(nextTask.label)}</div>
+            <div class="pg-next-desc">${escGuide(nextTask.detail)}</div>
           </div>
-          <button type="button" class="btn btn-primary btn-sm" id="guide-cta-next"><i class="fa-solid fa-play"></i> Do this now</button>`;
-        nextCta.querySelector('#guide-cta-next')?.addEventListener('click', () => {
-          closeGuide();
-          if (nextTask.action) nextTask.action();
-          else if (nextTask.tabId) activateTab(nextTask.tabId);
-        });
+          <button type="button" class="btn btn-primary btn-sm" id="guide-cta-next">Continue</button>`;
+        nextCta.querySelector('#guide-cta-next')?.addEventListener('click', () => runTask(nextTask));
       } else {
         nextCta.hidden = true;
         nextCta.innerHTML = '';
@@ -643,42 +685,29 @@
     }
 
     if (summary) {
-      summary.innerHTML = `
-        <section class="product-guide-setup ${allDone ? 'is-complete' : ''}">
-          <div class="product-guide-progress-copy">
-            <div>
-              <span>LAUNCH CHECKLIST</span>
-              <strong>${allDone ? 'All recommended steps complete' : `${completed} of ${tasks.length} steps complete`}</strong>
-              <em class="product-guide-progress-hint">${allDone ? 'Great work — keep this guide for training new staff.' : 'Complete these once. Progress updates automatically from your live data.'}</em>
-            </div>
-            <b aria-label="${percent} percent complete">${percent}%</b>
-          </div>
-          <div class="product-guide-progress" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${percent}%"></span></div>
-          <div class="product-guide-task-grid">
-            ${tasks.map((task, index) => `
-              <button type="button" class="product-guide-task ${task.done ? 'is-done' : ''} ${nextTask && task.id === nextTask.id ? 'is-next' : ''}" data-task-index="${index}">
-                <i class="fa-solid ${task.done ? 'fa-circle-check' : (nextTask && task.id === nextTask.id ? 'fa-circle-play' : 'fa-circle')}"></i>
-                <span>
-                  <strong>${escGuide(task.label)}</strong>
-                  <small>${escGuide(task.detail)}</small>
-                </span>
-                <span class="product-guide-task-meta">
-                  ${task.eta ? `<em>${escGuide(task.eta)}</em>` : ''}
-                  <i class="fa-solid fa-chevron-right"></i>
-                </span>
-              </button>
-            `).join('')}
-          </div>
-        </section>
-      `;
-      summary.querySelectorAll('[data-task-index]').forEach(button => {
-        button.addEventListener('click', () => {
-          const task = tasks[Number(button.dataset.taskIndex)];
-          closeGuide();
-          if (task.action) task.action();
-          else if (task.tabId) activateTab(task.tabId);
+      if (!tasks.length) {
+        summary.innerHTML = `<div class="pg-empty-inline">No setup steps for this role.</div>`;
+      } else {
+        summary.innerHTML = tasks.map((task, index) => {
+          const state = task.done ? 'is-done' : (nextTask && task.id === nextTask.id ? 'is-next' : '');
+          const icon = task.done ? 'fa-check' : (state === 'is-next' ? 'fa-arrow-right' : 'fa-minus');
+          return `
+            <button type="button" class="pg-task ${state}" data-task-index="${index}">
+              <span class="pg-task-check" aria-hidden="true"><i class="fa-solid ${icon}"></i></span>
+              <span class="pg-task-body">
+                <span class="pg-task-title">${escGuide(task.label)}</span>
+                <span class="pg-task-desc">${escGuide(task.detail)}</span>
+              </span>
+              <span class="pg-task-side">
+                ${task.eta ? `<span class="pg-task-eta">${escGuide(task.eta)}</span>` : ''}
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+              </span>
+            </button>`;
+        }).join('');
+        summary.querySelectorAll('[data-task-index]').forEach(button => {
+          button.addEventListener('click', () => runTask(tasks[Number(button.dataset.taskIndex)]));
         });
-      });
+      }
     }
 
     const groups = ['all', ...Array.from(new Set(allFeatures.map(f => f.group || 'Other')))];
@@ -688,7 +717,7 @@
         const label = g === 'all' ? 'All' : g;
         const count = g === 'all' ? allFeatures.length : allFeatures.filter(f => (f.group || 'Other') === g).length;
         const active = guideFilterGroup === g ? 'is-active' : '';
-        return `<button type="button" class="product-guide-filter ${active}" data-group="${escGuide(g)}" role="tab" aria-selected="${guideFilterGroup === g}">${escGuide(label)} <span>${count}</span></button>`;
+        return `<button type="button" class="pg-chip ${active}" data-group="${escGuide(g)}" role="tab" aria-selected="${guideFilterGroup === g}"><span class="pg-chip-label">${escGuide(label)}</span><span class="pg-chip-count">${count}</span></button>`;
       }).join('');
       filters.querySelectorAll('[data-group]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -710,25 +739,28 @@
 
     if (grid) {
       grid.innerHTML = features.length ? features.map(feature => `
-        <article class="product-guide-card">
-          <div class="product-guide-card-icon"><i class="fa-solid ${escGuide(feature.icon)}"></i></div>
-          <div class="product-guide-card-copy">
-            <div class="product-guide-card-top">
-              <span>${escGuide(feature.subtitle)}</span>
-              ${feature.minutes ? `<em class="product-guide-eta">~${feature.minutes} min</em>` : ''}
+        <article class="pg-feature">
+          <div class="pg-feature-top">
+            <div class="pg-feature-ic"><i class="fa-solid ${escGuide(feature.icon)}"></i></div>
+            <div class="pg-feature-head">
+              <div class="pg-feature-meta">
+                <span class="pg-feature-group">${escGuide(feature.group || 'Feature')}</span>
+                ${feature.minutes ? `<span class="pg-feature-eta">${feature.minutes} min</span>` : ''}
+              </div>
+              <h4>${escGuide(feature.label)}</h4>
             </div>
-            <h4>${escGuide(feature.label)}</h4>
-            <p>${escGuide(feature.description)}</p>
-            <div class="product-guide-first-action"><strong>Try this:</strong> ${escGuide(feature.firstAction)}</div>
-            <button type="button" class="product-guide-open-btn" data-guide-tab="${escGuide(feature.tabId)}">
-              Open ${escGuide(feature.label)} <i class="fa-solid fa-arrow-right"></i>
-            </button>
           </div>
+          <p class="pg-feature-desc">${escGuide(feature.description)}</p>
+          <p class="pg-feature-try"><span>Try</span> ${escGuide(feature.firstAction)}</p>
+          <button type="button" class="btn btn-ghost btn-sm pg-feature-open" data-guide-tab="${escGuide(feature.tabId)}">
+            Open ${escGuide(feature.label)} <i class="fa-solid fa-arrow-right"></i>
+          </button>
         </article>
-      `).join('') : `<div class="product-guide-empty">
+      `).join('') : `
+        <div class="pg-empty">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <strong>No features match</strong>
-          <span>Clear search or pick another filter. Only modules on your plan and role are listed.</span>
+          <strong>No matching features</strong>
+          <span>Clear search or choose another filter.</span>
         </div>`;
       grid.querySelectorAll('[data-guide-tab]').forEach(button => {
         button.addEventListener('click', () => {
@@ -956,35 +988,36 @@
             </div>
           </div>
         ` : ''}
-        <div class="update-history-container" style="display:flex; flex-direction:column; gap:20px; max-height:350px; overflow-y:auto; padding-right:6px;">
-          ${UPDATES_HISTORY.map(up => `
-            <div class="update-version-card" style="border: 1px solid var(--stroke); border-radius: 12px; padding: 16px; background: var(--panel-tint, rgba(0,0,0,0.02));">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-                <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--orange);">${up.title}</h4>
-                <span class="pill" style="font-size:11px; font-weight:600; padding:2px 8px;">Version ${up.version} · ${up.date}</span>
+        <div class="update-history-container" style="display:flex;flex-direction:column;gap:12px;max-height:min(420px,55vh);overflow-y:auto;padding-right:4px;">
+          ${UPDATES_HISTORY.map(up => {
+            const shortVer = String(up.version || '').split('-')[0];
+            const isActive = up.version === currentVer || shortVer === String(currentVer).split('-')[0];
+            return `
+            <div style="border:1px solid var(--stroke-2);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--glass) 35%,var(--panel));">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+                <h4 style="margin:0;font-size:14px;font-weight:800;color:var(--text);letter-spacing:-0.01em;line-height:1.3;max-width:min(100%,420px);">${up.title}</h4>
+                <span style="font-size:11px;font-weight:750;padding:3px 9px;border-radius:999px;background:var(--orange-tint);color:var(--orange);white-space:nowrap;">${shortVer} · ${up.date}</span>
               </div>
-              <p style="margin:0 0 10px 0; font-size:12.5px; line-height:1.5; color:var(--text-soft);">${up.summary}</p>
-              <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--text-soft);">
-                ${up.highlights.map(h => `<li>${h}</li>`).join('')}
+              <p style="margin:0 0 8px;font-size:12.5px;line-height:1.5;color:var(--text-soft);">${up.summary}</p>
+              <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.55;color:var(--text-soft);">
+                ${(up.highlights || []).map(h => `<li style="margin-bottom:2px">${h}</li>`).join('')}
               </ul>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">
                 ${up.version === '2026.06.20-onboarding' || up.version === '2026.06.19-dues' ? `
-                  <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn" style="background:var(--orange); border-color:var(--orange); font-size:11px; margin:0;">
-                    <i class="fa-solid fa-compass"></i> Take Feature Tour
-                  </button>
+                  <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn"><i class="fa-solid fa-compass"></i> Feature tour</button>
                 ` : ''}
-                ${up.version !== currentVer ? `
-                  <button type="button" class="btn btn-sm btn-ghost rollback-btn" data-rollback-version="${up.version}" style="border:1px dashed var(--stroke-hi); color:var(--text-soft); font-size:11px; margin:0;">
-                    <i class="fa-solid fa-clock-rotate-left"></i> Rollback to this version
+                ${!isActive ? `
+                  <button type="button" class="btn btn-sm btn-ghost rollback-btn" data-rollback-version="${up.version}" style="border:1px solid var(--stroke-2);color:var(--text-soft);">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Rollback
                   </button>
                 ` : `
-                  <span class="pill pill-success" style="font-size:11px; display:inline-flex; align-items:center; gap:5px; background:rgba(16,185,129,0.08); color:#10b981; border:1px solid rgba(16,185,129,0.2); padding:3px 10px; border-radius:12px;">
-                    <i class="fa-solid fa-circle-check"></i> Active Version
+                  <span style="font-size:11.5px;font-weight:750;display:inline-flex;align-items:center;gap:6px;background:rgba(16,185,129,0.1);color:#059669;border:1px solid rgba(16,185,129,0.22);padding:4px 10px;border-radius:999px;">
+                    <i class="fa-solid fa-circle-check"></i> Active
                   </span>
                 `}
               </div>
-            </div>
-          `).join('')}
+            </div>`;
+          }).join('')}
         </div>
       `,
       foot: `
