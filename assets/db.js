@@ -114,6 +114,11 @@
     return Math.abs(hash) % 9007199254740991;
   }
 
+  function isUuid(id) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      String(id == null ? '' : id)
+    );
+  }
   function cleanIdForCollection(c, id) {
     if (id == null) return id;
     const isBigIntPK = ['menu', 'inventory', 'bills', 'customers', 'drafts', 'pending_orders'].includes(c);
@@ -666,8 +671,52 @@
     },
     reservations: {
       table:'doppio_reservations', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, guestName:r.guest_name, guestPhone:r.phone, pax:num(r.party_size), tableNumber:r.table_number, time:r.notes||'', date:(r.reserved_for||'').slice(0,10), status:r.status }),
-      to: o => ({ guest_name:o.guestName||'Guest', phone:o.guestPhone||null, party_size:num(o.pax)||2, table_number:o.tableNumber||'', reserved_for:(function(){ try { if(o.date&&o.time){ var d=new Date(o.date+'T'+o.time); if(!isNaN(d)) return d.toISOString(); } } catch(e){} return o.reserved_for||new Date().toISOString(); })(), notes:o.time||'', status:o.status||'confirmed' })
+      from: r => {
+        const reserved = r.reserved_for || '';
+        let time = r.notes || '';
+        // Prefer clock time from reserved_for when notes empty/stale
+        if ((!time || !/^\d{1,2}:\d{2}/.test(String(time))) && reserved) {
+          try {
+            const d = new Date(reserved);
+            if (!isNaN(d.getTime())) {
+              time = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+            }
+          } catch (e) {}
+        }
+        return {
+          id: r.id,
+          guestName: r.guest_name,
+          guestPhone: r.phone,
+          pax: num(r.party_size),
+          tableNumber: r.table_number,
+          time,
+          date: String(reserved).slice(0, 10),
+          status: r.status,
+          reserved_for: reserved || null,
+        };
+      },
+      to: o => {
+        let reserved = o.reserved_for || null;
+        if (!reserved && o.date) {
+          try {
+            let t = String(o.time || '19:30').trim();
+            if (/^\d{2}:\d{2}$/.test(t)) t += ':00';
+            const d = new Date(o.date + 'T' + t);
+            if (!isNaN(d.getTime())) reserved = d.toISOString();
+          } catch (e) {}
+        }
+        if (!reserved) reserved = new Date().toISOString();
+        const timeNote = String(o.time || '').replace(/:\d{2}$/, '').slice(0, 5) || '';
+        return {
+          guest_name: o.guestName || 'Guest',
+          phone: o.guestPhone || null,
+          party_size: num(o.pax) || 2,
+          table_number: o.tableNumber || '',
+          reserved_for: reserved,
+          notes: timeNote || o.notes || '',
+          status: o.status || 'confirmed',
+        };
+      },
     },
     offers: {
       table:'doppio_offers', pk:'id', clientId:false, uuidPK:true,
@@ -1040,9 +1089,14 @@
     async put(c,id,obj){
       const m=MAP[c]; if(!m) return obj;
       if (m.localOnly || !m.table) return LS.put(c, id, obj);
-      const cleanId = cleanIdForCollection(c, id);
-      const cleanObj = { ...obj, id: cleanId };
+      let cleanId = cleanIdForCollection(c, id);
+      // uuid PK tables: never send logical codes (RES-… / TKT-… / OFF-…) as id —
+      // Postgres uuid columns reject them. Leave id empty so gen_random_uuid() runs.
+      if (m.uuidPK && cleanId != null && !isUuid(cleanId)) cleanId = null;
+      const cleanObj = { ...obj, id: cleanId != null ? cleanId : obj.id };
+      if (m.uuidPK && !isUuid(cleanObj.id)) delete cleanObj.id;
       const body = m.to(cleanObj);
+      if (m.uuidPK && body && body[m.pk] != null && !isUuid(body[m.pk])) delete body[m.pk];
 
       // Bills: upsert on (tenant_id, order_id) — multi-device safe, no hash PK races
       if (c === 'bills' && body.order_id) {
@@ -1068,7 +1122,7 @@
         }
       }
 
-      const isKnown = known[c] && known[c].has(String(cleanId));
+      const isKnown = !!(cleanId != null && known[c] && known[c].has(String(cleanId)) && (!m.uuidPK || isUuid(cleanId)));
       if(isKnown){
         try {
           await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
@@ -1076,7 +1130,7 @@
           if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
           await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
         }
-        return cleanObj;
+        return { ...obj, ...cleanObj, id: cleanId };
       }
       // Only auto-generate a new ID if clientId mode AND the body doesn't already have one
       if(m.clientId && !body[m.pk]) { body[m.pk] = cleanId || newClientId(); }
@@ -1087,6 +1141,7 @@
       else if(!body[m.pk] && !m.uuidPK && c !== 'bills') { body[m.pk] = cleanId; }
       else if (c === 'bills' && body.id == null) { /* leave id for identity */ }
       else if(!body[m.pk] && !m.uuidPK) { body[m.pk] = cleanId; }
+      if (m.uuidPK && body[m.pk] != null && !isUuid(body[m.pk])) delete body[m.pk];
       try {
         let res;
         try {
@@ -1106,12 +1161,29 @@
             known[c].add(String(newId));
             return { ...obj, id: newId };
           }
+          // Offers unique (tenant_id, code) → update existing code instead of failing
+          if (c === 'offers' && body.code && /duplicate|unique|code/i.test(msg)) {
+            await API.update(m.table, body, [{ operator: 'eq', column: 'code', value: body.code }]);
+            const rows = await API.select(m.table, {
+              filters: [{ operator: 'eq', column: 'code', value: body.code }],
+              limit: 1,
+            }).catch(() => null);
+            const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+            const newId = row && row.id != null ? row.id : cleanId;
+            if (newId != null && (!m.uuidPK || isUuid(newId))) {
+              if (!known[c]) known[c] = new Set();
+              known[c].add(String(newId));
+            }
+            return { ...obj, id: newId, code: body.code };
+          }
           if (!omitUnsupportedOptionalColumns(c, body, err)) throw err;
           res = await API.insert(m.table, body);
         }
         const newId = (Array.isArray(res)&&res[0]&&res[0][m.pk]!=null) ? res[0][m.pk] : (body[m.pk]!=null?body[m.pk]:cleanId);
         const cleanNewId = cleanIdForCollection(c, newId);
-        if(!known[c]) known[c]=new Set(); known[c].add(String(cleanNewId));
+        if (cleanNewId != null && (!m.uuidPK || isUuid(cleanNewId))) {
+          if(!known[c]) known[c]=new Set(); known[c].add(String(cleanNewId));
+        }
         return { ...obj, id:cleanNewId };
       } catch (err) {
         console.warn(`[RS_DB] Cloud insert failed for ${c}/${cleanId}, attempting update fallback:`, err.message);
@@ -1120,6 +1192,8 @@
             await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
             return { ...obj, id: cleanId };
           }
+          // Don't try update-by-id for non-uuid ids on uuid tables (would never match)
+          if (m.uuidPK && !isUuid(cleanId)) throw err;
           try {
             await API.update(m.table, body, [{operator:'eq',column:m.pk,value:cleanId}]);
           } catch (updateErr) {

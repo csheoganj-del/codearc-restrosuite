@@ -257,8 +257,21 @@
   }
   function offerIsActive(o) {
     if (!o) return false;
-    const st = String(o.status || 'sent').toLowerCase();
-    if (st === 'redeemed' || st === 'expired' || st === 'cancelled' || st === 'canceled') return false;
+    const st = String(o.status || 'active').toLowerCase();
+    // paused / inactive / expired must NOT apply on POS
+    if (
+      st === 'redeemed' ||
+      st === 'expired' ||
+      st === 'cancelled' ||
+      st === 'canceled' ||
+      st === 'paused' ||
+      st === 'inactive' ||
+      st === 'disabled'
+    ) {
+      return false;
+    }
+    // Accept active POS offers and CRM "sent" personal coupons
+    if (st && st !== 'active' && st !== 'sent' && st !== 'open') return false;
     const exp = parseOfferExpiry(o);
     if (exp && exp < Date.now()) return false;
     return true;
@@ -328,10 +341,20 @@
         code: String(offer.code || code).toUpperCase(),
         pct,
         fixed,
-        title: offer.title || offer.name || 'Promo',
+        title: offer.title || offer.name || offer.description || 'Promo',
         offerId: offer.id || null,
       });
     }
+    // Bump usage_count in cloud (best-effort) so Growth Hub shows real usage
+    try {
+      if (offer.id && global.RS_DB && RS_DB.put) {
+        const next = {
+          ...offer,
+          usageCount: (Number(offer.usageCount) || 0) + 1,
+        };
+        RS_DB.put('offers', offer.id, next).catch(() => {});
+      }
+    } catch (_) {}
     toast(
       `Promo ${code} · ${fixed > 0 ? rs(fixed) + ' off' : pct + '% off'}`,
       'fa-tags'

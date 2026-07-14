@@ -4406,9 +4406,30 @@
     }
 
     async function hubSave(coll, row) {
-      if (RS.saveOne) return RS.saveOne(coll, row);
-      if (window.RS_DB) return RS_DB.put(coll, row.id, row);
-      return row;
+      const payload = { ...(row || {}) };
+      // Let uuid tables allocate real UUIDs (never send RES-/TKT-/OFF- as PK)
+      if (payload.id != null && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(String(payload.id))) {
+        // keep logical codes in their own fields
+        if (coll === 'support_tickets' && !payload.ticketNumber) payload.ticketNumber = payload.id;
+        if (coll === 'offers' && !payload.code) payload.code = payload.id;
+        delete payload.id;
+      }
+      if (window.RS_DB && RS_DB.put) {
+        return RS_DB.put(coll, payload.id, payload);
+      }
+      if (RS.saveOne) return RS.saveOne(coll, payload);
+      return payload;
+    }
+    async function hubRunAction(btn, fn) {
+      if (!btn) return fn();
+      const prev = btn.innerHTML;
+      btn.disabled = true;
+      try {
+        await fn();
+      } finally {
+        btn.disabled = false;
+        try { btn.innerHTML = prev; } catch (e) {}
+      }
     }
 
     async function hubScreen(name){
@@ -4713,60 +4734,59 @@
 
           // Row actions: tickets / reservations / offers
           modal.querySelectorAll('[data-hub-act]').forEach((btn) => {
-            btn.onclick = async () => {
+            btn.onclick = () => hubRunAction(btn, async () => {
               const act = btn.getAttribute('data-hub-act');
               const id = btn.getAttribute('data-id');
               if (!act || !id) return;
-              btn.disabled = true;
-              try {
-                if (act.startsWith('tkt-')) {
-                  let list = [];
-                  try { list = await RS_DB.list('support_tickets'); } catch (e) {}
-                  const row = (list || []).find((r) => String(r.id) === String(id) || String(r.ticketNumber) === String(id));
-                  if (!row) { RS.toast('Ticket not found', 'fa-circle-exclamation'); return; }
-                  if (act === 'tkt-resolve') row.status = 'resolved';
-                  if (act === 'tkt-wait') row.status = 'waiting';
-                  if (act === 'tkt-reopen') row.status = 'open';
-                  await hubSave('support_tickets', row);
-                  RS.toast('Ticket ' + row.status, 'fa-headset');
-                  close();
-                  hubScreen('Support Tickets');
-                } else if (act.startsWith('res-')) {
-                  let list = [];
-                  try { list = await RS_DB.list('reservations'); } catch (e) {}
-                  const row = (list || []).find((r) => String(r.id) === String(id));
-                  if (!row) { RS.toast('Reservation not found', 'fa-circle-exclamation'); return; }
-                  if (act === 'res-seat') row.status = 'seated';
-                  if (act === 'res-noshow') row.status = 'no_show';
-                  if (act === 'res-cancel') row.status = 'cancelled';
-                  await hubSave('reservations', row);
-                  try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (e) {}
-                  RS.toast('Reservation ' + row.status.replace('_', ' '), 'fa-calendar-check');
-                  close();
-                  hubScreen('Reservations');
-                } else if (act.startsWith('off-')) {
-                  let list = [];
-                  try { list = await RS_DB.list('offers'); } catch (e) {}
-                  let row = (list || []).find((r) => String(r.id) === String(id));
-                  if (!row && Array.isArray(RS.OFFERS)) row = RS.OFFERS.find((r) => String(r.id) === String(id));
-                  if (!row) { RS.toast('Offer not found', 'fa-circle-exclamation'); return; }
-                  row.status = act === 'off-pause' ? 'paused' : 'active';
-                  await hubSave('offers', row);
-                  if (Array.isArray(RS.OFFERS)) {
-                    const i = RS.OFFERS.findIndex((r) => String(r.id) === String(id));
-                    if (i >= 0) RS.OFFERS[i] = { ...RS.OFFERS[i], status: row.status };
-                  }
-                  RS.toast('Offer ' + row.status, 'fa-tags');
-                  close();
-                  hubScreen('Offers & Coupons');
-                }
-              } catch (e) {
-                console.warn(e);
-                RS.toast('Update failed — try again', 'fa-circle-exclamation');
-              } finally {
-                btn.disabled = false;
+              if (!window.RS_DB) {
+                RS.toast('Database not ready — refresh and sign in again', 'fa-circle-exclamation');
+                return;
               }
-            };
+              if (act.startsWith('tkt-')) {
+                let list = [];
+                try { list = await RS_DB.list('support_tickets'); } catch (e) {}
+                const row = (list || []).find((r) => String(r.id) === String(id) || String(r.ticketNumber) === String(id));
+                if (!row || !row.id) { RS.toast('Ticket not found — reopen module', 'fa-circle-exclamation'); return; }
+                if (act === 'tkt-resolve') row.status = 'resolved';
+                if (act === 'tkt-wait') row.status = 'waiting';
+                if (act === 'tkt-reopen') row.status = 'open';
+                await hubSave('support_tickets', row);
+                RS.toast('Ticket marked ' + row.status, 'fa-headset');
+                close();
+                hubScreen('Support Tickets');
+              } else if (act.startsWith('res-')) {
+                let list = [];
+                try { list = await RS_DB.list('reservations'); } catch (e) {}
+                const row = (list || []).find((r) => String(r.id) === String(id));
+                if (!row || !row.id) { RS.toast('Reservation not found — reopen module', 'fa-circle-exclamation'); return; }
+                if (act === 'res-seat') row.status = 'seated';
+                if (act === 'res-noshow') row.status = 'no_show';
+                if (act === 'res-cancel') row.status = 'cancelled';
+                await hubSave('reservations', row);
+                try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (e) {}
+                RS.toast('Reservation ' + String(row.status).replace('_', ' '), 'fa-calendar-check');
+                close();
+                hubScreen('Reservations');
+              } else if (act.startsWith('off-')) {
+                let list = [];
+                try { list = await RS_DB.list('offers'); } catch (e) {}
+                let row = (list || []).find((r) => String(r.id) === String(id));
+                if (!row && Array.isArray(RS.OFFERS)) row = RS.OFFERS.find((r) => String(r.id) === String(id));
+                if (!row || !row.id) { RS.toast('Offer not found — reopen module', 'fa-circle-exclamation'); return; }
+                row.status = act === 'off-pause' ? 'paused' : 'active';
+                const saved = await hubSave('offers', row);
+                if (Array.isArray(RS.OFFERS)) {
+                  const i = RS.OFFERS.findIndex((r) => String(r.id) === String(id) || String(r.code).toUpperCase() === String(row.code || '').toUpperCase());
+                  if (i >= 0) RS.OFFERS[i] = { ...RS.OFFERS[i], ...row, id: (saved && saved.id) || row.id, status: row.status };
+                }
+                RS.toast(row.status === 'active' ? 'Offer live on POS' : 'Offer paused', 'fa-tags');
+                close();
+                hubScreen('Offers & Coupons');
+              }
+            }).catch((e) => {
+              console.warn(e);
+              RS.toast((e && e.message) ? String(e.message).slice(0, 80) : 'Update failed — try again', 'fa-circle-exclamation');
+            });
           });
 
           const newBtn = modal.querySelector('[data-x]');
@@ -4818,26 +4838,43 @@
                   foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Book Table</button>`,
                   onMount(resModal, resClose) {
                     resModal.querySelector('[data-cancel]').onclick = resClose;
-                    resModal.querySelector('[data-confirm]').onclick = async () => {
-                      const guestName = resModal.querySelector('#res-guest').value || '';
-                      if (!guestName) return RS.toast('Guest name is required', 'fa-circle-exclamation');
+                    const confirmBtn = resModal.querySelector('[data-confirm]');
+                    confirmBtn.onclick = () => hubRunAction(confirmBtn, async () => {
+                      const guestName = (resModal.querySelector('#res-guest').value || '').trim();
+                      if (!guestName) { RS.toast('Guest name is required', 'fa-circle-exclamation'); return; }
                       const guestPhone = (resModal.querySelector('#res-phone').value || '').trim();
                       const date = resModal.querySelector('#res-date').value || _todayISO;
-                      const time = resModal.querySelector('#res-time').value || '19:30';
-                      const pax = Number(resModal.querySelector('#res-pax').value) || 2;
-                      const tableNumber = resModal.querySelector('#res-table').value || '';
-
-                      const id = RS.nextLogicalNo('RES');
-                      const resRow = { id, time, date, guestName, guestPhone, pax, tableNumber, status: 'confirmed' };
-                      resClose();
-                      if (RS.saveOne) {
-                        await RS.saveOne('reservations', resRow);
-                        RS.toast('Reservation booked — table marked reserved', 'fa-circle-check');
-                        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch(e){}
-                        try { if (typeof sendReservationWhatsApp === 'function') await sendReservationWhatsApp({ guestName, guestPhone, tableNumber, date, time, pax }); } catch(e){ console.warn('Reservation WhatsApp failed', e); }
+                      let time = resModal.querySelector('#res-time').value || '19:30';
+                      if (/^\d{2}:\d{2}$/.test(time)) time = time + ':00';
+                      const pax = Math.max(1, Number(resModal.querySelector('#res-pax').value) || 2);
+                      const tableNumber = (resModal.querySelector('#res-table').value || '').trim();
+                      const resRow = {
+                        guestName, guestPhone, pax, tableNumber,
+                        date, time: time.slice(0, 5),
+                        status: 'confirmed',
+                        reserved_for: (() => {
+                          try {
+                            const d = new Date(date + 'T' + time);
+                            return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+                          } catch (e) { return new Date().toISOString(); }
+                        })(),
+                      };
+                      try {
+                        await hubSave('reservations', resRow);
+                        resClose();
+                        RS.toast('Reservation booked · shows on floor for that day', 'fa-circle-check');
+                        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (e) {}
+                        try {
+                          if (typeof sendReservationWhatsApp === 'function') {
+                            await sendReservationWhatsApp({ guestName, guestPhone, tableNumber, date, time: time.slice(0, 5), pax });
+                          }
+                        } catch (e) { console.warn('Reservation WhatsApp failed', e); }
                         hubScreen('Reservations');
+                      } catch (e) {
+                        console.warn(e);
+                        RS.toast('Could not save reservation — check connection', 'fa-circle-exclamation');
                       }
-                    };
+                    });
                   }
                 });
               } else if (name === 'Support Tickets') {
@@ -4876,26 +4913,25 @@
                   foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Open Ticket</button>`,
                   onMount(tktModal, tktClose) {
                     tktModal.querySelector('[data-cancel]').onclick = tktClose;
-                    tktModal.querySelector('[data-confirm]').onclick = async () => {
-                      const customerName = tktModal.querySelector('#tkt-cust').value || 'Guest';
-                      const subject = tktModal.querySelector('#tkt-subject').value || '';
-                      if (!subject) return RS.toast('Subject is required', 'fa-circle-exclamation');
+                    const confirmBtn = tktModal.querySelector('[data-confirm]');
+                    confirmBtn.onclick = () => hubRunAction(confirmBtn, async () => {
+                      const customerName = (tktModal.querySelector('#tkt-cust').value || 'Guest').trim() || 'Guest';
+                      const subject = (tktModal.querySelector('#tkt-subject').value || '').trim();
+                      if (!subject) { RS.toast('Subject is required', 'fa-circle-exclamation'); return; }
                       const priority = tktModal.querySelector('#tkt-priority').value || 'medium';
                       const notes = (tktModal.querySelector('#tkt-notes').value || '').trim();
-
-                      const tktNum = RS.nextLogicalNo('TKT');
-                      const tktRow = { id: tktNum, ticketNumber: tktNum, subject, customerName, priority, status: 'open', notes };
-                      tktClose();
+                      const tktNum = RS.nextLogicalNo ? RS.nextLogicalNo('TKT') : ('TKT-' + Date.now());
+                      const tktRow = { ticketNumber: tktNum, subject, customerName, priority, status: 'open', notes };
                       try {
-                        if (RS.saveOne) await RS.saveOne('support_tickets', tktRow);
-                        else if (window.RS_DB) await RS_DB.put('support_tickets', tktNum, tktRow);
+                        await hubSave('support_tickets', tktRow);
+                        tktClose();
                         RS.toast('Support ticket opened', 'fa-circle-check');
                         hubScreen('Support Tickets');
                       } catch (e) {
                         console.warn(e);
-                        RS.toast('Could not save ticket', 'fa-circle-exclamation');
+                        RS.toast('Could not save ticket — check connection', 'fa-circle-exclamation');
                       }
-                    };
+                    });
                   }
                 });
               } else if (name === 'Offers & Coupons') {
@@ -4931,45 +4967,49 @@
                   foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Create Offer</button>`,
                   onMount(offModal, offClose) {
                     offModal.querySelector('[data-cancel]').onclick = offClose;
-                    offModal.querySelector('[data-confirm]').onclick = async () => {
+                    const confirmBtn = offModal.querySelector('[data-confirm]');
+                    confirmBtn.onclick = () => hubRunAction(confirmBtn, async () => {
                       const code = String(offModal.querySelector('#off-code').value || '')
                         .trim()
-                        .toUpperCase();
-                      if (!code) return RS.toast('Coupon code is required', 'fa-circle-exclamation');
-                      const description = offModal.querySelector('#off-desc').value || 'Discount Coupon';
+                        .toUpperCase()
+                        .replace(/\s+/g, '');
+                      if (!code) { RS.toast('Coupon code is required', 'fa-circle-exclamation'); return; }
+                      const description = (offModal.querySelector('#off-desc').value || '').trim() || code + ' discount';
                       const pct = Math.max(0, Math.min(100, Number(offModal.querySelector('#off-pct').value) || 0));
                       const fixed = Math.max(0, Number(offModal.querySelector('#off-fixed').value) || 0);
                       if (!(pct > 0 || fixed > 0)) {
-                        return RS.toast('Enter percent off or a fixed amount', 'fa-circle-exclamation');
+                        RS.toast('Enter percent off or a fixed amount', 'fa-circle-exclamation');
+                        return;
                       }
-                      const id = RS.nextLogicalNo ? RS.nextLogicalNo('OFF') : 'OFF-' + Date.now();
                       const offRow = {
-                        id,
                         code,
                         description,
                         title: description,
-                        pct,
-                        discount_pct: pct,
+                        pct: fixed > 0 ? 0 : pct,
+                        discount_pct: fixed > 0 ? 0 : pct,
                         fixed,
                         amount: fixed,
                         usageCount: 0,
                         status: 'active',
                       };
-                      offClose();
                       try {
-                        if (RS.saveOne) await RS.saveOne('offers', offRow);
-                        else if (window.RS_DB) await RS_DB.put('offers', id, offRow);
-                        if (Array.isArray(RS.OFFERS)) RS.OFFERS.push(offRow);
+                        const saved = await hubSave('offers', offRow);
+                        if (!Array.isArray(RS.OFFERS)) RS.OFFERS = [];
+                        const merged = { ...offRow, id: saved && saved.id };
+                        const ix = RS.OFFERS.findIndex((o) => String(o.code || '').toUpperCase() === code);
+                        if (ix >= 0) RS.OFFERS[ix] = { ...RS.OFFERS[ix], ...merged };
+                        else RS.OFFERS.unshift(merged);
+                        offClose();
                         RS.toast(
-                          'Offer ' + code + ' · ' + (fixed > 0 ? rs(fixed) + ' off' : pct + '% off'),
+                          'Offer ' + code + ' live on POS · ' + (fixed > 0 ? rs(fixed) + ' off' : pct + '% off'),
                           'fa-circle-check'
                         );
                         hubScreen('Offers & Coupons');
                       } catch (e) {
                         console.warn(e);
-                        RS.toast('Could not save offer', 'fa-circle-exclamation');
+                        RS.toast('Could not save offer — check connection', 'fa-circle-exclamation');
                       }
-                    };
+                    });
                   },
                 });
               } else if (name === 'WhatsApp Campaigns') {
