@@ -547,7 +547,7 @@
               <div class="pg-progress-ring" id="guide-progress-label" aria-live="polite">—</div>
             </header>
             <div class="pg-block-body">
-              <div class="pg-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="guide-progress-bar"><i style="width:0%"></i></div>
+              <div class="pg-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="guide-progress-bar"><span class="pg-bar-fill" style="width:0%"></span></div>
               <div id="guide-setup-summary" class="pg-task-list"></div>
             </div>
           </section>
@@ -649,7 +649,7 @@
     if (progressLabel) progressLabel.textContent = `${percent}%`;
     if (progressBar) {
       progressBar.setAttribute('aria-valuenow', String(percent));
-      const fill = progressBar.querySelector('i');
+      const fill = progressBar.querySelector('.pg-bar-fill') || progressBar.querySelector('span');
       if (fill) fill.style.width = `${percent}%`;
     }
 
