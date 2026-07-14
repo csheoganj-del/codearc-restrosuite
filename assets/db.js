@@ -370,13 +370,43 @@
     },
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
-      from: r => ({ id:r.id, name:r.name, phone:r.phone, visits:num(r.visits), spend:num(r.total_spend),
-                    email:r.email||'', last:r.last_visit, dues:num(r.dues),
-                    marketingOptIn: r.marketing_opt_in !== false,
-                    tier:(num(r.total_spend)>25000?'vip':num(r.total_spend)>12000?'gold':'silver') }),
-      to: o => ({ id:o.id, name:o.name, phone:o.phone, visits:num(o.visits)||1, total_spend:num(o.spend),
-                  email:o.email||'', dues:num(o.dues),
-                  marketing_opt_in: o.marketingOptIn !== false && o.marketing_opt_in !== false })
+      from: r => {
+        const spend = num(r.total_spend);
+        return {
+          id: r.id,
+          name: r.name,
+          phone: r.phone,
+          visits: num(r.visits),
+          spend,
+          email: r.email || '',
+          last: r.last_visit,
+          dues: num(r.dues),
+          notes: r.notes || '',
+          marketingOptIn: r.marketing_opt_in !== false,
+          tier: spend > 10000 ? 'vip' : spend > 5000 ? 'gold' : 'silver',
+        };
+      },
+      to: o => {
+        // Normalize phone to national last-10 when possible to avoid +353 vs 353 duplicates
+        let phone = String(o.phone || '').trim();
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length >= 10) phone = digits.slice(-10);
+        const body = {
+          name: o.name,
+          phone,
+          visits: num(o.visits) || 0,
+          total_spend: num(o.spend),
+          email: o.email || '',
+          dues: num(o.dues),
+          marketing_opt_in: o.marketingOptIn !== false && o.marketing_opt_in !== false,
+        };
+        if (o.last) body.last_visit = o.last;
+        // Only send id when it's a real cloud id (uuid or number)
+        if (o.id != null && (/^[0-9a-f-]{36}$/i.test(String(o.id)) || Number.isFinite(Number(o.id)))) {
+          body.id = o.id;
+        }
+        return body;
+      },
     },
     notifications: {
       table:'doppio_notifications', pk:'id', clientId:true, order:{column:'created_at',ascending:false},

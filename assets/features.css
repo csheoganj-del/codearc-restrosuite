@@ -600,17 +600,39 @@ table.rcp-qr-wrap {
 }
 
 /* ---------------- CUSTOMERS / CRM ---------------- */
-.crm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 14px; }
-.crm-card { border-radius: var(--r-md); border: 1px solid var(--stroke); background: var(--panel); padding: 16px; cursor: pointer; transition: var(--t); }
-.crm-card:hover { transform: translateY(-3px); border-color: var(--stroke-hi); box-shadow: var(--shadow-md); }
-.crm-top { display: flex; align-items: center; gap: 11px; margin-bottom: 13px; }
-.crm-av { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; font-family: var(--font-display); flex: none; }
-.crm-name { font-weight: 700; font-size: 14px; } .crm-phone { font-size: 12px; color: var(--text-mute); }
+.crm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 14px; }
+.crm-card {
+  border-radius: 16px; border: 1px solid var(--stroke); background: var(--panel);
+  padding: 16px; cursor: pointer; transition: var(--t); display: flex; flex-direction: column; gap: 12px;
+  position: relative; overflow: hidden;
+}
+.crm-card:hover { transform: translateY(-2px); border-color: var(--stroke-hi); box-shadow: var(--shadow-md); }
+.crm-card:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.crm-card.has-dues { border-color: rgba(255,79,0,.28); box-shadow: 0 0 0 1px rgba(255,79,0,.06); }
+.crm-top { display: flex; align-items: flex-start; gap: 12px; }
+.crm-av {
+  width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
+  font-weight: 800; color: #fff; font-family: var(--font-display); flex: none; font-size: 15px;
+}
+.crm-name { font-weight: 800; font-size: 14.5px; letter-spacing: -.02em; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.crm-phone { font-size: 12.5px; color: var(--text-mute); margin-top: 3px; font-weight: 500; }
+.crm-meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .crm-stats { display: flex; gap: 8px; }
-.crm-stats .cs { flex: 1; text-align: center; padding: 9px 4px; border-radius: 10px; background: var(--glass); }
-.crm-stats .csv { font-family: var(--font-display); font-weight: 800; font-size: 15px; }
-.crm-stats .csl { font-size: 10px; color: var(--text-mute); text-transform: uppercase; letter-spacing: .06em; }
+.crm-stats .cs { flex: 1; text-align: center; padding: 10px 4px; border-radius: 12px; background: var(--glass); }
+.crm-stats .csv { font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: -.02em; }
+.crm-stats .csl { font-size: 10px; color: var(--text-mute); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.crm-card-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 2px; }
+.crm-card-actions .btn { flex: 1; justify-content: center; font-size: 11.5px; padding: 7px 8px; height: auto; }
+.crm-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 2px; }
+.crm-filters .chip-btn {
+  border: 1px solid var(--stroke); background: var(--panel); border-radius: 999px;
+  padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--text-soft);
+  font-family: inherit;
+}
+.crm-filters .chip-btn.active { background: rgba(255,79,0,.1); border-color: rgba(255,79,0,.35); color: var(--orange); }
+.crm-sort { margin-left: auto; border: 1px solid var(--stroke); background: var(--panel); border-radius: 10px; padding: 7px 10px; font-size: 12px; font-weight: 600; font-family: inherit; color: var(--text); }
 .tier-badge { font-size: 10.5px; font-weight: 800; padding: 2px 9px; border-radius: 99px; text-transform: uppercase; letter-spacing: .05em; }
+.crm-dup-hint { font-size: 11px; color: var(--amber, #b45309); font-weight: 700; }
 .tier-gold { background: var(--amber-tint); color: var(--amber); } .tier-silver { background: var(--glass-3); color: var(--text-soft); } .tier-vip { background: var(--violet-tint); color: var(--violet-soft); }
 
 /* ---------------- SETTINGS ---------------- */

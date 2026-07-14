@@ -3732,25 +3732,113 @@
 
     /* ===================== CUSTOMERS / CRM ===================== */
     const CUSTOMERS = [];
-    const tierCls = {vip:'tier-vip',gold:'tier-gold',silver:'tier-silver'};
-    function renderCustomers(){
+    const tierCls = { vip: 'tier-vip', gold: 'tier-gold', silver: 'tier-silver' };
+    let _crmFilter = 'all';
+    let _crmSort = 'recent';
+
+    function normPhone(p) {
+      const d = String(p == null ? '' : p).replace(/\D/g, '');
+      if (!d) return '';
+      // Ireland/UK/IN: keep last 10 national digits for matching
+      if (d.length > 10) return d.slice(-10);
+      return d;
+    }
+    function formatPhoneDisplay(p) {
+      const raw = String(p == null ? '' : p).trim();
+      const d = raw.replace(/\D/g, '');
+      if (!d) return '—';
+      if (d.length === 10) return '+91 ' + d.slice(0, 5) + ' ' + d.slice(5);
+      if (d.length === 12 && d.startsWith('91')) return '+91 ' + d.slice(2, 7) + ' ' + d.slice(7);
+      if (d.length === 11 && d.startsWith('353')) return '+353 ' + d.slice(3);
+      if (d.length === 12 && d.startsWith('353')) return '+353 ' + d.slice(3);
+      if (raw.startsWith('+')) return raw;
+      return d.length > 10 ? '+' + d : raw;
+    }
+    function phonesMatch(a, b) {
+      const na = normPhone(a);
+      const nb = normPhone(b);
+      if (na && nb && na === nb) return true;
+      return String(a || '').trim() === String(b || '').trim() && !!String(a || '').trim();
+    }
+    function tierFromSpend(spend) {
+      const s = Number(spend) || 0;
+      if (s >= 10000) return 'vip';
+      if (s >= 5000) return 'gold';
+      return 'silver';
+    }
+    function avColor(name) {
+      const colors = RS.avatarColors || ['#FF4F00', '#0F9F6E', '#6366F1', '#D97706', '#DB2777', '#0891B2'];
+      let h = 0;
+      const s = String(name || '');
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return colors[h % colors.length];
+    }
+    function waDigits(phone) {
+      let d = String(phone || '').replace(/\D/g, '');
+      if (d.length === 10) d = '91' + d;
+      return d;
+    }
+
+    function renderCustomers() {
       const sec = $('#customers-tab');
-      if(!sec) return;
-      if(window.RS_DB){
-        sec.innerHTML = '<div class="sr-empty">Loading customers...</div>';
-        RS_DB.list('customers').then(rows => {
-          if (rows && rows.length) {
+      if (!sec) return;
+      if (window.RS_DB) {
+        sec.innerHTML = '<div class="sr-empty"><div class="spin" style="margin:0 auto 10px"></div>Loading customers…</div>';
+        RS_DB.list('customers')
+          .then((rows) => {
             CUSTOMERS.length = 0;
-            rows.forEach(r => CUSTOMERS.push(r));
-          }
-          drawCustomersUI(sec);
-        }).catch(e => {
-          console.warn("Failed loading customers from DB", e);
-          drawCustomersUI(sec);
-        });
+            (rows || []).forEach((r) => CUSTOMERS.push(r));
+            mergeCustomerDuplicatesInPlace();
+            drawCustomersUI(sec);
+          })
+          .catch((e) => {
+            console.warn('Failed loading customers from DB', e);
+            drawCustomersUI(sec);
+          });
       } else {
         drawCustomersUI(sec);
       }
+    }
+
+    /** Collapse near-duplicate CRM rows (same last-10 phone) for a clean UI. */
+    function mergeCustomerDuplicatesInPlace() {
+      const byKey = new Map();
+      const noPhone = [];
+      CUSTOMERS.forEach((r) => {
+        const key = normPhone(r.phone);
+        if (!key) {
+          noPhone.push(r);
+          return;
+        }
+        const prev = byKey.get(key);
+        if (!prev) {
+          byKey.set(key, { ...r, _dupIds: r.id ? [r.id] : [] });
+          return;
+        }
+        const dups = [...(prev._dupIds || [prev.id]), r.id].filter(Boolean);
+        // Prefer the profile with more activity / higher dues as primary
+        const score = (x) =>
+          (Number(x.spend) || 0) * 10 + (Number(x.visits) || 0) * 5 + (Number(x.dues) || 0);
+        const keep = score(r) > score(prev) ? r : prev;
+        const other = keep === r ? prev : r;
+        byKey.set(key, {
+          ...keep,
+          name: keep.name || other.name,
+          email: keep.email || other.email,
+          notes: keep.notes || other.notes,
+          // max dues — same person double-booked shouldn't sum twice
+          dues: Math.max(Number(keep.dues) || 0, Number(other.dues) || 0),
+          visits: Math.max(Number(keep.visits) || 0, Number(other.visits) || 0),
+          spend: Math.max(Number(keep.spend) || 0, Number(other.spend) || 0),
+          phone: formatPhoneDisplay(keep.phone || other.phone),
+          _rawPhone: key,
+          _dupIds: dups,
+          _mergedCount: dups.length,
+        });
+      });
+      CUSTOMERS.length = 0;
+      byKey.forEach((v) => CUSTOMERS.push(v));
+      noPhone.forEach((v) => CUSTOMERS.push(v));
     }
 
     function formatCustBillTime(b) {
@@ -3782,71 +3870,227 @@
       const s = String(t || 'silver').toLowerCase();
       if (s === 'platinum' || s === 'vip') return 'vip';
       if (s === 'gold') return 'gold';
-      if (s === 'bronze') return 'silver'; // map bronze → silver badge
+      if (s === 'bronze') return 'silver';
       return 'silver';
     }
-
-    function drawCustomersUI(sec){
-      // Calculate visits and spend dynamically for each customer from RS.BILLS
+    function billsForCustomer(c) {
       const bills = RS.BILLS || [];
-      CUSTOMERS.forEach(c => {
-        const cBills = bills
-          .filter(
-            (b) =>
-              b.customerPhone === c.phone ||
-              (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name)
-          )
-          .sort((a, b) => billTimeMs(b) - billTimeMs(a));
-        c.visits = cBills.length;
-        c.spend = cBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-        c.last = cBills.length > 0 ? formatCustBillTime(cBills[0]) : 'never';
-        c.tier = normalizeCustTier(c.tier);
+      const name = String(c.name || '').trim().toLowerCase();
+      return bills
+        .filter((b) => {
+          if (phonesMatch(b.customerPhone, c.phone)) return true;
+          const bn = String(b.customerName || '').trim().toLowerCase();
+          if (name && bn && bn === name && bn !== 'walk-in guest' && bn !== 'walk-in') return true;
+          return false;
+        })
+        .sort((a, b) => billTimeMs(b) - billTimeMs(a));
+    }
+    function enrichCustomerStats() {
+      CUSTOMERS.forEach((c) => {
+        const cBills = billsForCustomer(c);
+        const billSpend = cBills.reduce((sum, b) => sum + (Number(b.amount != null ? b.amount : b.total) || 0), 0);
+        const billVisits = cBills.length;
+        // Prefer live bill rollups; fall back to stored CRM fields
+        c.visits = billVisits > 0 ? billVisits : Number(c.visits) || 0;
+        c.spend = billSpend > 0 ? billSpend : Number(c.spend) || 0;
+        c.last = cBills.length > 0 ? formatCustBillTime(cBills[0]) : c.last && c.last !== 'Today' ? c.last : 'never';
+        c.tier = normalizeCustTier(c.tier || tierFromSpend(c.spend));
+        c.phoneDisplay = formatPhoneDisplay(c.phone);
+        c.dues = Number(c.dues) || 0;
       });
+    }
+
+    function drawCustomersUI(sec) {
+      enrichCustomerStats();
 
       const total = CUSTOMERS.length || 1;
-      const repeat = Math.round(CUSTOMERS.filter(c=>c.visits>1).length/total*100);
-      const totalSpend = CUSTOMERS.reduce((a,c)=>a+(c.spend||0),0);
-      const totalDues = CUSTOMERS.reduce((a,c)=>a+(c.dues||0),0);
+      const withVisits = CUSTOMERS.filter((c) => (c.visits || 0) > 0).length || 1;
+      const repeat = Math.round((CUSTOMERS.filter((c) => (c.visits || 0) > 1).length / withVisits) * 100);
+      const totalSpend = CUSTOMERS.reduce((a, c) => a + (c.spend || 0), 0);
+      const totalDues = CUSTOMERS.reduce((a, c) => a + (c.dues || 0), 0);
+      const duesCount = CUSTOMERS.filter((c) => (c.dues || 0) > 0).length;
+      const vipCount = CUSTOMERS.filter((c) => normalizeCustTier(c.tier) === 'vip').length;
+
       sec.innerHTML = `
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Total customers</div><div class="sd" style="display:none"></div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(Math.round(totalSpend/total))}</div><div class="sl">Avg lifetime spend</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a" style="background: rgba(255, 79, 0, 0.1); color: var(--orange);"><i class="fa-solid fa-hand-holding-dollar"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Total Outstanding Dues</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Customers</div><div class="sd">${withVisits} with orders</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div><div class="sd">Among guests with visits</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(Math.round(totalSpend / total))}</div><div class="sl">Avg lifetime spend</div><div class="sd">${rs(totalSpend)} total</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a" style="background:rgba(255,79,0,.1);color:var(--orange)"><i class="fa-solid fa-hand-holding-dollar"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Outstanding dues</div><div class="sd">${duesCount} guest${duesCount === 1 ? '' : 's'}</div></div></div>
         </div>
-        <div class="toolbar-row"><div class="pos-search grow" style="max-width:320px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone..." autocomplete="off"></div><div class="grow"></div><button type="button" class="btn btn-ghost btn-sm" id="btn-crm-broadcast"><i class="fa-brands fa-whatsapp"></i> Broadcast</button><button type="button" class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button></div>
+        <div class="toolbar-row" style="flex-wrap:wrap;gap:10px">
+          <div class="pos-search grow" style="max-width:min(100%,360px);padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name, phone, notes…" autocomplete="off"></div>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-crm-broadcast"><i class="fa-brands fa-whatsapp"></i> Broadcast</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-file-csv"></i> Export</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button>
+        </div>
+        <div class="crm-filters" id="crm-filters">
+          <button type="button" class="chip-btn ${_crmFilter === 'all' ? 'active' : ''}" data-crm-f="all">All</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'dues' ? 'active' : ''}" data-crm-f="dues">Dues${duesCount ? ' · ' + duesCount : ''}</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'vip' ? 'active' : ''}" data-crm-f="vip">VIP${vipCount ? ' · ' + vipCount : ''}</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'gold' ? 'active' : ''}" data-crm-f="gold">Gold</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'repeat' ? 'active' : ''}" data-crm-f="repeat">Repeat</button>
+          <select class="crm-sort" id="crm-sort" aria-label="Sort customers">
+            <option value="recent" ${_crmSort === 'recent' ? 'selected' : ''}>Sort: recent</option>
+            <option value="spend" ${_crmSort === 'spend' ? 'selected' : ''}>Sort: spend</option>
+            <option value="dues" ${_crmSort === 'dues' ? 'selected' : ''}>Sort: dues</option>
+            <option value="name" ${_crmSort === 'name' ? 'selected' : ''}>Sort: name</option>
+            <option value="visits" ${_crmSort === 'visits' ? 'selected' : ''}>Sort: visits</option>
+          </select>
+        </div>
         <div class="crm-grid" id="crm-grid"></div>`;
+
       const grid = $('#crm-grid');
-      function draw(q=''){ const t=q.toLowerCase();
-        const list = CUSTOMERS.filter(c=>String(c.name||'').toLowerCase().includes(t)||String(c.phone||'').includes(t));
+
+      function applyFilterSort(list) {
+        let out = list.slice();
+        if (_crmFilter === 'dues') out = out.filter((c) => (c.dues || 0) > 0);
+        else if (_crmFilter === 'vip') out = out.filter((c) => normalizeCustTier(c.tier) === 'vip');
+        else if (_crmFilter === 'gold') out = out.filter((c) => normalizeCustTier(c.tier) === 'gold');
+        else if (_crmFilter === 'repeat') out = out.filter((c) => (c.visits || 0) > 1);
+        out.sort((a, b) => {
+          if (_crmSort === 'spend') return (b.spend || 0) - (a.spend || 0);
+          if (_crmSort === 'dues') return (b.dues || 0) - (a.dues || 0);
+          if (_crmSort === 'visits') return (b.visits || 0) - (a.visits || 0);
+          if (_crmSort === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
+          // recent: last order / last_visit
+          const ta = a.last && a.last !== 'never' ? Date.parse(a.last) || 0 : 0;
+          const tb = b.last && b.last !== 'never' ? Date.parse(b.last) || 0 : 0;
+          if (tb !== ta) return tb - ta;
+          return (b.spend || 0) - (a.spend || 0);
+        });
+        return out;
+      }
+
+      function draw(q = '') {
+        const t = q.toLowerCase().trim();
+        const digits = t.replace(/\D/g, '');
+        let list = CUSTOMERS.filter((c) => {
+          if (!t) return true;
+          const hay = [c.name, c.phone, c.phoneDisplay, c.email, c.notes].join(' ').toLowerCase();
+          if (hay.includes(t)) return true;
+          if (digits && normPhone(c.phone).includes(digits)) return true;
+          return false;
+        });
+        list = applyFilterSort(list);
+
         if (!CUSTOMERS.length) {
           grid.innerHTML = `<div class="sr-empty" style="grid-column:1/-1;padding:40px 20px">
-            <i class="fa-solid fa-address-book" style="font-size:26px;opacity:.4;display:block;margin-bottom:10px"></i>
-            <div style="font-weight:700;margin-bottom:6px">No customers yet</div>
-            <div style="font-size:13px;color:var(--text-soft);max-width:360px;margin:0 auto 14px;line-height:1.45">Guests from POS bills appear here, or add/import a loyalty profile.</div>
+            <i class="fa-solid fa-address-book" style="font-size:28px;opacity:.35;display:block;margin-bottom:10px"></i>
+            <div style="font-weight:800;margin-bottom:6px;font-size:16px">No customers yet</div>
+            <div style="font-size:13px;color:var(--text-soft);max-width:380px;margin:0 auto 14px;line-height:1.45">Guests from POS bills appear here automatically. You can also add loyalty profiles or import a CSV.</div>
             <button type="button" class="btn btn-primary btn-sm" id="crm-empty-add"><i class="fa-solid fa-user-plus"></i> Add customer</button>
           </div>`;
           const ea = grid.querySelector('#crm-empty-add');
           if (ea) ea.onclick = () => document.getElementById('btn-add-customer')?.click();
           return;
         }
-        grid.innerHTML = list.length ? list.map((c)=>`
-          <div class="crm-card" data-i="${CUSTOMERS.indexOf(c)}" role="button" tabindex="0">
-            <div class="crm-top"><div class="crm-av" style="background:${(RS.avatarColors||['#FF4F00'])[String(c.name||'').length%(RS.avatarColors||['#FF4F00']).length]}">${RS.initials ? RS.initials(c.name) : (c.name||'?')[0]}</div><div style="flex:1"><div class="crm-name">${esc(c.name)} <span class="tier-badge ${esc(tierCls[c.tier||'silver']||'tier-silver')}">${esc(c.tier||'silver')}</span>${c.dues > 0 ? `<span class="pill pill-orange" style="margin-left:6px; font-size:10px; padding: 2px 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Due: ${rs(c.dues)}</span>` : ''}</div><div class="crm-phone">${esc(c.phone)}</div></div></div>
-            <div class="crm-stats"><div class="cs"><div class="csv">${c.visits||0}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend||0)}</div><div class="csl">Spent</div></div><div class="cs"><div class="csv" style="font-size:12px">${esc(c.last||'never')}</div><div class="csl">Last order</div></div></div>
-          </div>`).join('') : '<div class="sr-empty" style="grid-column:1/-1">No customers match your search</div>';
-        $$('.crm-card',grid).forEach(el=> {
-          const open = () => customerModal(CUSTOMERS[+el.dataset.i]);
-          el.onclick = open;
-          el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+
+        if (!list.length) {
+          grid.innerHTML = '<div class="sr-empty" style="grid-column:1/-1">No customers match this filter or search</div>';
+          return;
+        }
+
+        grid.innerHTML = list
+          .map((c) => {
+            const i = CUSTOMERS.indexOf(c);
+            const tier = normalizeCustTier(c.tier);
+            const lastLabel = c.last && c.last !== 'never' ? esc(c.last) : 'No orders';
+            const merged = (c._mergedCount || 0) > 1;
+            return `
+          <div class="crm-card ${c.dues > 0 ? 'has-dues' : ''}" data-i="${i}" role="button" tabindex="0">
+            <div class="crm-top">
+              <div class="crm-av" style="background:${avColor(c.name)}">${RS.initials ? RS.initials(c.name) : esc((c.name || '?')[0] || '?')}</div>
+              <div style="flex:1;min-width:0">
+                <div class="crm-name">
+                  <span style="overflow:hidden;text-overflow:ellipsis">${esc(c.name || 'Guest')}</span>
+                  <span class="tier-badge ${esc(tierCls[tier] || 'tier-silver')}">${esc(tier)}</span>
+                  ${c.dues > 0 ? `<span class="pill pill-orange" style="font-size:10px;padding:2px 7px"><i class="fa-solid fa-triangle-exclamation"></i> ${rs(c.dues)}</span>` : ''}
+                </div>
+                <div class="crm-phone"><i class="fa-solid fa-phone" style="opacity:.45;font-size:10px;margin-right:4px"></i>${esc(c.phoneDisplay || formatPhoneDisplay(c.phone))}</div>
+                ${merged ? `<div class="crm-dup-hint"><i class="fa-solid fa-object-group"></i> Merged ${c._mergedCount} profiles (same phone)</div>` : ''}
+              </div>
+            </div>
+            <div class="crm-stats">
+              <div class="cs"><div class="csv">${c.visits || 0}</div><div class="csl">Visits</div></div>
+              <div class="cs"><div class="csv">${rs(c.spend || 0)}</div><div class="csl">Spent</div></div>
+              <div class="cs"><div class="csv" style="font-size:11.5px;line-height:1.2">${lastLabel}</div><div class="csl">Last order</div></div>
+            </div>
+            <div class="crm-card-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-crm-wa data-i="${i}" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+              ${c.dues > 0 ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${i}" style="background:var(--orange);border-color:var(--orange)"><i class="fa-solid fa-hand-holding-dollar"></i> Settle</button>` : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${i}">Profile</button>`}
+            </div>
+          </div>`;
+          })
+          .join('');
+
+        $$('.crm-card', grid).forEach((el) => {
+          const open = () => {
+            const c = CUSTOMERS[+el.dataset.i];
+            if (c) customerModal(c);
+          };
+          el.onclick = (e) => {
+            if (e.target.closest('[data-crm-wa],[data-crm-settle],[data-crm-open]')) return;
+            open();
+          };
+          el.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              open();
+            }
+          };
+        });
+        $$('[data-crm-wa]', grid).forEach((btn) => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const c = CUSTOMERS[+btn.dataset.i];
+            if (!c) return;
+            const d = waDigits(c.phone);
+            if (!d) return RS.toast('No phone number', 'fa-circle-exclamation');
+            window.open(
+              `https://wa.me/${d}?text=${encodeURIComponent('Hi ' + (c.name || '') + ', thank you for dining with us!')}`,
+              '_blank',
+              'noopener,noreferrer'
+            );
+          };
+        });
+        $$('[data-crm-settle]', grid).forEach((btn) => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const c = CUSTOMERS[+btn.dataset.i];
+            if (c) showSettleDuesModal(c);
+          };
+        });
+        $$('[data-crm-open]', grid).forEach((btn) => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const c = CUSTOMERS[+btn.dataset.i];
+            if (c) customerModal(c);
+          };
         });
       }
-      draw(); $('#crm-search').addEventListener('input', e=>draw(e.target.value));
-      const addCustomerBtn = $('#btn-add-customer');
-      if(addCustomerBtn && !$('#btn-import-customers')) {
-        addCustomerBtn.insertAdjacentHTML('beforebegin', '<button type="button" class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import CSV</button><button type="button" class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-file-csv"></i> Export CSV</button>');
+
+      draw();
+      const searchEl = $('#crm-search');
+      if (searchEl) searchEl.addEventListener('input', (e) => draw(e.target.value));
+      $$('[data-crm-f]', sec).forEach((btn) => {
+        btn.onclick = () => {
+          _crmFilter = btn.getAttribute('data-crm-f') || 'all';
+          $$('[data-crm-f]', sec).forEach((b) => b.classList.toggle('active', b === btn));
+          draw(searchEl ? searchEl.value : '');
+        };
+      });
+      const sortEl = $('#crm-sort');
+      if (sortEl) {
+        sortEl.onchange = () => {
+          _crmSort = sortEl.value || 'recent';
+          draw(searchEl ? searchEl.value : '');
+        };
       }
-      const broadcastBtn = $('#btn-crm-broadcast') || $$('.toolbar-row .btn-ghost', sec).find(b => /Broadcast/i.test(b.textContent || ''));
+
+      const broadcastBtn = $('#btn-crm-broadcast');
       if(broadcastBtn) broadcastBtn.onclick = () => {
         if (!window.RSModal) { RS.toast('Modal module is unavailable', 'fa-circle-exclamation'); return; }
         RSModal.open({ title:'Broadcast to customers', sub:'Compose a WhatsApp message for your customer list', icon:'fa-bullhorn', size:'md',
@@ -4026,47 +4270,76 @@
         input.click();
       };
 
-      $('#btn-add-customer').onclick = () => {
-        RSModal.open({
-          title: 'Add customer', sub: 'Create new loyalty profile', icon: 'fa-user-plus', size: 'sm',
-          body: `<div style="display:flex;flex-direction:column;gap:12px">
-            <div class="form-group"><label>Full Name</label><input class="form-input" id="add-cust-name" placeholder="John Doe"></div>
-            <div class="form-group"><label>Phone Number</label><input class="form-input" id="add-cust-phone" placeholder="+91 99999 99999"></div>
-            <div class="form-group"><label>Email Address</label><input class="form-input" id="add-cust-email" placeholder="john@example.com"></div>
-          </div>`,
-          foot: `<button class="btn btn-ghost" data-x>Cancel</button><button class="btn btn-primary" id="btn-save-new-cust"><i class="fa-solid fa-check"></i> Save Customer</button>`,
-          onMount(modal, close) {
-            modal.querySelector('[data-x]').onclick = close;
-            modal.querySelector('#btn-save-new-cust').onclick = async () => {
-              const name = modal.querySelector('#add-cust-name').value.trim();
-              const phone = modal.querySelector('#add-cust-phone').value.trim();
-              const email = modal.querySelector('#add-cust-email').value.trim();
-              if (!name || !phone) {
-                RS.toast('Name and phone are required', 'fa-circle-exclamation');
-                return;
-              }
-              if (window.RS_DB) {
+      const addBtn = $('#btn-add-customer');
+      if (addBtn) {
+        addBtn.onclick = () => {
+          RSModal.open({
+            title: 'Add customer',
+            sub: 'Loyalty profile · unique phone per guest',
+            icon: 'fa-user-plus',
+            size: 'sm',
+            body: `<div style="display:flex;flex-direction:column;gap:12px">
+              <div class="form-group"><label class="fl">Full name</label><input class="form-input" id="add-cust-name" placeholder="e.g. Priya Sharma" autocomplete="name"></div>
+              <div class="form-group"><label class="fl">Phone (WhatsApp)</label><input class="form-input" id="add-cust-phone" placeholder="+91 98765 43210" inputmode="tel" autocomplete="tel"></div>
+              <div class="form-group"><label class="fl">Email (optional)</label><input class="form-input" id="add-cust-email" placeholder="guest@email.com" autocomplete="email"></div>
+              <p style="font-size:11.5px;color:var(--text-soft);margin:0;line-height:1.4">Phone is normalized (last 10 digits). Existing guests with the same number are updated, not duplicated.</p>
+            </div>`,
+            foot: `<button class="btn btn-ghost" data-x>Cancel</button><button class="btn btn-primary" id="btn-save-new-cust"><i class="fa-solid fa-check"></i> Save</button>`,
+            onMount(modal, close) {
+              modal.querySelector('[data-x]').onclick = close;
+              const saveBtn = modal.querySelector('#btn-save-new-cust');
+              saveBtn.onclick = async () => {
+                const name = modal.querySelector('#add-cust-name').value.trim();
+                const phoneRaw = modal.querySelector('#add-cust-phone').value.trim();
+                const email = modal.querySelector('#add-cust-email').value.trim();
+                const phoneKey = normPhone(phoneRaw);
+                if (!name || phoneKey.length < 8) {
+                  RS.toast('Name and a valid phone are required', 'fa-circle-exclamation');
+                  return;
+                }
+                const phone = phoneKey.length === 10 ? phoneKey : phoneRaw.replace(/\s+/g, '');
+                saveBtn.disabled = true;
                 try {
+                  // Upsert by phone if exists
+                  let existing = CUSTOMERS.find((x) => phonesMatch(x.phone, phone));
+                  if (!existing && window.RS_DB) {
+                    try {
+                      const all = await RS_DB.list('customers');
+                      existing = (all || []).find((x) => phonesMatch(x.phone, phone));
+                    } catch (e) {}
+                  }
                   const newCust = {
-                    id: 'cust-' + Date.now(),
-                    name, phone, email,
-                    visits: 1, spend: 0, last: 'Today', tier: 'silver'
+                    id: existing && existing.id ? existing.id : undefined,
+                    name,
+                    phone,
+                    email,
+                    visits: existing ? existing.visits || 0 : 0,
+                    spend: existing ? existing.spend || 0 : 0,
+                    dues: existing ? existing.dues || 0 : 0,
+                    last: existing ? existing.last : null,
+                    tier: existing ? normalizeCustTier(existing.tier) : 'silver',
+                    notes: existing ? existing.notes || '' : '',
                   };
-                  await RS_DB.put('customers', newCust.id, newCust);
-                  RS.toast('Customer saved successfully', 'fa-circle-check');
+                  if (window.RS_DB) {
+                    const saved = await RS_DB.put('customers', newCust.id, newCust);
+                    if (saved && saved.id) newCust.id = saved.id;
+                  } else if (RS.saveOne) {
+                    await RS.saveOne('customers', { ...newCust, id: newCust.id || 'cust-' + phone });
+                  }
+                  RS.toast(existing ? 'Customer updated · ' + name : 'Customer saved · ' + name, 'fa-circle-check');
                   close();
                   renderCustomers();
-                } catch(e) {
-                  console.warn("Failed saving customer", e);
-                  RS.toast('Customer save failed: '+e.message, 'fa-circle-exclamation');
+                } catch (e) {
+                  console.warn('Failed saving customer', e);
+                  RS.toast('Save failed: ' + (e.message || 'try again'), 'fa-circle-exclamation');
+                } finally {
+                  saveBtn.disabled = false;
                 }
-              } else {
-                close();
-              }
-            };
-          }
-        });
-      };
+              };
+            },
+          });
+        };
+      }
     }
     function showSettleDuesModal(c, closeParentModal) {
       if (!c) return;
@@ -4205,17 +4478,11 @@
 
     function customerModal(c){
       if (!c) return;
-      const custBills = (RS.BILLS || [])
-        .filter(
-          (b) =>
-            b.customerPhone === c.phone ||
-            (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name)
-        )
-        .sort((a, b) => billTimeMs(b) - billTimeMs(a));
+      const custBills = billsForCustomer(c);
       const history = custBills.slice(0, 12).map((b) => [
         formatCustBillTime(b),
         (b._items || []).map((i) => `${i.name} x${i.qty}`).join(', ') || (b.items != null ? b.items + ' items' : '—'),
-        b.amount,
+        Number(b.amount != null ? b.amount : b.total) || 0,
       ]);
 
       const avgVisit = c.visits > 0 ? Math.round(c.spend/c.visits) : 0;
@@ -4228,17 +4495,20 @@
               ? Math.round(c.spend / 100)
               : 0;
       const tierLabel = String(normalizeCustTier(c.tier) || 'silver').toUpperCase();
+      const phoneShow = formatPhoneDisplay(c.phone);
 
-      RSModal.open({ title:c.name, sub:c.phone+' · '+tierLabel+' member · '+points+' pts', icon:'fa-user', size:'md',
+      RSModal.open({ title:c.name, sub:phoneShow+' · '+tierLabel+' · '+points+' pts', icon:'fa-user', size:'md',
         body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits||0}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend||0)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${rs(avgVisit)}</div><div class="csl">Avg / visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${points}</div><div class="csl">Points</div></div></div>
+          ${(c._mergedCount || 0) > 1 ? `<div style="font-size:12px;color:#b45309;margin-bottom:10px;font-weight:700"><i class="fa-solid fa-object-group"></i> ${c._mergedCount} CRM rows shared this phone — shown as one guest</div>` : ''}
           ${c.notes ? `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:12px;padding:8px 10px;background:var(--glass);border-radius:8px"><i class="fa-solid fa-sticky-note"></i> ${esc(c.notes)}</div>` : ''}
+          ${c.email ? `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:12px"><i class="fa-solid fa-envelope" style="opacity:.5"></i> ${esc(c.email)}</div>` : ''}
           ${c.dues > 0 ? `
-          <div style="background:var(--orange-tint); border:1px solid rgba(255,107,0,0.3); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="background:var(--orange-tint); border:1px solid rgba(255,107,0,0.3); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
             <div style="font-size:13px; color:var(--text); font-weight:700;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--orange); margin-right:6px;"></i> Outstanding dues: <span style="color:var(--orange); font-size:15px; font-weight:800;">${rs(c.dues)}</span></div>
             <button type="button" class="btn btn-sm btn-primary" style="background:var(--orange); border-color:var(--orange); font-size:11px;" id="modal-settle-dues-btn">Settle now</button>
           </div>` : ''}
-          <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3></div>
-          <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td style="white-space:nowrap">${esc(h[0])}</td><td style="color:var(--text-soft)">${esc(h[1])}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history</td></tr>'}</tbody></table>`,
+          <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3><span class="ph-sub">${custBills.length} total</span></div>
+          <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td style="white-space:nowrap">${esc(h[0])}</td><td style="color:var(--text-soft)">${esc(h[1])}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history yet — visits appear after POS bills with this phone</td></tr>'}</tbody></table>`,
         foot:`<button type="button" class="btn btn-ghost btn-sm" data-edit title="Edit profile"><i class="fa-solid fa-pen"></i></button>
               <button type="button" class="btn btn-ghost btn-sm" data-del title="Delete customer" style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
               <button type="button" class="btn btn-ghost" style="flex:1" data-wa><i class="fa-brands fa-whatsapp"></i> Message</button>
@@ -4246,9 +4516,10 @@
               <button type="button" class="btn btn-ghost" style="flex:1; border:1px solid var(--stroke-2)" data-offer><i class="fa-solid fa-tags"></i> Offer</button>`,
         onMount(modal,close){
           modal.querySelector('[data-wa]').onclick=()=>{
-            window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent('Hi '+c.name+', thank you for dining with us.')}`, '_blank', 'noopener,noreferrer');
-            close();
-            RS.toast('WhatsApp message ready for '+c.name,'fa-whatsapp');
+            const d = waDigits(c.phone);
+            if (!d) return RS.toast('No phone number', 'fa-circle-exclamation');
+            window.open(`https://wa.me/${d}?text=${encodeURIComponent('Hi '+c.name+', thank you for dining with us.')}`, '_blank', 'noopener,noreferrer');
+            RS.toast('WhatsApp ready for '+c.name,'fa-whatsapp');
           };
           const editBtn = modal.querySelector('[data-edit]');
           if (editBtn)
@@ -4293,9 +4564,9 @@
                   const code = 'OFR' + Math.random().toString(36).slice(2,7).toUpperCase();
                   const expiry = new Date(Date.now() + days*24*60*60*1000).toLocaleDateString();
                   const msg = `Hi ${c.name}! ${title} -- use code ${code} for ${pct}% off, valid until ${expiry}.`;
-                  const offerRow = { id: 'offer_'+Date.now(), code, title, pct, discount_pct: pct, customerPhone: c.phone, customerName: c.name, createdAt: new Date().toISOString(), expiresAt: expiry, status: 'sent' };
-                  try { if (window.RS_DB) await RS_DB.put('offers', offerRow.id, offerRow); } catch(e) { console.warn('Failed to save offer record', e); }
-                  window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+                  const offerRow = { code, title, pct, discount_pct: pct, fixed: 0, customerPhone: c.phone, customerName: c.name, createdAt: new Date().toISOString(), expiresAt: expiry, status: 'sent' };
+                  try { if (window.RS_DB) await RS_DB.put('offers', null, offerRow); } catch(e) { console.warn('Failed to save offer record', e); }
+                  window.open(`https://wa.me/${waDigits(c.phone)}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
                   closeOffer();
                   close();
                   RS.toast('Offer '+code+' sent to '+c.name, 'fa-tags');
@@ -4349,8 +4620,9 @@
               RS.toast('Name and phone required', 'fa-circle-exclamation');
               return;
             }
+            const phoneKey = normPhone(phone);
             c.name = name;
-            c.phone = phone;
+            c.phone = phoneKey.length === 10 ? phoneKey : phone;
             c.email = modal.querySelector('#edit-cust-email').value.trim();
             c.tier = normalizeCustTier(modal.querySelector('#edit-cust-tier').value);
             c.notes = modal.querySelector('#edit-cust-notes').value.trim();
