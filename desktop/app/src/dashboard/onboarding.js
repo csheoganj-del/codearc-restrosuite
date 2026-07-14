@@ -771,14 +771,25 @@
     }
   }
 
-  function openGuide() {
+  function openGuide(ev) {
+    if (ev && typeof ev.preventDefault === 'function') {
+      try { ev.preventDefault(); ev.stopPropagation(); } catch (_) {}
+    }
     injectGuide();
     const modal = document.getElementById('product-guide-modal');
+    if (!modal) return;
+    // Already open — refresh content, don't require a second click
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('product-guide-open');
     renderGuide(document.getElementById('guide-search')?.value || '');
-    setTimeout(() => document.getElementById('guide-search')?.focus(), 50);
+    // Focus search only after content paints (avoid stealing first click)
+    setTimeout(() => {
+      const search = document.getElementById('guide-search');
+      if (search && document.activeElement !== search) {
+        try { search.focus({ preventScroll: true }); } catch (_) { search.focus(); }
+      }
+    }, 120);
   }
 
   function closeGuide() {
@@ -1081,6 +1092,8 @@
   window.endOnboardingTour = endTour;
   window.startOnboardingTour = startTour;
   window.startUpdateTour = startUpdateTour;
+  window.__rsOpenProductGuide = openGuide;
+  window.__rsProductGuideReady = true;
   window.openProductGuide = openGuide;
   window.closeProductGuide = closeGuide;
   window.openUpdateHistoryModal = openUpdateHistoryModal;

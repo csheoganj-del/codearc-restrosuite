@@ -175,11 +175,16 @@
 .tb-right #tb-wa-status-btn,
 .tb-right #tb-notif-btn,
 .tb-right #tb-call-support,
-.sb-foot #open-settings {
+.sb-foot #open-settings,
+.sb-foot #open-product-guide-btn {
   pointer-events: auto !important;
   cursor: pointer !important;
   position: relative;
   z-index: 2;
+}
+.sb-foot #open-product-guide-btn[aria-busy="true"] {
+  opacity: 0.7;
+  cursor: wait !important;
 }
 /* Support popover (Call + WhatsApp support) */
 .tb-support-wrap {

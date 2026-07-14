@@ -449,7 +449,7 @@
         <span class="hide-collapsed" id="role-switch-label" style="font-size:12px">Owner view</span>
       </div>
       <button type="button" class="sb-foot-btn" id="open-settings" title="Settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
-      <button type="button" class="sb-foot-btn" id="open-product-guide-btn" title="Help &amp; setup" onclick="window.openProductGuide &amp;&amp; window.openProductGuide()"><i class="fa-solid fa-circle-question"></i><span>Help</span></button>
+      <button type="button" class="sb-foot-btn" id="open-product-guide-btn" title="Help &amp; setup"><i class="fa-solid fa-circle-question"></i><span>Help</span></button>
       <button type="button" class="sb-foot-btn logout" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
     </div>
   </aside>
@@ -1894,12 +1894,67 @@
         'assets/features-editor.js',
         'assets/features-manage.js',
         'assets/features-growth.js',
-        'assets/features-extra.js',
-        'src/dashboard/onboarding.js'
+        'assets/features-extra.js'
       ];
       rest.forEach(function(src, i) {
         setTimeout(function() { loadScript(src).catch(function(){}); }, 800 + i * 400);
       });
+    }
+
+    // Help must work on first click — never require waiting for idle preload.
+    // Stub opens guide after loading onboarding.js (or immediately if already ready).
+    window.RS_loadProductGuide = function() {
+      return loadScript('src/dashboard/onboarding.js');
+    };
+    window.openProductGuide = function openProductGuideStub(ev) {
+      if (ev && ev.preventDefault) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+      if (window.__rsProductGuideReady && typeof window.__rsOpenProductGuide === 'function') {
+        window.__rsOpenProductGuide();
+        return;
+      }
+      var btn = document.getElementById('open-product-guide-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+      }
+      window.RS_loadProductGuide()
+        .then(function() {
+          if (btn) {
+            btn.disabled = false;
+            btn.removeAttribute('aria-busy');
+          }
+          if (typeof window.__rsOpenProductGuide === 'function') {
+            window.__rsOpenProductGuide();
+          } else if (typeof window.openProductGuide === 'function' && window.openProductGuide !== openProductGuideStub) {
+            window.openProductGuide();
+          }
+        })
+        .catch(function() {
+          if (btn) {
+            btn.disabled = false;
+            btn.removeAttribute('aria-busy');
+          }
+          if (window.RS && typeof RS.toast === 'function') {
+            RS.toast('Help is still loading — try again in a moment', 'fa-circle-info');
+          }
+        });
+    };
+
+    function wireHelpButton() {
+      var btn = document.getElementById('open-product-guide-btn');
+      if (!btn || btn.dataset.helpWired === '1') return;
+      btn.dataset.helpWired = '1';
+      btn.addEventListener('click', function(e) {
+        window.openProductGuide(e);
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', wireHelpButton);
+    } else {
+      wireHelpButton();
     }
 
     loadSeq(pre)
@@ -1914,6 +1969,10 @@
         return loadSeq(['assets/receipt.js', 'assets/competitive-ops.js']).catch(function() {});
       })
       .then(function() { return loadSeq(post); })
+      .then(function() {
+        // Load Help/Guide right after shell so first click is instant once ready
+        return loadScript('src/dashboard/onboarding.js').catch(function() {});
+      })
       .then(function() {
         if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 5000 });
         else setTimeout(preloadRest, 2500);
