@@ -2637,12 +2637,14 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 .product-guide-body {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 16px 20px 8px;
+  padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Next step strip */
@@ -2707,7 +2709,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   border: 1px solid var(--stroke-2, #e5e7eb);
   border-radius: 12px;
   background: color-mix(in srgb, var(--glass, #f8fafc) 40%, var(--panel, #fff));
-  overflow: hidden;
+  overflow: visible;
 }
 .pg-block-head {
   display: flex;
@@ -2926,17 +2928,21 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 .pg-feature-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  align-items: start;
+  grid-auto-rows: auto;
 }
 .pg-feature {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px;
+  padding: 14px 14px 12px;
   border-radius: 12px;
   border: 1px solid var(--stroke-2, #e5e7eb);
   background: var(--panel-solid, var(--panel, #fff));
-  min-height: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 .pg-feature:hover {
@@ -2992,7 +2998,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-soft, #64748b);
-  flex: 1;
+  flex: 0 1 auto;
+  overflow: visible;
+  word-break: break-word;
 }
 .pg-feature-try {
   margin: 0;
@@ -3011,7 +3019,8 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 }
 .pg-feature-open {
   align-self: flex-start;
-  margin-top: auto;
+  margin-top: 4px;
+  flex: none;
 }
 
 .pg-pill {
