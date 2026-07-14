@@ -3736,29 +3736,75 @@
     let _crmFilter = 'all';
     let _crmSort = 'recent';
 
+    /** National mobile key for matching (+353 85… and 85… become the same). */
     function normPhone(p) {
-      const d = String(p == null ? '' : p).replace(/\D/g, '');
+      let d = String(p == null ? '' : p).replace(/\D/g, '');
       if (!d) return '';
-      // Ireland/UK/IN: keep last 10 national digits for matching
-      if (d.length > 10) return d.slice(-10);
+      if (d.startsWith('00')) d = d.slice(2);
+      // Country codes
+      if (d.startsWith('353')) d = d.slice(3); // Ireland
+      else if (d.startsWith('91') && d.length >= 12) d = d.slice(2); // India
+      else if (d.startsWith('44') && d.length >= 12) d = d.slice(2); // UK
+      else if (d.startsWith('1') && d.length === 11) d = d.slice(1); // NANP
+      // National trunk prefix
+      if (d.startsWith('0') && d.length >= 9) d = d.slice(1);
       return d;
     }
     function formatPhoneDisplay(p) {
       const raw = String(p == null ? '' : p).trim();
+      if (!raw) return '—';
       const d = raw.replace(/\D/g, '');
-      if (!d) return '—';
-      if (d.length === 10) return '+91 ' + d.slice(0, 5) + ' ' + d.slice(5);
-      if (d.length === 12 && d.startsWith('91')) return '+91 ' + d.slice(2, 7) + ' ' + d.slice(7);
-      if (d.length === 11 && d.startsWith('353')) return '+353 ' + d.slice(3);
-      if (d.length === 12 && d.startsWith('353')) return '+353 ' + d.slice(3);
-      if (raw.startsWith('+')) return raw;
-      return d.length > 10 ? '+' + d : raw;
+      const nat = normPhone(raw);
+      // Ireland: national 8xxxxxxxx (9 digits)
+      if (d.startsWith('353') || (nat.length === 9 && nat.charAt(0) === '8')) {
+        const n = nat.length === 9 ? nat : d.replace(/^3530?/, '');
+        if (n.length === 9) return '+353 ' + n.slice(0, 2) + ' ' + n.slice(2, 5) + ' ' + n.slice(5);
+      }
+      // India 10-digit national
+      if (nat.length === 10) {
+        return '+91 ' + nat.slice(0, 5) + ' ' + nat.slice(5);
+      }
+      if (raw.startsWith('+') && d.length >= 10) {
+        return '+' + d;
+      }
+      return nat || raw;
     }
     function phonesMatch(a, b) {
       const na = normPhone(a);
       const nb = normPhone(b);
       if (na && nb && na === nb) return true;
-      return String(a || '').trim() === String(b || '').trim() && !!String(a || '').trim();
+      // Partial overlap (9 vs 10 digit national)
+      if (na && nb && na.length >= 8 && nb.length >= 8) {
+        if (na.endsWith(nb) || nb.endsWith(na)) return true;
+      }
+      return false;
+    }
+    function formatVisitLabel(raw) {
+      if (raw == null || raw === '' || raw === 'never' || raw === 'Never' || raw === 'Today') {
+        if (raw === 'Today') {
+          try {
+            return new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+          } catch (_) { return 'Today'; }
+        }
+        return 'No orders';
+      }
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) {
+        try {
+          return d.toLocaleString(undefined, {
+            day: 'numeric',
+            month: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          });
+        } catch (_) {
+          return d.toLocaleDateString();
+        }
+      }
+      // Already human string
+      if (!/T\d{2}:\d{2}/.test(String(raw))) return String(raw);
+      return '—';
     }
     function tierFromSpend(spend) {
       const s = Number(spend) || 0;
@@ -3775,7 +3821,13 @@
     }
     function waDigits(phone) {
       let d = String(phone || '').replace(/\D/g, '');
-      if (d.length === 10) d = '91' + d;
+      if (!d) return '';
+      const nat = normPhone(phone);
+      // Ireland 9-digit mobile starting 8
+      if (nat.length === 9 && nat.startsWith('8')) return '353' + nat;
+      // India 10-digit
+      if (nat.length === 10) return '91' + nat;
+      if (d.startsWith('00')) d = d.slice(2);
       return d;
     }
 
@@ -3830,10 +3882,10 @@
           dues: Math.max(Number(keep.dues) || 0, Number(other.dues) || 0),
           visits: Math.max(Number(keep.visits) || 0, Number(other.visits) || 0),
           spend: Math.max(Number(keep.spend) || 0, Number(other.spend) || 0),
-          phone: formatPhoneDisplay(keep.phone || other.phone),
+          phone: keep.phone || other.phone,
           _rawPhone: key,
-          _dupIds: dups,
-          _mergedCount: dups.length,
+          _dupIds: [...new Set(dups)],
+          _mergedCount: new Set(dups).size,
         });
       });
       CUSTOMERS.length = 0;
@@ -3843,22 +3895,7 @@
 
     function formatCustBillTime(b) {
       const raw = b && (b.dateTime || b.time || b.created_at || '');
-      if (!raw) return '—';
-      const d = new Date(raw);
-      if (!Number.isNaN(d.getTime())) {
-        try {
-          return d.toLocaleString(undefined, {
-            day: '2-digit',
-            month: 'short',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          });
-        } catch (_) {
-          return d.toLocaleString();
-        }
-      }
-      return String(raw);
+      return formatVisitLabel(raw);
     }
     function billTimeMs(b) {
       const raw = b && (b.dateTime || b.time || b.created_at);
@@ -3893,7 +3930,8 @@
         // Prefer live bill rollups; fall back to stored CRM fields
         c.visits = billVisits > 0 ? billVisits : Number(c.visits) || 0;
         c.spend = billSpend > 0 ? billSpend : Number(c.spend) || 0;
-        c.last = cBills.length > 0 ? formatCustBillTime(cBills[0]) : c.last && c.last !== 'Today' ? c.last : 'never';
+        if (cBills.length > 0) c.last = formatCustBillTime(cBills[0]);
+        else c.last = formatVisitLabel(c.last);
         c.tier = normalizeCustTier(c.tier || tierFromSpend(c.spend));
         c.phoneDisplay = formatPhoneDisplay(c.phone);
         c.dues = Number(c.dues) || 0;
@@ -3997,30 +4035,42 @@
           .map((c) => {
             const i = CUSTOMERS.indexOf(c);
             const tier = normalizeCustTier(c.tier);
-            const lastLabel = c.last && c.last !== 'never' ? esc(c.last) : 'No orders';
+            const lastLabel = esc(formatVisitLabel(c.last));
             const merged = (c._mergedCount || 0) > 1;
+            const initials = RS.initials
+              ? RS.initials(c.name)
+              : String(c.name || '?')
+                  .split(/\s+/)
+                  .map((w) => w[0] || '')
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase() || '?';
             return `
           <div class="crm-card ${c.dues > 0 ? 'has-dues' : ''}" data-i="${i}" role="button" tabindex="0">
             <div class="crm-top">
-              <div class="crm-av" style="background:${avColor(c.name)}">${RS.initials ? RS.initials(c.name) : esc((c.name || '?')[0] || '?')}</div>
-              <div style="flex:1;min-width:0">
+              <div class="crm-av" style="background:${avColor(c.name)}">${esc(initials)}</div>
+              <div class="crm-name-block">
                 <div class="crm-name">
-                  <span style="overflow:hidden;text-overflow:ellipsis">${esc(c.name || 'Guest')}</span>
+                  <span>${esc(c.name || 'Guest')}</span>
                   <span class="tier-badge ${esc(tierCls[tier] || 'tier-silver')}">${esc(tier)}</span>
-                  ${c.dues > 0 ? `<span class="pill pill-orange" style="font-size:10px;padding:2px 7px"><i class="fa-solid fa-triangle-exclamation"></i> ${rs(c.dues)}</span>` : ''}
+                  ${c.dues > 0 ? `<span class="crm-due-pill">Due ${rs(c.dues)}</span>` : ''}
                 </div>
-                <div class="crm-phone"><i class="fa-solid fa-phone" style="opacity:.45;font-size:10px;margin-right:4px"></i>${esc(c.phoneDisplay || formatPhoneDisplay(c.phone))}</div>
-                ${merged ? `<div class="crm-dup-hint"><i class="fa-solid fa-object-group"></i> Merged ${c._mergedCount} profiles (same phone)</div>` : ''}
+                <div class="crm-phone"><i class="fa-solid fa-phone"></i>${esc(c.phoneDisplay || formatPhoneDisplay(c.phone))}</div>
+                ${merged ? `<div class="crm-dup-hint">Merged ${c._mergedCount} saved profiles</div>` : ''}
               </div>
             </div>
             <div class="crm-stats">
               <div class="cs"><div class="csv">${c.visits || 0}</div><div class="csl">Visits</div></div>
               <div class="cs"><div class="csv">${rs(c.spend || 0)}</div><div class="csl">Spent</div></div>
-              <div class="cs"><div class="csv" style="font-size:11.5px;line-height:1.2">${lastLabel}</div><div class="csl">Last order</div></div>
+              <div class="cs"><div class="csv" style="font-size:12px;font-weight:600">${lastLabel}</div><div class="csl">Last order</div></div>
             </div>
             <div class="crm-card-actions">
-              <button type="button" class="btn btn-ghost btn-sm" data-crm-wa data-i="${i}" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
-              ${c.dues > 0 ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${i}" style="background:var(--orange);border-color:var(--orange)"><i class="fa-solid fa-hand-holding-dollar"></i> Settle</button>` : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${i}">Profile</button>`}
+              <button type="button" class="btn btn-ghost btn-sm" data-crm-wa data-i="${i}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+              ${
+                c.dues > 0
+                  ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${i}" style="background:var(--orange);border-color:var(--orange)"><i class="fa-solid fa-indian-rupee-sign"></i> Settle</button>`
+                  : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${i}"><i class="fa-solid fa-user"></i> Profile</button>`
+              }
             </div>
           </div>`;
           })

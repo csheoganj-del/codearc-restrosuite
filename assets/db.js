@@ -387,10 +387,14 @@
         };
       },
       to: o => {
-        // Normalize phone to national last-10 when possible to avoid +353 vs 353 duplicates
-        let phone = String(o.phone || '').trim();
-        const digits = phone.replace(/\D/g, '');
-        if (digits.length >= 10) phone = digits.slice(-10);
+        // National mobile only — strip country codes so +353 85… and 85… store the same
+        let digits = String(o.phone || '').replace(/\D/g, '');
+        if (digits.startsWith('00')) digits = digits.slice(2);
+        if (digits.startsWith('353')) digits = digits.slice(3);
+        else if (digits.startsWith('91') && digits.length >= 12) digits = digits.slice(2);
+        else if (digits.startsWith('44') && digits.length >= 12) digits = digits.slice(2);
+        if (digits.startsWith('0') && digits.length >= 9) digits = digits.slice(1);
+        const phone = digits || String(o.phone || '').trim();
         const body = {
           name: o.name,
           phone,
@@ -400,8 +404,11 @@
           dues: num(o.dues),
           marketing_opt_in: o.marketingOptIn !== false && o.marketing_opt_in !== false,
         };
-        if (o.last) body.last_visit = o.last;
-        // Only send id when it's a real cloud id (uuid or number)
+        // Only ISO / parseable dates for last_visit (avoid "Jul 13, 11:18 AM" parse noise)
+        if (o.last) {
+          const t = Date.parse(o.last);
+          if (!Number.isNaN(t)) body.last_visit = new Date(t).toISOString();
+        }
         if (o.id != null && (/^[0-9a-f-]{36}$/i.test(String(o.id)) || Number.isFinite(Number(o.id)))) {
           body.id = o.id;
         }
