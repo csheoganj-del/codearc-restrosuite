@@ -1682,8 +1682,13 @@
     return new Promise((resolve) => {
       try {
         if (!global.QRCode || !bill || !bill.no) return resolve(null);
-        const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
-        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${slug}/${bill.no}`;
+        const digitalUrl =
+          (global.RSReceiptEngine && typeof RSReceiptEngine.digitalBillUrl === 'function')
+            ? RSReceiptEngine.digitalBillUrl(bill.no)
+            : (() => {
+                const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+                return `https://restrosuite.codearc.co.in/bill?slug=${encodeURIComponent(slug)}&no=${encodeURIComponent(bill.no)}`;
+              })();
         global.QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
           resolve(err ? null : url);
         });

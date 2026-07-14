@@ -232,9 +232,15 @@
         if (!global.QRCode || !bill) return resolve(null);
         const no = bill.no || bill.orderId || bill.id;
         if (!no) return resolve(null);
-        const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+        const digitalUrl =
+          (global.RSReceiptEngine && typeof RSReceiptEngine.digitalBillUrl === 'function')
+            ? RSReceiptEngine.digitalBillUrl(no)
+            : (() => {
+                const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+                return `https://restrosuite.codearc.co.in/bill?slug=${encodeURIComponent(slug)}&no=${encodeURIComponent(no)}`;
+              })();
         global.QRCode.toDataURL(
-          `https://restrosuite.codearc.co.in/bill/${slug}/${no}`,
+          digitalUrl,
           { width: 200, margin: 1 },
           (err, url) => resolve(err ? null : url)
         );

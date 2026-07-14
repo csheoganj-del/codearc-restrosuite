@@ -1058,8 +1058,14 @@
           resolve(null);
           return;
         }
-        const tenantSlug = sessionStorage.getItem('tenant_slug') || 'outlet';
-        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${tenantSlug}/${bill.no}`;
+        // Query form works on production; path form /bill/slug/no returns 404
+        const digitalUrl =
+          (window.RSReceiptEngine && typeof RSReceiptEngine.digitalBillUrl === 'function')
+            ? RSReceiptEngine.digitalBillUrl(bill.no)
+            : (() => {
+                const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+                return `https://restrosuite.codearc.co.in/bill?slug=${encodeURIComponent(slug)}&no=${encodeURIComponent(bill.no)}`;
+              })();
         QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
           if (err) {
             console.error('[QR Generation Error]', err);

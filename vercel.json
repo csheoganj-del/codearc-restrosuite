@@ -33,8 +33,12 @@
   ],
   "rewrites": [
     {
-      "source": "/bill/:tenantSlug/:billNo",
+      "source": "/bill/:tenantSlug/:billNo*",
       "destination": "/bill.html?slug=:tenantSlug&no=:billNo"
+    },
+    {
+      "source": "/bill",
+      "destination": "/bill.html"
     },
     {
       "source": "/login",

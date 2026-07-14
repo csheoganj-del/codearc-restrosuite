@@ -313,13 +313,25 @@
         return `${symbol} ${formatted}`;
       }
 
-      // Parse parameters
+      // Parse parameters — prefer query (?slug=&no=), also accept path /bill/:slug/:no
       const params = new URLSearchParams(window.location.search);
-      const tenantSlug = params.get('slug');
-      const billNo = params.get('no');
+      let tenantSlug = params.get('slug') || params.get('tenant') || params.get('outlet');
+      let billNo = params.get('no') || params.get('bill') || params.get('orderId');
 
       if (!tenantSlug || !billNo) {
-        showError("Invalid digital receipt URL. Missing outlet slug or bill number.");
+        try {
+          const parts = (location.pathname || '').replace(/\/+$/, '').split('/').filter(Boolean);
+          // …/bill/{slug}/{billNo}
+          const bi = parts.map((p) => p.toLowerCase()).lastIndexOf('bill');
+          if (bi >= 0 && parts[bi + 1] && parts[bi + 2]) {
+            tenantSlug = tenantSlug || decodeURIComponent(parts[bi + 1]);
+            billNo = billNo || decodeURIComponent(parts.slice(bi + 2).join('/'));
+          }
+        } catch (_) {}
+      }
+
+      if (!tenantSlug || !billNo) {
+        showError("Invalid digital receipt URL. Missing outlet slug or bill number. Open the link from a RestroSuite receipt QR.");
         return;
       }
 

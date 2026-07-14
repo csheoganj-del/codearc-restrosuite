@@ -384,13 +384,51 @@
     else setTimeout(run, 1500);
   }
 
+  /**
+   * Public digital bill URL for QR codes.
+   * IMPORTANT: use query form `/bill?slug=&no=` — production returns 404 for
+   * path form `/bill/:slug/:no` (rewrite not applied on host).
+   */
+  function resolveTenantSlug() {
+    try {
+      const fromSess = sessionStorage.getItem('tenant_slug') || sessionStorage.getItem('outlet_slug');
+      if (fromSess) return String(fromSess).trim();
+    } catch (_) {}
+    try {
+      const s = global.RS_SETTINGS || {};
+      const cand = s.set_outlet_code || s.set_tenant_slug || s.tenant_slug;
+      if (cand) return String(cand).trim();
+    } catch (_) {}
+    try {
+      const api = global.RS_API && RS_API.session && RS_API.session();
+      if (api && (api.tenant_slug || api.slug)) return String(api.tenant_slug || api.slug).trim();
+    } catch (_) {}
+    return 'outlet';
+  }
+
+  function digitalBillUrl(billNo, slugOpt) {
+    const no = String(billNo || '').trim();
+    if (!no) return '';
+    const slug = String(slugOpt || resolveTenantSlug() || 'outlet').trim() || 'outlet';
+    let origin = 'https://restrosuite.codearc.co.in';
+    try {
+      if (typeof location !== 'undefined' && location.origin &&
+          /^https?:/i.test(location.origin) &&
+          location.hostname !== 'localhost' &&
+          location.hostname !== '127.0.0.1' &&
+          location.protocol !== 'file:') {
+        origin = location.origin.replace(/\/$/, '');
+      }
+    } catch (_) {}
+    return origin + '/bill?slug=' + encodeURIComponent(slug) + '&no=' + encodeURIComponent(no);
+  }
+
   async function qrDataUriFor(bill) {
     const m = normalizeBill(bill);
     if (!global.QRCode || !m.no) return null;
     return new Promise((resolve) => {
       try {
-        const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
-        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${slug}/${m.no}`;
+        const digitalUrl = digitalBillUrl(m.no);
         global.QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
           resolve(err ? null : url);
         });
@@ -648,6 +686,8 @@
     preload,
     getCachedPdf,
     qrDataUriFor,
+    digitalBillUrl,
+    resolveTenantSlug,
     qrBlockHtml,
     clearPdfCache: () => PDF_CACHE.clear(),
     EXPORT_CSS,
