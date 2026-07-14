@@ -3564,13 +3564,50 @@
             ${showDemo ? '<button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
             <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh" title="Refresh now"><i class="fa-solid fa-rotate"></i> Refresh</button>
             <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
+            ${window.RSViewMode ? RSViewMode.toggleHtml('online-orders', window.RSViewMode.get('online-orders', 'cards')) : ''}
             <span class="pill ${feedLive ? 'pill-green' : 'pill-amber'}" title="${feedLive ? 'Browser online — listening for sync' : 'Browser offline'}">
               <span class="dot ${feedLive ? 'dot-live' : ''}"></span>${feedLive ? 'Listening' : 'Offline'}
             </span>
           </div>
 
-          <div class="agg-grid${ONLINE.length ? '' : ' is-empty'}">${gridBody}</div>
+          ${(() => {
+            const mode = window.RSViewMode ? RSViewMode.get('online-orders', 'cards') : 'cards';
+            if (mode === 'list' && ONLINE.length && filtered.length) {
+              return `<div class="agg-grid is-list"><div class="rs-line-list">
+                <div class="rs-line-head agg-line-head">
+                  <span>Platform</span><span>Order</span><span>Customer</span><span>Status</span><span class="rl-num">Total</span><span class="rl-acts">Actions</span>
+                </div>
+                ${filtered.map((o) => {
+                  const i = ONLINE.indexOf(o);
+                  const actions =
+                    o.status === 'new'
+                      ? `<button type="button" class="btn btn-primary btn-sm" data-acc="${i}">Accept</button>`
+                      : o.status === 'preparing'
+                        ? `<button type="button" class="btn btn-primary btn-sm" data-ready="${i}">Ready</button>`
+                        : `<button type="button" class="btn btn-ghost btn-sm" data-rider="${i}">Rider</button>`;
+                  return `<div class="rs-line-row agg-line-row" data-i="${i}">
+                    <span class="rl-name">${esc(platName[o.plat] || o.plat || 'Online')}</span>
+                    <span class="rl-mute">${esc(o.oid)}</span>
+                    <span><span class="rl-name">${esc(o.cust)}</span><div class="rl-mute">${esc(o.area || '')}</div></span>
+                    <span class="pill ${o.status === 'new' ? 'pill-amber' : o.status === 'preparing' ? 'pill-orange' : 'pill-green'}" style="padding:2px 8px;font-size:10px;text-transform:capitalize;justify-self:start">${esc(statusLabel[o.status] || o.status)}</span>
+                    <span class="rl-num">${rs(o.total)}</span>
+                    <span class="rl-acts">
+                      <button type="button" class="btn btn-ghost btn-sm" data-pos="${i}" title="POS"><i class="fa-solid fa-cash-register"></i></button>
+                      ${actions}
+                    </span>
+                  </div>`;
+                }).join('')}
+              </div></div>`;
+            }
+            return `<div class="agg-grid${ONLINE.length ? '' : ' is-empty'}">${gridBody}</div>`;
+          })()}
         </div>`;
+
+      if (window.RSViewMode) {
+        RSViewMode.wire(sec, 'online-orders', () => {
+          renderAgg();
+        }, 'cards');
+      }
 
       $$('[data-pos]', sec).forEach((b) => {
         b.onclick = () => openOnlineOrderInPos(ONLINE[+b.dataset.pos]);
@@ -3736,6 +3773,7 @@
     let _crmFilter = 'all';
     let _crmSort = 'recent';
     let _crmView = (function () {
+      if (window.RSViewMode && RSViewMode.get) return RSViewMode.get('customers', 'list');
       try { return localStorage.getItem('rs_crm_view') || 'list'; } catch (e) { return 'list'; }
     })();
 
@@ -3975,10 +4013,12 @@
           <button type="button" class="chip-btn ${_crmFilter === 'vip' ? 'active' : ''}" data-crm-f="vip">VIP${vipCount ? ' · ' + vipCount : ''}</button>
           <button type="button" class="chip-btn ${_crmFilter === 'gold' ? 'active' : ''}" data-crm-f="gold">Gold</button>
           <button type="button" class="chip-btn ${_crmFilter === 'repeat' ? 'active' : ''}" data-crm-f="repeat">Repeat</button>
-          <div class="crm-view-toggle" role="group" aria-label="View mode">
+          ${window.RSViewMode
+            ? RSViewMode.toggleHtml('customers', _crmView)
+            : `<div class="crm-view-toggle" role="group" aria-label="View mode">
             <button type="button" class="crm-view-btn ${_crmView === 'list' ? 'active' : ''}" data-crm-view="list" title="Line view"><i class="fa-solid fa-list"></i> List</button>
             <button type="button" class="crm-view-btn ${_crmView === 'cards' ? 'active' : ''}" data-crm-view="cards" title="Card view"><i class="fa-solid fa-grip"></i> Cards</button>
-          </div>
+          </div>`}
           <select class="crm-sort" id="crm-sort" aria-label="Sort customers">
             <option value="recent" ${_crmSort === 'recent' ? 'selected' : ''}>Recent first</option>
             <option value="spend" ${_crmSort === 'spend' ? 'selected' : ''}>Highest spend</option>
@@ -4193,14 +4233,21 @@
           draw(searchEl ? searchEl.value : '');
         };
       });
-      $$('[data-crm-view]', sec).forEach((btn) => {
-        btn.onclick = () => {
-          _crmView = btn.getAttribute('data-crm-view') === 'cards' ? 'cards' : 'list';
-          try { localStorage.setItem('rs_crm_view', _crmView); } catch (e) {}
-          $$('[data-crm-view]', sec).forEach((b) => b.classList.toggle('active', b === btn));
+      if (window.RSViewMode) {
+        _crmView = RSViewMode.wire(sec, 'customers', (m) => {
+          _crmView = m;
           draw(searchEl ? searchEl.value : '');
-        };
-      });
+        }, 'list');
+      } else {
+        $$('[data-crm-view]', sec).forEach((btn) => {
+          btn.onclick = () => {
+            _crmView = btn.getAttribute('data-crm-view') === 'cards' ? 'cards' : 'list';
+            try { localStorage.setItem('rs_crm_view', _crmView); } catch (e) {}
+            $$('[data-crm-view]', sec).forEach((b) => b.classList.toggle('active', b === btn));
+            draw(searchEl ? searchEl.value : '');
+          };
+        });
+      }
       const sortEl = $('#crm-sort');
       if (sortEl) {
         sortEl.onchange = () => {

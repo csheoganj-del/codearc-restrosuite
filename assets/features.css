@@ -640,6 +640,8 @@ table.rcp-qr-wrap {
 .crm-body.is-list {
   display: block;
 }
+/* Shared List | Cards toggle (CRM, Employees, Suppliers, QR, Online…) */
+.rs-view-toggle,
 .crm-view-toggle {
   display: inline-flex;
   border: 1px solid var(--stroke);
@@ -647,7 +649,9 @@ table.rcp-qr-wrap {
   overflow: hidden;
   background: var(--panel);
   margin-left: 4px;
+  flex-shrink: 0;
 }
+.rs-view-btn,
 .crm-view-btn {
   border: 0;
   background: transparent;
@@ -662,12 +666,137 @@ table.rcp-qr-wrap {
   gap: 6px;
   letter-spacing: -0.01em;
 }
+.rs-view-btn + .rs-view-btn,
 .crm-view-btn + .crm-view-btn { border-left: 1px solid var(--stroke); }
+.rs-view-btn.active,
 .crm-view-btn.active {
   background: #1A1714;
   color: #fff;
 }
+.rs-view-btn i,
 .crm-view-btn i { font-size: 11px; }
+
+/* Employees list layout */
+.emp-line-head,
+.emp-line-row {
+  grid-template-columns:
+    minmax(160px, 1.5fr)
+    minmax(100px, 0.9fr)
+    90px
+    72px
+    72px
+    90px
+    minmax(130px, 1fr);
+}
+.emp-line-guest {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+#emp-grid.emp-grid-list {
+  display: block !important;
+  grid-template-columns: none !important;
+}
+
+/* Suppliers list */
+.sup-line-head,
+.sup-line-row {
+  grid-template-columns:
+    minmax(150px, 1.4fr)
+    minmax(90px, 0.8fr)
+    minmax(110px, 1fr)
+    80px
+    70px
+    90px;
+}
+
+/* QR orders list */
+.qr-line-head,
+.qr-line-row {
+  grid-template-columns:
+    72px
+    minmax(100px, 1fr)
+    minmax(120px, 1.2fr)
+    90px
+    80px
+    minmax(140px, 1fr);
+}
+#qr-grid.is-list {
+  display: block !important;
+  grid-template-columns: none !important;
+}
+.agg-grid.is-list {
+  display: block !important;
+  grid-template-columns: none !important;
+}
+.agg-line-head,
+.agg-line-row {
+  grid-template-columns:
+    88px
+    minmax(100px, 1fr)
+    minmax(100px, 1fr)
+    80px
+    90px
+    minmax(150px, 1.1fr);
+}
+
+/* Shared dense line list (reuse on employees / suppliers / qr) */
+.rs-line-list {
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+  width: 100%;
+}
+.rs-line-head,
+.rs-line-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  padding: 0 14px;
+  min-height: 48px;
+}
+.rs-line-head {
+  min-height: 40px;
+  background: rgba(26, 23, 20, 0.03);
+  border-bottom: 1px solid var(--stroke);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-mute);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.rs-line-row {
+  border-bottom: 1px solid rgba(26, 23, 20, 0.06);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition: background .12s ease;
+}
+.rs-line-row:last-child { border-bottom: 0; }
+.rs-line-row:hover { background: rgba(26, 23, 20, 0.025); }
+.rs-line-row .rl-name { font-weight: 650; letter-spacing: -0.015em; }
+.rs-line-row .rl-mute { color: var(--text-soft); font-size: 12.5px; }
+.rs-line-row .rl-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-align: right;
+}
+.rs-line-row .rl-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  align-items: center;
+}
+.rs-line-row .rl-acts .btn {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
 
 /* Line / list view — one row per guest */
 .crm-list {

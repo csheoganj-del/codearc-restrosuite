@@ -284,6 +284,33 @@
   const grid = $('#emp-grid');
   if (!grid) return;
 
+  var empView =
+    global.RSViewMode && RSViewMode.get
+      ? RSViewMode.get('employees', 'list')
+      : 'list';
+
+  // Toolbar view toggle above the grid (once)
+  (function ensureEmpViewToggle() {
+    const tab = document.getElementById('employees-tab');
+    if (!tab) return;
+    let bar = tab.querySelector('.emp-view-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'emp-view-bar';
+      bar.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 12px;';
+      const host = grid.parentElement;
+      if (host) host.insertBefore(bar, grid);
+      else tab.insertBefore(bar, grid);
+    }
+    if (global.RSViewMode && RSViewMode.toggleHtml) {
+      bar.innerHTML = RSViewMode.toggleHtml('employees', empView);
+      empView = RSViewMode.wire(bar, 'employees', function (m) {
+        empView = m;
+        renderEmployees();
+      }, 'list');
+    }
+  })();
+
   if (EMPLOYEES.length === 0) {
     // Soft-link: staff login accounts exist but employee directory is empty
     grid.innerHTML = `
@@ -410,7 +437,47 @@
     return;
   }
 
-  grid.innerHTML = EMPLOYEES.map((e,i)=>`
+  if (empView === 'list') {
+    grid.classList.add('emp-grid-list');
+    grid.classList.remove('emp-grid');
+    grid.style.display = 'block';
+    grid.innerHTML = `
+      <div class="rs-line-list emp-line-list">
+        <div class="rs-line-head emp-line-head">
+          <span>Team member</span>
+          <span>Role</span>
+          <span>Shift</span>
+          <span class="rl-num">Sales</span>
+          <span class="rl-num">Orders</span>
+          <span>Payroll</span>
+          <span class="rl-acts">Actions</span>
+        </div>
+        ${EMPLOYEES.map((e, i) => `
+        <div class="rs-line-row emp-line-row" data-idx="${i}">
+          <span class="emp-line-guest">
+            <span class="emp-av" style="width:32px;height:32px;border-radius:9px;font-size:11px;background:${avatarColors_[i % avatarColors_.length]}">${_e(initials(e.name))}</span>
+            <span>
+              <div class="rl-name">${_e(e.name)}</div>
+              <div class="rl-mute">${_e(e.email || e.phone || '—')}</div>
+            </span>
+          </span>
+          <span><span class="role-tag ${_e(e.rc || '')}">${_e(e.role || 'Staff')}</span></span>
+          <span class="rl-mute"><i class="fa-solid fa-clock" style="font-size:9px;opacity:.6"></i> ${_e(e.shift || '—')}</span>
+          <span class="rl-num">${_e(e.sales || '—')}</span>
+          <span class="rl-num">${_e(e.orders || '—')}</span>
+          <span class="rl-mute">${e.payroll ? rs(parseFloat(String(e.payroll).replace(/[^0-9.]/g, '')) || 0) : '—'}</span>
+          <span class="rl-acts">
+            <button type="button" class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}"><i class="fa-solid fa-pen"></i> Role</button>
+            <button type="button" class="icon-act emp-reset-pin" data-idx="${i}" title="PIN"><i class="fa-solid fa-key"></i></button>
+            <button type="button" class="icon-act danger emp-remove" data-idx="${i}" title="Remove"><i class="fa-solid fa-user-minus"></i></button>
+          </span>
+        </div>`).join('')}
+      </div>`;
+  } else {
+    grid.classList.remove('emp-grid-list');
+    grid.classList.add('emp-grid');
+    grid.style.display = '';
+    grid.innerHTML = EMPLOYEES.map((e,i)=>`
     <div class="emp-card">
       <div class="emp-top"><div class="emp-av" style="background:${avatarColors_[i%avatarColors_.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email || '—')}</div></div></div>
       <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc || '')}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift || '—')}</span></div>
@@ -421,6 +488,7 @@
         <button type="button" class="icon-act danger emp-remove" data-idx="${i}" title="Remove from directory" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button>
       </div>
     </div>`).join('');
+  }
   $$('#emp-grid .edit-role-btn').forEach((b) =>
     b.addEventListener('click', () => openEditRoleModal(+b.dataset.idx))
   );

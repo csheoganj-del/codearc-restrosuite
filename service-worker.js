@@ -1,6 +1,6 @@
 ﻿// Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260714-crm-list-cards-v10";
+const CACHE_NAME = "restrosuite-shell-v20260714-view-mode-everywhere-v11";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -68,6 +68,7 @@ const APP_SHELL = [
   "/assets/modules/super-admin.js",
   "/assets/modules/kds-ui.js",
   "/assets/modules/qr-orders-ui.js",
+  "/assets/modules/view-mode.js",
   "/assets/modules/employees-ui.js",
   "/assets/modules/progress-ops.js",
   "/assets/modules/report-pdf.js",
