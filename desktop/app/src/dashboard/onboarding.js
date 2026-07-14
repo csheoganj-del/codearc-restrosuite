@@ -4,107 +4,153 @@
   const FEATURES = [
     {
       tabId: 'pos-tab',
-      label: 'Takeaway POS',
+      label: 'Point of Sale',
       icon: 'fa-mug-hot',
-      subtitle: 'Counter billing and checkout',
-      description: 'Create dine-in, takeaway, and delivery bills, customize items, apply loyalty, split payments, and print receipts.',
-      firstAction: 'Add an item to the cart, select the order type and payment method, then complete one test bill.'
+      group: 'Service',
+      subtitle: 'Counter billing & checkout',
+      description: 'Create dine-in, takeaway, and delivery bills. Apply loyalty, split payments, print receipts, and settle tables.',
+      firstAction: 'Add a menu item → choose order type & payment → complete one test bill.',
+      minutes: 3
+    },
+    {
+      tabId: 'floor-tab',
+      label: 'Floor & Tables',
+      icon: 'fa-border-all',
+      group: 'Service',
+      subtitle: 'Seating & table map',
+      description: 'Manage tables, hold and merge orders, print QR cards, and see which covers are open or settled.',
+      firstAction: 'Open Floor, pick a free table, seat a test party, and send one item to the kitchen.',
+      minutes: 3
     },
     {
       tabId: 'qr-orders-tab',
-      label: 'Live Table Orders',
+      label: 'QR Orders',
       icon: 'fa-qrcode',
-      subtitle: 'QR ordering and table service',
-      description: 'Generate table QR links, receive customer orders, approve them, and send accepted tickets to the kitchen.',
-      firstAction: 'Generate a QR for one table, open its customer link, and submit a test order.'
+      group: 'Service',
+      subtitle: 'Guest self-order at the table',
+      description: 'Generate table QR links, receive customer orders, approve them, and route tickets to the kitchen.',
+      firstAction: 'Generate a QR for one table → open the guest link → submit a test order → approve it.',
+      minutes: 5
     },
     {
       tabId: 'online-tab',
-      label: 'Online Integrations',
+      label: 'Online Orders',
       icon: 'fa-cloud-arrow-down',
-      subtitle: 'Delivery-channel order queue',
-      description: 'Review incoming online and delivery orders from supported channels in one operational queue.',
-      firstAction: 'Review channel settings and confirm how your team accepts or rejects incoming online orders.'
+      group: 'Service',
+      subtitle: 'Delivery-channel queue',
+      description: 'Review incoming online and delivery-channel orders in one place and accept or reject them.',
+      firstAction: 'Open Online Orders and confirm how your team accepts or rejects channel tickets.',
+      minutes: 2
     },
     {
       tabId: 'kds-tab',
-      label: 'Kitchen KDS',
+      label: 'Kitchen Display',
       icon: 'fa-tv',
-      subtitle: 'Kitchen preparation board',
-      description: 'Display accepted orders for kitchen staff, track item preparation, and move completed orders to ready.',
-      firstAction: 'Open an accepted sample or test order and move it through the preparation workflow.'
+      group: 'Kitchen',
+      subtitle: 'Prep board for cooks',
+      description: 'Show accepted tickets, track item prep, and mark orders ready for service or collection.',
+      firstAction: 'Send a test order from POS/QR, then move it from preparing → ready on the KDS.',
+      minutes: 3
     },
     {
       tabId: 'tokens-tab',
-      label: 'Live Token Board',
+      label: 'Token Board',
       icon: 'fa-ticket',
+      group: 'Kitchen',
       subtitle: 'Customer collection display',
-      description: 'Show which order tokens are preparing and which are ready for collection on a customer-facing screen.',
-      firstAction: 'Open this tab on the collection display and verify one test order changes from preparing to ready.'
+      description: 'Show which tokens are preparing and which are ready on a customer-facing screen.',
+      firstAction: 'Open this on the pickup display and verify one test order flips to ready.',
+      minutes: 2
     },
     {
       tabId: 'bills-tab',
-      label: 'Bills Management',
+      label: 'Bills',
       icon: 'fa-file-invoice-dollar',
-      subtitle: 'Invoices and sales history',
-      description: 'Search, inspect, edit, reprint, refund, and export completed invoices with daily summary metrics.',
-      firstAction: 'Open a test invoice, verify totals and customer details, then test reprint or export.'
+      group: 'Back office',
+      subtitle: 'Invoices & sales history',
+      description: 'Search, inspect, reprint, refund, and export completed invoices with day totals.',
+      firstAction: 'Open a test bill and confirm totals, tax, and payment method look correct.',
+      minutes: 2
     },
     {
       tabId: 'inventory-tab',
-      label: 'Inventory Control',
+      label: 'Inventory',
       icon: 'fa-boxes-stacked',
-      subtitle: 'Stock, batches, and expiry',
-      description: 'Track ingredients, capacities, reorder thresholds, purchase batches, expiry dates, and recipe consumption.',
-      firstAction: 'Download the Excel template or add stock manually, then confirm low-stock thresholds and units.'
-    },
-    {
-      tabId: 'reports-tab',
-      label: 'Sales Reports',
-      icon: 'fa-chart-line',
-      subtitle: 'Revenue and performance analytics',
-      description: 'Analyze revenue, order volume, item performance, payment mix, and tax data for selected periods.',
-      firstAction: 'Choose a date range and verify the totals against Bills Management before exporting.'
+      group: 'Back office',
+      subtitle: 'Stock, batches & expiry',
+      description: 'Track ingredients, reorder thresholds, batches, expiry, and recipe consumption.',
+      firstAction: 'Add 3–5 stock items (or import Excel) and set low-stock thresholds.',
+      minutes: 8
     },
     {
       tabId: 'editor-tab',
       label: 'Menu Editor',
       icon: 'fa-pen-to-square',
-      subtitle: 'Menu and recipe publishing',
-      description: 'Create and update items, prices, categories, availability, preparation time, descriptions, and recipes.',
-      firstAction: 'Create one test item with a recipe and confirm it appears in both POS and customer QR ordering.'
+      group: 'Back office',
+      subtitle: 'Items, prices & recipes',
+      description: 'Publish categories, prices, availability, descriptions, and recipes used by POS and QR.',
+      firstAction: 'Create one test item with a price and confirm it appears in POS.',
+      minutes: 10
+    },
+    {
+      tabId: 'reports-tab',
+      label: 'Reports',
+      icon: 'fa-chart-line',
+      group: 'Back office',
+      subtitle: 'Sales & performance',
+      description: 'Revenue, order volume, item mix, payment split, and tax for any date range.',
+      firstAction: 'Pick today as the range and match totals to Bills after a test sale.',
+      minutes: 2
+    },
+    {
+      tabId: 'customers-tab',
+      label: 'Customers',
+      icon: 'fa-address-book',
+      group: 'Back office',
+      subtitle: 'CRM, loyalty & dues',
+      description: 'Customer visits, spend, loyalty points, notes, and outstanding dues.',
+      firstAction: 'Complete a bill with a phone number and confirm the customer record updates.',
+      minutes: 3
     },
     {
       tabId: 'crm-tab',
       label: 'CRM & Loyalty',
       icon: 'fa-users-rectangle',
+      group: 'Back office',
       subtitle: 'Customer and loyalty records',
-      description: 'Track customer visits, spend, loyalty points, notes, and communication-ready contact details.',
-      firstAction: 'Add a test customer or complete a bill with a phone number and confirm the loyalty record updates.'
+      description: 'Track visits, spend, loyalty points, and notes for marketing-ready contacts.',
+      firstAction: 'Add a test customer or bill with a phone number and confirm loyalty updates.',
+      minutes: 3
     },
     {
       tabId: 'tax-tab',
-      label: 'Tax Management',
+      label: 'Tax & GST',
       icon: 'fa-calculator',
-      subtitle: 'GST and billing configuration',
-      description: 'Configure GST behavior, tax records, invoice exports, discounts, and billing compliance settings.',
-      firstAction: 'Verify GST registration details and rates with your accountant before processing live sales.'
+      group: 'Back office',
+      subtitle: 'Rates & compliance',
+      description: 'Tax rates, invoice exports, and billing compliance for your country.',
+      firstAction: 'Confirm rates and registration details before live sales.',
+      minutes: 5
     },
     {
       tabId: 'employees-tab',
-      label: 'Employee Ledger',
+      label: 'Employees',
       icon: 'fa-users',
-      subtitle: 'Staff, shifts, attendance, and payroll',
-      description: 'Manage staff records, roles, salaries, attendance, leave requests, shifts, and payroll calculations.',
-      firstAction: 'Add staff accounts with the minimum required permissions and test each role before launch.'
+      group: 'Team',
+      subtitle: 'Roles, shifts & access',
+      description: 'Staff accounts, roles, attendance, leave, and payroll helpers.',
+      firstAction: 'Add one cashier with limited tabs and log in as them once to test access.',
+      minutes: 6
     },
     {
       tabId: 'growth-hub-tab',
       label: 'Growth Hub',
       icon: 'fa-rocket',
-      subtitle: 'Setup and restaurant operations',
-      description: 'Manage launch tasks, support, reservations, procurement, costing, offers, refunds, outlets, devices, and backups.',
-      firstAction: 'Complete the production onboarding checklist and assign an owner for every remaining task.'
+      group: 'Team',
+      subtitle: 'Ops toolkit',
+      description: 'Reservations, procurement, offers, refunds, devices, backups, and launch tasks.',
+      firstAction: 'Open Growth Hub and complete any remaining launch checklist items.',
+      minutes: 5
     }
   ];
 
@@ -113,8 +159,8 @@
     label: 'Getting Started',
     icon: 'fa-compass',
     subtitle: 'Your enabled RestroSuite workspace',
-    description: 'This tour only covers features enabled for your plan and staff role. You can reopen Help & Setup from the sidebar at any time.',
-    firstAction: 'Start with Business Profile, import your menu and inventory, configure tax and staff access, then run one complete test order.'
+    description: 'This tour only covers features enabled for your plan and staff role. Reopen Help anytime from the sidebar.',
+    firstAction: 'Finish the setup checklist (profile → menu → staff → one test bill), then explore features below.'
   };
 
   const UPDATES_HISTORY = [
@@ -268,122 +314,181 @@
     }
   }
 
+  function readSettingsSnapshot() {
+    try {
+      if (window.RS_SETTINGS && typeof window.RS_SETTINGS === 'object') return window.RS_SETTINGS;
+    } catch (_) {}
+    return readJson('rs_v2:settings', {}) || {};
+  }
+
   // Shared with the mandatory first-login profile widget below so both
   // "is the profile complete" checks can never drift out of sync.
-  function detectHasBusinessProfile() {
+  function detectHasBusinessProfile(settingsOverride) {
     const profile = readJson('doppio_business_profile', {}) || {};
-    const localSettings = readJson('rs_v2:settings', {}) || {};
+    const localSettings = settingsOverride || readSettingsSnapshot();
     return Boolean(
-      profile.name || profile.businessName || profile.restaurantName ||
+      profile.name || profile.businessName || profile.restaurantName || profile.business_name ||
       localSettings.set_restaurant_name || localSettings.set_outlet_name
     );
   }
 
-  function setupTasks() {
-    const enabled = new Set(enabledFeatures().map(feature => feature.tabId));
-    const profile = readJson('doppio_business_profile', {}) || {};
-    const localSettings = readJson('rs_v2:settings', {}) || {};
-    const menu = readJson('doppio_menu', []);
-    const inventory = readJson('doppio_inventory', {});
-    const employees = readJson('doppio_employees', []);
-    const bills = readJson('doppio_bills', []);
-    const pendingOrders = readJson('doppio_pending_qr_orders', []);
+  function openSettingsSection(sectionKey, focusSelector) {
+    if (window.RS && typeof window.RS.activateTab === 'function') {
+      window.RS.activateTab('settings-tab');
+    } else {
+      document.getElementById('open-settings')?.click();
+    }
+    setTimeout(() => {
+      document.querySelector(`.set-nav button[data-s="${sectionKey}"]`)?.click();
+      if (focusSelector) {
+        setTimeout(() => document.querySelector(focusSelector)?.focus(), 60);
+      }
+    }, 80);
+  }
 
-    const hasProfile = detectHasBusinessProfile();
+  async function listCollection(name, fallbackKey) {
+    try {
+      if (window.RS_DB && typeof RS_DB.list === 'function') {
+        const rows = await RS_DB.list(name);
+        if (Array.isArray(rows)) return rows;
+        if (rows && typeof rows === 'object') return Object.values(rows);
+      }
+    } catch (_) {}
+    if (fallbackKey) {
+      const raw = readJson(fallbackKey, null);
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw === 'object') return Object.values(raw);
+    }
+    return [];
+  }
+
+  async function gatherWorkspaceSnapshot() {
+    let settings = readSettingsSnapshot();
+    try {
+      if (window.RS && typeof RS.getSettings === 'function') {
+        const s = await RS.getSettings();
+        if (s && typeof s === 'object') settings = s;
+      } else if (window.RS_DB && typeof RS_DB.getSettings === 'function') {
+        const s = await RS_DB.getSettings();
+        if (s && typeof s === 'object') settings = s;
+      }
+    } catch (_) {}
+
+    const [menu, bills, employees, inventory, pendingOrders] = await Promise.all([
+      listCollection('menu', 'doppio_menu'),
+      listCollection('bills', 'doppio_bills'),
+      listCollection('employees', 'doppio_employees'),
+      listCollection('inventory', 'doppio_inventory'),
+      listCollection('pending_orders', 'doppio_pending_orders'),
+    ]);
+
+    return { settings, menu, bills, employees, inventory, pendingOrders };
+  }
+
+  async function setupTasks() {
+    const enabled = new Set(enabledFeatures().map(feature => feature.tabId));
+    // Sidebar may use "settings" via gear only — treat tax/settings as available for admins
+    const role = String(sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+    const canSettings = ['admin', 'owner', 'manager', 'superadmin', ''].includes(role);
+
+    const snap = await gatherWorkspaceSnapshot();
+    const { settings, menu, bills, employees, inventory, pendingOrders } = snap;
+    const profile = readJson('doppio_business_profile', {}) || {};
+
+    const hasProfile = detectHasBusinessProfile(settings);
     const hasTax = Boolean(
       profile.gstin || profile.gstNumber || profile.gst_number ||
-      localSettings.set_gstin || localSettings.set_invoice_prefix
+      settings.set_gstin || settings.set_invoice_prefix || settings.set_default_gst_slab ||
+      settings.set_tax_mode
+    );
+    const hasMenu = Array.isArray(menu) && menu.length > 0;
+    const hasInventory = Array.isArray(inventory) && inventory.length > 0;
+    const hasStaff = Array.isArray(employees) && employees.length > 0;
+    const hasBill = Array.isArray(bills) && bills.length > 0;
+    const hasQr = Array.isArray(pendingOrders) && pendingOrders.some(order =>
+      order && (order.orderType === 'Dine-In' || order.order_type === 'Dine-In' ||
+        String(order.tableNumber || order.table || '').match(/^\d+$/))
     );
 
     const tasks = [
       {
-        label: 'Complete Business Profile',
-        detail: 'Business name, address, contact, receipt and payment information',
+        id: 'profile',
+        label: 'Complete outlet profile',
+        detail: 'Name, phone, address — used on receipts and bills',
+        eta: '1 min',
         done: hasProfile,
-        action: () => {
-          if (window.RS && typeof window.RS.activateTab === 'function') {
-            window.RS.activateTab('settings-tab');
-          } else {
-            const openSettings = document.getElementById('open-settings');
-            if (openSettings) openSettings.click();
-          }
-          setTimeout(() => {
-            const btn = document.querySelector(`.set-nav button[data-s="profile"]`);
-            if (btn) btn.click();
-            setTimeout(() => {
-              const input = document.querySelector('[data-skey="set_restaurant_name"]');
-              if (input) input.focus();
-            }, 50);
-          }, 50);
-        }
+        priority: 1,
+        action: () => openSettingsSection('profile', '[data-skey="set_restaurant_name"]')
       }
     ];
+
     if (enabled.has('editor-tab') || enabled.has('pos-tab')) {
       tasks.push({
-        label: 'Publish menu and recipes',
-        detail: 'Use Menu Editor or the Excel Setup Wizard',
-        done: Array.isArray(menu) && menu.length > 0,
-        tabId: enabled.has('editor-tab') ? 'editor-tab' : 'inventory-tab'
+        id: 'menu',
+        label: 'Publish your menu',
+        detail: 'Add items in Menu Editor or import via Excel',
+        eta: '10 min',
+        done: hasMenu,
+        priority: 2,
+        tabId: enabled.has('editor-tab') ? 'editor-tab' : 'pos-tab'
       });
     }
     if (enabled.has('inventory-tab')) {
       tasks.push({
-        label: 'Configure inventory',
-        detail: 'Stock levels, units, capacities, thresholds, batches, and expiry',
-        done: inventory && Object.keys(inventory).length > 0,
+        id: 'inventory',
+        label: 'Stock your inventory',
+        detail: 'Items, units, and low-stock thresholds',
+        eta: '8 min',
+        done: hasInventory,
+        priority: 3,
         tabId: 'inventory-tab'
       });
     }
-    if (enabled.has('tax-tab') || enabled.has('settings-tab')) {
+    if (canSettings || enabled.has('tax-tab')) {
       tasks.push({
+        id: 'tax',
         label: 'Verify tax settings',
-        detail: 'Confirm GST registration and rates before live billing',
+        detail: 'Country, tax rates / GST before live billing',
+        eta: '3 min',
         done: hasTax,
-        action: () => {
-          if (window.RS && typeof window.RS.activateTab === 'function') {
-            window.RS.activateTab('settings-tab');
-          } else {
-            const openSettings = document.getElementById('open-settings');
-            if (openSettings) openSettings.click();
-          }
-          setTimeout(() => {
-            const btn = document.querySelector(`.set-nav button[data-s="tax"]`);
-            if (btn) btn.click();
-            setTimeout(() => {
-              const select = document.querySelector('[data-skey="set_default_gst_slab"]');
-              if (select) select.focus();
-            }, 50);
-          }, 50);
-        }
+        priority: 4,
+        action: () => openSettingsSection('tax', '[data-skey="set_default_gst_slab"]')
       });
     }
     if (enabled.has('employees-tab')) {
       tasks.push({
-        label: 'Add staff and test permissions',
-        detail: 'Create only the access each employee needs',
-        done: Array.isArray(employees) && employees.length > 0,
+        id: 'staff',
+        label: 'Add staff & roles',
+        detail: 'Give each person only the tabs they need',
+        eta: '5 min',
+        done: hasStaff,
+        priority: 5,
         tabId: 'employees-tab'
       });
     }
-    if (enabled.has('qr-orders-tab')) {
+    if (enabled.has('qr-orders-tab') || enabled.has('floor-tab')) {
       tasks.push({
+        id: 'qr',
         label: 'Test one table QR order',
-        detail: 'Scan, submit, approve, prepare, and mark ready',
-        done: Array.isArray(pendingOrders) && pendingOrders.some(order =>
-          order && (order.orderType === 'Dine-In' || String(order.tableNumber || '').match(/^\d+$/))
-        ),
-        tabId: 'qr-orders-tab'
+        detail: 'Guest scans → orders → you approve → kitchen',
+        eta: '5 min',
+        done: hasQr,
+        priority: 6,
+        tabId: enabled.has('qr-orders-tab') ? 'qr-orders-tab' : 'floor-tab'
       });
     }
     if (enabled.has('pos-tab')) {
       tasks.push({
+        id: 'bill',
         label: 'Complete one test bill',
-        detail: 'Check item price, tax, payment, receipt, inventory, and reports',
-        done: Array.isArray(bills) && bills.length > 0,
+        detail: 'Price, tax, payment, receipt — full checkout path',
+        eta: '3 min',
+        done: hasBill,
+        priority: 7,
         tabId: 'pos-tab'
       });
     }
-    return tasks;
+    return tasks.sort((a, b) => a.priority - b.priority);
   }
 
   function activateTab(tabId) {
@@ -397,34 +502,65 @@
     if (link) link.click();
   }
 
+  function escGuide(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
   function injectGuide() {
     if (document.getElementById('product-guide-modal')) return;
     const modal = document.createElement('div');
     modal.id = 'product-guide-modal';
     modal.className = 'product-guide-modal';
     modal.setAttribute('aria-hidden', 'true');
+    const ver = String(window.__RESTROSUITE_ASSET_VERSION__ || 'v191').split('-')[0];
     modal.innerHTML = `
       <div class="product-guide-backdrop" data-guide-close></div>
       <section class="product-guide-panel" role="dialog" aria-modal="true" aria-labelledby="product-guide-title">
         <header class="product-guide-header">
-          <div>
+          <div class="product-guide-header-copy">
             <span class="product-guide-eyebrow">HELP &amp; SETUP</span>
-            <h2 id="product-guide-title">RestroSuite Workspace Guide</h2>
-            <p>Instructions are filtered to your enabled plan features and staff permissions.</p>
+            <h2 id="product-guide-title">Workspace Guide</h2>
+            <p>Get live fast: finish setup, then learn only the features your plan unlocks.</p>
           </div>
-          <button type="button" class="product-guide-close" data-guide-close aria-label="Close help guide">&times;</button>
+          <button type="button" class="product-guide-close" data-guide-close aria-label="Close help guide"><i class="fa-solid fa-xmark"></i></button>
         </header>
-        <div class="product-guide-toolbar" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary" id="guide-start-tour"><i class="fa-solid fa-compass"></i> Start Feature Tour</button>
-          <button type="button" class="btn btn-ghost" id="guide-view-updates" style="border:1px solid var(--stroke-2); color:var(--text-soft); padding:8px 12px; font-size:12px; font-weight:700;"><i class="fa-solid fa-clock-rotate-left"></i> What's New</button>
-          <input type="search" id="guide-search" placeholder="Search enabled features..." aria-label="Search enabled features" style="flex:1;">
+
+        <div class="product-guide-toolbar">
+          <button type="button" class="btn btn-primary" id="guide-start-tour"><i class="fa-solid fa-compass"></i> Guided tour</button>
+          <button type="button" class="btn btn-ghost product-guide-secondary-btn" id="guide-view-updates"><i class="fa-solid fa-clock-rotate-left"></i> What's new</button>
+          <div class="product-guide-search-wrap">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="guide-search" placeholder="Search features…" aria-label="Search enabled features" autocomplete="off">
+          </div>
         </div>
+
+        <div id="guide-next-cta" class="product-guide-next-cta" hidden></div>
         <div id="guide-setup-summary"></div>
+
         <div class="product-guide-section-heading">
-          <div><span>FEATURE GUIDE</span><h3>Your enabled workspace</h3></div>
+          <div>
+            <span>FEATURE GUIDE</span>
+            <h3>Your enabled workspace</h3>
+          </div>
           <span id="guide-feature-count" class="product-guide-count"></span>
         </div>
+        <div id="guide-group-filters" class="product-guide-filters" role="tablist" aria-label="Filter features by area"></div>
         <div id="guide-feature-grid" class="product-guide-grid"></div>
+
+        <footer class="product-guide-footer">
+          <div>
+            <strong>Need a hand?</strong>
+            <span>Email support with your outlet name — we help with setup and training.</span>
+          </div>
+          <div class="product-guide-footer-actions">
+            <a class="btn btn-ghost btn-sm" href="mailto:support@codearc.co.in?subject=RestroSuite%20setup%20help"><i class="fa-solid fa-envelope"></i> support@codearc.co.in</a>
+            <span class="product-guide-version-pill">${escGuide(ver)}</span>
+          </div>
+        </footer>
       </section>
     `;
     document.body.appendChild(modal);
@@ -437,73 +573,179 @@
       closeGuide();
       openUpdateHistoryModal();
     });
-    modal.querySelector('#guide-search').addEventListener('input', event => renderGuide(event.target.value));
+    let searchTimer = null;
+    modal.querySelector('#guide-search').addEventListener('input', event => {
+      clearTimeout(searchTimer);
+      const val = event.target.value;
+      searchTimer = setTimeout(() => renderGuide(val), 120);
+    });
   }
 
-  function renderGuide(search = '') {
+  let guideFilterGroup = 'all';
+
+  async function renderGuide(search = '') {
     injectGuide();
     const query = String(search).trim().toLowerCase();
-    const features = enabledFeatures().filter(feature =>
-      !query || `${feature.label} ${feature.subtitle} ${feature.description} ${feature.firstAction}`.toLowerCase().includes(query)
-    );
-    const tasks = setupTasks();
-    const completed = tasks.filter(task => task.done).length;
-    const percent = tasks.length ? Math.round((completed / tasks.length) * 100) : 100;
+    const allFeatures = enabledFeatures();
     const summary = document.getElementById('guide-setup-summary');
-    summary.innerHTML = `
-      <section class="product-guide-setup">
-        <div class="product-guide-progress-copy">
-          <div><span>INITIAL SETUP</span><strong>${completed} of ${tasks.length} recommended steps complete</strong></div>
-          <b>${percent}%</b>
-        </div>
-        <div class="product-guide-progress"><span style="width:${percent}%"></span></div>
-        <div class="product-guide-task-grid">
-          ${tasks.map((task, index) => `
-            <button type="button" class="product-guide-task ${task.done ? 'is-done' : ''}" data-task-index="${index}">
-              <i class="fa-solid ${task.done ? 'fa-circle-check' : 'fa-circle'}"></i>
-              <span><strong>${task.label}</strong><small>${task.detail}</small></span>
-              <i class="fa-solid fa-chevron-right"></i>
-            </button>
-          `).join('')}
-        </div>
-      </section>
-    `;
-    summary.querySelectorAll('[data-task-index]').forEach(button => {
-      button.addEventListener('click', () => {
-        const task = tasks[Number(button.dataset.taskIndex)];
-        closeGuide();
-        if (task.action) task.action();
-        else if (task.tabId) activateTab(task.tabId);
-      });
-    });
-    document.getElementById('guide-feature-count').textContent = `${enabledFeatures().length} enabled`;
+    const nextCta = document.getElementById('guide-next-cta');
     const grid = document.getElementById('guide-feature-grid');
-    grid.innerHTML = features.length ? features.map(feature => `
-      <article class="product-guide-card">
-        <div class="product-guide-card-icon"><i class="fa-solid ${feature.icon}"></i></div>
-        <div class="product-guide-card-copy">
-          <span>${feature.subtitle}</span>
-          <h4>${feature.label}</h4>
-          <p>${feature.description}</p>
-          <div class="product-guide-first-action"><strong>Start here:</strong> ${feature.firstAction}</div>
-          <button type="button" data-guide-tab="${feature.tabId}">Open ${feature.label} <i class="fa-solid fa-arrow-right"></i></button>
-        </div>
-      </article>
-    `).join('') : '<div class="product-guide-empty">No enabled feature matched your search.</div>';
-    grid.querySelectorAll('[data-guide-tab]').forEach(button => {
-      button.addEventListener('click', () => {
-        closeGuide();
-        activateTab(button.dataset.guideTab);
+    if (summary) {
+      summary.innerHTML = `<div class="product-guide-setup product-guide-setup-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking your workspace…</div>`;
+    }
+
+    let tasks = [];
+    try {
+      tasks = await setupTasks();
+    } catch (e) {
+      console.warn('[Guide] setupTasks failed', e);
+      tasks = [];
+    }
+
+    const completed = tasks.filter(task => task.done).length;
+    const remaining = tasks.filter(task => !task.done);
+    const percent = tasks.length ? Math.round((completed / tasks.length) * 100) : 100;
+    const nextTask = remaining[0] || null;
+    const allDone = tasks.length > 0 && remaining.length === 0;
+
+    if (nextCta) {
+      if (allDone) {
+        nextCta.hidden = false;
+        nextCta.className = 'product-guide-next-cta is-complete';
+        nextCta.innerHTML = `
+          <div class="product-guide-next-icon"><i class="fa-solid fa-circle-check"></i></div>
+          <div class="product-guide-next-copy">
+            <strong>Setup complete — you're ready for service</strong>
+            <span>Take the guided tour anytime, or open a feature below to go deeper.</span>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="guide-cta-tour"><i class="fa-solid fa-compass"></i> Tour features</button>`;
+        nextCta.querySelector('#guide-cta-tour')?.addEventListener('click', () => { closeGuide(); startTour(); });
+      } else if (nextTask) {
+        nextCta.hidden = false;
+        nextCta.className = 'product-guide-next-cta';
+        nextCta.innerHTML = `
+          <div class="product-guide-next-icon"><i class="fa-solid fa-bolt"></i></div>
+          <div class="product-guide-next-copy">
+            <span class="product-guide-next-label">Recommended next</span>
+            <strong>${escGuide(nextTask.label)}</strong>
+            <span>${escGuide(nextTask.detail)}${nextTask.eta ? ` · ~${escGuide(nextTask.eta)}` : ''}</span>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="guide-cta-next"><i class="fa-solid fa-play"></i> Do this now</button>`;
+        nextCta.querySelector('#guide-cta-next')?.addEventListener('click', () => {
+          closeGuide();
+          if (nextTask.action) nextTask.action();
+          else if (nextTask.tabId) activateTab(nextTask.tabId);
+        });
+      } else {
+        nextCta.hidden = true;
+        nextCta.innerHTML = '';
+      }
+    }
+
+    if (summary) {
+      summary.innerHTML = `
+        <section class="product-guide-setup ${allDone ? 'is-complete' : ''}">
+          <div class="product-guide-progress-copy">
+            <div>
+              <span>LAUNCH CHECKLIST</span>
+              <strong>${allDone ? 'All recommended steps complete' : `${completed} of ${tasks.length} steps complete`}</strong>
+              <em class="product-guide-progress-hint">${allDone ? 'Great work — keep this guide for training new staff.' : 'Complete these once. Progress updates automatically from your live data.'}</em>
+            </div>
+            <b aria-label="${percent} percent complete">${percent}%</b>
+          </div>
+          <div class="product-guide-progress" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100"><span style="width:${percent}%"></span></div>
+          <div class="product-guide-task-grid">
+            ${tasks.map((task, index) => `
+              <button type="button" class="product-guide-task ${task.done ? 'is-done' : ''} ${nextTask && task.id === nextTask.id ? 'is-next' : ''}" data-task-index="${index}">
+                <i class="fa-solid ${task.done ? 'fa-circle-check' : (nextTask && task.id === nextTask.id ? 'fa-circle-play' : 'fa-circle')}"></i>
+                <span>
+                  <strong>${escGuide(task.label)}</strong>
+                  <small>${escGuide(task.detail)}</small>
+                </span>
+                <span class="product-guide-task-meta">
+                  ${task.eta ? `<em>${escGuide(task.eta)}</em>` : ''}
+                  <i class="fa-solid fa-chevron-right"></i>
+                </span>
+              </button>
+            `).join('')}
+          </div>
+        </section>
+      `;
+      summary.querySelectorAll('[data-task-index]').forEach(button => {
+        button.addEventListener('click', () => {
+          const task = tasks[Number(button.dataset.taskIndex)];
+          closeGuide();
+          if (task.action) task.action();
+          else if (task.tabId) activateTab(task.tabId);
+        });
       });
+    }
+
+    const groups = ['all', ...Array.from(new Set(allFeatures.map(f => f.group || 'Other')))];
+    const filters = document.getElementById('guide-group-filters');
+    if (filters) {
+      filters.innerHTML = groups.map(g => {
+        const label = g === 'all' ? 'All' : g;
+        const count = g === 'all' ? allFeatures.length : allFeatures.filter(f => (f.group || 'Other') === g).length;
+        const active = guideFilterGroup === g ? 'is-active' : '';
+        return `<button type="button" class="product-guide-filter ${active}" data-group="${escGuide(g)}" role="tab" aria-selected="${guideFilterGroup === g}">${escGuide(label)} <span>${count}</span></button>`;
+      }).join('');
+      filters.querySelectorAll('[data-group]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          guideFilterGroup = btn.getAttribute('data-group') || 'all';
+          renderGuide(document.getElementById('guide-search')?.value || '');
+        });
+      });
+    }
+
+    const features = allFeatures.filter(feature => {
+      if (guideFilterGroup !== 'all' && (feature.group || 'Other') !== guideFilterGroup) return false;
+      if (!query) return true;
+      const hay = `${feature.label} ${feature.subtitle} ${feature.description} ${feature.firstAction} ${feature.group || ''}`.toLowerCase();
+      return hay.includes(query);
     });
+
+    const countEl = document.getElementById('guide-feature-count');
+    if (countEl) countEl.textContent = `${allFeatures.length} enabled`;
+
+    if (grid) {
+      grid.innerHTML = features.length ? features.map(feature => `
+        <article class="product-guide-card">
+          <div class="product-guide-card-icon"><i class="fa-solid ${escGuide(feature.icon)}"></i></div>
+          <div class="product-guide-card-copy">
+            <div class="product-guide-card-top">
+              <span>${escGuide(feature.subtitle)}</span>
+              ${feature.minutes ? `<em class="product-guide-eta">~${feature.minutes} min</em>` : ''}
+            </div>
+            <h4>${escGuide(feature.label)}</h4>
+            <p>${escGuide(feature.description)}</p>
+            <div class="product-guide-first-action"><strong>Try this:</strong> ${escGuide(feature.firstAction)}</div>
+            <button type="button" class="product-guide-open-btn" data-guide-tab="${escGuide(feature.tabId)}">
+              Open ${escGuide(feature.label)} <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        </article>
+      `).join('') : `<div class="product-guide-empty">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <strong>No features match</strong>
+          <span>Clear search or pick another filter. Only modules on your plan and role are listed.</span>
+        </div>`;
+      grid.querySelectorAll('[data-guide-tab]').forEach(button => {
+        button.addEventListener('click', () => {
+          closeGuide();
+          activateTab(button.dataset.guideTab);
+        });
+      });
+    }
   }
 
   function openGuide() {
-    renderGuide();
+    injectGuide();
     const modal = document.getElementById('product-guide-modal');
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('product-guide-open');
+    renderGuide(document.getElementById('guide-search')?.value || '');
     setTimeout(() => document.getElementById('guide-search')?.focus(), 50);
   }
 
