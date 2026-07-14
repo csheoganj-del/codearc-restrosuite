@@ -4389,83 +4389,230 @@
     }
     function renderGrowthHub(){ return renderHub(); }
     function table(head, rows){ return `<div class="table-scroll"><table class="data-table"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`; }
+    function hubLocalKey(kind) {
+      try {
+        const tid = sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local';
+        return 'rs_hub_' + kind + '_' + tid;
+      } catch (e) { return 'rs_hub_' + kind; }
+    }
+    function hubLocalList(kind) {
+      try {
+        const raw = JSON.parse(localStorage.getItem(hubLocalKey(kind)) || '[]');
+        return Array.isArray(raw) ? raw : [];
+      } catch (e) { return []; }
+    }
+    function hubLocalSave(kind, rows) {
+      try { localStorage.setItem(hubLocalKey(kind), JSON.stringify(rows || [])); } catch (e) {}
+    }
+
     async function hubScreen(name){
       let body='', size='md', icon='fa-rocket', sub='';
       let records = [];
+      let footExtra = '';
 
       if(name==='Reservations'){ 
-        icon='fa-calendar-check'; sub="Today's bookings"; size='lg';
+        icon='fa-calendar-check'; sub="Bookings · synced to floor plan"; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reservations'); } catch(e){}
         }
-        body = records && records.length 
-          ? table(['Time','Guest','Pax','Table','Status'], records.map(r=>`<tr><td class="td-strong">${r.time || '--'}</td><td>${r.guestName || '--'}</td><td>${r.pax || 2}</td><td>${r.tableNumber || '--'}</td><td><span class="pill ${r.status==='confirmed'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${r.status || 'confirmed'}</span></td></tr>`).join('')) 
-          : '<div class="sr-empty">No reservations for today</div>'; 
+        const today = new Date().toISOString().slice(0,10);
+        const sorted = (records || []).slice().sort((a,b) => String(a.date||'').localeCompare(String(b.date||'')) || String(a.time||'').localeCompare(String(b.time||'')));
+        const upcoming = sorted.filter(r => !r.date || r.date >= today);
+        const show = upcoming.length ? upcoming : sorted;
+        body = show.length 
+          ? `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px">${show.length} booking(s)${upcoming.length ? ' · upcoming first' : ''} · appears on Floor when date matches</div>`
+            + table(['Date','Time','Guest','Phone','Pax','Table','Status'], show.map(r=>`<tr>
+              <td>${esc(r.date || '—')}</td>
+              <td class="td-strong">${esc(r.time || '—')}</td>
+              <td>${esc(r.guestName || '—')}</td>
+              <td style="font-size:12px;color:var(--text-soft)">${esc(r.guestPhone || '—')}</td>
+              <td>${esc(r.pax || 2)}</td>
+              <td>${esc(r.tableNumber || '—')}</td>
+              <td><span class="pill ${r.status==='confirmed'||r.status==='booked'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${esc(r.status || 'confirmed')}</span></td>
+            </tr>`).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-calendar-check"></i></div><div style="font-weight:700;margin-bottom:4px">No reservations yet</div><div style="font-size:13px;color:var(--text-soft);max-width:320px;margin:0 auto">Book a table for walk-ins or WhatsApp enquiries. Confirmed bookings show on the floor plan for that day.</div></div>'; 
       }
       else if(name==='Support Tickets'){ 
-        icon='fa-headset'; sub='Open customer issues';
+        icon='fa-headset'; sub='Customer issues · cloud-synced'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('support_tickets'); } catch(e){}
         }
         body = records && records.length 
-          ? table(['Ticket','Subject','Customer','Priority','Status'], records.map(r=>`<tr><td><b>${r.ticketNumber}</b></td><td>${r.subject}</td><td>${r.customerName}</td><td><span class="pill ${r.priority==='high'?'pill-red':r.priority==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${r.priority}</span></td><td><span class="pill ${r.status==='open'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${r.status}</span></td></tr>`).join('')) 
-          : '<div class="sr-empty">No open support tickets</div>'; 
+          ? table(['Ticket','Subject','Customer','Priority','Status','Notes'], records.map(r=>`<tr>
+              <td><b>${esc(r.ticketNumber || r.id)}</b></td>
+              <td>${esc(r.subject)}</td>
+              <td>${esc(r.customerName)}</td>
+              <td><span class="pill ${r.priority==='high'?'pill-red':r.priority==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${esc(r.priority||'medium')}</span></td>
+              <td><span class="pill ${r.status==='open'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(r.status||'open')}</span></td>
+              <td style="font-size:12px;color:var(--text-soft);max-width:160px;overflow:hidden;text-overflow:ellipsis">${esc(r.notes || '—')}</td>
+            </tr>`).join('')) 
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-headset"></i></div><div style="font-weight:700;margin-bottom:4px">No support tickets</div><div style="font-size:13px;color:var(--text-soft)">Log complaints, double-charge issues, or service feedback. Tickets sync to your outlet cloud DB.</div></div>'; 
       }
       else if(name==='Recipe Costing'){ 
-        icon='fa-flask-vial'; sub='Plate cost & margin across the menu'; size='lg';
-        const rows = RS.MENU.slice(0,10).map(m=>{ 
-          const ing=m.ingredients||[]; 
-          const cost=ing.reduce((a,g)=>{const inv=(RS.INVENTORY||[]).find(x=>x.name===g.name);return a+(inv?g.qty*inv.cost:0);},0); 
-          const c=cost||Math.round(m.price*0.32); 
-          const margin=Math.round((1-c/m.price)*100); 
-          return `<tr><td><b>${m.name}</b></td><td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td><td>${rs(c)}</td><td style="color:var(--green)">${margin}%</td></tr>`; 
-        }).join('');
-        body = rows.length ? table(['Item','Category','Sells at','Plate cost','Margin'], rows) : '<div class="sr-empty">No menu items to calculate costing</div>'; 
+        icon='fa-flask-vial'; sub='Plate cost & margin from menu + inventory'; size='lg';
+        const menu = Array.isArray(RS.MENU) ? RS.MENU : [];
+        const inv = Array.isArray(RS.INVENTORY) ? RS.INVENTORY : [];
+        const findInv = (name) => inv.find(x => String(x.name||'').toLowerCase() === String(name||'').toLowerCase());
+        const lines = menu.map(m => {
+          const ing = m.ingredients || m.recipe || [];
+          let recipeCost = 0;
+          let fromRecipe = false;
+          if (Array.isArray(ing) && ing.length) {
+            recipeCost = ing.reduce((a, g) => {
+              const row = findInv(g.name || g.ingredient || g.item);
+              const unitCost = row ? Number(row.cost || row.unit_cost || 0) : 0;
+              const qty = Number(g.qty || g.quantity || 0) || 0;
+              return a + unitCost * qty;
+            }, 0);
+            fromRecipe = recipeCost > 0;
+          }
+          const price = Number(m.price) || 0;
+          const c = fromRecipe ? recipeCost : (price > 0 ? Math.round(price * 0.32 * 100) / 100 : 0);
+          const margin = price > 0 ? Math.round((1 - c / price) * 100) : 0;
+          return { name: m.name, cat: m.cat || m.category || '—', price, cost: c, margin, fromRecipe };
+        }).sort((a,b) => a.margin - b.margin);
+        const avgM = lines.length ? Math.round(lines.reduce((s,l)=>s+l.margin,0)/lines.length) : 0;
+        const low = lines.filter(l => l.margin < 50).length;
+        const kpis = `<div class="crm-stats" style="margin-bottom:12px">
+          <div class="cs"><div class="csv">${lines.length}</div><div class="csl">Items</div></div>
+          <div class="cs"><div class="csv">${avgM}%</div><div class="csl">Avg margin</div></div>
+          <div class="cs"><div class="csv" style="color:${low?'var(--orange)':'var(--green)'}">${low}</div><div class="csl">Below 50%</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.4">
+          Cost uses <b>recipe ingredients × inventory unit cost</b> when linked. Otherwise estimates ~32% of sell price (mark “est.”). Set inventory unit costs + recipes for accuracy.
+        </p>`;
+        const rows = lines.map(l => `<tr>
+          <td><b>${esc(l.name)}</b></td>
+          <td style="font-size:12px">${esc(l.cat)}</td>
+          <td class="td-strong">${rs(l.price)}</td>
+          <td>${rs(l.cost)}${l.fromRecipe ? '' : ' <span style="font-size:10px;color:var(--text-mute)">(est.)</span>'}</td>
+          <td style="color:${l.margin<50?'var(--orange)':'var(--green)'};font-weight:700">${l.margin}%</td>
+        </tr>`).join('');
+        body = lines.length
+          ? kpis + table(['Item','Category','Sells at','Plate cost','Margin'], rows)
+          : '<div class="sr-empty">No menu items — add dishes in Menu Editor first.</div>'; 
       }
       else if(name==='Offers & Coupons'){ 
-        icon='fa-tags'; sub='Active promotions';
+        icon='fa-tags'; sub='POS promo codes · cloud-synced'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('offers'); } catch(e){}
         }
+        if ((!records || !records.length) && Array.isArray(RS.OFFERS) && RS.OFFERS.length) records = RS.OFFERS;
         body = records && records.length 
-          ? table(['Code','Offer','Usage','Status'], records.map(r=>`<tr><td><b>${r.code}</b></td><td>${r.description || 'Discount'}</td><td>${r.usageCount || 0}</td><td><span class="pill ${r.status==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${r.status}</span></td></tr>`).join('')) 
-          : '<div class="sr-empty">No active coupons or offers</div>'; 
+          ? `<p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Staff enter the <b>code</b> on POS cart promo. Percent or fixed amount applies to the bill.</p>`
+            + table(['Code','Offer','Discount','Usage','Status'], records.map(r=>{
+              const disc = (Number(r.fixed||r.amount)>0) ? rs(r.fixed||r.amount)+' off' : ((r.pct||r.discount_pct||0)+'% off');
+              return `<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.description || r.title || 'Discount')}</td><td>${esc(disc)}</td><td>${esc(r.usageCount || 0)}</td><td><span class="pill ${r.status==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${esc(r.status||'active')}</span></td></tr>`;
+            }).join('')) 
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-tags"></i></div><div style="font-weight:700;margin-bottom:4px">No offers yet</div><div style="font-size:13px;color:var(--text-soft)">Create FESTIVE20-style codes. They work on the POS cart when staff enter the code.</div></div>'; 
       }
       else if(name==='Loyalty Program'){ 
-        icon='fa-gift'; sub='Members & rewards';
-        const crm = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+        icon='fa-gift'; sub='Points earn on POS · tiers from spend'; size='lg';
+        const crm = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : (Array.isArray(RS.CUSTOMERS) ? RS.CUSTOMERS : []);
         const totalMembers = crm.length;
-        const totalPoints = crm.reduce((sum, c) => sum + (c.points || 0), 0);
-        body = `<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${totalMembers}</div><div class="csl">Members</div></div><div class="cs"><div class="csv">${totalPoints}</div><div class="csl">Points issued</div></div><div class="cs"><div class="csv">${Math.round(totalPoints * 0.1)}</div><div class="csl">Rewards claimed</div></div></div>`
+        const totalPoints = crm.reduce((sum, c) => sum + (Number(c.points) || 0), 0);
+        const vip = crm.filter(c => Number(c.spend) >= 10000 || String(c.tier||'').toLowerCase()==='vip').length;
+        const gold = crm.filter(c => {
+          const s = Number(c.spend)||0; const t = String(c.tier||'').toLowerCase();
+          return t==='gold' || (s >= 5000 && s < 10000);
+        }).length;
+        const silver = Math.max(0, totalMembers - vip - gold);
+        const top = crm.slice().sort((a,b)=>(Number(b.spend)||0)-(Number(a.spend)||0)).slice(0,8);
+        body = `<div class="crm-stats" style="margin-bottom:14px">
+            <div class="cs"><div class="csv">${totalMembers}</div><div class="csl">Members</div></div>
+            <div class="cs"><div class="csv">${totalPoints}</div><div class="csl">Points balance</div></div>
+            <div class="cs"><div class="csv">${vip}</div><div class="csl">VIP</div></div>
+          </div>
+          <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">
+            Loyalty is <b>live on POS</b>: customers earn points on settle and can redeem from the cart banner (Settings → Loyalty). Tiers use lifetime spend.
+          </p>`
           + table(['Tier','Members','Earn rate','Perk'], [
-              ['VIP', crm.filter(c => c.spend >= 10000).length, '3× points', 'Free dessert monthly'],
-              ['Gold', crm.filter(c => c.spend >= 5000 && c.spend < 10000).length, '2× points', 'Priority seating'],
-              ['Silver', crm.filter(c => c.spend < 5000).length, '1× point', 'Birthday treat']
-            ].map(r=>`<tr><td><span class="tier-badge ${r[0]==='VIP'?'tier-vip':r[0]==='Gold'?'tier-gold':'tier-silver'}">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--text-soft)">${r[3]}</td></tr>`).join('')); 
+              ['VIP', vip, '3× points', 'Free dessert monthly'],
+              ['Gold', gold, '2× points', 'Priority seating'],
+              ['Silver', silver, '1× point', 'Birthday treat']
+            ].map(r=>`<tr><td><span class="tier-badge ${r[0]==='VIP'?'tier-vip':r[0]==='Gold'?'tier-gold':'tier-silver'}">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--text-soft)">${r[3]}</td></tr>`).join(''))
+          + (top.length
+            ? '<div style="margin-top:16px;font-size:12px;font-weight:800;margin-bottom:8px;color:var(--text-soft);letter-spacing:.04em;text-transform:uppercase">Top members</div>'
+              + table(['Name','Phone','Spend','Points','Tier'], top.map(c=>`<tr>
+                <td><b>${esc(c.name||'—')}</b></td>
+                <td style="font-size:12px">${esc(c.phone||'—')}</td>
+                <td class="td-strong">${rs(c.spend||0)}</td>
+                <td>${esc(c.points||0)}</td>
+                <td style="text-transform:capitalize">${esc(c.tier||'silver')}</td>
+              </tr>`).join(''))
+            : '<div class="sr-empty" style="padding:20px 0">No customers yet — they appear after POS bills or CRM add.</div>');
+        footExtra = `<button class="btn btn-ghost" data-open-crm><i class="fa-solid fa-users"></i> Open CRM</button>`;
       }
       else if(name==='WhatsApp Campaigns'){ 
-        icon='fa-bullhorn'; sub='Broadcast performance';
-        body = '<div class="sr-empty">No campaigns run yet</div>'; 
+        icon='fa-bullhorn'; sub='Broadcast history · sends via WhatsApp'; size='lg';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('broadcasts'); } catch(e){}
+        }
+        if (!records || !records.length) records = hubLocalList('broadcasts');
+        records = (records || []).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+        body = records.length
+          ? `<p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Campaigns open pre-filled WhatsApp chats (browser blocks silent bulk send). Gateway can auto-send when connected.</p>`
+            + table(['When','Audience','Recipients','Message'], records.map(r=>`<tr>
+              <td style="font-size:12px;white-space:nowrap">${esc(String(r.createdAt||'').slice(0,16).replace('T',' '))}</td>
+              <td style="text-transform:capitalize">${esc(r.audience||'all')}</td>
+              <td class="td-strong">${esc(r.recipientCount||0)}</td>
+              <td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.message||'')}</td>
+            </tr>`).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-bullhorn"></i></div><div style="font-weight:700;margin-bottom:4px">No campaigns yet</div><div style="font-size:13px;color:var(--text-soft);max-width:340px;margin:0 auto">Compose a message for VIP / Gold / all customers with phones. Same engine as CRM → Broadcast.</div></div>'; 
       }
       else if(name==='Feedback & Reviews'){ 
-        icon='fa-star'; sub='Recent ratings';
-        body = '<div class="sr-empty">No reviews collected yet</div>'; 
+        icon='fa-star'; sub='Guest ratings logged by staff'; size='lg';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('reviews'); } catch(e){}
+        }
+        if (!records || !records.length) records = hubLocalList('reviews');
+        records = (records || []).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+        const avg = records.length
+          ? (records.reduce((s,r)=>s+(Number(r.rating)||0),0)/records.length).toFixed(1)
+          : '—';
+        body = (records.length
+          ? `<div class="crm-stats" style="margin-bottom:12px">
+              <div class="cs"><div class="csv">${records.length}</div><div class="csl">Reviews</div></div>
+              <div class="cs"><div class="csv">${avg}</div><div class="csl">Avg stars</div></div>
+            </div>`
+            + table(['Date','Guest','Stars','Comment','Source'], records.map(r=>`<tr>
+              <td style="font-size:12px">${esc(String(r.createdAt||'').slice(0,10))}</td>
+              <td><b>${esc(r.guestName||'Guest')}</b></td>
+              <td style="color:var(--orange);font-weight:800">${'★'.repeat(Math.min(5,Number(r.rating)||0))}${'☆'.repeat(Math.max(0,5-Math.min(5,Number(r.rating)||0)))}</td>
+              <td style="font-size:12px;max-width:200px">${esc(r.comment||'—')}</td>
+              <td style="font-size:11px;color:var(--text-soft)">${esc(r.source||'staff')}</td>
+            </tr>`).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Log walk-out feedback or Google/Zomato scores so the team sees trends in one place.</div></div>');
       }
       else if(name==='Purchase Orders'){ 
         RS.activateTab('inventory-tab'); 
-        setTimeout(()=>{ const b=$$('#inventory-tab .seg button')[2]; b&&b.click(); },80); 
+        setTimeout(()=>{
+          const btns = $$('#inventory-tab .seg button');
+          const po = btns.find(b => /purchase/i.test(b.textContent||'')) || btns[3];
+          po && po.click();
+        },80); 
         RS.toast('Opening purchase orders','fa-truck-ramp-box'); 
         return; 
       }
-      else { body = `<p style="color:var(--text-soft)">${name} module.</p>`; }
+      else { body = `<p style="color:var(--text-soft)">${esc(name)} module.</p>`; }
 
-      const hideNewBtn = ['Recipe Costing', 'Loyalty Program', 'WhatsApp Campaigns', 'Feedback & Reviews'].includes(name);
+      const hideNewBtn = ['Recipe Costing', 'Loyalty Program'].includes(name);
+      const newLabel = name === 'WhatsApp Campaigns' ? 'New campaign'
+        : name === 'Feedback & Reviews' ? 'Log review'
+        : 'New';
 
       RSModal.open({ title:name, sub, icon, size, body,
-        foot: hideNewBtn ? `<div class="grow"></div><button class="btn btn-ghost" data-cancel>Close</button>` : `<div class="grow"></div><button class="btn btn-primary" data-x><i class="fa-solid fa-plus"></i> New</button>`,
+        foot: hideNewBtn
+          ? `${footExtra}<div class="grow"></div><button class="btn btn-ghost" data-cancel>Close</button>`
+          : `${footExtra}<div class="grow"></div><button class="btn btn-primary" data-x><i class="fa-solid fa-plus"></i> ${newLabel}</button><button class="btn btn-ghost" data-cancel>Close</button>`,
         onMount(modal,close){ 
           const cancelBtn = modal.querySelector('[data-cancel]');
           if (cancelBtn) cancelBtn.onclick = close;
+          const crmBtn = modal.querySelector('[data-open-crm]');
+          if (crmBtn) crmBtn.onclick = () => {
+            close();
+            try { RS.activateTab('customers-tab'); } catch (e) {}
+          };
 
           const newBtn = modal.querySelector('[data-x]');
           if (newBtn) {
@@ -4559,6 +4706,10 @@
                         </select>
                       </div>
                     </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Details / notes</label>
+                      <textarea id="tkt-notes" rows="3" class="form-control" placeholder="What happened? Order #, amount, staff involved…" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
                   </div>
                 `;
                 RSModal.open({
@@ -4575,14 +4726,19 @@
                       const subject = tktModal.querySelector('#tkt-subject').value || '';
                       if (!subject) return RS.toast('Subject is required', 'fa-circle-exclamation');
                       const priority = tktModal.querySelector('#tkt-priority').value || 'medium';
+                      const notes = (tktModal.querySelector('#tkt-notes').value || '').trim();
 
                       const tktNum = RS.nextLogicalNo('TKT');
-                      const tktRow = { id: tktNum, ticketNumber: tktNum, subject, customerName, priority, status: 'open' };
+                      const tktRow = { id: tktNum, ticketNumber: tktNum, subject, customerName, priority, status: 'open', notes };
                       tktClose();
-                      if (RS.saveOne) {
-                        await RS.saveOne('support_tickets', tktRow);
-                        RS.toast('Support ticket opened successfully', 'fa-circle-check');
+                      try {
+                        if (RS.saveOne) await RS.saveOne('support_tickets', tktRow);
+                        else if (window.RS_DB) await RS_DB.put('support_tickets', tktNum, tktRow);
+                        RS.toast('Support ticket opened', 'fa-circle-check');
                         hubScreen('Support Tickets');
+                      } catch (e) {
+                        console.warn(e);
+                        RS.toast('Could not save ticket', 'fa-circle-exclamation');
                       }
                     };
                   }
@@ -4658,6 +4814,181 @@
                         console.warn(e);
                         RS.toast('Could not save offer', 'fa-circle-exclamation');
                       }
+                    };
+                  },
+                });
+              } else if (name === 'WhatsApp Campaigns') {
+                const crm = (Array.isArray(RS.CUSTOMERS) && RS.CUSTOMERS.length)
+                  ? RS.CUSTOMERS
+                  : [];
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Audience</label>
+                      <select id="wa-audience" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <option value="all">All customers with phone</option>
+                        <option value="vip">VIP tier</option>
+                        <option value="gold">Gold tier</option>
+                        <option value="silver">Silver tier</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Message</label>
+                      <textarea id="wa-message" rows="4" class="form-control" placeholder="e.g. This weekend only: 15% off all mains. Show this message at the counter!" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
+                    <p id="wa-count" style="font-size:12px;color:var(--text-soft);margin:0">Loading customers…</p>
+                  </div>`;
+                RSModal.open({
+                  title: 'New WhatsApp campaign',
+                  sub: 'Broadcast to your CRM list',
+                  icon: 'fa-bullhorn',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-brands fa-whatsapp"></i> Review &amp; send</button>`,
+                  onMount(waModal, waClose) {
+                    let list = crm.slice();
+                    const load = async () => {
+                      if (window.RS_DB) {
+                        try {
+                          const rows = await RS_DB.list('customers');
+                          if (rows && rows.length) list = rows;
+                        } catch (e) {}
+                      }
+                      refreshCount();
+                    };
+                    const matching = () => {
+                      const aud = waModal.querySelector('#wa-audience').value;
+                      return list.filter((c) => {
+                        if (!c.phone) return false;
+                        const t = String(c.tier || 'silver').toLowerCase();
+                        if (aud === 'all') return true;
+                        return t === aud;
+                      });
+                    };
+                    const refreshCount = () => {
+                      const el = waModal.querySelector('#wa-count');
+                      if (el) el.textContent = matching().length + ' customer(s) match this audience.';
+                    };
+                    waModal.querySelector('#wa-audience').onchange = refreshCount;
+                    waModal.querySelector('[data-cancel]').onclick = waClose;
+                    waModal.querySelector('[data-confirm]').onclick = async () => {
+                      const message = (waModal.querySelector('#wa-message').value || '').trim();
+                      if (!message) return RS.toast('Enter a message', 'fa-circle-exclamation');
+                      const recipients = matching();
+                      if (!recipients.length) return RS.toast('No customers match — add phones in CRM first', 'fa-circle-exclamation');
+                      const audience = waModal.querySelector('#wa-audience').value;
+                      waClose();
+                      const campaignRow = {
+                        id: 'bcast_' + Date.now(),
+                        message,
+                        audience,
+                        recipientCount: recipients.length,
+                        createdAt: new Date().toISOString(),
+                      };
+                      try {
+                        if (window.RS_DB) await RS_DB.put('broadcasts', campaignRow.id, campaignRow);
+                      } catch (e) {}
+                      const prev = hubLocalList('broadcasts');
+                      prev.unshift(campaignRow);
+                      hubLocalSave('broadcasts', prev.slice(0, 100));
+                      RSModal.open({
+                        title: 'Send to ' + recipients.length + ' customer(s)',
+                        sub: 'Tap Send to open WhatsApp for each guest',
+                        icon: 'fa-bullhorn',
+                        size: 'sm',
+                        body: `<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto">${recipients.map((c, i) => `
+                          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--stroke);border-radius:10px;gap:8px">
+                            <div style="min-width:0"><b>${esc(c.name || 'Guest')}</b><div style="font-size:11px;color:var(--text-mute)">${esc(c.phone)}</div></div>
+                            <button type="button" class="btn btn-ghost btn-sm" data-send-i="${i}"><i class="fa-brands fa-whatsapp"></i> Send</button>
+                          </div>`).join('')}</div>`,
+                        foot: `<button class="btn btn-primary" style="flex:1" data-done>Done</button>`,
+                        onMount(sendModal, closeSend) {
+                          sendModal.querySelector('[data-done]').onclick = () => {
+                            closeSend();
+                            hubScreen('WhatsApp Campaigns');
+                          };
+                          sendModal.querySelectorAll('[data-send-i]').forEach((btn) => {
+                            btn.onclick = () => {
+                              const cst = recipients[+btn.dataset.sendI];
+                              const digits = String(cst.phone || '').replace(/\D/g, '');
+                              const waPhone = digits.length === 10 ? '91' + digits : digits;
+                              window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+                              btn.innerHTML = '<i class="fa-solid fa-check"></i> Opened';
+                              btn.disabled = true;
+                            };
+                          });
+                        },
+                      });
+                      RS.toast('Campaign saved · send from the list', 'fa-bullhorn');
+                    };
+                    load();
+                  },
+                });
+              } else if (name === 'Feedback & Reviews') {
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Guest name</label>
+                        <input type="text" id="rv-name" class="form-control" placeholder="e.g. Priya" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Rating</label>
+                        <select id="rv-rating" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                          <option value="5">5 ★ Excellent</option>
+                          <option value="4" selected>4 ★ Good</option>
+                          <option value="3">3 ★ OK</option>
+                          <option value="2">2 ★ Poor</option>
+                          <option value="1">1 ★ Bad</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Source</label>
+                      <select id="rv-source" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <option value="in-house">In-house / verbal</option>
+                        <option value="google">Google</option>
+                        <option value="zomato">Zomato</option>
+                        <option value="swiggy">Swiggy</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Comment</label>
+                      <textarea id="rv-comment" rows="3" class="form-control" placeholder="What did they say?" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
+                  </div>`;
+                RSModal.open({
+                  title: 'Log review',
+                  sub: 'Record guest feedback',
+                  icon: 'fa-star',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Save review</button>`,
+                  onMount(rvModal, rvClose) {
+                    rvModal.querySelector('[data-cancel]').onclick = rvClose;
+                    rvModal.querySelector('[data-confirm]').onclick = async () => {
+                      const guestName = (rvModal.querySelector('#rv-name').value || '').trim() || 'Guest';
+                      const rating = Number(rvModal.querySelector('#rv-rating').value) || 4;
+                      const source = rvModal.querySelector('#rv-source').value || 'staff';
+                      const comment = (rvModal.querySelector('#rv-comment').value || '').trim();
+                      const row = {
+                        id: 'rev_' + Date.now(),
+                        guestName,
+                        rating,
+                        source,
+                        comment,
+                        createdAt: new Date().toISOString(),
+                      };
+                      rvClose();
+                      try {
+                        if (window.RS_DB) await RS_DB.put('reviews', row.id, row);
+                      } catch (e) {}
+                      const prev = hubLocalList('reviews');
+                      prev.unshift(row);
+                      hubLocalSave('reviews', prev.slice(0, 200));
+                      RS.toast('Review saved · ' + rating + '★', 'fa-star');
+                      hubScreen('Feedback & Reviews');
                     };
                   },
                 });

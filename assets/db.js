@@ -808,9 +808,38 @@
     },
     support_tickets: {
       table:'doppio_support_tickets', pk:'id', clientId:false, uuidPK:true,
-      from: r => ({ id:r.id, ticketNumber:r.ticket_number, subject:r.subject, customerName:r.customer_name, priority:r.priority, status:r.status }),
-      to: o => ({ ticket_number:o.ticketNumber||'', subject:o.subject||'', customer_name:o.customerName||'', priority:o.priority||'medium', status:o.status||'open' })
-    }
+      from: r => ({
+        id: r.id,
+        ticketNumber: r.ticket_number,
+        subject: r.subject,
+        customerName: r.customer_name,
+        priority: r.priority,
+        status: r.status,
+        notes: r.last_message || r.notes || '',
+        createdAt: r.created_at || null,
+      }),
+      to: o => ({
+        ticket_number: o.ticketNumber || '',
+        subject: o.subject || '',
+        customer_name: o.customerName || '',
+        priority: o.priority || 'medium',
+        status: o.status || 'open',
+        last_message: o.notes || o.last_message || '',
+      })
+    },
+    // Local-first growth tools (no dedicated cloud table on all deploys)
+    broadcasts: {
+      table: null,
+      pk: 'id',
+      clientId: true,
+      localOnly: true,
+    },
+    reviews: {
+      table: null,
+      pk: 'id',
+      clientId: true,
+      localOnly: true,
+    },
   };
   const conflictTargets = Object.freeze({
     businessProfile: { table: 'doppio_business_profile', onConflict: 'tenant_id' },
