@@ -2111,6 +2111,15 @@ body.rs-role-brandadmin #klc-mobile-setup {
   cursor: pointer;
 }
 
+/* Legacy MORE SECTIONS sheet — retired; All sections modal is canonical */
+#mobile-more-sheet {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  z-index: -1 !important;
+}
+
 /* ===================== MOBILE BOTTOM NAV ===================== */
 .mobile-nav { display: none; }
 .pos-m-cart-btn {

@@ -2153,7 +2153,16 @@
         ['settings-tab','Settings','gear'],
         ['logout','Sign Out','right-from-bracket']
       ];
-      moreBtn.addEventListener('click', ()=>{
+      moreBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        // Kill legacy MORE SECTIONS sheet if any other code tried to open it
+        const legacy = document.getElementById('mobile-more-sheet');
+        if (legacy) {
+          legacy.style.display = 'none';
+          legacy.setAttribute('hidden', '');
+          legacy.setAttribute('aria-hidden', 'true');
+        }
         // Filter the sheet by the signed-in staff role's allowed tabs so
         // restricted roles can't even see (let alone open) forbidden screens.
         const roleInfo = window.RS_ROLE || {};
@@ -2167,6 +2176,8 @@
             return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
           }).join('')}</div>`,
           onMount(modal, close){
+            // Keep legacy sheet suppressed while this modal is open
+            if (legacy) legacy.style.display = 'none';
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
                 if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
@@ -2184,8 +2195,9 @@
                   location.href='login';
                 }
               } else {
-                RS.activateTab(b.dataset.go);
                 close();
+                if (legacy) legacy.style.display = 'none';
+                RS.activateTab(b.dataset.go);
               }
             });
           }

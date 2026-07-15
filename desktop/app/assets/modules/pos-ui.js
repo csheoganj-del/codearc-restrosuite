@@ -1598,23 +1598,14 @@ function initPOS(){
 
   renderPOS(); renderCart();
 
-  // Mobile "More" bottom nav sheet
-  const mnavMore = document.getElementById('mnav-more');
-  const moreSheet = document.getElementById('mobile-more-sheet');
-  if (mnavMore && moreSheet) {
-    mnavMore.addEventListener('click', () => {
-      moreSheet.style.display = moreSheet.style.display === 'none' ? 'block' : 'none';
-    });
-    moreSheet.querySelectorAll('.mnav-more-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        moreSheet.style.display = 'none';
-        if (window.RS_ROLE && Array.isArray(RS_ROLE.allowedTabs) && RS_ROLE.allowedTabs.length && !RS_ROLE.allowedTabs.includes(btn.dataset.tab)) {
-          activateTab(RS_ROLE.allowedTabs[0]);
-          return;
-        }
-        activateTab(btn.dataset.tab);
-      });
-    });
+  // Mobile "More" is owned by features-shell.js (RSModal "All sections").
+  // Do NOT toggle #mobile-more-sheet here — that older bottom sheet was still
+  // opening underneath the modal, flashing "MORE SECTIONS" when a tile closed.
+  const legacyMore = document.getElementById('mobile-more-sheet');
+  if (legacyMore) {
+    legacyMore.style.display = 'none';
+    legacyMore.setAttribute('hidden', '');
+    legacyMore.setAttribute('aria-hidden', 'true');
   }
 }
 
