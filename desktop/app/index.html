@@ -226,275 +226,151 @@
     .hero-trust .t-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); }
     .hero-trust .t-item i { color: var(--green); }
 
-    /* Hero product mock — matches REAL RestroSuite (text menu, no dish photos) */
+    /* Hero: dashboard segments syncing (text UI, no dish photos) */
     .hero-visual {
       position: relative;
       animation: fadeUp .55s .15s both;
-      perspective: 1200px;
     }
-    .hero-stage {
+    .sync-stage {
       position: relative;
-      border-radius: 20px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #F6F4F1;
-      box-shadow:
-        0 4px 8px rgba(20,18,16,.04),
-        0 28px 56px -18px rgba(20,18,16,.22);
-    }
-    .hero-ui {
-      display: grid;
-      grid-template-columns: 56px 1fr 168px;
-      min-height: 340px;
-      max-height: 380px;
-    }
-    /* Slim sidebar */
-    .hui-sb {
-      background: #fff;
-      border-right: 1px solid var(--border);
-      padding: 12px 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-    .hui-logo {
-      width: 34px; height: 34px; border-radius: 10px;
-      background: linear-gradient(135deg, #FF4F00, #FF7A3D);
-      display: grid; place-items: center; color: #fff; font-size: 14px;
-      margin-bottom: 6px;
-    }
-    .hui-nav {
-      width: 36px; height: 36px; border-radius: 10px;
-      display: grid; place-items: center; font-size: 13px;
-      color: var(--text-mute); cursor: default;
-    }
-    .hui-nav.on {
-      background: rgba(255,79,0,.12); color: var(--accent);
-    }
-    /* Main POS area */
-    .hui-main {
-      padding: 12px 12px 10px;
-      display: flex; flex-direction: column; gap: 10px;
-      min-width: 0;
-      overflow: hidden;
-    }
-    .hui-top {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    }
-    .hui-top h3 {
-      margin: 0; font-size: 14px; font-weight: 800; letter-spacing: -.02em;
-    }
-    .hui-top .live {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 10px; font-weight: 800; color: #0F9F6E;
-      background: #E8F8F1; padding: 3px 8px; border-radius: 999px;
-    }
-    .hui-top .live i { font-size: 6px; animation: pulseDot 1.6s infinite; }
-    .hui-cats {
-      display: flex; gap: 6px; flex-wrap: wrap;
-    }
-    .hui-cat {
-      font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px;
-      background: #fff; border: 1px solid var(--border); color: var(--text-soft);
-    }
-    .hui-cat.on {
-      background: var(--accent); color: #fff; border-color: transparent;
-    }
-    /* TEXT-ONLY menu tiles — no food photos */
-    .hui-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      flex: 1;
-      min-height: 0;
-    }
-    .hui-item {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 10px 9px;
-      display: flex; flex-direction: column; gap: 4px;
-      min-height: 72px;
-      transition: border-color .2s, box-shadow .2s;
-    }
-    .hui-item:hover, .hui-item.pick {
-      border-color: rgba(255,79,0,.35);
-      box-shadow: 0 0 0 3px rgba(255,79,0,.1);
-    }
-    .hui-item .nm {
-      font-size: 12px; font-weight: 800; color: var(--text);
-      line-height: 1.25; letter-spacing: -.01em;
-    }
-    .hui-item .meta {
-      display: flex; align-items: center; justify-content: space-between; gap: 4px;
-      margin-top: auto;
-    }
-    .hui-item .pr { font-size: 12px; font-weight: 800; color: var(--accent); }
-    .hui-item .badge {
-      font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
-      background: #E8F8F1; color: #0F9F6E;
-    }
-    .hui-item .badge.nv { background: #FEE2E2; color: #B91C1C; }
-    /* Cart rail */
-    .hui-cart {
-      background: #fff;
-      border-left: 1px solid var(--border);
-      padding: 12px 11px;
-      display: flex; flex-direction: column; gap: 8px;
-      min-width: 0;
-    }
-    .hui-cart h4 {
-      margin: 0; font-size: 12px; font-weight: 800;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .hui-cart h4 span {
-      font-size: 10px; font-weight: 700; color: var(--text-mute);
-      background: var(--surface-2); padding: 2px 7px; border-radius: 999px;
-    }
-    .hui-line {
-      display: flex; justify-content: space-between; gap: 6px;
-      font-size: 11px; padding: 6px 0;
-      border-bottom: 1px dashed var(--border);
-    }
-    .hui-line .ln { font-weight: 700; color: var(--text); line-height: 1.3; }
-    .hui-line .lq { color: var(--text-mute); font-size: 10px; font-weight: 600; }
-    .hui-line .lp { font-weight: 800; color: var(--text); white-space: nowrap; }
-    .hui-tot {
-      margin-top: auto;
-      padding-top: 8px;
-      border-top: 1px solid var(--border);
-    }
-    .hui-tot .row {
-      display: flex; justify-content: space-between;
-      font-size: 11px; color: var(--text-soft); padding: 2px 0;
-    }
-    .hui-tot .grand {
-      display: flex; justify-content: space-between;
-      font-size: 14px; font-weight: 800; color: var(--text); margin-top: 4px;
-    }
-    .hui-tot .grand b { color: var(--accent); }
-    .hui-pay {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px;
-    }
-    .hui-pay button {
-      border: 1px solid var(--border); background: #FAF8F5;
-      border-radius: 9px; padding: 7px 4px; font-size: 10px; font-weight: 800;
-      color: var(--text-soft); cursor: default; font-family: inherit;
-    }
-    .hui-pay button.on {
-      background: var(--accent); color: #fff; border-color: transparent;
-      box-shadow: 0 6px 14px -6px rgba(255,79,0,.5);
-    }
-    .hui-cta {
-      margin-top: 6px; width: 100%; border: 0; border-radius: 11px;
-      padding: 10px; font-size: 12px; font-weight: 800; font-family: inherit;
-      background: linear-gradient(135deg, #FF4F00, #FF7A3D); color: #fff;
-      box-shadow: 0 8px 18px -8px rgba(255,79,0,.55); cursor: default;
-    }
-
-    /* Kitchen / Bill view panels (swap inside stage) */
-    .hui-view { display: none; }
-    .hui-view.on { display: contents; }
-    .hui-kds, .hui-bill {
-      display: none;
+      border-radius: 22px;
       padding: 14px;
-      flex-direction: column; gap: 10px;
-      min-height: 340px;
-      background: #F6F4F1;
+      background:
+        radial-gradient(90% 70% at 100% 0%, rgba(255,79,0,.1), transparent 55%),
+        radial-gradient(80% 60% at 0% 100%, rgba(42,155,143,.08), transparent 50%),
+        #F7F5F2;
+      border: 1px solid var(--border);
+      box-shadow:
+        0 4px 10px rgba(20,18,16,.04),
+        0 28px 56px -20px rgba(20,18,16,.2);
+      overflow: hidden;
     }
-    .hero-stage[data-view="kitchen"] .hui-ui { display: none; }
-    .hero-stage[data-view="kitchen"] .hui-kds { display: flex; }
-    .hero-stage[data-view="bill"] .hui-ui { display: none; }
-    .hero-stage[data-view="bill"] .hui-bill { display: flex; }
-
-    .hui-kds-head, .hui-bill-head {
-      display: flex; align-items: center; justify-content: space-between;
+    .sync-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 12px; flex-wrap: wrap;
     }
-    .hui-kds-head h3, .hui-bill-head h3 {
-      margin: 0; font-size: 14px; font-weight: 800;
+    .sync-bar-live {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 11.5px; font-weight: 800; color: #0F9F6E;
+      background: #E8F8F1; border: 1px solid #BBF7D0;
+      padding: 6px 12px; border-radius: 999px;
     }
-    .hui-tickets {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1;
+    .sync-bar-live .pulse {
+      width: 8px; height: 8px; border-radius: 50%; background: #0F9F6E;
+      box-shadow: 0 0 0 0 rgba(15,159,110,.5);
+      animation: syncPulse 1.6s infinite;
     }
-    .hui-ticket {
-      background: #fff; border: 1px solid var(--border); border-radius: 14px;
-      padding: 12px; display: flex; flex-direction: column; gap: 6px;
+    @keyframes syncPulse {
+      0% { box-shadow: 0 0 0 0 rgba(15,159,110,.45); }
+      70% { box-shadow: 0 0 0 8px rgba(15,159,110,0); }
+      100% { box-shadow: 0 0 0 0 rgba(15,159,110,0); }
     }
-    .hui-ticket .th {
-      display: flex; justify-content: space-between; font-size: 11px; font-weight: 800;
+    .sync-bar-msg {
+      font-size: 11.5px; font-weight: 700; color: var(--text-soft);
+      background: #fff; border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 999px;
+      max-width: min(100%, 320px);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: color .25s, background .25s, border-color .25s;
     }
-    .hui-ticket .th em {
-      font-style: normal; font-size: 10px; padding: 2px 7px; border-radius: 999px;
-      background: #FEF3C7; color: #B45309;
+    .sync-bar-msg.flash {
+      color: var(--accent);
+      border-color: rgba(255,79,0,.28);
+      background: rgba(255,79,0,.08);
     }
-    .hui-ticket .th em.hot { background: #FFEDD5; color: #C2410C; }
-    .hui-ticket li {
-      list-style: none; font-size: 12px; font-weight: 600; color: var(--text);
-      padding: 3px 0; border-bottom: 1px dashed var(--border);
+    .sync-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      z-index: 2;
     }
-    .hui-ticket .tbtn {
-      margin-top: auto; border: 0; border-radius: 9px; padding: 8px;
-      font-size: 11px; font-weight: 800; font-family: inherit;
-      background: var(--accent); color: #fff;
+    .sync-packet {
+      position: absolute;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: linear-gradient(135deg, #FF4F00, #FF9A5C);
+      box-shadow: 0 0 0 3px rgba(255,79,0,.2), 0 4px 10px rgba(255,79,0,.35);
+      z-index: 5;
+      opacity: 0;
+      pointer-events: none;
+      margin-left: -5px; margin-top: -5px;
     }
-    .hui-bill-card {
-      background: #fff; border: 1px solid var(--border); border-radius: 16px;
-      padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 8px;
-    }
-    .hui-bill-card .br {
-      display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-soft);
-    }
-    .hui-bill-card .br.tot {
-      margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border);
-      font-size: 16px; font-weight: 800; color: var(--text);
-    }
-    .hui-bill-card .br.tot b { color: var(--accent); }
-    .hui-bill-pays {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    }
-    .hui-bill-pays span {
-      text-align: center; font-size: 11px; font-weight: 800; padding: 10px 4px;
-      border-radius: 11px; border: 1px solid var(--border); background: #FAF8F5;
-      color: var(--text-soft);
-    }
-    .hui-bill-pays span.on {
-      background: var(--accent); color: #fff; border-color: transparent;
-    }
-
-    /* Workflow strip under mock */
-    .hero-flow {
-      display: flex; align-items: center; gap: 6px;
-      padding: 10px 12px;
+    .sync-card {
+      position: relative;
+      z-index: 2;
       background: #fff;
-      border-top: 1px solid var(--border);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 11px 12px 12px;
+      min-height: 148px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: border-color .25s, box-shadow .25s, transform .25s;
     }
-    .hero-flow-step {
-      flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-      padding: 9px 8px; border-radius: 11px;
-      font-size: 12px; font-weight: 800; color: var(--text-soft);
-      border: 1px solid transparent; cursor: pointer;
-      background: transparent; font-family: inherit;
-      transition: .2s;
+    .sync-card.active {
+      border-color: rgba(255,79,0,.4);
+      box-shadow: 0 0 0 3px rgba(255,79,0,.1), 0 12px 24px -14px rgba(255,79,0,.35);
+      transform: translateY(-2px);
     }
-    .hero-flow-step i { font-size: 12px; opacity: .75; }
-    .hero-flow-step.active {
+    .sync-card.recv { animation: cardRecv .55s ease; }
+    @keyframes cardRecv {
+      0% { box-shadow: 0 0 0 0 rgba(15,159,110,0); }
+      40% { box-shadow: 0 0 0 4px rgba(15,159,110,.22); }
+      100% { box-shadow: 0 0 0 0 rgba(15,159,110,0); }
+    }
+    .sc-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    }
+    .sc-title {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 800; color: var(--text);
+    }
+    .sc-title i {
+      width: 24px; height: 24px; border-radius: 8px;
+      display: grid; place-items: center; font-size: 11px;
       background: rgba(255,79,0,.1); color: var(--accent);
-      border-color: rgba(255,79,0,.22);
     }
-    .hero-flow-arrow { color: var(--text-mute); font-size: 9px; opacity: .5; flex: none; }
-    .hero-caption-bar {
+    .sc-title.kit i { background: #FFEDD5; color: #C2410C; }
+    .sc-title.bill i { background: #E8F8F1; color: #0F9F6E; }
+    .sc-title.qr i { background: #E0E7FF; color: #4338CA; }
+    .sc-badge {
+      font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+      background: #F3F4F6; color: var(--text-mute); letter-spacing: .02em;
+    }
+    .sc-badge.on { background: #E8F8F1; color: #0F9F6E; }
+    .sc-badge.warn { background: #FEF3C7; color: #B45309; }
+    .sc-body { flex: 1; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+    .sc-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      font-size: 11.5px; font-weight: 600; color: var(--text);
+      padding: 5px 7px; border-radius: 8px; background: #FAF8F5;
+    }
+    .sc-row .muted { color: var(--text-mute); font-weight: 600; font-size: 10.5px; }
+    .sc-row .amt { font-weight: 800; color: var(--accent); white-space: nowrap; }
+    .sc-row.new-in {
+      animation: rowIn .45s ease;
+      background: rgba(255,79,0,.08);
+      border: 1px solid rgba(255,79,0,.18);
+    }
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
+    }
+    .sc-foot {
       display: flex; justify-content: space-between; align-items: center;
-      gap: 8px; flex-wrap: wrap;
-      padding: 0 2px; margin-top: 12px;
+      font-size: 10.5px; font-weight: 700; color: var(--text-mute);
+      padding-top: 4px; border-top: 1px dashed var(--border);
+    }
+    .sc-foot b { color: var(--text); font-weight: 800; }
+    .sync-caption {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 0 2px;
       font-size: 12.5px; color: var(--text-mute);
     }
-    .hero-caption-bar b { color: var(--text); font-weight: 700; }
-    .hero-caption-bar .hc-badge {
+    .sync-caption b { color: var(--text); font-weight: 800; }
+    .sync-caption .hc-badge {
       font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 999px;
       background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
     }
-    .hero-float { display: none; }
 
     /* Logo strip */
     .logo-strip { padding: 16px 0 40px; }
@@ -730,11 +606,10 @@
       .hero-actions { gap: 10px; }
       .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
       .hero-trust { gap: 12px; flex-wrap: wrap; }
-      .hero-ui { grid-template-columns: 1fr 150px; min-height: 300px; }
-      .hui-sb { display: none; }
-      .hui-grid { grid-template-columns: repeat(2, 1fr); }
-      .hui-tickets { grid-template-columns: 1fr; }
-      .hero-flow-step { font-size: 11px; padding: 8px 4px; }
+      .sync-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .sync-card { min-height: 128px; padding: 10px; }
+      .sc-row { font-size: 11px; padding: 4px 6px; }
+      .sync-bar-msg { max-width: 55%; font-size: 10.5px; }
       .float-chip.sync { display: none; }
       .float-chip.wa { right: 4%; top: -14px; }
 
@@ -879,121 +754,66 @@
           </div>
         </div>
 
-        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite product workflow">
-          <div class="hero-stage" id="hero-stage" data-view="order">
-            <!-- POS view: text menu only (matches real app — no dish photos) -->
-            <div class="hui-ui hero-ui" id="hui-ui">
-              <aside class="hui-sb" aria-hidden="true">
-                <div class="hui-logo"><i class="fa-solid fa-utensils"></i></div>
-                <div class="hui-nav on" title="POS"><i class="fa-solid fa-cash-register"></i></div>
-                <div class="hui-nav" title="Kitchen"><i class="fa-solid fa-fire-burner"></i></div>
-                <div class="hui-nav" title="Bills"><i class="fa-solid fa-file-invoice"></i></div>
-                <div class="hui-nav" title="Tables"><i class="fa-solid fa-chair"></i></div>
-              </aside>
-              <div class="hui-main">
-                <div class="hui-top">
-                  <h3>Point of Sale</h3>
-                  <span class="live"><i class="fa-solid fa-circle"></i> Live</span>
-                </div>
-                <div class="hui-cats">
-                  <span class="hui-cat on">All</span>
-                  <span class="hui-cat">Mains</span>
-                  <span class="hui-cat">Breads</span>
-                  <span class="hui-cat">Drinks</span>
-                </div>
-                <div class="hui-grid" aria-label="Menu — name and price only">
-                  <div class="hui-item pick"><span class="nm">Butter Chicken</span><div class="meta"><span class="pr">₹320</span><span class="badge nv">Non-veg</span></div></div>
-                  <div class="hui-item pick"><span class="nm">Paneer Tikka</span><div class="meta"><span class="pr">₹249</span><span class="badge">Veg</span></div></div>
-                  <div class="hui-item"><span class="nm">Garlic Naan</span><div class="meta"><span class="pr">₹50</span><span class="badge">Veg</span></div></div>
-                  <div class="hui-item"><span class="nm">Dal Makhani</span><div class="meta"><span class="pr">₹220</span><span class="badge">Veg</span></div></div>
-                  <div class="hui-item pick"><span class="nm">Mango Lassi</span><div class="meta"><span class="pr">₹120</span><span class="badge">Veg</span></div></div>
-                  <div class="hui-item"><span class="nm">Jeera Rice</span><div class="meta"><span class="pr">₹160</span><span class="badge">Veg</span></div></div>
-                </div>
-              </div>
-              <aside class="hui-cart">
-                <h4>Current order <span>T12 · 3</span></h4>
-                <div class="hui-line"><div><div class="ln">Butter Chicken</div><div class="lq">1 × ₹320</div></div><div class="lp">₹320</div></div>
-                <div class="hui-line"><div><div class="ln">Paneer Tikka</div><div class="lq">2 × ₹249</div></div><div class="lp">₹498</div></div>
-                <div class="hui-line"><div><div class="ln">Mango Lassi</div><div class="lq">1 × ₹120</div></div><div class="lp">₹120</div></div>
-                <div class="hui-tot">
-                  <div class="row"><span>Subtotal</span><span>₹938</span></div>
-                  <div class="row"><span>GST</span><span>₹47</span></div>
-                  <div class="grand"><span>Total</span><b>₹985</b></div>
-                  <div class="hui-pay">
-                    <button type="button" class="on">Cash</button>
-                    <button type="button">UPI</button>
-                    <button type="button">Card</button>
-                    <button type="button">Due</button>
-                  </div>
-                  <button type="button" class="hui-cta">Print &amp; Pay</button>
-                </div>
-              </aside>
+                <div class="hero-visual" id="hero-visual" aria-label="Dashboard modules syncing live">
+          <div class="sync-stage" id="sync-stage">
+            <div class="sync-bar">
+              <span class="sync-bar-live"><span class="pulse" aria-hidden="true"></span> Live sync · all modules</span>
+              <span class="sync-bar-msg" id="sync-msg">POS · Kitchen · Bills · QR — one console</span>
             </div>
 
-            <!-- Kitchen view -->
-            <div class="hui-kds" id="hui-kds" aria-hidden="true">
-              <div class="hui-kds-head">
-                <h3><i class="fa-solid fa-fire-burner" style="color:var(--accent);margin-right:6px"></i>Kitchen Display</h3>
-                <span class="live" style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;color:#0F9F6E;background:#E8F8F1;padding:3px 8px;border-radius:999px"><i class="fa-solid fa-circle" style="font-size:6px"></i> Queue live</span>
-              </div>
-              <div class="hui-tickets">
-                <div class="hui-ticket">
-                  <div class="th"><span>Table 12</span><em class="hot">8 min</em></div>
-                  <ul style="margin:0;padding:0">
-                    <li>1× Butter Chicken</li>
-                    <li>2× Paneer Tikka</li>
-                    <li>1× Garlic Naan</li>
-                  </ul>
-                  <button type="button" class="tbtn">Mark ready</button>
+            <div class="sync-grid" id="sync-grid">
+              <article class="sync-card active" data-seg="pos" id="seg-pos">
+                <div class="sc-head">
+                  <div class="sc-title"><i class="fa-solid fa-cash-register"></i> Point of Sale</div>
+                  <span class="sc-badge on" id="pos-badge">Ready</span>
                 </div>
-                <div class="hui-ticket">
-                  <div class="th"><span>Table 04</span><em>3 min</em></div>
-                  <ul style="margin:0;padding:0">
-                    <li>1× Dal Makhani</li>
-                    <li>2× Jeera Rice</li>
-                  </ul>
-                  <button type="button" class="tbtn">Mark ready</button>
+                <div class="sc-body" id="pos-body">
+                  <div class="sc-row"><span>Table 12 · Butter Chicken</span><span class="amt">₹320</span></div>
+                  <div class="sc-row"><span>Table 12 · Paneer Tikka ×2</span><span class="amt">₹498</span></div>
+                  <div class="sc-row"><span class="muted">Guest · 4 pax · Dine-in</span><span class="muted">KOT ready</span></div>
                 </div>
-              </div>
-            </div>
+                <div class="sc-foot"><span>Order total</span><b id="pos-total">₹818</b></div>
+              </article>
 
-            <!-- Bill view — text only, no food photos -->
-            <div class="hui-bill" id="hui-bill" aria-hidden="true">
-              <div class="hui-bill-head">
-                <h3><i class="fa-solid fa-file-invoice" style="color:var(--accent);margin-right:6px"></i>Checkout</h3>
-                <span style="font-size:11px;font-weight:700;color:var(--text-mute)">Table 12 · 3 items</span>
-              </div>
-              <div class="hui-bill-card">
-                <div class="br"><span>1× Butter Chicken</span><span>₹320</span></div>
-                <div class="br"><span>2× Paneer Tikka</span><span>₹498</span></div>
-                <div class="br"><span>1× Mango Lassi</span><span>₹120</span></div>
-                <div class="br" style="margin-top:6px"><span>Subtotal</span><span>₹938</span></div>
-                <div class="br"><span>GST (5%)</span><span>₹47</span></div>
-                <div class="br tot"><span>Grand total</span><b>₹985</b></div>
-                <div class="hui-bill-pays" style="margin-top:8px">
-                  <span class="on">Cash</span><span>UPI</span><span>Card</span><span>Due</span>
+              <article class="sync-card" data-seg="kds" id="seg-kds">
+                <div class="sc-head">
+                  <div class="sc-title kit"><i class="fa-solid fa-fire-burner"></i> Kitchen</div>
+                  <span class="sc-badge warn" id="kds-badge">Waiting</span>
                 </div>
-                <button type="button" class="hui-cta" style="margin-top:10px"><i class="fa-brands fa-whatsapp"></i> Complete &amp; send WhatsApp</button>
-              </div>
-            </div>
+                <div class="sc-body" id="kds-body">
+                  <div class="sc-row"><span class="muted">Queue empty — standing by</span><span class="muted">—</span></div>
+                </div>
+                <div class="sc-foot"><span>Tickets</span><b id="kds-count">0 open</b></div>
+              </article>
 
-            <div class="hero-flow" role="tablist" aria-label="Product workflow">
-              <button type="button" class="hero-flow-step active" data-hero-step="0" role="tab" aria-selected="true">
-                <i class="fa-solid fa-cash-register" aria-hidden="true"></i> Order
-              </button>
-              <span class="hero-flow-arrow" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
-              <button type="button" class="hero-flow-step" data-hero-step="1" role="tab" aria-selected="false">
-                <i class="fa-solid fa-fire-burner" aria-hidden="true"></i> Kitchen
-              </button>
-              <span class="hero-flow-arrow" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
-              <button type="button" class="hero-flow-step" data-hero-step="2" role="tab" aria-selected="false">
-                <i class="fa-solid fa-receipt" aria-hidden="true"></i> Bill
-              </button>
+              <article class="sync-card" data-seg="qr" id="seg-qr">
+                <div class="sc-head">
+                  <div class="sc-title qr"><i class="fa-solid fa-qrcode"></i> Floor &amp; QR</div>
+                  <span class="sc-badge" id="qr-badge">Tables</span>
+                </div>
+                <div class="sc-body" id="qr-body">
+                  <div class="sc-row"><span>Table 12</span><span class="muted">Free</span></div>
+                  <div class="sc-row"><span>Table 04</span><span class="muted">Free</span></div>
+                  <div class="sc-row"><span class="muted">QR guests can add items</span><span class="muted">Live</span></div>
+                </div>
+                <div class="sc-foot"><span>Occupied</span><b id="qr-count">0 / 12</b></div>
+              </article>
+
+              <article class="sync-card" data-seg="bills" id="seg-bills">
+                <div class="sc-head">
+                  <div class="sc-title bill"><i class="fa-solid fa-file-invoice"></i> Bills</div>
+                  <span class="sc-badge" id="bills-badge">Ready</span>
+                </div>
+                <div class="sc-body" id="bills-body">
+                  <div class="sc-row"><span class="muted">No bill yet for Table 12</span><span class="muted">—</span></div>
+                </div>
+                <div class="sc-foot"><span>Today</span><b id="bills-total">₹0</b></div>
+              </article>
             </div>
           </div>
-          <div class="hero-caption-bar">
-            <div><b id="hero-cap-title">1 · Take the order</b> <span id="hero-cap-sub">· text menu, cart, table — no dish photos needed</span></div>
-            <span class="hc-badge">Matches real product UI</span>
+          <div class="sync-caption">
+            <div><b>One console</b> · order data flows POS → Kitchen → Floor → Bills in real time</div>
+            <span class="hc-badge">Text UI · modules stay in sync</span>
           </div>
         </div>
       </div>
@@ -1527,51 +1347,181 @@
         closeMobileNav();
     });
 
-    // ===== HERO WORKFLOW (text UI only — no dish photos) =====
-    (function initHeroWorkflow() {
-      var stage = document.getElementById('hero-stage');
-      var steps = document.querySelectorAll('[data-hero-step]');
-      var capTitle = document.getElementById('hero-cap-title');
-      var capSub = document.getElementById('hero-cap-sub');
-      if (!stage || !steps.length) return;
-
-      var views = ['order', 'kitchen', 'bill'];
-      var copy = [
-        { title: '1 · Take the order', sub: '· text menu + cart — no dish photos needed' },
-        { title: '2 · Kitchen fires', sub: '· tickets land on KDS the moment you send' },
-        { title: '3 · Bill & collect', sub: '· cash, UPI, WhatsApp — guest pays, you move on' }
-      ];
-      var i = 0;
+    // ===== HERO: dashboard segments syncing =====
+    (function initHeroSync() {
+      var stage = document.getElementById('sync-stage');
+      if (!stage) return;
+      var msg = document.getElementById('sync-msg');
+      var cards = {
+        pos: document.getElementById('seg-pos'),
+        kds: document.getElementById('seg-kds'),
+        qr: document.getElementById('seg-qr'),
+        bills: document.getElementById('seg-bills')
+      };
+      var badges = {
+        pos: document.getElementById('pos-badge'),
+        kds: document.getElementById('kds-badge'),
+        qr: document.getElementById('qr-badge'),
+        bills: document.getElementById('bills-badge')
+      };
+      var step = 0;
       var timer = null;
 
-      function setScene(idx) {
-        i = ((idx % 3) + 3) % 3;
-        stage.setAttribute('data-view', views[i]);
-        steps.forEach(function (el, n) {
-          var on = n === i;
-          el.classList.toggle('active', on);
-          el.setAttribute('aria-selected', on ? 'true' : 'false');
+      function setActive(key) {
+        Object.keys(cards).forEach(function (k) {
+          if (cards[k]) cards[k].classList.toggle('active', k === key);
         });
-        if (capTitle) capTitle.textContent = copy[i].title;
-        if (capSub) capSub.textContent = copy[i].sub;
+      }
+      function flashMsg(text) {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.classList.add('flash');
+        setTimeout(function () { msg.classList.remove('flash'); }, 1000);
+      }
+      function spawnPacket(fromEl, toEl) {
+        if (!fromEl || !toEl) return;
+        var sr = stage.getBoundingClientRect();
+        var a = fromEl.getBoundingClientRect();
+        var b = toEl.getBoundingClientRect();
+        var x1 = a.left + a.width / 2 - sr.left;
+        var y1 = a.top + a.height / 2 - sr.top;
+        var x2 = b.left + b.width / 2 - sr.left;
+        var y2 = b.top + b.height / 2 - sr.top;
+        var p = document.createElement('span');
+        p.className = 'sync-packet';
+        p.style.left = x1 + 'px';
+        p.style.top = y1 + 'px';
+        p.style.opacity = '1';
+        p.style.transition = 'left .85s cubic-bezier(.22,1,.36,1), top .85s cubic-bezier(.22,1,.36,1), opacity .85s';
+        stage.appendChild(p);
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            p.style.left = x2 + 'px';
+            p.style.top = y2 + 'px';
+            p.style.opacity = '0';
+          });
+        });
+        setTimeout(function () { try { p.remove(); } catch (e) {} }, 950);
+      }
+      function recv(card) {
+        if (!card) return;
+        card.classList.remove('recv');
+        void card.offsetWidth;
+        card.classList.add('recv');
+      }
+
+      var scenes = [
+        function () {
+          setActive('pos');
+          badges.pos.textContent = 'Sending KOT';
+          badges.pos.className = 'sc-badge on';
+          badges.kds.textContent = 'Waiting';
+          badges.kds.className = 'sc-badge warn';
+          flashMsg('POS rings Table 12 → data leaves for kitchen…');
+          spawnPacket(cards.pos, cards.kds);
+        },
+        function () {
+          setActive('kds');
+          badges.pos.textContent = 'Synced';
+          badges.kds.textContent = 'New ticket';
+          badges.kds.className = 'sc-badge on';
+          document.getElementById('kds-body').innerHTML =
+            '<div class="sc-row new-in"><span>T12 · Butter Chicken</span><span class="muted">Prep</span></div>' +
+            '<div class="sc-row new-in"><span>T12 · Paneer Tikka ×2</span><span class="muted">Prep</span></div>' +
+            '<div class="sc-row"><span class="muted">Same lines as POS · no re-type</span><span class="muted">8 min</span></div>';
+          document.getElementById('kds-count').textContent = '1 open';
+          flashMsg('Kitchen received the same order · live queue');
+          recv(cards.kds);
+          spawnPacket(cards.pos, cards.qr);
+        },
+        function () {
+          setActive('qr');
+          badges.qr.textContent = 'Occupied';
+          badges.qr.className = 'sc-badge on';
+          document.getElementById('qr-body').innerHTML =
+            '<div class="sc-row new-in"><span>Table 12</span><span class="muted">Dining · ₹818</span></div>' +
+            '<div class="sc-row"><span>Table 04</span><span class="muted">Free</span></div>' +
+            '<div class="sc-row"><span class="muted">QR guest can still amend</span><span class="muted">Live</span></div>';
+          document.getElementById('qr-count').textContent = '1 / 12';
+          flashMsg('Floor map updates · Table 12 = Dining');
+          recv(cards.qr);
+        },
+        function () {
+          setActive('kds');
+          badges.kds.textContent = 'Ready';
+          document.getElementById('kds-body').innerHTML =
+            '<div class="sc-row new-in"><span>T12 · All items ready</span><span class="muted">Serve</span></div>' +
+            '<div class="sc-row"><span class="muted">Kitchen closes ticket</span><span class="muted">✓</span></div>';
+          flashMsg('Kitchen marks ready → floor & bills get the signal');
+          spawnPacket(cards.kds, cards.bills);
+          spawnPacket(cards.kds, cards.qr);
+        },
+        function () {
+          setActive('bills');
+          badges.bills.textContent = 'Paid';
+          badges.bills.className = 'sc-badge on';
+          document.getElementById('bills-body').innerHTML =
+            '<div class="sc-row new-in"><span>RS-23041 · Table 12</span><span class="amt">₹859</span></div>' +
+            '<div class="sc-row"><span class="muted">UPI · GST included</span><span class="muted">WhatsApp ✓</span></div>';
+          document.getElementById('bills-total').textContent = '₹859';
+          document.getElementById('pos-total').textContent = '₹0';
+          document.getElementById('pos-body').innerHTML =
+            '<div class="sc-row"><span class="muted">Cart cleared · next guest</span><span class="muted">—</span></div>';
+          badges.pos.textContent = 'Idle';
+          document.getElementById('kds-count').textContent = '0 open';
+          document.getElementById('kds-body').innerHTML =
+            '<div class="sc-row"><span class="muted">Queue empty — standing by</span><span class="muted">—</span></div>';
+          document.getElementById('qr-body').innerHTML =
+            '<div class="sc-row new-in"><span>Table 12</span><span class="muted">Free</span></div>' +
+            '<div class="sc-row"><span>Table 04</span><span class="muted">Free</span></div>';
+          document.getElementById('qr-count').textContent = '0 / 12';
+          badges.qr.textContent = 'Tables';
+          badges.qr.className = 'sc-badge';
+          flashMsg('Bill settled · WhatsApp PDF · table freed everywhere');
+          recv(cards.bills);
+          spawnPacket(cards.bills, cards.pos);
+        },
+        function () {
+          badges.pos.textContent = 'Ready';
+          badges.kds.textContent = 'Waiting';
+          badges.kds.className = 'sc-badge warn';
+          badges.bills.textContent = 'Ready';
+          badges.bills.className = 'sc-badge';
+          document.getElementById('pos-body').innerHTML =
+            '<div class="sc-row"><span>Table 12 · Butter Chicken</span><span class="amt">₹320</span></div>' +
+            '<div class="sc-row"><span>Table 12 · Paneer Tikka ×2</span><span class="amt">₹498</span></div>' +
+            '<div class="sc-row"><span class="muted">Guest · 4 pax · Dine-in</span><span class="muted">KOT ready</span></div>';
+          document.getElementById('pos-total').textContent = '₹818';
+          document.getElementById('bills-body').innerHTML =
+            '<div class="sc-row"><span class="muted">Last bill kept in history</span><span class="amt">₹859</span></div>';
+          setActive('pos');
+          flashMsg('Same loop · every module stays on one shared truth');
+        }
+      ];
+
+      function run() {
+        scenes[step % scenes.length]();
+        step++;
       }
       function start() {
         stop();
-        timer = setInterval(function () { setScene(i + 1); }, 3400);
+        timer = setInterval(run, 2600);
       }
       function stop() {
         if (timer) clearInterval(timer);
         timer = null;
       }
-      steps.forEach(function (el) {
-        el.addEventListener('click', function () {
-          setScene(Number(el.getAttribute('data-hero-step')) || 0);
-          start();
+      Object.keys(cards).forEach(function (k) {
+        if (!cards[k]) return;
+        cards[k].style.cursor = 'pointer';
+        cards[k].addEventListener('click', function () {
+          setActive(k);
+          flashMsg(cards[k].querySelector('.sc-title').textContent.trim() + ' · linked to the same order data');
         });
       });
       stage.addEventListener('mouseenter', stop);
       stage.addEventListener('mouseleave', start);
-      setScene(0);
+      run();
       start();
     })();
 
