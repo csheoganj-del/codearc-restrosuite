@@ -413,9 +413,11 @@
   window.withToast = withToast;
 
   const appVersion = (function resolveDisplayedAppVersion() {
+    // Prefer the build tag stamped in dashboard.html (single source of truth per deploy).
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v191-20260714-biz-type-locked';
+    // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
+    return 'v194-20260715-staff-amend';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

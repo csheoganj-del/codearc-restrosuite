@@ -505,6 +505,17 @@
   }
 
   /** Prefer server no; stamp channel series + station metadata onto bill rows. */
+  function stampServedBy(billRow) {
+    if (!billRow) return billRow;
+    try {
+      const s = session();
+      const name = s.display_name || s.username || s.name || '';
+      if (name && !billRow.servedBy) billRow.servedBy = name;
+      if (name && !billRow.cashier) billRow.cashier = name;
+      if (name && !billRow.cashierName) billRow.cashierName = name;
+    } catch (_) {}
+    return billRow;
+  }
   function decorateBillMeta(billRow, bill) {
     if (!billRow) return billRow;
     billRow.stationId = getStationId();
@@ -512,8 +523,17 @@
     billRow.channelCode = channelPrefix(bill && (bill.channel || bill.orderType));
     try {
       const s = session();
-      billRow.cashier = s.display_name || s.username || '';
+      const name = s.display_name || s.username || s.name || '';
+      if (name) {
+        billRow.cashier = name;
+        billRow.cashierName = name;
+        if (!billRow.servedBy) billRow.servedBy = name;
+        if (!billRow.waiter && /waiter|captain|manager|owner/i.test(String(s.role || s.staff_role || ''))) {
+          billRow.waiter = name;
+        }
+      }
     } catch (_) {}
+    stampServedBy(billRow);
     const sh = getOpenShift();
     if (sh) billRow.shiftId = sh.shiftId;
     return billRow;
@@ -1019,12 +1039,29 @@
       if (!ok) return;
     }
     const pre = summarizeShift(shift);
-    const actualStr = window.prompt('Actual cash in drawer (count)', String(pre.expectedCash));
-    if (actualStr === null) return;
-    const actual = Number(actualStr);
+    let actual = 0;
+    let closeDenom = null;
+    let closeNote = '';
+    if (global.RS10 && typeof RS10.promptDenomination === 'function') {
+      const result = await RS10.promptDenomination({
+        title: (global.RS10.t && RS10.t('shift_close')) || 'Close shift',
+        sub: (global.RS10.t && RS10.t('shift_count')) || 'Closing cash count',
+        initial: pre.expectedCash,
+      });
+      if (!result) return;
+      actual = result.total;
+      closeDenom = result.counts;
+      closeNote = result.note || '';
+    } else {
+      const actualStr = window.prompt('Actual cash in drawer (count)', String(pre.expectedCash));
+      if (actualStr === null) return;
+      actual = Number(actualStr);
+    }
     shift.closedAt = new Date().toISOString();
     shift.status = 'CLOSED';
     shift.actualCash = Number.isFinite(actual) ? actual : 0;
+    if (closeDenom) shift.closingDenom = closeDenom;
+    if (closeNote) shift.closingNote = closeNote;
     const summary = summarizeShift(shift, shift.actualCash);
     shift.expectedCash = summary.expectedCash;
     shift.variance = summary.variance;
@@ -1046,6 +1083,32 @@
         RSPrint(zReportHtml(shift, summary), 'Z-Report ' + shift.shiftId);
       } catch (_) {}
     }
+    // Notify owner (WhatsApp / print) when product-10x is present
+    try {
+      if (global.RS10 && closeDenom) {
+        const ownerPhone =
+          (global.RS_SETTINGS && (RS_SETTINGS.set_owner_phone || RS_SETTINGS.set_phone)) || '';
+        const lines = [
+          'RestroSuite · Shift closed',
+          'Shift: ' + (shift.shiftId || ''),
+          'Cashier: ' + (shift.cashierName || ''),
+          'Expected: ' + rs(summary.expectedCash),
+          'Counted: ' + rs(shift.actualCash),
+          'Variance: ' + rs(summary.variance),
+          closeNote ? 'Note: ' + closeNote : '',
+          new Date().toLocaleString('en-IN'),
+        ]
+          .filter(Boolean)
+          .join('\n');
+        if (ownerPhone) {
+          const digits = String(ownerPhone).replace(/\D/g, '');
+          const wa = digits.length === 10 ? '91' + digits : digits;
+          if (wa.length >= 10) {
+            window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(lines), '_blank', 'noopener');
+          }
+        }
+      }
+    } catch (_) {}
     toast('Shift closed · variance ' + (summary.variance != null ? rs(summary.variance) : 'n/a'), 'fa-lock');
   }
 
@@ -1148,6 +1211,24 @@
       const op = bar.querySelector('#rs-shift-open');
       if (op)
         op.onclick = async () => {
+          // Prefer denomination grid (notes/coins) when product-10x is loaded
+          if (global.RS10 && typeof RS10.promptDenomination === 'function') {
+            const result = await RS10.promptDenomination({
+              title: (global.RS10.t && RS10.t('shift_open')) || 'Open shift',
+              sub: (global.RS10.t && RS10.t('shift_float')) || 'Opening cash (notes & coins)',
+              initial: 0,
+            });
+            if (!result) return;
+            const shift = await openShift(result.total);
+            if (shift) {
+              shift.openingDenom = result.counts;
+              shift.openingNote = result.note;
+              try {
+                if (global.RS_DB && RS_DB.put) await RS_DB.put('shifts', shift.shiftId, shift);
+              } catch (_) {}
+            }
+            return;
+          }
           const f = window.prompt('Opening cash float (drawer start amount)', '0');
           if (f === null) return;
           await openShift(Number(f) || 0);

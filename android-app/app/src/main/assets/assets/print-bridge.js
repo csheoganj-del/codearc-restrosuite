@@ -118,15 +118,108 @@
     return arr.map((l) => String(l || '')).join('\n') + '\n\n\n';
   }
 
+  /** Web Bluetooth ESC/POS (Chrome / Edge / Android Chrome). Printer must support BLE serial. */
+  async function printWebBluetoothEscPos(base64OrText) {
+    if (!navigator.bluetooth || typeof navigator.bluetooth.requestDevice !== 'function') {
+      return { ok: false, error: 'no_web_bluetooth' };
+    }
+    try {
+      let bytes;
+      if (typeof base64OrText === 'string' && /^[A-Za-z0-9+/=]+$/.test(base64OrText) && base64OrText.length > 32) {
+        const bin = atob(base64OrText);
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } else {
+        const text = String(base64OrText || '');
+        bytes = new TextEncoder().encode(text + '\n\n\n');
+      }
+      // Reuse bonded device if user already chose one
+      let device = global.__rsBtPrinter;
+      if (!device) {
+        device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [
+            '000018f0-0000-1000-8000-00805f9b34fb', // common thermal
+            '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART
+            'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+            0x18f0,
+          ],
+        });
+        global.__rsBtPrinter = device;
+      }
+      const server = await device.gatt.connect();
+      let service;
+      const svcIds = [
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+      ];
+      for (const id of svcIds) {
+        try {
+          service = await server.getPrimaryService(id);
+          if (service) break;
+        } catch (_) {}
+      }
+      if (!service) {
+        const services = await server.getPrimaryServices();
+        service = services && services[0];
+      }
+      if (!service) return { ok: false, error: 'no_bt_service' };
+      const chars = await service.getCharacteristics();
+      const writeChar =
+        chars.find((c) => c.properties.write || c.properties.writeWithoutResponse) || chars[0];
+      if (!writeChar) return { ok: false, error: 'no_bt_characteristic' };
+      // Chunk writes (BLE MTU ~20–180)
+      const chunk = 100;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        const slice = bytes.slice(i, i + chunk);
+        if (writeChar.properties.writeWithoutResponse) {
+          await writeChar.writeValueWithoutResponse(slice);
+        } else {
+          await writeChar.writeValue(slice);
+        }
+      }
+      return { ok: true, mode: 'web-bluetooth', device: device.name || 'BT printer' };
+    } catch (e) {
+      console.warn('[Print] Web Bluetooth failed', e);
+      return { ok: false, error: (e && e.message) || 'bt_failed' };
+    }
+  }
+
+  /** Network (Wi‑Fi) raw ESC/POS via desktop agent or optional gateway */
+  async function printNetworkEscPos(base64, opts) {
+    const options = opts || {};
+    const host =
+      options.host ||
+      (global.RS_SETTINGS && (RS_SETTINGS.set_wifi_printer_host || RS_SETTINGS.set_printer_ip)) ||
+      '';
+    const port = Number(options.port || (global.RS_SETTINGS && RS_SETTINGS.set_wifi_printer_port) || 9100);
+    if (!host) return { ok: false, error: 'no_wifi_host' };
+    const desk = global.RS_DESKTOP || global.rsDesktop;
+    if (desk && typeof desk.printNetworkEscPos === 'function') {
+      try {
+        return await desk.printNetworkEscPos({ base64, host, port });
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+    // Browser cannot open raw TCP sockets — guide user
+    return {
+      ok: false,
+      error: 'wifi_needs_desktop_or_android',
+      hint: 'Set Wi‑Fi printer in Desktop app, or pair printer in Android Print settings',
+    };
+  }
+
   async function printHtml(innerHTML, title, opts) {
     const options = opts || {};
     const fullHtml = wrapHtml(innerHTML, title);
 
-    // Android WebView
+    // Android WebView — system Print dialog covers USB, Bluetooth & Wi‑Fi printers
     if (global.AndroidInterface && typeof global.AndroidInterface.printReceipt === 'function') {
       try {
         global.AndroidInterface.printReceipt(fullHtml);
-        return { ok: true, mode: 'android' };
+        return { ok: true, mode: 'android-print-service' };
       } catch (e) {
         console.warn('[Print] Android failed', e);
       }
@@ -147,7 +240,17 @@
       }
     }
 
-    // Browser fallback
+    // PWA / mobile browser: prefer system share of text if print blocked
+    if (options.preferShare && navigator.share) {
+      try {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = innerHTML;
+        await navigator.share({ title: title || 'Receipt', text: tmp.innerText || '' });
+        return { ok: true, mode: 'web-share' };
+      } catch (_) {}
+    }
+
+    // Browser fallback (USB/Wi‑Fi if OS has printer drivers)
     return iframePrint(fullHtml);
   }
 
@@ -169,6 +272,17 @@
         base64 = enc.toBase64();
       } catch (_) {}
     }
+
+    // Android raw ESC/POS hook (if native bridge added)
+    if (global.AndroidInterface && typeof global.AndroidInterface.printEscPos === 'function' && base64) {
+      try {
+        global.AndroidInterface.printEscPos(base64);
+        return { ok: true, mode: 'android-escpos' };
+      } catch (e) {
+        console.warn('[Print] Android ESC/POS failed', e);
+      }
+    }
+
     if (desk && typeof desk.printEscPos === 'function') {
       try {
         const res = await desk.printEscPos({
@@ -184,6 +298,19 @@
         console.warn('[Print] escpos failed', e);
       }
     }
+
+    // Wi‑Fi raw (desktop)
+    if (base64 && (options.wifi || (global.RS_SETTINGS && RS_SETTINGS.set_wifi_printer_host))) {
+      const net = await printNetworkEscPos(base64, options);
+      if (net && net.ok) return net;
+    }
+
+    // Web Bluetooth (Chrome mobile/desktop)
+    if (options.bluetooth !== false && base64) {
+      const bt = await printWebBluetoothEscPos(base64);
+      if (bt && bt.ok) return bt;
+    }
+
     return printHtml(`<pre class="escpos">${String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`, 'Receipt', options);
   }
 
@@ -232,9 +359,15 @@
         if (!global.QRCode || !bill) return resolve(null);
         const no = bill.no || bill.orderId || bill.id;
         if (!no) return resolve(null);
-        const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+        const digitalUrl =
+          (global.RSReceiptEngine && typeof RSReceiptEngine.digitalBillUrl === 'function')
+            ? RSReceiptEngine.digitalBillUrl(no)
+            : (() => {
+                const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+                return `https://restrosuite.codearc.co.in/bill?slug=${encodeURIComponent(slug)}&no=${encodeURIComponent(no)}`;
+              })();
         global.QRCode.toDataURL(
-          `https://restrosuite.codearc.co.in/bill/${slug}/${no}`,
+          digitalUrl,
           { width: 200, margin: 1 },
           (err, url) => resolve(err ? null : url)
         );
@@ -346,10 +479,48 @@
     listPrinters,
     wrapHtml,
     toEscPosText,
+    printWebBluetoothEscPos,
+    printNetworkEscPos,
+    /**
+     * Smart print path for mobile/PWA/Android/desktop:
+     * Android print service (BT/USB/Wi‑Fi) → Desktop ESC/POS → Web BT → browser dialog
+     */
+    async printSmart(innerHTML, title, opts) {
+      const options = opts || {};
+      // Android system printers (Bluetooth, USB, Wi‑Fi all appear in Print dialog)
+      if (global.AndroidInterface && typeof global.AndroidInterface.printReceipt === 'function') {
+        return printHtml(innerHTML, title, options);
+      }
+      const desk = global.RS_DESKTOP || global.rsDesktop;
+      if (desk) return printHtml(innerHTML, title, options);
+      // Try Web Bluetooth raw if user opted in
+      if (options.bluetooth && global.RSEscPos && RSEscPos.Encoder) {
+        try {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = innerHTML;
+          const text = tmp.innerText || '';
+          const enc = new RSEscPos.Encoder().init().text(text).feed(3).cut();
+          const bt = await printWebBluetoothEscPos(enc.toBase64());
+          if (bt && bt.ok) return bt;
+        } catch (_) {}
+      }
+      return printHtml(innerHTML, title, options);
+    },
     async choosePreferredPrinter() {
       const desk = global.RS_DESKTOP || global.rsDesktop;
       if (!desk || !desk.listPrinters) {
-        if (global.RS && RS.toast) RS.toast('Printer picker needs desktop app', 'fa-print');
+        // Mobile: offer Web Bluetooth pair
+        if (navigator.bluetooth) {
+          const ok = confirm('Pair a Bluetooth thermal printer for raw ESC/POS?\n\n(Or use Android Print for USB/Wi‑Fi printers.)');
+          if (ok) {
+            const res = await printWebBluetoothEscPos(btoa('\nRestroSuite BT test\n\n\n'));
+            if (res && res.ok && global.RS && RS.toast) RS.toast('Bluetooth printer ready: ' + (res.device || ''), 'fa-bluetooth');
+            return res;
+          }
+        }
+        if (global.RS && RS.toast) {
+          RS.toast('On phone: use Android Print (BT/USB/Wi‑Fi). Desktop app lists printers.', 'fa-print');
+        }
         return null;
       }
       const printers = await desk.listPrinters();

@@ -198,9 +198,11 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
   const rules: Record<string, { limit: number; windowSeconds: number }> = {
     list_menu: { limit: 120, windowSeconds: 60 },
     create_order: { limit: 20, windowSeconds: 5 * 60 },
+    amend_order: { limit: 30, windowSeconds: 5 * 60 },
     get_table_orders: { limit: 90, windowSeconds: 60 },
     create_notification: { limit: 12, windowSeconds: 60 },
     submit_review: { limit: 8, windowSeconds: 60 },
+    list_homepage_reviews: { limit: 60, windowSeconds: 60 },
   };
   const rule = rules[action];
   if (!rule) return { allowed: true };
@@ -561,6 +563,186 @@ serve(async (req) => {
       return jsonResponse({ success: true }, 200, req);
     }
 
+    // ── Amend shared table order (guest QR + waiter) ─────────────────────────
+    // Rules: only while status is Pending Review / pending / new.
+    // Preparing / ready / paid / cancelled → reject with clear reason.
+    if (action === "amend_order") {
+      const orderId = String(payload.order_id || payload.orderId || "").trim();
+      if (!orderId || orderId.length > 80) {
+        return jsonResponse({ error: "Invalid order ID." }, 400, req);
+      }
+      const tableRaw = String(payload.table || payload.tableNumber || "").trim().slice(0, 40);
+      const sessionToken = String(payload.session_token || payload.token || "").trim();
+      const sessionCheck = await validateActiveSession(tenant.id, tenantSlug, tableRaw, sessionToken, true);
+      if (!sessionCheck.allowed) {
+        return jsonResponse({ error: sessionCheck.error }, 403, req);
+      }
+      const byRole = String(payload.by || payload.actor || "guest").trim().slice(0, 40) || "guest";
+      const covers = Math.max(0, Math.min(99, Number(payload.covers || payload.pax) || 0));
+
+      // Load existing order (try snake + camel column names)
+      let existing: Record<string, unknown> | null = null;
+      {
+        const { data: d1 } = await supabaseAdmin
+          .from("doppio_pending_orders")
+          .select("*")
+          .eq("tenant_id", tenant.id)
+          .eq("order_id", orderId)
+          .maybeSingle();
+        existing = d1 as Record<string, unknown> | null;
+      }
+      if (!existing) {
+        const { data: d2 } = await supabaseAdmin
+          .from("doppio_pending_orders")
+          .select("*")
+          .eq("tenant_id", tenant.id)
+          .eq("orderId", orderId)
+          .maybeSingle();
+        existing = d2 as Record<string, unknown> | null;
+      }
+      if (!existing) {
+        return jsonResponse({ error: "Order not found." }, 404, req);
+      }
+
+      const status = String(existing.status || "").toLowerCase();
+      const locked =
+        /prepar|ready|serv|paid|settled|complet|cancel|reject|picked|deliver|cook|kitchen|accepted/i.test(status) &&
+        !/^pending/i.test(status) &&
+        status !== "pending review" &&
+        status !== "new" &&
+        status !== "pending";
+      // Explicit allow list for amendable statuses
+      const amendable =
+        /^(pending review|pending|new|hold|draft)$/i.test(String(existing.status || "").trim()) ||
+        status === "pending review" ||
+        status === "pending" ||
+        status === "new";
+      if (!amendable || locked) {
+        return jsonResponse({
+          error: "Order is already in kitchen / prepared — cannot delete or fully rewrite items.",
+          reason: "status_locked",
+          status: existing.status,
+          canAmend: false,
+        }, 409, req);
+      }
+
+      const tableOfOrder = String(existing.table_number || existing.tableNumber || "").trim();
+      if (normalizeTableKey(tableOfOrder) !== sessionCheck.tableKey) {
+        return jsonResponse({ error: "Order does not belong to this table session." }, 403, req);
+      }
+
+      let parsedItems: unknown;
+      try {
+        parsedItems = typeof payload.items === "string"
+          ? JSON.parse(payload.items)
+          : (payload.items ||
+            (payload.order && typeof payload.order === "object"
+              ? (payload.order as Record<string, unknown>).items
+              : null));
+      } catch {
+        return jsonResponse({ error: "Invalid order items." }, 400, req);
+      }
+      if (!Array.isArray(parsedItems) || parsedItems.length === 0 || parsedItems.length > 100) {
+        return jsonResponse({ error: "Invalid order items." }, 400, req);
+      }
+
+      const { data: menuData, error: menuError } = await supabaseAdmin
+        .from("doppio_menu")
+        .select("name, price")
+        .eq("tenant_id", tenant.id);
+      if (menuError) {
+        return jsonResponse({ error: "Failed to validate order." }, 500, req);
+      }
+      const priceMap = new Map<string, number>(
+        (menuData || []).map((item: { name: string; price: number }) => [
+          item.name.trim().toLowerCase(),
+          Number(item.price),
+        ])
+      );
+      const safeItems: Array<Record<string, unknown>> = [];
+      for (const rawItem of parsedItems as Array<Record<string, unknown>>) {
+        const itemName = String(rawItem.name || "").trim().toLowerCase();
+        const quantity = Number(rawItem.qty || 1);
+        const serverPrice = priceMap.get(itemName);
+        if (serverPrice === undefined) {
+          return jsonResponse({ error: `Item not found in menu: ${String(rawItem.name || "").slice(0, 60)}` }, 400, req);
+        }
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+          return jsonResponse({ error: `Invalid quantity for item: ${String(rawItem.name || "").slice(0, 60)}` }, 400, req);
+        }
+        safeItems.push({
+          name: String(rawItem.name || "").trim().slice(0, 120),
+          price: serverPrice,
+          qty: quantity,
+          notes: String(rawItem.notes || rawItem.note || "").trim().slice(0, 240),
+        });
+      }
+      const expectedSubtotal = safeItems.reduce(
+        (sum, item) => sum + Number(item.price) * Number(item.qty),
+        0,
+      );
+
+      // Prefer snake_case update (matches create_order insert); fall back to camelCase
+      const patchSnake = {
+        items: JSON.stringify(safeItems),
+        subtotal: expectedSubtotal,
+        total: expectedSubtotal,
+        gst: 0,
+        discount: 0,
+      };
+      let updErr: { message?: string } | null = null;
+      {
+        const { error } = await supabaseAdmin
+          .from("doppio_pending_orders")
+          .update(patchSnake)
+          .eq("tenant_id", tenant.id)
+          .eq("order_id", orderId);
+        updErr = error;
+      }
+      if (updErr) {
+        const patchCamel = {
+          items: safeItems,
+          subtotal: expectedSubtotal,
+          total: expectedSubtotal,
+          gst: 0,
+          discount: 0,
+        };
+        const { error } = await supabaseAdmin
+          .from("doppio_pending_orders")
+          .update(patchCamel)
+          .eq("tenant_id", tenant.id)
+          .eq("orderId", orderId);
+        if (error) {
+          console.error("tenant-public amend_order failed:", error);
+          return jsonResponse({ error: "Failed to amend order." }, 500, req);
+        }
+      }
+
+      // Notify staff / kitchen / other party
+      const notifId = "amd_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const tableLabel = sessionCheck.tableKey || tableRaw || "table";
+      await supabaseAdmin.from("doppio_notifications").insert({
+        id: notifId,
+        tenant_id: tenant.id,
+        title: `Order amended · Table ${tableLabel}`,
+        message: `${byRole} updated ${orderId.slice(0, 24)} · ${safeItems.length} lines · ₹${Math.round(expectedSubtotal)}${covers ? " · " + covers + " guests" : ""}`.slice(0, 240),
+        type: "order_amended",
+        role: "staff",
+        is_read: false,
+        timestamp: new Date().toISOString(),
+      }).then(() => {}).catch((e: unknown) => console.warn("amend_order notif:", e));
+
+      return jsonResponse({
+        success: true,
+        orderId,
+        total: expectedSubtotal,
+        items: safeItems,
+        canAmend: true,
+        covers: covers || null,
+        by: byRole,
+      }, 200, req);
+    }
+
     if (action === "get_order_status") {
       const orderId = String(payload.order_id || payload.orderId || "").trim();
       if (!orderId) {
@@ -640,18 +822,31 @@ serve(async (req) => {
 
       const orders = (pendingRows || [])
         .filter((row: Record<string, unknown>) => normalizeTableKey(row.tableNumber) === tableKey)
-        .map((row: Record<string, unknown>) => ({
-          orderId: String(row.orderId || ""),
-          status: String(row.status || "Pending Review"),
-          items: parseItems(row.items),
-          total: Number(row.total || 0),
-          orderType: String(row.orderType || ""),
-          paymentMethod: String(row.paymentMethod || ""),
-          dateTime: String(row.dateTime || row.created_at || ""),
-          prepMinutes: row.prep_minutes != null ? Number(row.prep_minutes) : null,
-          prepStartedAt: row.prep_started_at || null,
-          source: /^DO-QR-/i.test(String(row.orderId || "")) ? "qr" : "staff",
-        }));
+        .map((row: Record<string, unknown>) => {
+          const st = String(row.status || "Pending Review");
+          const stL = st.toLowerCase();
+          const canAmend =
+            /^(pending review|pending|new|hold|draft)$/i.test(st.trim()) ||
+            stL === "pending review" ||
+            stL === "pending" ||
+            stL === "new";
+          return {
+            orderId: String(row.orderId || ""),
+            status: st,
+            items: parseItems(row.items),
+            total: Number(row.total || 0),
+            orderType: String(row.orderType || ""),
+            paymentMethod: String(row.paymentMethod || ""),
+            dateTime: String(row.dateTime || row.created_at || ""),
+            prepMinutes: row.prep_minutes != null ? Number(row.prep_minutes) : null,
+            prepStartedAt: row.prep_started_at || null,
+            source: /^DO-QR-/i.test(String(row.orderId || "")) ? "qr" : "staff",
+            canAmend,
+            lockReason: canAmend
+              ? null
+              : "In kitchen or already prepared — ask staff if you need a change",
+          };
+        });
 
       // Recently settled bills for this table -> show as Paid
       const billWindowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -708,6 +903,8 @@ serve(async (req) => {
         source,
         table_number: tableRaw || null,
         bill_no: billNo || null,
+        status: "pending",
+        homepage_approved: false,
       };
 
       let reviewId: string | null = null;
@@ -738,6 +935,35 @@ serve(async (req) => {
       }).then(() => {}).catch((e: unknown) => console.warn("submit_review notif:", e));
 
       return jsonResponse({ success: true, id: reviewId || notifId, rating }, 200, req);
+    }
+
+    // Public approved reviews for marketing homepage (no secrets)
+    if (action === "list_homepage_reviews") {
+      const limit = Math.min(20, Math.max(1, Number(payload.limit) || 6));
+      const { data: rows, error: listErr } = await supabaseAdmin
+        .from("doppio_guest_reviews")
+        .select("guest_name, rating, comment, created_at, source")
+        .eq("tenant_id", tenant.id)
+        .eq("homepage_approved", true)
+        .gte("rating", 4)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (listErr) {
+        console.warn("tenant-public list_homepage_reviews:", listErr.message || listErr);
+        return jsonResponse({ success: true, reviews: [], avg: null, count: 0 }, 200, req);
+      }
+      const reviews = (rows || []).map((r: Record<string, unknown>) => ({
+        guestName: String(r.guest_name || "Guest"),
+        rating: Number(r.rating) || 5,
+        comment: String(r.comment || "").slice(0, 280),
+        createdAt: r.created_at || null,
+        source: r.source || "guest",
+      }));
+      const avg = reviews.length
+        ? Math.round((reviews.reduce((s: number, r: { rating: number }) => s + r.rating, 0) / reviews.length) * 10) / 10
+        : null;
+      return jsonResponse({ success: true, reviews, avg, count: reviews.length }, 200, req);
     }
 
     if (action === "create_notification") {

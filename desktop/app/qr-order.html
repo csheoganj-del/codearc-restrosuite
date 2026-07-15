@@ -548,7 +548,7 @@
         <div class="brand-row">
           <span class="tbl"><i class="fa-solid fa-utensils" style="font-size:10px"></i> <span id="table-label">Table —</span></span>
         </div>
-        <p class="brand-sub" id="brand-sub" data-i18n="brandSub">Dine-in · order on phone · food to your table</p>
+        <p class="brand-sub" id="brand-sub" data-i18n="brandSub">Table QR · scan to order food or call waiter · shared with staff</p>
       </div>
     </header>
 
@@ -1328,11 +1328,72 @@
           '</div><div class="tdesc">' + escHtml(st.desc) + '</div></div>';
       }).join('');
       var src = o.source === 'staff' ? ' · ' + t('fromKitchen') : '';
-      return '<div class="ord"><div class="ord-h"><div><div class="oid">' + escHtml(displayOrderId(o.orderId)) +
+      var canAmend = o.canAmend === true || /^(pending review|pending|new)$/i.test(String(status).trim());
+      var amendHtml = '';
+      if (canAmend && items.length) {
+        amendHtml = '<div class="amend-box" style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)">' +
+          '<div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">' + escHtml(uiLang === 'hi' ? 'ऑर्डर बदलें (रसोई से पहले)' : 'Change order (before kitchen)') + '</div>' +
+          items.map(function (it, idx) {
+            return '<div class="li" style="align-items:center;gap:6px">' +
+              '<span style="flex:1">' + escHtml(it.name || '') + '</span>' +
+              '<button type="button" class="x" data-amd-oid="' + escHtml(o.orderId) + '" data-amd-idx="' + idx + '" data-amd-d="-1" style="width:28px;height:28px;font-size:12px">−</button>' +
+              '<b style="min-width:18px;text-align:center">' + escHtml(String(it.qty || 1)) + '</b>' +
+              '<button type="button" class="x" data-amd-oid="' + escHtml(o.orderId) + '" data-amd-idx="' + idx + '" data-amd-d="1" style="width:28px;height:28px;font-size:12px">+</button>' +
+              '</div>';
+          }).join('') +
+          '<p style="font-size:10px;color:var(--muted);margin-top:6px">' + escHtml(uiLang === 'hi' ? 'रसोई में जाने के बाद हट नहीं सकते' : 'Cannot remove once kitchen starts prep') + '</p></div>';
+      } else if (!canAmend && o.lockReason) {
+        amendHtml = '<p style="font-size:11px;color:var(--warn);margin-top:8px">' + escHtml(o.lockReason) + '</p>';
+      }
+      return '<div class="ord" data-order-id="' + escHtml(o.orderId) + '"><div class="ord-h"><div><div class="oid">' + escHtml(displayOrderId(o.orderId)) +
         '</div><div class="om">' + escHtml(money(o.total)) +
         (o.dateTime ? ' · ' + escHtml(String(o.dateTime).slice(0, 16).replace('T', ' ')) : '') +
         escHtml(src) + '</div></div><span class="pill ' + statusPillClass(status) + '">' +
-        escHtml(statusLabel(status)) + '</span></div>' + eta + '<div class="tl">' + tl + '</div>' + itemsHtml + '</div>';
+        escHtml(statusLabel(status)) + '</span></div>' + eta + '<div class="tl">' + tl + '</div>' + itemsHtml + amendHtml + '</div>';
+    }
+
+    function wireAmendButtons(list) {
+      document.querySelectorAll('[data-amd-oid]').forEach(function (btn) {
+        btn.onclick = function () {
+          if (!ensureSessionOrWarn()) return;
+          var oid = btn.getAttribute('data-amd-oid');
+          var idx = Number(btn.getAttribute('data-amd-idx'));
+          var d = Number(btn.getAttribute('data-amd-d')) || 0;
+          var order = (list || []).find(function (o) { return String(o.orderId) === String(oid); });
+          if (!order) return;
+          if (order.canAmend === false) {
+            showToast(order.lockReason || (uiLang === 'hi' ? 'बदल नहीं सकते' : 'Cannot change now'));
+            return;
+          }
+          var items = parseItems(order.items).map(function (it) {
+            return { name: it.name, qty: Number(it.qty) || 1, price: Number(it.price) || 0, notes: it.notes || '' };
+          });
+          if (!items[idx]) return;
+          items[idx].qty += d;
+          if (items[idx].qty <= 0) items.splice(idx, 1);
+          if (!items.length) {
+            showToast(uiLang === 'hi' ? 'कम से कम 1 आइटम रखें' : 'Keep at least 1 item');
+            return;
+          }
+          btn.disabled = true;
+          apiCall('amend_order', {
+            order_id: oid,
+            table: table,
+            items: items,
+            by: 'guest',
+            covers: Number(sessionStorage.getItem('rs_table_covers_' + table) || 0) || undefined
+          }).then(function (res) {
+            if (res && res.success) {
+              showToast(uiLang === 'hi' ? 'ऑर्डर अपडेट · स्टाफ को सूचना' : 'Order updated · staff notified');
+              pollOrderTrackers(true);
+            } else {
+              showToast((res && res.error) || (uiLang === 'hi' ? 'बदल नहीं सका' : 'Could not amend'));
+            }
+          }).catch(function () {
+            showToast(uiLang === 'hi' ? 'नेटवर्क त्रुटि' : 'Network error');
+          }).finally(function () { btn.disabled = false; });
+        };
+      });
     }
 
     function pollOrderTrackers(silent) {
@@ -1351,6 +1412,7 @@
         var show = (open.length ? open : list).slice(0, 5);
         if (open.length && paid.length) show = show.concat(paid).slice(0, 6);
         box.innerHTML = show.map(renderOrderCard).join('');
+        wireAmendButtons(show);
       });
     }
 

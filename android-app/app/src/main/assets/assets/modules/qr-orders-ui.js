@@ -132,6 +132,178 @@
     if (m) return m[1];
     return raw;
   }
+  function normalizeStatus(s) {
+    const st = String(s || '').toLowerCase().trim();
+    if (/pending|new|hold|draft|review/.test(st) && !/prepar|ready|serv|paid|cancel/.test(st)) return 'pending';
+    if (/prepar|accept|cook|kitchen/.test(st)) return 'preparing';
+    if (/serv|ready|paid|settled|complet/.test(st)) return 'served';
+    return st || 'pending';
+  }
+
+  function canStaffAmend(order) {
+    if (global.RSAmend && typeof RSAmend.canAmendOrderLine === 'function') {
+      return RSAmend.canAmendOrderLine(order);
+    }
+    const st = normalizeStatus(order && order.status);
+    if (st === 'pending') return { ok: true };
+    if (st === 'preparing') {
+      return { ok: false, reason: 'In kitchen — cannot rewrite items. Void from kitchen if needed.' };
+    }
+    return { ok: false, reason: 'Order already served / closed' };
+  }
+
+  function orderItemsEditable(order) {
+    return (order.items || []).map((item) => {
+      if (Array.isArray(item)) {
+        const label = String(item[0] || 'Item').replace(/^\s*\d+\s*[×x]\s*/i, '').trim() || 'Item';
+        return { name: label, qty: 1, price: Number(item[1] || 0), note: item[2] || '' };
+      }
+      return {
+        id: item.id,
+        name: item.name || 'Item',
+        qty: Math.max(1, Number(item.qty || 1)),
+        price: Number(item.price || 0),
+        note: item.notes || item.note || '',
+      };
+    });
+  }
+
+  async function openStaffAmendModal(orderIdx) {
+    const o = QR_ORDERS[orderIdx];
+    if (!o) return;
+    const check = canStaffAmend(o);
+    if (!check.ok) {
+      toast(check.reason || 'Cannot amend', 'fa-lock');
+      return;
+    }
+    if (!global.RSModal) {
+      toast('Modal unavailable', 'fa-circle-exclamation');
+      return;
+    }
+    let lines = orderItemsEditable(o);
+    const sess = (() => {
+      try {
+        return (global.RS_API && RS_API.session && RS_API.session()) || {};
+      } catch (_) {
+        return {};
+      }
+    })();
+    const staffName = sess.display_name || sess.username || 'Staff';
+
+    RSModal.open({
+      title: 'Amend order · Table ' + qrTableShort(o.table),
+      sub: 'Guest & waiter share this order. Changes notify kitchen/guest devices.',
+      icon: 'fa-pen-to-square',
+      size: 'md',
+      body: `<div class="qr-amend-modal">
+        <p style="font-size:12.5px;color:var(--text-soft);margin:0 0 10px">Only while <b>Pending</b>. After Accept → kitchen, lines are locked.</p>
+        <div id="qr-amend-lines" class="qr-amend-lines"></div>
+        <div class="form-grid-2" style="margin-top:12px">
+          <div class="set-field"><label class="fl">Guests (covers)</label>
+            <input type="number" id="qr-amend-covers" class="form-input" min="0" max="99" value="${Math.max(0, Number(o.covers != null ? o.covers : o.pax) || 0)}" inputmode="numeric">
+          </div>
+          <div class="set-field"><label class="fl">Note to kitchen</label>
+            <input type="text" id="qr-amend-note" class="form-input" placeholder="Optional" maxlength="120">
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;justify-content:space-between;font-weight:800">
+          <span>Total</span><span id="qr-amend-total">${rs(0)}</span>
+        </div>
+      </div>`,
+      foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+             <button type="button" class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-check"></i> Save &amp; notify</button>`,
+      onMount(m, close) {
+        const listEl = m.querySelector('#qr-amend-lines');
+        const totalEl = m.querySelector('#qr-amend-total');
+        const paint = () => {
+          listEl.innerHTML = lines
+            .map(
+              (l, i) => `<div class="qr-amend-row" style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--stroke)">
+              <span style="font-size:13px;font-weight:600">${esc(l.name)}</span>
+              <button type="button" class="btn btn-ghost btn-sm" data-d="-1" data-i="${i}">−</button>
+              <b style="min-width:22px;text-align:center">${l.qty}</b>
+              <button type="button" class="btn btn-ghost btn-sm" data-d="1" data-i="${i}">+</button>
+            </div>`
+            )
+            .join('');
+          const tot = lines.reduce((a, l) => a + l.price * l.qty, 0);
+          totalEl.textContent = rs(tot);
+          listEl.querySelectorAll('[data-d]').forEach((btn) => {
+            btn.onclick = () => {
+              const i = +btn.getAttribute('data-i');
+              const d = +btn.getAttribute('data-d');
+              if (!lines[i]) return;
+              lines[i].qty += d;
+              if (lines[i].qty <= 0) lines.splice(i, 1);
+              if (!lines.length) {
+                toast('Keep at least one item', 'fa-circle-exclamation');
+                lines = orderItemsEditable(o);
+              }
+              paint();
+            };
+          });
+        };
+        paint();
+        m.querySelector('[data-x]').onclick = close;
+        m.querySelector('[data-ok]').onclick = async () => {
+          const covers = Math.max(0, Number(m.querySelector('#qr-amend-covers').value) || 0);
+          const note = (m.querySelector('#qr-amend-note').value || '').trim();
+          const items = lines.map((l) => ({
+            id: l.id || l.name,
+            name: l.name,
+            qty: l.qty,
+            price: l.price,
+            note: l.note || '',
+            notes: note || l.note || '',
+          }));
+          const total = items.reduce((a, it) => a + it.price * it.qty, 0);
+          try {
+            let row = null;
+            if (window.RS_DB && o.id) {
+              const rows = await RS_DB.list('pending_orders');
+              row = rows.find((r) => r.id === o.id) || null;
+            }
+            if (row && global.RSAmend && typeof RSAmend.amendViaStaffDb === 'function') {
+              await RSAmend.amendViaStaffDb(row, items, { by: staffName, covers });
+            } else if (row && window.RS_DB) {
+              row.items = items;
+              row.total = total;
+              row.subtotal = total;
+              row.covers = covers;
+              row.pax = covers;
+              row.amendedBy = staffName;
+              row.amendedAt = new Date().toISOString();
+              await RS_DB.put('pending_orders', row.id, row);
+              syncPendingOrders({ forceCloud: true });
+              if (global.RS10 && RS10.notifyOrderAmendment) {
+                RS10.notifyOrderAmendment({ by: staffName, table: o.table });
+              }
+            } else {
+              o.items = items;
+              o.total = total;
+              o.covers = covers;
+            }
+            o.items = items;
+            o.total = total;
+            o.covers = covers;
+            close();
+            toast('Order amended · guest & kitchen notified', 'fa-bell');
+            renderQR();
+            try {
+              document.dispatchEvent(
+                new CustomEvent('rs:order-amended', {
+                  detail: { by: staffName, table: o.table, order: o },
+                })
+              );
+            } catch (_) {}
+          } catch (err) {
+            toast((err && err.message) || 'Amend failed', 'fa-circle-exclamation');
+          }
+        };
+      },
+    });
+  }
+
   function qrCartItems(order) {
     return (order.items || [])
       .map((item) => {
@@ -273,7 +445,28 @@
     const grid = $('#qr-grid');
     if (!grid) return;
 
+    var qrView =
+      global.RSViewMode && RSViewMode.get ? RSViewMode.get('qr-orders', 'cards') : 'cards';
+    (function ensureQrViewBar() {
+      const tab = document.getElementById('qr-orders-tab');
+      if (!tab || !global.RSViewMode) return;
+      let bar = tab.querySelector('.qr-view-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'qr-view-bar';
+        bar.style.cssText = 'display:flex;justify-content:flex-end;margin:0 0 10px;';
+        const host = grid.parentElement;
+        if (host) host.insertBefore(bar, grid);
+      }
+      bar.innerHTML = RSViewMode.toggleHtml('qr-orders', qrView);
+      qrView = RSViewMode.wire(bar, 'qr-orders', function (m) {
+        qrView = m;
+        renderQR();
+      }, 'cards');
+    })();
+
     if (!QR_ORDERS.length) {
+      grid.classList.remove('is-list');
       grid.innerHTML = emptyQrHtml();
       const floorBtn = grid.querySelector('[data-qr-goto-floor]');
       if (floorBtn)
@@ -298,7 +491,43 @@
       return ageMinutes(b.o) - ageMinutes(a.o); // older first within bucket
     });
 
-    grid.innerHTML = sortedIdx
+    if (qrView === 'list') {
+      grid.classList.add('is-list');
+      grid.innerHTML = `
+        <div class="rs-line-list">
+          <div class="rs-line-head qr-line-head">
+            <span>Table</span><span>Guest</span><span>Items</span><span>Age</span><span class="rl-num">Total</span><span class="rl-acts">Actions</span>
+          </div>
+          ${sortedIdx
+            .map(({ o, i }) => {
+              const mins = ageMinutes(o);
+              const itemSummary = (o.items || [])
+                .slice(0, 3)
+                .map((it) => qrItemLabel(it))
+                .join(', ');
+              const more = (o.items || []).length > 3 ? '…' : '';
+              return `
+            <div class="rs-line-row qr-line-row s-${_e(o.status)}" data-order-id="${_e(o.id || '')}">
+              <span class="rl-name">T ${_e(qrTableShort(o.table))}</span>
+              <span class="rl-mute">${_e(o.customerName || '—')}</span>
+              <span class="rl-mute" title="${_e(itemSummary + more)}">${_e((itemSummary || '—') + more)}</span>
+              <span class="rl-mute qtime" data-qr-start="${_e(o.start || parseTs(o.dateTime) || '')}">${_e(relativeAge(o))}</span>
+              <span class="rl-num">${rs(o.total)}</span>
+              <span class="rl-acts">
+                <span class="pill ${statusPill[o.status] || 'pill-amber'}" style="padding:2px 8px;font-size:10px">${statusTxt[o.status] || o.status}</span>
+                ${canStaffAmend(o).ok ? `<button class="btn btn-ghost btn-sm" data-amend="${i}" title="Amend items"><i class="fa-solid fa-pen-to-square"></i></button>` : ''}
+                ${o.status === 'pending' || o.status === 'preparing' ? `<button class="btn btn-ghost btn-sm" data-pos="${i}" title="POS"><i class="fa-solid fa-cash-register"></i></button>` : ''}
+                ${o.status !== 'served'
+                  ? `<button class="btn btn-primary btn-sm" data-adv="${i}">${o.status === 'pending' ? 'Accept' : 'Serve'}</button>`
+                  : `<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i></button>`}
+              </span>
+            </div>`;
+            })
+            .join('')}
+        </div>`;
+    } else {
+      grid.classList.remove('is-list');
+      grid.innerHTML = sortedIdx
       .map(({ o, i }) => {
         const guest = o.customerName
           ? `<div class="qguest"><i class="fa-solid fa-user"></i> ${_e(o.customerName)}</div>`
@@ -309,6 +538,11 @@
           o.status === 'pending' || o.status === 'preparing'
             ? `<button class="btn btn-ghost btn-sm" data-pos="${i}" title="Load into POS"><i class="fa-solid fa-cash-register"></i></button>`
             : '';
+        const amendBtn = canStaffAmend(o).ok
+          ? `<button class="btn btn-ghost btn-sm" data-amend="${i}" title="Amend items / guests"><i class="fa-solid fa-pen-to-square"></i> Amend</button>`
+          : o.status === 'preparing'
+            ? `<span class="qr-lock-hint" title="Locked in kitchen" style="font-size:10px;color:var(--text-mute)"><i class="fa-solid fa-lock"></i> Locked</span>`
+            : '';
         const lines = (o.items || [])
           .map((it) => {
             const note = qrItemNote(it);
@@ -317,24 +551,31 @@
             }</span><b>${rs(qrItemTotal(it))}</b></div>`;
           })
           .join('');
+        const coversN = Math.max(0, Number(o.covers != null ? o.covers : o.pax) || 0);
         return `
     <div class="qr-card s-${_e(o.status)}${o.status === 'pending' ? ' needs-attention' : ''}${mins > 15 && o.status !== 'served' ? ' qr-aging' : ''}" data-order-id="${_e(o.id || '')}">
-      <div class="qr-ch"><div><span class="tnum">Table ${_e(qrTableShort(o.table))}</span><div class="qtime${ageCls}" data-qr-start="${_e(o.start || parseTs(o.dateTime) || '')}">${_e(relativeAge(o))}</div>${guest}</div><span class="pill ${statusPill[o.status] || 'pill-amber'}"><span class="dot ${o.status === 'preparing' || o.status === 'pending' ? 'dot-live' : ''}"></span>${statusTxt[o.status] || o.status}</span></div>
+      <div class="qr-ch"><div><span class="tnum">Table ${_e(qrTableShort(o.table))}</span><div class="qtime${ageCls}" data-qr-start="${_e(o.start || parseTs(o.dateTime) || '')}">${_e(relativeAge(o))}${coversN ? ' · ' + coversN + ' guests' : ''}</div>${guest}</div><span class="pill ${statusPill[o.status] || 'pill-amber'}"><span class="dot ${o.status === 'preparing' || o.status === 'pending' ? 'dot-live' : ''}"></span>${statusTxt[o.status] || o.status}</span></div>
       <div class="qr-lines">${lines}</div>
       <div class="qr-cf"><span class="qtot">${rs(o.total)}</span>
         ${
           o.status !== 'served'
-            ? `${openPosBtn}<button class="btn btn-ghost btn-sm" data-merge="${i}" title="Merge into another table"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status === 'pending' ? 'Accept' : 'Mark served'}</button>`
+            ? `${amendBtn}${openPosBtn}<button class="btn btn-ghost btn-sm" data-merge="${i}" title="Merge into another table"><i class="fa-solid fa-code-merge"></i> Merge</button><button class="btn btn-primary btn-sm" data-adv="${i}">${o.status === 'pending' ? 'Accept' : 'Mark served'}</button>`
             : `<button class="btn btn-ghost btn-sm" data-bill="${i}"><i class="fa-solid fa-receipt"></i> Bill</button>`
         }
       </div>
     </div>`;
       })
       .join('');
+    }
 
     $$('#qr-grid [data-pos]').forEach((b) =>
       b.addEventListener('click', () => {
         openQrOrderInPos(QR_ORDERS[+b.dataset.pos]);
+      })
+    );
+    $$('#qr-grid [data-amend]').forEach((b) =>
+      b.addEventListener('click', () => {
+        openStaffAmendModal(+b.dataset.amend);
       })
     );
     $$('#qr-grid [data-adv]').forEach((b) =>

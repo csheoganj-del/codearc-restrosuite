@@ -83,7 +83,7 @@
   // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v191-20260714-biz-type-locked';
+    var builtin = 'v194-20260715-staff-amend';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -156,7 +156,7 @@
   // is never blank/unstyled.
   (function() {
     var ver = encodeURIComponent(window.__RESTROSUITE_ASSET_VERSION__);
-    var hrefs = ['assets/dashboard.css', 'assets/features.css'];
+    var hrefs = ['assets/dashboard.css', 'assets/features.css', 'assets/product-10x.css'];
     var pending = hrefs.length;
     var revealed = false;
     function reveal() {
@@ -1711,6 +1711,9 @@
 <script src="assets/modules/qr-orders-ui.js"></script>
 <script src="assets/modules/employees-ui.js"></script>
 <script src="assets/modules/tax-helpers.js"></script>
+<script src="assets/modules/tax-country-pack.js"></script>
+<script src="assets/modules/shared-order-amend.js"></script>
+<script src="assets/modules/staff-efficiency.js"></script>
 <script src="assets/modules/progress-ops.js"></script>
 <script src="assets/modules/report-pdf.js"></script>
 <script src="assets/modules/menu-intelligence.js"></script>
@@ -1972,6 +1975,13 @@
       .then(function() {
         // Load Help/Guide right after shell so first click is instant once ready
         return loadScript('src/dashboard/onboarding.js').catch(function() {});
+      })
+      .then(function() {
+        // Product 10x layer: mobile shell, shift denom, manual online, feedback, QR scan, i18n
+        return loadScript('assets/modules/product-10x.js').catch(function() {});
+      })
+      .then(function() {
+        return loadScript('assets/modules/staff-efficiency.js').catch(function() {});
       })
       .then(function() {
         if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 5000 });

@@ -1,11 +1,11 @@
 {
-  "version": "v191-20260714-biz-type-locked",
-  "date": "2026-07-14",
-  "title": "Business type locked in Settings",
-  "summary": "Business type is assigned at registration and is no longer a free dropdown in Settings. It shows as a locked read-only field.",
+  "version": "v194-20260715-staff-amend",
+  "date": "2026-07-15",
+  "title": "Staff QR amend",
+  "summary": "QR Orders tab: staff can amend pending shared-table orders (qty, covers) with kitchen/guest notify and prep locks.",
   "highlights": [
-    "Business type locked to registration value",
-    "Settings dropdown menus fixed (v190)",
-    "Version pill shows v191 after refresh"
+    "QR Orders: Amend button on pending cards (qty + guests)",
+    "Preparing orders show Locked — no silent deletes",
+    "Shared table guest + waiter amend until kitchen starts"
   ]
 }

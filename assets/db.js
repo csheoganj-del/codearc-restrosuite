@@ -936,6 +936,8 @@
         tableNumber: r.table_number || r.tableNumber || '',
         billNo: r.bill_no || r.billNo || '',
         createdAt: r.created_at || r.createdAt || null,
+        status: r.status || (r.homepage_approved ? 'approved' : 'pending'),
+        homepageApproved: !!(r.homepage_approved || r.homepageApproved),
       }),
       to: (o) => ({
         guest_name: o.guestName || o.guest_name || 'Guest',
@@ -944,6 +946,8 @@
         source: o.source || 'staff',
         table_number: o.tableNumber || o.table_number || null,
         bill_no: o.billNo || o.bill_no || null,
+        status: o.status || (o.homepageApproved ? 'approved' : 'pending'),
+        homepage_approved: !!(o.homepageApproved || o.homepage_approved),
       }),
     },
   };
@@ -957,6 +961,7 @@
   const optionalCloudColumns = Object.freeze({
     menu: ['tax_category'],
     bills: ['idempotency_key', 'cgst', 'sgst', 'igst', 'tax_summary', 'tax_profile', 'channel', 'liquor_tax_amount', 'service_charge_amount', 'transaction_type'],
+    reviews: ['status', 'homepage_approved'],
     // These persist once migration 20260709160000_crm_customer_fields is
     // applied; until then a DB without the columns will drop them gracefully
     // instead of rejecting the whole customer upsert.

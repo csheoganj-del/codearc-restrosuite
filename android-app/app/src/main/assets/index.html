@@ -20,11 +20,11 @@
   <meta property="og:url" content="https://restrosuite.codearc.co.in/">
   <meta property="og:title" content="RestroSuite — Offline-First Restaurant POS &amp; Billing">
   <meta property="og:description" content="Offline-first POS, kitchen display, WhatsApp receipts, and QR table ordering. Free to start — no credit card required.">
-  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=7">
+  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=8">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="RestroSuite — Restaurant POS &amp; Billing">
   <meta name="twitter:description" content="Offline-first restaurant POS. WhatsApp receipts, KDS, QR orders. Free to start.">
-  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=7">
+  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=8">
   <link rel="canonical" href="https://restrosuite.codearc.co.in/">
   <!-- Favicons — SVG preferred, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=7">
@@ -611,17 +611,17 @@
             </a>
           </div>
           <div class="hero-trust">
+            <div class="t-item" id="hero-stars-item"><i class="fa-solid fa-star" aria-hidden="true" style="color:var(--accent)"></i> <span id="hero-stars-label">Owner-approved reviews</span></div>
             <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Free to start</div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Setup in minutes</div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> GST-ready billing</div>
+            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Offline billing</div>
           </div>
         </div>
 
         <div class="hero-visual">
           <figure class="hero-shot">
-            <img src="assets/screenshot-pos.png" width="1400" height="900" alt="RestroSuite point of sale — menu grid, cart, and checkout on a warm light dashboard">
+            <img src="assets/screenshot-cart.png?v=8" width="1400" height="900" alt="RestroSuite cart and checkout — items, totals, and pay actions">
             <figcaption class="hero-shot-caption">
-              <span><b>Point of sale</b> · menu, cart, and pay in one view</span>
+              <span><b>Live POS cart</b> · items, tax, and checkout</span>
               <span>Actual product UI</span>
             </figcaption>
           </figure>
@@ -750,8 +750,8 @@
       <div class="container">
         <div class="section-head">
           <span class="eyebrow">Interactive sandbox</span>
-          <h2>Try the POS. Feel the speed.</h2>
-          <p>Tap a few items to build a real receipt. No spinners, no cloud lag — sub-millisecond local checkout.</p>
+          <h2>Try a 30-second bill</h2>
+          <p>Tap 2–3 items → see tax → print or send a demo WhatsApp invoice. Same feel as the real POS — no signup needed.</p>
         </div>
         <div class="demo-grid">
           <div>
@@ -1037,7 +1037,7 @@
               <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free
             </a>
             <a class="btn btn-ghost btn-lg"
-              href="https://api.whatsapp.com/send?text=Check%20out%20RestroSuite%20%E2%80%94%20free%20offline-first%20restaurant%20POS%0A%0Ahttps%3A%2F%2Fcodearc-restrosuite.vercel.app%2F"
+              href="https://api.whatsapp.com/send?text=Check%20out%20RestroSuite%20%E2%80%94%20free%20offline-first%20restaurant%20POS%0A%0Ahttps%3A%2F%2Frestrosuite.codearc.co.in%2F"
               target="_blank" rel="noopener noreferrer" id="share-whatsapp">
               <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Share on WhatsApp
             </a>
@@ -1611,6 +1611,67 @@
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp"></i> Send WhatsApp Invoice'; }
       renderSimCart(); validateSandboxPhone();
     }
+
+    // ===== APPROVED HOMEPAGE REVIEWS (optional public feed) =====
+    (async function loadHomepageReviews() {
+      try {
+        var params = new URLSearchParams(location.search);
+        var slug = params.get('tenant') || params.get('slug') || localStorage.getItem('rs_public_review_tenant') || '';
+        // Default demo: try platform marketing slug if set on window
+        if (!slug && window.__RS_REVIEW_TENANT__) slug = window.__RS_REVIEW_TENANT__;
+        var localApproved = [];
+        try { localApproved = JSON.parse(localStorage.getItem('rs_homepage_reviews') || '[]') || []; } catch (e) {}
+
+        var reviews = localApproved.filter(function (r) { return r && r.homepageApproved !== false && Number(r.rating) >= 4; });
+        if (slug && window.__configReady) {
+          try {
+            await window.__configReady;
+            var su = window.__SUPABASE_URL__;
+            var sk = window.__SUPABASE_ANON_KEY__;
+            var fn = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic)
+              || (su ? su + '/functions/v1/tenant-public' : '');
+            if (fn) {
+              var res = await fetch(fn, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': sk || '', 'Authorization': 'Bearer ' + (sk || '') },
+                body: JSON.stringify({ action: 'list_homepage_reviews', tenant_slug: slug, limit: 6 })
+              });
+              var data = await res.json().catch(function () { return {}; });
+              if (res.ok && data && Array.isArray(data.reviews) && data.reviews.length) {
+                reviews = data.reviews;
+                if (data.avg != null) {
+                  var lab = document.getElementById('hero-stars-label');
+                  if (lab) lab.textContent = data.avg + '★ from approved guests';
+                }
+              }
+            }
+          } catch (e) {}
+        }
+        if (!reviews.length) return;
+        var track = document.getElementById('testi-track');
+        if (!track) return;
+        var avg = reviews.reduce(function (s, r) { return s + (Number(r.rating) || 5); }, 0) / reviews.length;
+        var lab2 = document.getElementById('hero-stars-label');
+        if (lab2 && !/★/.test(lab2.textContent || '')) lab2.textContent = avg.toFixed(1) + '★ approved reviews';
+        track.innerHTML = reviews.slice(0, 6).map(function (r, i) {
+          var name = String(r.guestName || r.guest_name || 'Guest');
+          var initials = name.split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase() || '★';
+          var stars = '★'.repeat(Math.min(5, Number(r.rating) || 5));
+          var quote = String(r.comment || 'Great experience with RestroSuite.').slice(0, 220);
+          return '<div class="testi-card" role="group" aria-label="Review ' + (i + 1) + '">' +
+            '<div class="testi-inner">' +
+            '<div class="testi-stars" aria-label="' + (r.rating || 5) + ' out of 5 stars">' + stars + '</div>' +
+            '<p class="testi-quote">"' + quote.replace(/</g, '&lt;') + '"</p>' +
+            '<div class="testi-author"><div class="testi-avatar" aria-hidden="true">' + initials.replace(/</g, '') + '</div>' +
+            '<div class="testi-meta" style="text-align:left"><div class="n">' + name.replace(/</g, '&lt;') + '</div>' +
+            '<div class="r">Verified guest feedback</div></div></div></div></div>';
+        }).join('');
+        // Reset carousel counters if present
+        try {
+          if (typeof window.__rsRebuildTestiDots === 'function') window.__rsRebuildTestiDots();
+        } catch (e) {}
+      } catch (e) {}
+    })();
 
     // ===== TESTIMONIALS CAROUSEL =====
     let testiIndex = 0;

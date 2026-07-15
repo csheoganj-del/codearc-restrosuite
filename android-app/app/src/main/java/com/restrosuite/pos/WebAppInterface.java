@@ -117,12 +117,42 @@ public class WebAppInterface {
         }
     }
 
+    /**
+     * Raw ESC/POS bytes as base64. Routes through Android Print service as plain text
+     * when a native thermal SDK is not bundled — USB/Bluetooth/Wi‑Fi printers that
+     * appear in system Print work via {@link #printReceipt(String)}.
+     */
+    @JavascriptInterface
+    public void printEscPos(final String base64EscPos) {
+        if (mContext instanceof MainActivity && base64EscPos != null) {
+            ((MainActivity) mContext).runOnUiThread(() -> {
+                try {
+                    byte[] raw = android.util.Base64.decode(base64EscPos, android.util.Base64.DEFAULT);
+                    // Prefer HTML path for broad printer support (BT/USB/Wi‑Fi via PrintManager)
+                    String safe = new String(raw, java.nio.charset.StandardCharsets.ISO_8859_1)
+                            .replace("&", "&amp;").replace("<", "&lt;");
+                    String html = "<!doctype html><html><body><pre style='font:12px/1.3 monospace;white-space:pre-wrap'>"
+                            + safe + "</pre></body></html>";
+                    ((MainActivity) mContext).printReceipt(html);
+                } catch (Exception e) {
+                    Log.e(TAG, "printEscPos: " + e.getMessage());
+                }
+            });
+        }
+    }
+
     @JavascriptInterface
     public void shareText(String title, String text) {
         if (mContext instanceof MainActivity) {
             ((MainActivity) mContext).runOnUiThread(
                     () -> ((MainActivity) mContext).shareText(title, text));
         }
+    }
+
+    /** Capabilities advertised to JS for print path selection */
+    @JavascriptInterface
+    public String getPrintCapabilities() {
+        return "{\"androidPrintService\":true,\"bluetooth\":true,\"usb\":true,\"wifi\":true,\"webBluetooth\":false,\"escpos\":true}";
     }
 
     @JavascriptInterface
