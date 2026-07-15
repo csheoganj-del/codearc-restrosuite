@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
@@ -80,10 +80,10 @@
   }
 
   // Canonical build tag. The SERVER builtin always wins for the version chip.
-  // ?appv= is only a cache-bust token — sticky old values like ?appv=v151 used
+  // ?appv= is only a cache-bust token â€” sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v195-20260715-partials';
+    var builtin = 'v196-20260715-pos-sandbox';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -97,7 +97,7 @@
     var shortBuiltin = builtin.split('-')[0]; // e.g. v159
     var q = '';
     try { q = String(new URLSearchParams(location.search).get('appv') || '').trim(); } catch (_) {}
-    // Always display/load this deploy's builtin — never stay stuck on an older appv.
+    // Always display/load this deploy's builtin â€” never stay stuck on an older appv.
     var resolved = builtin;
     try {
       var url = new URL(location.href);
@@ -106,7 +106,7 @@
       if (!cur || !isReal(cur)) needRewrite = true;
       else if (majorNum(cur) < majorNum(shortBuiltin)) needRewrite = true; // v151 < v159
       else if (cur !== shortBuiltin && cur !== builtin) {
-        // Same major or newer short form → normalize to shortBuiltin for clean URLs
+        // Same major or newer short form â†’ normalize to shortBuiltin for clean URLs
         if (majorNum(cur) === majorNum(shortBuiltin)) needRewrite = true;
       }
       if (needRewrite) {
@@ -246,7 +246,7 @@
     .support-dropdown .dropdown-trigger i:last-child { display: none; }
   }
 
-  /* Hold Buttons Styling — single primary Hold + Send KOT */
+  /* Hold Buttons Styling â€” single primary Hold + Send KOT */
   .hold-buttons-group,
   .hold-kot-row {
     display: grid;
@@ -315,7 +315,7 @@
     display: flex !important;
   }
 
-  /* ── Super-admin platform shell: hide entire client POS surface ── */
+  /* â”€â”€ Super-admin platform shell: hide entire client POS surface â”€â”€ */
   html.rs-role-superadmin .sidebar-link:not(.superadmin-only),
   html.rs-role-superadmin .sb-section:not(.superadmin-only):not(.brandadmin-only),
   html.rs-role-superadmin .superadmin-hide,
@@ -408,7 +408,7 @@
       <div class="avatar" aria-hidden="true">RS</div>
       <div class="uinfo hide-collapsed">
         <div class="un">Outlet User</div>
-        <div class="ur">Outlet · Admin</div>
+        <div class="ur">Outlet Â· Admin</div>
       </div>
     </div>
 
@@ -423,7 +423,7 @@
       <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
-      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup · Menu · Recipe · Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
+      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup Â· Menu Â· Recipe Â· Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
       <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
       <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
@@ -466,11 +466,11 @@
       </div>
       <div class="tb-spacer"></div>
       <!-- Center: shift host injected by competitive-ops (#rs-topbar-shift) -->
-      <!-- Right: search · call · bill WhatsApp · clock · bell · theme · version (no ⋯ dump) -->
+      <!-- Right: search Â· call Â· bill WhatsApp Â· clock Â· bell Â· theme Â· version (no â‹¯ dump) -->
       <div class="tb-right" id="tb-right">
         <div class="tb-search tb-search-compact" title="Global search">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="search" placeholder="Search…" aria-label="Search anything" autocomplete="off">
+          <input type="search" placeholder="Searchâ€¦" aria-label="Search anything" autocomplete="off">
         </div>
         <div class="tb-support-wrap" id="tb-support-wrap">
           <button type="button" class="tb-icon-btn tb-call-btn" id="tb-call-support" aria-label="Contact support" aria-expanded="false" aria-haspopup="true" title="Contact support" data-tooltip="Contact support">
@@ -494,12 +494,12 @@
             </a>
           </div>
         </div>
-        <!-- Bill WhatsApp only (not support chat) — green / red / spin -->
+        <!-- Bill WhatsApp only (not support chat) â€” green / red / spin -->
         <button type="button" class="tb-pill tb-wa-pill js-wa-status-pill wa-starting" id="tb-wa-status-btn" role="status" aria-label="Bill WhatsApp status" title="Bill WhatsApp" data-tooltip="Bill WhatsApp">
           <i class="fa-brands fa-whatsapp tb-wa-icon" id="tb-wa-icon" aria-hidden="true"></i>
-          <span class="tb-badge-label" id="tb-wa-label">…</span>
+          <span class="tb-badge-label" id="tb-wa-label">â€¦</span>
         </button>
-        <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">—</span></span>
+        <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">â€”</span></span>
         <button type="button" class="tb-icon-btn" id="tb-notif-btn" aria-label="Notifications" title="Notifications" data-tooltip="Notifications"><i class="fa-regular fa-bell" aria-hidden="true"></i><span class="dot-notif" style="display:none"></span></button>
         <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
         <span class="tb-version" id="app-version-pill" role="status" title="App version" aria-label="App version"></span>
@@ -518,7 +518,7 @@
             <div class="pos-toolbar pos-toolbar-menu">
               <div class="pos-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="pos-search-input" placeholder="Search menu or item code…" autocomplete="off" enterkeyhint="search">
+                <input id="pos-search-input" placeholder="Search menu or item codeâ€¦" autocomplete="off" enterkeyhint="search">
                 <div class="mobile-only-inline pos-m-hold-buttons" id="pos-m-hold-buttons" style="display:none; align-items:center; gap:4px;">
                   <button type="button" class="hold-btn hold-btn-current" id="btn-m-hold-current" style="padding: 4px 10px; font-size: 11px;" title="Held orders">
                     <i class="fa-solid fa-pause"></i> Holds <span id="held-count-current-m"></span>
@@ -536,10 +536,10 @@
                       <select id="pos-sort-select" class="pos-sort-select" aria-label="Sort menu">
                         <option value="popular">Most Ordered</option>
                         <option value="default">Default</option>
-                        <option value="name-asc">A–Z</option>
-                        <option value="name-desc">Z–A</option>
-                        <option value="price-asc">Price ↑</option>
-                        <option value="price-desc">Price ↓</option>
+                        <option value="name-asc">Aâ€“Z</option>
+                        <option value="name-desc">Zâ€“A</option>
+                        <option value="price-asc">Price â†‘</option>
+                        <option value="price-desc">Price â†“</option>
                         <option value="veg-first">Veg first</option>
                         <option value="nonveg-first">Non-veg first</option>
                       </select>
@@ -585,7 +585,7 @@
           </div>
 
           <aside class="pos-cart pos-cart-workbench pos-cart-symbols">
-            <!-- Symbol chrome: title · order type icons · count · clear (one row) -->
+            <!-- Symbol chrome: title Â· order type icons Â· count Â· clear (one row) -->
             <div class="cart-head cart-head-symbols">
               <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" title="Back to menu" aria-label="Back to menu"><i class="fa-solid fa-chevron-left"></i></button>
               <h3 title="Current order"><i class="fa-solid fa-receipt cart-head-ico" aria-hidden="true"></i><span class="cart-head-title">Order</span></h3>
@@ -599,7 +599,7 @@
                 <button class="btn btn-ghost cart-clear-btn" id="btn-clear-cart" title="Clear cart" aria-label="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <!-- Customer only (shift tools live in top bar — Petpooja order cart) -->
+            <!-- Customer only (shift tools live in top bar â€” Petpooja order cart) -->
             <div class="cart-meta-row cart-meta-customer-only" id="cart-meta-row">
               <div id="pos-shift-slot" class="pos-shift-slot" hidden aria-hidden="true"></div>
               <div class="cart-table-sel" id="cart-table-sel">
@@ -636,8 +636,8 @@
                       <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
                       <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
                         <div class="insight-item"><span class="insight-label">Visits</span><span class="insight-val" id="insight-visits">0</span></div>
-                        <div class="insight-item"><span class="insight-label">Spent</span><span class="insight-val" id="insight-spend">₹0</span></div>
-                        <div class="insight-item"><span class="insight-label">Dues</span><span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Spent</span><span class="insight-val" id="insight-spend">â‚¹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Dues</span><span class="insight-val" id="insight-dues" style="color:var(--orange)">â‚¹0</span></div>
                         <div class="insight-item"><span class="insight-label">Favorite</span><span class="insight-val" id="insight-favorite">None</span></div>
                       </div>
                     </div>
@@ -659,22 +659,22 @@
             </div>
             <div class="cart-items" id="cart-items"></div>
               <div class="cart-foot">
-              <!-- Plain Sub / Tax / Total — readable at a glance -->
+              <!-- Plain Sub / Tax / Total â€” readable at a glance -->
               <div class="totals-compact totals-readable">
                 <div class="totals-meta">
-                  <span title="Subtotal">Sub <b id="t-sub">₹0</b></span>
-                  <span id="t-disc-wrap" style="color:var(--orange);display:none" title="Discount">Disc <b id="t-disc">₹0</b></span>
-                  <span title="Tax">Tax <b id="t-gst">₹0</b></span>
+                  <span title="Subtotal">Sub <b id="t-sub">â‚¹0</b></span>
+                  <span id="t-disc-wrap" style="color:var(--orange);display:none" title="Discount">Disc <b id="t-disc">â‚¹0</b></span>
+                  <span title="Tax">Tax <b id="t-gst">â‚¹0</b></span>
                 </div>
                 <div class="totals-grand">
                   <span class="totals-grand-lbl">Total</span>
-                  <span class="amt" id="t-grand">₹0</span>
+                  <span class="amt" id="t-grand">â‚¹0</span>
                 </div>
               </div>
               <details class="cart-more-opts" id="cart-more-opts">
                 <summary title="Discount, tip, promo">
                   <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                  <span class="cart-more-summary-txt">Discount · Tip · Promo</span>
+                  <span class="cart-more-summary-txt">Discount Â· Tip Â· Promo</span>
                 </summary>
                 <div class="cart-tip-row" id="cart-tip-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 8px">
                   <input type="number" id="disc-input" min="0" max="100" step="1" placeholder="Disc %" title="Discount percent" class="form-input" style="width:68px;height:36px;font-size:12px;padding:4px 6px">
@@ -686,7 +686,7 @@
                 <div class="cart-promo-row" id="cart-promo-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 10px">
                   <input type="text" id="promo-input" placeholder="Promo code" title="Offer / coupon code" class="form-input" style="flex:1;min-width:100px;height:36px;font-size:12px;padding:4px 8px;text-transform:uppercase" autocomplete="off">
                   <button type="button" class="btn btn-ghost btn-sm" id="promo-apply" style="min-height:36px;padding:0 12px;font-size:11px"><i class="fa-solid fa-tags"></i> Apply</button>
-                  <button type="button" class="btn btn-ghost btn-sm" id="promo-clear" style="min-height:36px;padding:0 10px;font-size:11px" title="Clear promo">×</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="promo-clear" style="min-height:36px;padding:0 10px;font-size:11px" title="Clear promo">Ã—</button>
                   <span id="promo-applied-badge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(255,79,0,.12);color:var(--orange)"></span>
                 </div>
               </details>
@@ -722,16 +722,16 @@
                         <i class="fa-solid fa-hand-holding-dollar csd-ico" title="Received" aria-hidden="true"></i>
                         <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0" inputmode="decimal" title="Cash received" aria-label="Cash received">
                         <i class="fa-solid fa-coins csd-ico" title="Change" aria-hidden="true"></i>
-                        <strong id="inline-cash-change" class="csd-change-amt" title="Change due">₹0</strong>
+                        <strong id="inline-cash-change" class="csd-change-amt" title="Change due">â‚¹0</strong>
                         <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact" title="Exact amount">=</button>
                         <button type="button" class="btn btn-ghost btn-sm cart-cash-more" id="cash-dens-toggle" title="Quick notes" aria-expanded="false" aria-label="Quick cash notes"><i class="fa-solid fa-ellipsis"></i></button>
                         <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Hide cash pad" aria-label="Hide cash pad">&times;</button>
                       </div>
                       <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens" hidden aria-label="Quick cash amounts">
-                        <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
-                        <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
-                        <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
-                        <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="100">â‚¹100</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="200">â‚¹200</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="500">â‚¹500</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="2000">â‚¹2k</button>
                         <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">CLR</button>
                       </div>
                     </div>
@@ -760,16 +760,16 @@
                         </div>
                       </div>
                       <div id="split-quick-fill" class="cart-split-quick">
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Rest to cash">→₹</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Rest to UPI">→UPI</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Rest to card">→Card</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Rest to due">→Due</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="Half cash half UPI">½</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear">×</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Rest to cash">â†’â‚¹</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Rest to UPI">â†’UPI</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Rest to card">â†’Card</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Rest to due">â†’Due</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="Half cash half UPI">Â½</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear">Ã—</button>
                       </div>
                       <div class="csd-split-status cart-split-status">
-                        <span id="split-status-text" class="csd-split-remaining">—</span>
-                        <strong id="split-total-text" class="csd-split-paid">—</strong>
+                        <span id="split-status-text" class="csd-split-remaining">â€”</span>
+                        <strong id="split-total-text" class="csd-split-paid">â€”</strong>
                       </div>
                     </div>
                   </div>
@@ -777,7 +777,7 @@
 
                 <div class="cart-actions cart-actions-final">
                   <div class="hold-kot-row">
-                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order · right-click for held list" aria-label="Hold order">
+                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order Â· right-click for held list" aria-label="Hold order">
                       <i class="fa-solid fa-pause"></i>
                       <span class="act-lbl">Hold</span>
                       <span id="held-count-current" class="hold-count"></span>
@@ -814,7 +814,7 @@
       <section class="tab-content" id="kds-tab" data-screen-label="KDS">
         <div class="toolbar-row">
           <div class="grow"><span class="pill pill-green"><span class="dot dot-live"></span> Live kitchen queue</span> <span class="pill" style="margin-left:6px" id="kds-avg-prep">Avg prep --:--</span></div>
-          <input id="kds-search" type="search" placeholder="Search order #, table or item…" autocomplete="off" aria-label="Search kitchen orders" style="flex:0 1 260px;min-width:150px;padding:8px 12px;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);color:var(--text);font-size:13px;margin:0 10px 0 0" />
+          <input id="kds-search" type="search" placeholder="Search order #, table or itemâ€¦" autocomplete="off" aria-label="Search kitchen orders" style="flex:0 1 260px;min-width:150px;padding:8px 12px;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);color:var(--text);font-size:13px;margin:0 10px 0 0" />
           <div class="seg"><button class="active">All stations</button><button>Tandoor</button><button>Curry</button><button>Beverages</button></div>
         </div>
         <div class="kds-grid" id="kds-grid"></div>
@@ -823,9 +823,9 @@
       <!-- ============ BILLS ============ -->
       <section class="tab-content" id="bills-tab" data-screen-label="Bills">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl" id="bills-stat-sales-label">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">â‚¹0</div><div class="sl" id="bills-stat-sales-label">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl" id="bills-stat-count-label">Bills in range</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">₹0</div><div class="sl">Avg order value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">â‚¹0</div><div class="sl">Avg order value</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl" id="bills-stat-refunds-label">Refunds in range</div></div></div>
         </div>
         <div class="panel panel-pad">
@@ -839,11 +839,11 @@
             </div>
             <div class="bills-custom-range" id="bills-custom-range" hidden>
               <input type="date" id="bills-date-from" aria-label="From date">
-              <span class="bills-custom-sep">–</span>
+              <span class="bills-custom-sep">â€“</span>
               <input type="date" id="bills-date-to" aria-label="To date">
               <button type="button" class="btn btn-ghost btn-sm" id="bills-date-apply">Apply</button>
             </div>
-            <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone…" autocomplete="off" aria-label="Search bills"></div>
+            <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phoneâ€¦" autocomplete="off" aria-label="Search bills"></div>
             <span id="bills-result-meta" class="bills-result-meta" hidden></span>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
             <div class="bills-export-group" role="group" aria-label="Export bills">
@@ -855,7 +855,7 @@
           <div id="bills-filter-hint" class="bills-filter-hint" hidden aria-hidden="true">
             <i class="fa-solid fa-circle-info"></i>
             <span>Date chips control stats + the table. Payment / Status filters are in the table header. Export respects the same filters.</span>
-            <button type="button" class="bills-hint-dismiss" id="bills-hint-dismiss" aria-label="Dismiss tip" title="Dismiss">×</button>
+            <button type="button" class="bills-hint-dismiss" id="bills-hint-dismiss" aria-label="Dismiss tip" title="Dismiss">Ã—</button>
           </div>
           <div class="table-scroll"><table class="data-table bills-table">
             <thead>
@@ -910,7 +910,7 @@
           <div class="grow"></div>
           <div class="pos-search inv-search-wrap" style="max-width:220px;padding:8px 12px">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="inv-stock-search" placeholder="Search food, boxes, bags…" autocomplete="off" aria-label="Search inventory">
+            <input id="inv-stock-search" placeholder="Search food, boxes, bagsâ€¦" autocomplete="off" aria-label="Search inventory">
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-variance" title="Theoretical usage from sales vs stock"><i class="fa-solid fa-chart-column"></i> Variance</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-prep" title="Run prep batch: use stock to make stock"><i class="fa-solid fa-blender"></i> Prep</button>
@@ -935,7 +935,7 @@
               </th>
               <th>In stock</th>
               <th>Min level</th>
-              <th title="Click a cell to set/edit — links to plate cost">Unit cost · value</th>
+              <th title="Click a cell to set/edit â€” links to plate cost">Unit cost Â· value</th>
               <th>
                 Status
                 <select id="inv-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
@@ -971,9 +971,9 @@
             <div class="panel-head"><h3>Add / edit item</h3></div>
             <div style="display:flex;flex-direction:column;gap:14px">
               <div><label class="fl">Item name</label><input class="form-input" placeholder="e.g. Paneer Tikka"></div>
-              <div style="display:flex;gap:12px"><div style="flex:1"><label class="fl">Price (₹)</label><input class="form-input" type="number" placeholder="199"></div><div style="flex:1"><label class="fl">Category</label><select class="form-input"><option>Starters</option><option>Mains</option><option>Breads</option><option>Beverages</option><option>Desserts</option></select></div></div>
+              <div style="display:flex;gap:12px"><div style="flex:1"><label class="fl">Price (â‚¹)</label><input class="form-input" type="number" placeholder="199"></div><div style="flex:1"><label class="fl">Category</label><select class="form-input"><option>Starters</option><option>Mains</option><option>Breads</option><option>Beverages</option><option>Desserts</option></select></div></div>
               <div style="display:flex;gap:12px"><div style="flex:1"><label class="fl">Type</label><select class="form-input"><option>Veg</option><option>Non-veg</option></select></div><div style="flex:1"><label class="fl">GST slab</label><select class="form-input"><option>5%</option><option>12%</option><option>18%</option></select></div></div>
-              <div><label class="fl">Linked ingredients</label><div style="display:flex;flex-wrap:wrap;gap:7px"><span class="pill">Paneer 100g ×</span><span class="pill">Onion 30g ×</span><span class="pill" style="border-style:dashed;cursor:pointer"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span></div></div>
+              <div><label class="fl">Linked ingredients</label><div style="display:flex;flex-wrap:wrap;gap:7px"><span class="pill">Paneer 100g Ã—</span><span class="pill">Onion 30g Ã—</span><span class="pill" style="border-style:dashed;cursor:pointer"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span></div></div>
               <div><label class="fl">Photo</label><div class="ph" style="height:90px"><span>Drop item photo</span></div></div>
               <button class="btn btn-primary btn-block"><i class="fa-solid fa-circle-check"></i> Save item</button>
             </div>
@@ -1032,19 +1032,19 @@
       <!-- ============ REPORTS ============ -->
       <section class="tab-content" id="reports-tab" data-screen-label="Reports">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹0</div><div class="sl">Revenue this week</div><div class="sd" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">â‚¹0</div><div class="sl">Revenue this week</div><div class="sd" style="display:none"></div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">0</div><div class="sl">Orders this week</div><div class="sd" style="display:none"></div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">₹0</div><div class="sl">Avg order value</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">₹0</div><div class="sl">GST collected</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">â‚¹0</div><div class="sl">Avg order value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">â‚¹0</div><div class="sl">GST collected</div></div></div>
         </div>
         <div class="report-grid">
           <div class="panel panel-pad">
-            <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">Last 7 days · hover for value</span></div>
+            <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">Last 7 days Â· hover for value</span></div>
             <div class="chart-bars" id="chart-revenue"></div>
           </div>
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Payment mix</h3></div>
-            <div class="donut-wrap"><div class="donut" id="donut-pay"><div class="donut-center"><div class="dc-v">₹3.28L</div><div class="dc-l">collected</div></div></div><div class="legend" id="legend-pay"></div></div>
+            <div class="donut-wrap"><div class="donut" id="donut-pay"><div class="donut-center"><div class="dc-v">â‚¹3.28L</div><div class="dc-l">collected</div></div></div><div class="legend" id="legend-pay"></div></div>
           </div>
         </div>
         <div class="report-grid" style="margin-top:16px">
@@ -1055,10 +1055,10 @@
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Tax summary</h3></div>
             <table class="data-table"><tbody>
-              <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">₹11,200</td></tr>
-              <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">₹5,200</td></tr>
-              <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">₹3,11,600</td></tr>
-              <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">₹16,400</b></td></tr>
+              <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">â‚¹11,200</td></tr>
+              <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">â‚¹5,200</td></tr>
+              <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">â‚¹3,11,600</td></tr>
+              <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">â‚¹16,400</b></td></tr>
             </tbody></table>
             <button class="btn btn-ghost btn-block" id="btn-download-gstr" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready report</button>
           </div>
@@ -1096,7 +1096,7 @@
         <div class="stat-row">
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">0</div><div class="sl">Team members</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-user-clock"></i></div><div><div class="sv">0</div><div class="sl">On shift now</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹0</div><div class="sl">Payroll (month)</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">â‚¹0</div><div class="sl">Payroll (month)</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-calendar-day"></i></div><div><div class="sv">0%</div><div class="sl">Attendance</div></div></div>
         </div>
         <div class="toolbar-row">
@@ -1111,9 +1111,9 @@
       <!-- ============ CHAIN DASHBOARD ============ -->
       <section class="tab-content" id="chain-dashboard-tab" data-screen-label="Chain Dashboard">
         <div class="stat-row" id="chain-platform-summary">
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="chain-total-revenue">₹0.00</div><div class="sl">Total Brand Revenue</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="chain-total-revenue">â‚¹0.00</div><div class="sl">Total Brand Revenue</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="chain-total-orders">0</div><div class="sl">Total Order Count</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-ticket"></i></div><div><div class="sv" id="chain-avg-ticket">₹0.00</div><div class="sl">Avg Ticket Value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-ticket"></i></div><div><div class="sv" id="chain-avg-ticket">â‚¹0.00</div><div class="sl">Avg Ticket Value</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-r"><i class="fa-solid fa-triangle-exclamation"></i></div><div><div class="sv" id="chain-alerting-stores">0</div><div class="sl">Alerting Outlets</div></div></div>
         </div>
 
@@ -1197,13 +1197,13 @@
             <div class="sa-controls">
               <div class="sa-search-wrapper">
                 <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-mute);font-size:12px;pointer-events:none"></i>
-                <input id="tenant-search-input" placeholder="Search tenants…" style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none">
+                <input id="tenant-search-input" placeholder="Search tenantsâ€¦" style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none">
               </div>
               <button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button>
               <button class="btn btn-sm" id="btn-create-tenant" style="background:var(--orange);color:#fff;border:none;gap:6px"><i class="fa-solid fa-plus"></i> New Workspace</button>
             </div>
           </div>
-          <!-- Bulk actions bar — shown for selected tenants or pending approvals -->
+          <!-- Bulk actions bar â€” shown for selected tenants or pending approvals -->
           <div id="sa-bulk-bar" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;margin-bottom:12px">
             <i id="sa-bulk-icon" class="fa-solid fa-user-clock" style="color:#b45309"></i>
             <span id="sa-bulk-label" style="font-size:13px;font-weight:500;color:#b45309;flex:1"></span>
@@ -1243,8 +1243,8 @@
             <div class="gw-status" style="margin-bottom: 0;">
               <div class="gw-ic"><i class="fa-brands fa-whatsapp"></i></div>
               <div style="flex:1">
-                <div class="gw-t">WhatsApp Gateway · <span id="saas-gateway-status-label">Online</span></div>
-                <div class="gw-s">Connected as <strong id="saas-gateway-phone">-</strong> · Session Saved: <span id="saas-gateway-session-saved">-</span></div>
+                <div class="gw-t">WhatsApp Gateway Â· <span id="saas-gateway-status-label">Online</span></div>
+                <div class="gw-s">Connected as <strong id="saas-gateway-phone">-</strong> Â· Session Saved: <span id="saas-gateway-session-saved">-</span></div>
               </div>
               <span id="saas-gateway-status" class="pill pill-green"><span class="dot dot-live"></span> Ready</span>
             </div>
@@ -1265,7 +1265,7 @@
             </div>
 
             <div class="stat-row" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
-              <div class="stat-card" style="padding: 12px;" title="Messages / alerts dispatched today"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">—</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
+              <div class="stat-card" style="padding: 12px;" title="Messages / alerts dispatched today"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">â€”</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
               <div class="stat-card" style="padding: 12px;" title="Successful deliveries vs attempts"><div class="stat-ic bg-o" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-check-double"></i></div><div><div class="sv" id="gw-delivery-rate" style="font-size: 15px;">n/a</div><div class="sl" style="font-size: 10px;">Delivery rate</div></div></div>
               <div class="stat-card" style="padding: 12px;" title="Average send latency"><div class="stat-ic bg-v" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-gauge-high"></i></div><div><div class="sv" id="gw-latency" style="font-size: 15px;">n/a</div><div class="sl" style="font-size: 10px;">Avg latency</div></div></div>
               <div class="stat-card" style="padding: 12px;" title="Messages waiting in queue"><div class="stat-ic bg-a" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-layer-group"></i></div><div><div class="sv" id="gw-queued" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Queued</div></div></div>
@@ -1286,7 +1286,7 @@
                 </div>
               </div>
               <p style="font-size:11.5px;color:var(--text-mute);margin:0 0 12px;line-height:1.45">
-                Client crashes and unhandled errors from restaurant dashboards (and related apps). <b>Resolve</b> only marks them reviewed — it does not fix the bug. Safe to clear old noise after you’ve checked.
+                Client crashes and unhandled errors from restaurant dashboards (and related apps). <b>Resolve</b> only marks them reviewed â€” it does not fix the bug. Safe to clear old noise after youâ€™ve checked.
               </p>
               <div id="app-incidents-list" style="display: flex; flex-direction: column; gap: 8px; flex: 1; max-height: 250px; overflow-y: auto;">
                 <div style="text-align: center; padding: 20px; color: var(--text-mute); font-size: 12px;"><i class="fa-solid fa-spinner fa-spin"></i> Checking incidents...</div>
@@ -1321,7 +1321,7 @@
     <span id="pos-m-cart-bar-count">0 items</span>
   </div>
   <div class="pmcb-right">
-    <span id="pos-m-cart-bar-total">₹0</span>
+    <span id="pos-m-cart-bar-total">â‚¹0</span>
     <span class="pmcb-cta">Checkout <i class="fa-solid fa-arrow-right"></i></span>
   </div>
 </div>
@@ -1371,13 +1371,13 @@
         <div>
           <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Outlet type *</label>
           <select id="ct-outlet-type" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
-            <option value="cafe">☕ Café</option>
-            <option value="restaurant">🍽️ Restaurant</option>
-            <option value="qsr">🍔 QSR / Fast Food</option>
-            <option value="bakery">🥐 Bakery</option>
-            <option value="bar">🍺 Bar & Lounge</option>
-            <option value="cloud_kitchen">📦 Cloud Kitchen</option>
-            <option value="retail">🛒 Retail</option>
+            <option value="cafe">â˜• CafÃ©</option>
+            <option value="restaurant">ðŸ½ï¸ Restaurant</option>
+            <option value="qsr">ðŸ” QSR / Fast Food</option>
+            <option value="bakery">ðŸ¥ Bakery</option>
+            <option value="bar">ðŸº Bar & Lounge</option>
+            <option value="cloud_kitchen">ðŸ“¦ Cloud Kitchen</option>
+            <option value="retail">ðŸ›’ Retail</option>
           </select>
         </div>
         <div>
@@ -1491,9 +1491,9 @@
           <div>
             <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Account status</label>
             <select id="manage-status" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
-              <option value="pending">⏳ Pending</option>
-              <option value="approved">✅ Active</option>
-              <option value="suspended">🚫 Suspended</option>
+              <option value="pending">â³ Pending</option>
+              <option value="approved">âœ… Active</option>
+              <option value="suspended">ðŸš« Suspended</option>
             </select>
           </div>
           <div>
@@ -1523,13 +1523,13 @@
       <!-- Licensing & devices -->
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-key" style="font-size:9px"></i> Licensing &amp; Devices</div>
-        <div id="manage-devices-box" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;background:var(--panel);font-size:12.5px;color:var(--text-soft);min-height:44px">Loading devices…</div>
+        <div id="manage-devices-box" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;background:var(--panel);font-size:12.5px;color:var(--text-soft);min-height:44px">Loading devicesâ€¦</div>
       </div>
 
       <!-- Notes -->
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-note-sticky" style="font-size:9px"></i> Internal Notes</div>
-        <textarea id="manage-notes" placeholder="Account notes, support history, onboarding status…" rows="2" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+        <textarea id="manage-notes" placeholder="Account notes, support history, onboarding statusâ€¦" rows="2" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
       </div>
 
       <div style="display:flex;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--stroke)">
@@ -1759,7 +1759,7 @@
 
     function hasRecentCloudFailure() {
       var last = window.RS_LAST_CLOUD_ERROR;
-      // Only treat as soft warning (not hard lock) — 60s window
+      // Only treat as soft warning (not hard lock) â€” 60s window
       return !!(last && last.time && (Date.now() - last.time < 60000));
     }
 
@@ -1796,7 +1796,7 @@
         }
         return;
       }
-      // Force logout path — clear soft lock and re-click after releasing guard
+      // Force logout path â€” clear soft lock and re-click after releasing guard
       window.__RS_FORCE_LOGOUT__ = true;
       try {
         if (window.RS_API && typeof RS_API.signOut === 'function') {
@@ -1857,7 +1857,7 @@
       }, Promise.resolve());
     }
 
-    // Wave 4: load order matters — dashboard/pos first, then receipt+ops bundle, then shell.
+    // Wave 4: load order matters â€” dashboard/pos first, then receipt+ops bundle, then shell.
     var pre = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
@@ -1871,7 +1871,7 @@
       'assets/competitive-ops.js'
     ];
 
-    // Secondary modules — loaded on first tab that needs them (or idle preload)
+    // Secondary modules â€” loaded on first tab that needs them (or idle preload)
     var TAB_MODULES = {
       'editor-tab': ['assets/features-editor.js'],
       'inventory-tab': ['assets/features-manage.js'],
@@ -1904,7 +1904,7 @@
       });
     }
 
-    // Help must work on first click — never require waiting for idle preload.
+    // Help must work on first click â€” never require waiting for idle preload.
     // Stub opens guide after loading onboarding.js (or immediately if already ready).
     window.RS_loadProductGuide = function() {
       return loadScript('src/dashboard/onboarding.js');
@@ -1941,7 +1941,7 @@
             btn.removeAttribute('aria-busy');
           }
           if (window.RS && typeof RS.toast === 'function') {
-            RS.toast('Help is still loading — try again in a moment', 'fa-circle-info');
+            RS.toast('Help is still loading â€” try again in a moment', 'fa-circle-info');
           }
         });
     };
@@ -1994,7 +1994,7 @@
 </script>
 
 <script>
-/* Fix 1: Sidebar hamburger toggle — mobile/tablet */
+/* Fix 1: Sidebar hamburger toggle â€” mobile/tablet */
 (function () {
   var btn     = document.getElementById("sidebarToggle");
   var sidebar = document.querySelector(".sidebar");

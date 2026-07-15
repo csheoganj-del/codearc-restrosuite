@@ -1,13 +1,11 @@
-{
-  "version": "v195-20260715-partials",
+﻿{
+  "version": "v196-20260715-pos-sandbox",
   "date": "2026-07-15",
-  "title": "Partials polish",
-  "summary": "Homepage sandbox print path, offline sync banner, employee deactivate + session revoke, clearer table QR purpose labels, smoother updates and alert sound settings.",
+  "title": "POS-exact homepage sandbox",
+  "summary": "Homepage Live Demo menu tiles and cart match the real dashboard POS chrome (item cards, cart lines, pay methods, Print & Pay).",
   "highlights": [
-    "Sandbox: Print & close bill works; country tax/currency fixed",
-    "Offline banner: clear save-local / syncing / retry states",
-    "Employees: deactivate login revokes sessions; staff suspend hardened",
-    "Table QR: purpose line — guest order or call waiter, this table only",
-    "Settings → Printers: sound on/mute + test chime; safer update dialog"
+    "Sandbox menu uses real .pos-item tiles with veg mark, category, price, qty badge",
+    "Sandbox cart uses real .cart-line + totals + Cash/UPI/Card/Due",
+    "Print & Pay closes demo bill like live POS checkout"
   ]
 }

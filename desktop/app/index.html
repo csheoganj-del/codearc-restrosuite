@@ -418,52 +418,298 @@
     .empathy-col.new li i { color: var(--success); }
     .empathy-col.new li b { color: var(--text); font-weight: 600; }
 
-    /* Interactive demo */
-    .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: start; }
-    .menu-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 26px; }
-    .menu-item-btn {
-      text-align: left; padding: 16px 17px; border-radius: 15px; background: var(--surface-2);
-      border: 1px solid var(--border-2); color: var(--text); transition: all .2s; position: relative; overflow: hidden;
+    /* Interactive demo — exact POS menu tiles + cart chrome (matches dashboard POS) */
+    .demo-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-top: 8px;
     }
-    .menu-item-btn:hover { border-color: var(--accent-line); transform: translateY(-3px); box-shadow: 0 14px 30px -16px var(--accent-glow); }
-    .menu-item-btn::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cc, var(--accent)); opacity: .9; }
-    .menu-item-btn .mtop { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
-    .menu-item-btn .mveg    { width: 15px; height: 15px; border-radius: 3px; background: var(--surface-solid); border: 1.5px solid #22a65a; display: grid; place-items: center; flex: none; }
-    .menu-item-btn .mveg::after { content: ""; width: 6.5px; height: 6.5px; border-radius: 50%; background: #22a65a; }
-    .menu-item-btn .mnonveg { width: 15px; height: 15px; border-radius: 3px; background: var(--surface-solid); border: 1.5px solid #c0392b; display: grid; place-items: center; flex: none; }
-    .menu-item-btn .mnonveg::after { content: ""; width: 6.5px; height: 6.5px; border-radius: 50%; background: #c0392b; }
-    .menu-item-btn .mcat { font-size: 9.5px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--cc, var(--accent)); }
-    [data-theme="light"] .menu-item-btn .mcat { color: color-mix(in srgb, var(--cc, var(--accent)) 58%, #000); }
-    .menu-item-name { font-weight: 700; font-size: 15px; font-family: var(--font-display); }
-    .menu-item-price { font-size: 13.5px; color: var(--text-mute); margin-top: 2px; }
-    .menu-item-btn .add { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; opacity: 0; transition: opacity .2s; }
-    .menu-item-btn:hover .add { opacity: 1; }
-
-    .terminal { padding: 0; overflow: hidden; display: flex; flex-direction: column; min-height: 460px; }
-    .terminal-header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .terminal-header .th-title { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
-    .terminal-body { padding: 22px; flex: 1; display: flex; flex-direction: column; }
-    .empty-cart-msg { margin: auto; text-align: center; color: var(--text-mute); font-size: 14.5px; line-height: 1.7; }
-    .empty-cart-msg i { font-size: 30px; display: block; margin-bottom: 14px; opacity: .5; }
-    .receipt-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; max-height: 230px; overflow-y: auto; }
-    .receipt-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); }
-    .receipt-row:last-child { border-bottom: 0; }
-    .receipt-row .ri-name { font-weight: 600; font-size: 14.5px; }
-    .receipt-row .ri-meta { font-size: 12.5px; color: var(--text-mute); display: flex; align-items: center; gap: 8px; margin-top: 3px; }
-    .qty-btn { width: 22px; height: 22px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-dim); display: grid; place-items: center; font-size: 11px; }
-    .qty-btn:hover { color: var(--accent); border-color: var(--accent-line); }
-    .receipt-row .ri-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
-    .receipt-summary { margin-top: auto; padding-top: 14px; }
-    .sum-row { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--text-dim); padding: 4px 0; }
-    .sum-total { display: flex; justify-content: space-between; font-family: var(--font-display); font-weight: 800; font-size: 20px; padding-top: 12px; margin-top: 6px; border-top: 1px dashed var(--border-strong); }
-    /* FIX: sandbox-actions now also targeted by class */
-    .sandbox-actions {
-      margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 10px;
+    .rs-pos-sandbox {
+      --rs-pos-orange: var(--orange, #FF4F00);
+      --rs-pos-panel: var(--panel-solid, var(--panel, #fff));
+      --rs-pos-stroke: var(--stroke, rgba(0,0,0,.08));
+      --rs-pos-stroke-2: var(--stroke-2, rgba(0,0,0,.12));
+      --rs-pos-glass: var(--glass, rgba(0,0,0,.02));
+      --rs-pos-glass-2: var(--glass-2, rgba(0,0,0,.04));
+      --rs-pos-text: var(--text, #1a1a1a);
+      --rs-pos-mute: var(--text-mute, #6b7280);
+      --rs-pos-soft: var(--text-soft, #4b5563);
+      --rs-pos-green: var(--green, #16a34a);
+      --rs-pos-red: var(--red, #dc2626);
+      --rs-pos-r: var(--r-md, 12px);
+      --rs-pos-r-lg: var(--r-lg, 16px);
     }
-    .sandbox-phone-row { display: flex; gap: 8px; }
-    .sandbox-prefix { display: grid; place-items: center; padding: 0 14px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border-2); font-weight: 700; font-size: 14px; }
+    .rs-pos-sandbox .pos-menu-pane {
+      min-width: 0;
+      background: var(--rs-pos-panel);
+      border: 1px solid var(--rs-pos-stroke);
+      border-radius: var(--rs-pos-r-lg);
+      padding: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.04);
+    }
+    .rs-pos-sandbox .pos-menu-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 10px; padding: 0 2px 8px; border-bottom: 1px solid var(--rs-pos-stroke);
+    }
+    .rs-pos-sandbox .pos-menu-toolbar h3 {
+      margin: 0; font-size: 13px; font-weight: 800; letter-spacing: -.01em;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .rs-pos-sandbox .pos-menu-toolbar h3 i { color: var(--rs-pos-orange); }
+    .rs-pos-sandbox .pos-menu-hint {
+      font-size: 11px; color: var(--rs-pos-mute); font-weight: 600;
+    }
+    .rs-pos-sandbox .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+      gap: 11px;
+      padding: 2px;
+      align-content: start;
+    }
+    .rs-pos-sandbox .pos-item {
+      border-radius: var(--rs-pos-r);
+      background: var(--rs-pos-panel);
+      border: 1px solid var(--rs-pos-stroke);
+      padding: 12px 12px 11px;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s, box-shadow .22s, background .18s;
+      position: relative;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 96px;
+      text-align: left;
+      color: var(--rs-pos-text);
+      font: inherit;
+      width: 100%;
+    }
+    .rs-pos-sandbox .pos-item::before {
+      content: "";
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--cc, var(--rs-pos-orange)); opacity: .85;
+      border-radius: 3px 0 0 3px;
+    }
+    .rs-pos-sandbox .pos-item::after {
+      content: "";
+      position: absolute; inset: 0; pointer-events: none;
+      border-radius: inherit;
+      background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--cc, var(--rs-pos-orange)) 8%, transparent), transparent 55%);
+    }
+    .rs-pos-sandbox .pos-item:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--cc, var(--rs-pos-orange)) 45%, transparent);
+      box-shadow: 0 8px 22px -10px rgba(0,0,0,.18);
+    }
+    .rs-pos-sandbox .pos-item:active { transform: translateY(0) scale(.985); }
+    .rs-pos-sandbox .pos-item > * { position: relative; z-index: 1; }
+    .rs-pos-sandbox .pos-item.in-cart {
+      border-color: color-mix(in srgb, var(--rs-pos-orange) 70%, var(--rs-pos-stroke)) !important;
+      background: color-mix(in srgb, var(--rs-pos-orange) 4%, var(--rs-pos-panel)) !important;
+      box-shadow: 0 2px 10px rgba(255, 79, 0, 0.1);
+    }
+    .rs-pos-sandbox .pos-item-qty-badge {
+      position: absolute; top: -5px; right: -5px;
+      background: var(--rs-pos-orange); color: #fff;
+      font-size: 10px; font-weight: 800;
+      min-width: 20px; height: 20px; padding: 0 5px;
+      border-radius: 99px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--rs-pos-panel);
+      box-shadow: 0 2px 8px rgba(255, 79, 0, 0.35);
+      z-index: 10; line-height: 1;
+    }
+    .rs-pos-sandbox .pos-item .pi-top {
+      display: flex; align-items: center; gap: 6px; min-height: 14px;
+    }
+    .rs-pos-sandbox .pos-item .picat {
+      font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--rs-pos-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rs-pos-sandbox .pos-item .pname {
+      font-weight: 700; font-size: 14px; line-height: 1.25; letter-spacing: -.015em;
+      flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; word-break: break-word;
+    }
+    .rs-pos-sandbox .pos-item .prow {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto;
+    }
+    .rs-pos-sandbox .pos-item .pprice {
+      font-weight: 800; font-size: 15px; letter-spacing: -.02em;
+    }
+    .rs-pos-sandbox .pos-item .veg {
+      position: relative; width: 14px; height: 14px; border-radius: 3px;
+      background: var(--rs-pos-panel); border: 1.5px solid var(--rs-pos-green);
+      display: grid; place-items: center; flex: none;
+    }
+    .rs-pos-sandbox .pos-item .veg::after {
+      content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--rs-pos-green);
+    }
+    .rs-pos-sandbox .pos-item .veg.nonveg { border-color: var(--rs-pos-red); }
+    .rs-pos-sandbox .pos-item .veg.nonveg::after { background: var(--rs-pos-red); }
 
+    /* Cart — same structure as live POS */
+    .rs-pos-sandbox .pos-cart {
+      display: flex; flex-direction: column;
+      border-radius: var(--rs-pos-r-lg);
+      background: var(--rs-pos-panel);
+      border: 1px solid var(--rs-pos-stroke);
+      overflow: hidden;
+      min-height: 480px;
+      max-height: 640px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.04);
+      position: relative;
+    }
+    .rs-pos-sandbox .cart-head {
+      padding: 8px 10px; border-bottom: 1px solid var(--rs-pos-stroke);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 6px;
+    }
+    .rs-pos-sandbox .cart-head h3 {
+      font-size: 12px; font-weight: 800; letter-spacing: -.01em; margin: 0;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .rs-pos-sandbox .cart-head-ico { color: var(--rs-pos-orange); font-size: 12px; }
+    .rs-pos-sandbox .cart-count-pill {
+      padding: 2px 8px; font-size: 11px; font-weight: 800; min-width: 22px; text-align: center;
+      border-radius: 99px; background: color-mix(in srgb, var(--rs-pos-orange) 12%, transparent);
+      color: var(--rs-pos-orange); border: 1px solid color-mix(in srgb, var(--rs-pos-orange) 28%, transparent);
+    }
+    .rs-pos-sandbox .cart-clear-btn {
+      width: 28px; height: 28px; padding: 0; color: var(--rs-pos-orange);
+      font-size: 12px; display: inline-grid; place-items: center; border-radius: 8px;
+      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-glass);
+      cursor: pointer;
+    }
+    .rs-pos-sandbox .cart-clear-btn:hover { background: color-mix(in srgb, var(--rs-pos-orange) 10%, transparent); }
+    .rs-pos-sandbox .cart-meta-row {
+      padding: 6px 10px; border-bottom: 1px solid var(--rs-pos-stroke);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .rs-pos-sandbox .cart-walkin-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 9px; font-size: 12px; font-weight: 700;
+      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-glass);
+      color: var(--rs-pos-soft);
+    }
+    .rs-pos-sandbox .cart-walkin-chip i { color: var(--rs-pos-orange); font-size: 11px; }
+    .rs-pos-sandbox .cart-items {
+      flex: 1 1 auto; overflow-y: auto; padding: 6px 8px;
+      display: flex; flex-direction: column; gap: 4px;
+      min-height: 180px;
+    }
+    .rs-pos-sandbox .cart-empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; color: var(--rs-pos-mute); text-align: center; padding: 24px 12px;
+    }
+    .rs-pos-sandbox .cart-empty i { font-size: 24px; opacity: .5; }
+    .rs-pos-sandbox .cart-line {
+      display: flex; gap: 6px; align-items: center;
+      padding: 7px 8px; border-radius: 9px;
+      background: var(--rs-pos-glass); border: 1px solid var(--rs-pos-stroke);
+      min-height: 44px;
+    }
+    .rs-pos-sandbox .cart-line:hover {
+      border-color: color-mix(in srgb, var(--rs-pos-orange) 28%, var(--rs-pos-stroke));
+      background: color-mix(in srgb, var(--rs-pos-orange) 3%, var(--rs-pos-glass));
+    }
+    .rs-pos-sandbox .cart-line .cdot {
+      width: 5px; height: 5px; border-radius: 2px; background: var(--cc, var(--rs-pos-orange)); flex: none;
+    }
+    .rs-pos-sandbox .cart-line .cinfo { flex: 1; min-width: 0; }
+    .rs-pos-sandbox .cart-line .cn-row {
+      display: flex; align-items: baseline; gap: 6px; min-width: 0;
+    }
+    .rs-pos-sandbox .cart-line .cn {
+      font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; line-height: 1.2; flex: 1; min-width: 0;
+    }
+    .rs-pos-sandbox .cart-line .cp {
+      font-size: 11px; color: var(--rs-pos-mute); font-weight: 600; flex: none;
+    }
+    .rs-pos-sandbox .cart-line .cline-total {
+      font-weight: 800; font-size: 13px; min-width: 48px; text-align: right; flex: none;
+    }
+    .rs-pos-sandbox .qty { display: flex; align-items: center; gap: 3px; flex: none; }
+    .rs-pos-sandbox .qty button {
+      width: 30px; height: 30px; min-width: 30px; min-height: 30px;
+      border-radius: 8px; border: 1px solid var(--rs-pos-stroke-2);
+      background: var(--rs-pos-glass-2); color: var(--rs-pos-text); cursor: pointer; font-size: 11px;
+      display: grid; place-items: center;
+    }
+    .rs-pos-sandbox .qty button:hover {
+      background: color-mix(in srgb, var(--rs-pos-orange) 12%, transparent);
+      color: var(--rs-pos-orange); border-color: rgba(255,79,0,0.4);
+    }
+    .rs-pos-sandbox .qty .qn { font-weight: 800; font-size: 12.5px; min-width: 16px; text-align: center; }
+    .rs-pos-sandbox .cart-foot {
+      border-top: 1px solid var(--rs-pos-stroke); padding: 8px 10px 10px;
+      flex-shrink: 0;
+      background: color-mix(in srgb, var(--rs-pos-panel) 92%, var(--rs-pos-glass));
+      box-shadow: 0 -6px 16px rgba(0,0,0,.04);
+    }
+    .rs-pos-sandbox .totals-compact { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+    .rs-pos-sandbox .totals-meta {
+      display: flex; justify-content: space-between; flex-wrap: wrap;
+      font-size: 11px; color: var(--rs-pos-soft); gap: 4px 10px;
+    }
+    .rs-pos-sandbox .totals-meta b { color: var(--rs-pos-text); font-weight: 700; }
+    .rs-pos-sandbox .totals-grand {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 5px; border-top: 1px dashed var(--rs-pos-stroke-2);
+    }
+    .rs-pos-sandbox .totals-grand-lbl { font-weight: 700; font-size: 13px; }
+    .rs-pos-sandbox .totals-grand .amt {
+      font-family: var(--font-display, inherit); font-weight: 800; font-size: 22px;
+      color: var(--rs-pos-orange); letter-spacing: -.02em;
+    }
+    .rs-pos-sandbox .cart-payment {
+      margin: 0 0 8px; padding: 5px; border: 1px solid var(--rs-pos-stroke-2);
+      border-radius: 10px; background: var(--rs-pos-glass);
+    }
+    .rs-pos-sandbox .cpay-methods {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+    }
+    .rs-pos-sandbox .cpay-methods button {
+      min-height: 40px; padding: 4px 2px; font-size: 10px; font-weight: 700;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; border-radius: 8px; line-height: 1.1;
+      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-panel);
+      color: var(--rs-pos-soft); cursor: pointer;
+    }
+    .rs-pos-sandbox .cpay-methods button.active {
+      border-color: rgba(255,79,0,.5) !important;
+      background: color-mix(in srgb, var(--rs-pos-orange) 10%, transparent) !important;
+      color: var(--rs-pos-orange) !important;
+    }
+    .rs-pos-sandbox .cpay-lbl { font-size: 9.5px; font-weight: 700; }
+    .rs-pos-sandbox .cart-actions-final {
+      display: grid; grid-template-columns: 1fr 1.35fr; gap: 6px;
+    }
+    .rs-pos-sandbox .cart-actions-final .btn {
+      min-height: 42px; font-size: 12px; font-weight: 800; border-radius: 10px;
+    }
+    .rs-pos-sandbox .sandbox-wa-block {
+      margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--rs-pos-stroke-2);
+      display: none; flex-direction: column; gap: 8px;
+    }
+    .rs-pos-sandbox .sandbox-wa-block.is-open { display: flex; }
+    .rs-pos-sandbox .sandbox-phone-row { display: flex; gap: 8px; }
+    .rs-pos-sandbox .sandbox-prefix {
+      display: grid; place-items: center; padding: 0 12px; border-radius: 9px;
+      background: var(--rs-pos-glass-2); border: 1px solid var(--rs-pos-stroke-2);
+      font-weight: 700; font-size: 13px;
+    }
+    .rs-pos-sandbox .sandbox-phone-row .form-input { flex: 1; min-width: 0; height: 38px; }
+    .rs-pos-sandbox .field-label {
+      font-size: 11px; font-weight: 700; color: var(--rs-pos-soft); margin: 0;
+    }
+    .rs-pos-sandbox .demo-foot-note {
+      margin-top: 12px; font-size: 12.5px; color: var(--rs-pos-mute);
+      display: flex; gap: 8px; align-items: flex-start; line-height: 1.45;
+    }
+    .rs-pos-sandbox .demo-foot-note i { color: var(--teal, #2A9B8F); margin-top: 2px; }
     /* Competitor price chips */
     .comp-price-chip {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -625,14 +871,13 @@
       .empathy-list { gap: 12px; }
       .empathy-list li { font-size: 14px; }
 
-      /* Demo */
-      .demo-grid { gap: 20px; }
-      .menu-selector { grid-template-columns: 1fr 1fr; gap: 10px; }
-      .menu-item-btn { padding: 13px 13px; }
-      .menu-item-name { font-size: 13.5px; }
-      .terminal { min-height: 360px; }
-      .terminal-body { padding: 16px; }
-      .sum-total { font-size: 17px; }
+      /* Demo — POS clone */
+      .demo-grid { gap: 14px; grid-template-columns: 1fr; }
+      .rs-pos-sandbox .pos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .rs-pos-sandbox .pos-cart { min-height: 420px; max-height: none; }
+      .rs-pos-sandbox .pos-item { min-height: 88px; padding: 10px; }
+      .rs-pos-sandbox .pos-item .pname { font-size: 13px; }
+      .rs-pos-sandbox .cart-actions-final { grid-template-columns: 1fr 1.2fr; }
 
       /* Compare — all columns fit on mobile, no horizontal scroll */
       .compare-wrap { padding: 0; border-radius: 14px; overflow-x: hidden; }
@@ -909,31 +1154,70 @@
           <h2>Try a 30-second bill</h2>
           <p>Tap items → tax adds automatically → <b>Print &amp; close</b> or send a demo WhatsApp invoice. Same flow as the real POS — no signup.</p>
         </div>
-        <div class="demo-grid">
-          <div>
-            <div class="menu-selector" id="sim-menu-grid" role="group" aria-label="Menu items">
-              <!-- populated by JS based on detected country -->
+        <div class="demo-grid rs-pos-sandbox">
+          <div class="pos-menu-pane">
+            <div class="pos-menu-toolbar">
+              <h3><i class="fa-solid fa-utensils" aria-hidden="true"></i> Menu</h3>
+              <span class="pos-menu-hint" id="sandbox-status-text">Tap to add · same as live POS</span>
             </div>
-            <p class="muted" style="font-size:13.5px; margin-top:18px; display:flex; gap:9px; align-items:flex-start; line-height:1.45;">
-              <i class="fa-solid fa-circle-info" style="color:var(--teal);margin-top:3px" aria-hidden="true"></i>
-              <span><b>1</b> Tap menu · <b>2</b> Review tax total · <b>3</b> Print or WhatsApp. Live POS also queues a KOT to Kitchen Display.</span>
+            <div class="pos-grid" id="sim-menu-grid" role="group" aria-label="Menu items">
+              <!-- populated by JS — exact POS item tiles -->
+            </div>
+            <p class="demo-foot-note">
+              <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+              <span>Same menu tiles &amp; cart as the real POS. Live outlet also sends KOT to Kitchen Display.</span>
             </p>
           </div>
 
-          <div class="terminal glass">
-            <div class="terminal-header">
-              <span class="th-title">POS Terminal · Table 4</span>
-              <span class="badge badge-success" id="sandbox-status-badge">
-                <span class="dot" style="animation:pulseDot 1.6s infinite" aria-hidden="true"></span><span id="sandbox-status-text">Ready</span>
-              </span>
-            </div>
-            <div class="terminal-body">
-              <div class="sandbox-toast" id="sandbox-toast"></div>
-              <div id="sim-cart-content" class="empty-cart-msg" aria-live="polite" aria-label="Shopping cart">
-                <i class="fa-solid fa-receipt" aria-hidden="true"></i>
-                Your receipt is empty.<br>Tap menu items to start a bill.
+          <div class="pos-cart pos-cart-workbench" id="sandbox-pos-cart">
+            <div class="sandbox-toast" id="sandbox-toast"></div>
+            <div class="cart-head">
+              <h3><i class="fa-solid fa-cart-shopping cart-head-ico" aria-hidden="true"></i> Cart</h3>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="cart-count-pill" id="sim-cart-count">0</span>
+                <button type="button" class="cart-clear-btn" id="btn-clear-sim" onclick="clearSimCart()" title="Clear cart" aria-label="Clear cart">
+                  <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                </button>
               </div>
-              <div id="sandbox-actions" class="sandbox-actions" style="display:none;">
+            </div>
+            <div class="cart-meta-row">
+              <span class="cart-walkin-chip"><i class="fa-solid fa-user" aria-hidden="true"></i> Walk-in · Demo</span>
+              <span class="cart-walkin-chip" style="margin-left:auto"><i class="fa-solid fa-chair" aria-hidden="true"></i> Table 4</span>
+            </div>
+            <div class="cart-items" id="sim-cart-content" aria-live="polite" aria-label="Shopping cart">
+              <div class="cart-empty">
+                <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div>
+              </div>
+            </div>
+            <div class="cart-foot" id="sandbox-cart-foot" style="display:none">
+              <div class="totals-compact totals-readable">
+                <div class="totals-meta">
+                  <span>Sub <b id="sim-t-sub">₹0</b></span>
+                  <span>Tax <b id="sim-t-gst">₹0</b></span>
+                </div>
+                <div class="totals-grand">
+                  <span class="totals-grand-lbl">Total</span>
+                  <span class="amt" id="sim-t-grand">₹0</span>
+                </div>
+              </div>
+              <div class="cart-payment cart-payment-labeled">
+                <div class="cpay-methods" id="sim-pay-methods" role="group" aria-label="Payment method">
+                  <button type="button" class="active" data-sim-pay="Cash" title="Cash"><i class="fa-solid fa-money-bill-wave" style="color:#25d366"></i><span class="cpay-lbl">Cash</span></button>
+                  <button type="button" data-sim-pay="UPI" title="UPI"><i class="fa-solid fa-qrcode" style="color:#6366f1"></i><span class="cpay-lbl">UPI</span></button>
+                  <button type="button" data-sim-pay="Card" title="Card"><i class="fa-solid fa-credit-card" style="color:#0ea5e9"></i><span class="cpay-lbl">Card</span></button>
+                  <button type="button" data-sim-pay="Due" title="Due"><i class="fa-solid fa-book" style="color:#f59e0b"></i><span class="cpay-lbl">Due</span></button>
+                </div>
+              </div>
+              <div class="cart-actions-final">
+                <button type="button" class="btn btn-ghost" id="btn-sim-wa-toggle" onclick="toggleSandboxWa()">
+                  <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-trigger-sim" onclick="triggerSimulatedReceipt()">
+                  <i class="fa-solid fa-print" aria-hidden="true"></i> Print &amp; Pay
+                </button>
+              </div>
+              <div class="sandbox-wa-block" id="sandbox-actions">
                 <div class="field-label">Send a demo WhatsApp invoice</div>
                 <div class="sandbox-phone-row">
                   <span class="sandbox-prefix" id="sandbox-prefix">+91</span>
@@ -943,15 +1227,7 @@
                 </div>
                 <button class="btn btn-teal btn-block" id="btn-send-real"
                   onclick="sendRealWhatsAppReceipt()" disabled>
-                  <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Send WhatsApp Invoice (Demo)
-                </button>
-                <button class="btn btn-primary btn-block" id="btn-trigger-sim"
-                  onclick="triggerSimulatedReceipt()">
-                  <i class="fa-solid fa-print" aria-hidden="true"></i> Print &amp; close bill
-                </button>
-                <button class="btn btn-ghost btn-block" type="button" id="btn-clear-sim"
-                  onclick="clearSimCart()" style="font-size:13px">
-                  Clear cart
+                  <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Send demo invoice
                 </button>
               </div>
             </div>
@@ -1551,75 +1827,100 @@
       });
       return { subtotal: subtotal, tax: tax, total: subtotal + tax, cfg: cfg };
     }
-    function setSandboxStatus(text, ok) {
+    var simPayMethod = 'Cash';
+    function setSandboxStatus(text) {
       var el = document.getElementById('sandbox-status-text');
-      var badge = document.getElementById('sandbox-status-badge');
-      if (el) el.textContent = text || 'Ready';
-      if (badge) {
-        badge.className = 'badge ' + (ok === false ? 'badge-warn' : 'badge-success');
-      }
+      if (el) el.textContent = text || 'Tap to add · same as live POS';
     }
-    function addToSimCart(name, price, taxRate) {
+    function toggleSandboxWa() {
+      var block = document.getElementById('sandbox-actions');
+      if (!block) return;
+      block.classList.toggle('is-open');
+      var btn = document.getElementById('btn-sim-wa-toggle');
+      if (btn) btn.classList.toggle('active', block.classList.contains('is-open'));
+    }
+    function addToSimCart(name, price, taxRate, cat, color, veg) {
       var tr = taxRate || (simCfg().taxRate || 5);
-      if (simCart[name]) simCart[name].qty++;
-      else simCart[name] = { price: price, qty: 1, taxRate: tr };
-      setSandboxStatus('Open bill', true);
+      if (simCart[name]) {
+        simCart[name].qty++;
+      } else {
+        simCart[name] = {
+          price: price,
+          qty: 1,
+          taxRate: tr,
+          cat: cat || '',
+          color: color || '#FF4F00',
+          veg: !!veg,
+        };
+      }
+      setSandboxStatus('Open bill · ' + Object.keys(simCart).length + ' item(s)');
       renderSimCart();
+      renderSimMenu();
     }
     function changeQty(name, amount) {
       if (!simCart[name]) return;
       simCart[name].qty += amount;
       if (simCart[name].qty <= 0) delete simCart[name];
       renderSimCart();
+      renderSimMenu();
     }
     function clearSimCart() {
       simCart = {};
       var phone = document.getElementById('sandbox-phone');
       if (phone) phone.value = '';
-      setSandboxStatus('Ready', true);
+      var wa = document.getElementById('sandbox-actions');
+      if (wa) wa.classList.remove('is-open');
+      setSandboxStatus('Tap to add · same as live POS');
       renderSimCart();
+      renderSimMenu();
       showSandboxToast('Cart cleared — tap menu items to start again', false);
     }
     function renderSimCart() {
       const container = document.getElementById('sim-cart-content');
-      const actions   = document.getElementById('sandbox-actions');
-      var cfg = simCfg();
-      let itemsHtml = '', totalItems = 0;
+      const foot = document.getElementById('sandbox-cart-foot');
+      const countEl = document.getElementById('sim-cart-count');
+      if (!container) return;
+      let totalItems = 0;
+      let itemsHtml = '';
       for (const name in simCart) {
-        const it = simCart[name], lineTotal = it.price * it.qty;
+        const it = simCart[name];
+        const lineTotal = it.price * it.qty;
         totalItems += it.qty;
         var safeName = String(name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        itemsHtml += `<div class="receipt-row">
-          <div>
-            <div class="ri-name">${name}</div>
-            <div class="ri-meta">
-              <button class="qty-btn" onclick="changeQty('${safeName}',-1)" aria-label="Remove one ${name}"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
-              <span>${it.qty} &times; ${simMoney(it.price)}</span>
-              <button class="qty-btn" onclick="changeQty('${safeName}',1)" aria-label="Add one ${name}"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
-            </div>
-          </div>
-          <div class="ri-amt">${simMoney(lineTotal)}</div>
-        </div>`;
+        var cc = it.color || '#FF4F00';
+        itemsHtml +=
+          '<div class="cart-line" data-name="' + safeName + '">' +
+          '<div class="cdot" style="--cc:' + cc + '"></div>' +
+          '<div class="cinfo"><div class="cn-row">' +
+          '<span class="cn">' + name + '</span>' +
+          '<span class="cp">' + simMoney(it.price) + '</span>' +
+          '</div></div>' +
+          '<div class="qty">' +
+          '<button type="button" onclick="changeQty(\'' + safeName + '\',-1)" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button>' +
+          '<span class="qn">' + it.qty + '</span>' +
+          '<button type="button" onclick="changeQty(\'' + safeName + '\',1)" aria-label="Increase"><i class="fa-solid fa-plus"></i></button>' +
+          '</div>' +
+          '<div class="cline-total">' + simMoney(lineTotal) + '</div>' +
+          '</div>';
       }
+      if (countEl) countEl.textContent = String(totalItems);
       if (totalItems === 0) {
-        container.className = 'empty-cart-msg';
-        container.innerHTML = '<i class="fa-solid fa-receipt" aria-hidden="true"></i>Your receipt is empty.<br>Tap menu items to start a bill.';
-        if (actions) actions.style.display = 'none';
-        setSandboxStatus('Ready', true);
+        container.innerHTML =
+          '<div class="cart-empty"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>' +
+          '<div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>';
+        if (foot) foot.style.display = 'none';
+        setSandboxStatus('Tap to add · same as live POS');
         return;
       }
+      container.innerHTML = itemsHtml;
       var totals = simTaxFromCart();
-      var taxLabel = cfg.taxLabel + ' (' + cfg.taxRate + '%)';
-      if (cfg.taxMode === 'cgst_sgst') taxLabel = 'GST (5%)';
-      container.className = '';
-      container.innerHTML = `
-        <div class="receipt-list">${itemsHtml}</div>
-        <div class="receipt-summary">
-          <div class="sum-row"><span>Subtotal</span><span>${simMoney(totals.subtotal)}</span></div>
-          <div class="sum-row"><span>${taxLabel}</span><span>${simMoney(totals.tax)}</span></div>
-          <div class="sum-total"><span>Total</span><span>${simMoney(totals.total)}</span></div>
-        </div>`;
-      if (actions) { actions.style.display = 'flex'; actions.dataset.total = totals.total; }
+      if (foot) foot.style.display = 'block';
+      var subEl = document.getElementById('sim-t-sub');
+      var gstEl = document.getElementById('sim-t-gst');
+      var grandEl = document.getElementById('sim-t-grand');
+      if (subEl) subEl.textContent = simMoney(totals.subtotal);
+      if (gstEl) gstEl.textContent = simMoney(totals.tax);
+      if (grandEl) grandEl.textContent = simMoney(totals.total);
       var printBtn = document.getElementById('btn-trigger-sim');
       if (printBtn) printBtn.dataset.total = totals.total;
       validateSandboxPhone();
@@ -1645,17 +1946,18 @@
         var it = simCart[name];
         return it.qty + '× ' + name + ' — ' + simMoney(it.price * it.qty);
       }).join('<br>');
-      setSandboxStatus('Bill closed', true);
+      setSandboxStatus('Bill closed');
       showModal(
         'Bill closed · ' + billNo,
         '<div style="text-align:left;line-height:1.55;font-size:14px">' +
-          '<div style="margin-bottom:8px;color:var(--text-mute)">Demo print — same steps as live POS (KOT → pay → print).</div>' +
+          '<div style="margin-bottom:8px;color:var(--text-mute)">Same as live POS: cart → ' + (simPayMethod || 'Cash') + ' → print.</div>' +
           lines +
           '<hr style="border:none;border-top:1px dashed var(--border);margin:12px 0">' +
           '<div>Subtotal <b style="float:right">' + simMoney(totals.subtotal) + '</b></div>' +
           '<div>' + cfg.taxLabel + ' <b style="float:right">' + simMoney(totals.tax) + '</b></div>' +
           '<div style="font-size:16px;font-weight:800;margin-top:6px">Total <b style="float:right">' + simMoney(totals.total) + '</b></div>' +
-          '<p style="margin:14px 0 0;font-size:13px;color:var(--text-mute)">Create a free outlet to print on real thermal printers and send WhatsApp from your number.</p>' +
+          '<div style="margin-top:6px">Paid via <b>' + (simPayMethod || 'Cash') + '</b></div>' +
+          '<p style="margin:14px 0 0;font-size:13px;color:var(--text-mute)">Create a free outlet for real thermal print + WhatsApp from your number.</p>' +
           '<a class="btn btn-primary btn-block" href="login.html?tab=register" style="margin-top:12px">Create free outlet</a>' +
         '</div>'
       );
@@ -1816,25 +2118,47 @@
       if (!grid || !cfg) return;
       var colors = ['#FF4F00','#2A9B8F','#5B6C8F','#C47B16'];
       grid.innerHTML = cfg.items.map(function(item, i) {
-        var sym = cfg.sym;
-        var label = sym + item.price;
         var color = item.color || colors[i % colors.length];
-        var vegDot = item.veg ? '<span class="mveg" aria-label="Vegetarian"></span>' : '<span class="mnonveg" aria-label="Non-vegetarian"></span>';
-        var safeName = item.name.replace(/'/g, "\\'");
-        return '<button class="menu-item-btn" onclick="addToSimCart(\'' + safeName + '\',' + item.price + ',' + (item.taxRate||cfg.taxRate) + ')" style="--cc:' + color + '" aria-label="Add ' + item.name + ' ' + label + '">' +
-          '<span class="add" aria-hidden="true"><i class="fa-solid fa-plus"></i></span>' +
-          '<span class="mtop">' + vegDot + '<span class="mcat">' + item.cat + '</span></span>' +
-          '<div class="menu-item-name">' + item.name + '</div>' +
-          '<div class="menu-item-price">' + label + '</div>' +
-          '</button>';
+        var safeName = item.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var safeCat = String(item.cat || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var inCart = simCart[item.name];
+        var qtyBadge = inCart
+          ? '<div class="pos-item-qty-badge" aria-label="' + inCart.qty + ' in cart">' + inCart.qty + '</div>'
+          : '';
+        var vegCls = item.veg ? 'veg' : 'veg nonveg';
+        var vegTitle = item.veg ? 'Veg' : 'Non-veg';
+        var rate = item.taxRate || cfg.taxRate;
+        var vegFlag = item.veg ? 'true' : 'false';
+        return (
+          '<button type="button" class="pos-item' + (inCart ? ' in-cart' : '') + '" ' +
+          'style="--cc:' + color + '" ' +
+          'onclick="addToSimCart(\'' + safeName + '\',' + item.price + ',' + rate + ',\'' + safeCat + '\',\'' + color + '\',' + vegFlag + ')" ' +
+          'aria-label="Add ' + item.name + ' ' + cfg.sym + item.price + '">' +
+          qtyBadge +
+          '<div class="pi-top">' +
+          '<span class="' + vegCls + '" title="' + vegTitle + '" aria-hidden="true"></span>' +
+          '<span class="picat">' + (item.cat || '') + '</span>' +
+          '</div>' +
+          '<div class="pname">' + item.name + '</div>' +
+          '<div class="prow"><span class="pprice">' + cfg.sym + item.price + '</span></div>' +
+          '</button>'
+        );
       }).join('');
-      // Update phone prefix
       var pre = document.getElementById('sandbox-prefix');
       if (pre) pre.textContent = cfg.dial;
-      // Update phone input maxlength
       var ph = document.getElementById('sandbox-phone');
       if (ph) { ph.maxLength = cfg.dialDigits; ph.placeholder = cfg.dialDigits + '-digit WhatsApp number'; }
     }
+
+    // Wire payment method pills (demo only)
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('#sim-pay-methods [data-sim-pay]');
+      if (!btn) return;
+      simPayMethod = btn.getAttribute('data-sim-pay') || 'Cash';
+      document.querySelectorAll('#sim-pay-methods [data-sim-pay]').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+    });
 
     function buildBillNo() {
       var now = new Date();
