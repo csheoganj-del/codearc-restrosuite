@@ -1,11 +1,11 @@
 ﻿{
-  "version": "v203-20260715-sandbox-guest-required",
+  "version": "v204-20260715-10of10-hero",
   "date": "2026-07-15",
-  "title": "Sandbox guest required + denser hero",
-  "summary": "Sandbox cart always shows required name and WhatsApp fields; billing blocked without them. Hero denser with WhatsApp node and arrow connectors.",
+  "title": "10/10 hero constellation art",
+  "summary": "Art-directed CodeArc-quality hero image: POS, Kitchen, Floor, Bills and WhatsApp connected with solid green flow lines. Sandbox still requires guest name and mobile for billing.",
   "highlights": [
-    "Name + mobile always visible and required for sandbox bill",
-    "Cannot add items or Print and Pay without guest fields",
-    "Hero adds WhatsApp card and arrowed flow lines on cream stage"
+    "Premium hero constellation image matching CodeArc marketing quality",
+    "Soft float animation, clean caption strip",
+    "Sandbox: name + WhatsApp always visible and required for bill"
   ]
 }
