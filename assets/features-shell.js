@@ -608,9 +608,10 @@
           <div class="form-grid-2" style="margin-top:12px">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
           <div class="form-grid-2" style="margin-top:12px">${field('GSTIN','','Tax ID if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
           <div class="form-grid-2" style="margin-top:12px" id="set-country-currency-row"></div>`) +
-        setBlock('Guest QR cards', 'Optional extras printed on table QR cards (Order food + Call waiter are always on)',
+        setBlock('Guest QR cards', 'Printed on each table tent. Dual workflow: guest scans to order OR call waiter — staff can also take/amend the same table order until kitchen starts prep.',
           `<div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
-          <div style="margin-top:12px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>`),
+          <div style="margin-top:12px">${field('Guest welcome','','This table only · Order food or call waiter')}</div>
+          <p class="set-hint" style="margin-top:10px">Each QR is for <b>that table only</b>. Waiters can scan the same code (or open QR Orders → Amend) to edit the shared bill.</p>`),
       tax:
         setBlock('Tax engine', 'How tax is calculated on cart and invoices',
           `${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
@@ -667,7 +668,16 @@
           <div class="form-grid-2" style="margin-top:12px">${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}<div></div></div>
           <p class="set-hint">Exact preview matches the settled bill screen. Fast thermal is lighter on slow devices.</p>`) +
         setBlock('Operating mode', 'Advanced POS behaviour',
-          `${toggle('POS-only mode','Billing only — no KOT to Kitchen Display or waiter app. QR orders still work but stay in POS only.',false)}`),
+          `${toggle('POS-only mode','Billing only — no KOT to Kitchen Display or waiter app. QR orders still work but stay in POS only.',false)}`) +
+        setBlock('Sounds &amp; alerts', 'New QR orders, waiter calls, and kitchen chimes',
+          `<div class="set-row" style="border:0;padding:0 0 8px;align-items:center;gap:12px">
+            <div class="si" style="flex:1"><div class="st">Alert sounds</div><div class="sd" id="set-sound-status">Chimes for new QR orders and “call waiter”</div></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-alert-sound"><i class="fa-solid fa-volume-high"></i> Sound on</button>
+          </div>
+          <div class="set-actions-row" style="margin-top:4px">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-test-alert-sound"><i class="fa-solid fa-bell"></i> Test chime</button>
+          </div>
+          <p class="set-hint">Some browsers mute audio until you tap the page once. Test chime unlocks sound on this device.</p>`),
       gateway:
         setBlock('Connection', 'Send bills and order-ready messages from your restaurant WhatsApp',
           `<div id="outlet-gateway-status-container" class="set-gateway-status">
@@ -1841,6 +1851,77 @@
         }
         $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
         const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
+        // Sounds & alerts (Settings → Printers)
+        (function wireAlertSoundControls() {
+          const MUTE_KEY = 'rs_service_alert_mute';
+          const toggleBtn = body.querySelector('#btn-toggle-alert-sound');
+          const testBtn = body.querySelector('#btn-test-alert-sound');
+          const statusEl = body.querySelector('#set-sound-status');
+          if (!toggleBtn && !testBtn) return;
+          function isMuted() {
+            try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (_) { return false; }
+          }
+          function paint() {
+            const muted = isMuted();
+            if (toggleBtn) {
+              toggleBtn.innerHTML = muted
+                ? '<i class="fa-solid fa-volume-xmark"></i> Muted'
+                : '<i class="fa-solid fa-volume-high"></i> Sound on';
+            }
+            if (statusEl) {
+              statusEl.textContent = muted
+                ? 'Muted on this device — waiter call & QR order chimes off'
+                : 'Chimes for new QR orders and “call waiter”';
+            }
+          }
+          paint();
+          if (toggleBtn && !toggleBtn.dataset.rsSoundBound) {
+            toggleBtn.dataset.rsSoundBound = '1';
+            toggleBtn.onclick = () => {
+              try {
+                localStorage.setItem(MUTE_KEY, isMuted() ? '0' : '1');
+              } catch (_) {}
+              paint();
+              RS.toast(isMuted() ? 'Alert sounds muted' : 'Alert sounds on', isMuted() ? 'fa-volume-xmark' : 'fa-volume-high');
+            };
+          }
+          if (testBtn && !testBtn.dataset.rsSoundBound) {
+            testBtn.dataset.rsSoundBound = '1';
+            testBtn.onclick = () => {
+              try {
+                // Unlock + play same family of tones as floor chime
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) {
+                  RS.toast('Audio not supported in this browser', 'fa-circle-exclamation');
+                  return;
+                }
+                if (!window.__rsAlertAudioCtx) window.__rsAlertAudioCtx = new Ctx();
+                const ctx = window.__rsAlertAudioCtx;
+                if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+                if (isMuted()) {
+                  RS.toast('Sounds are muted — turn Sound on first', 'fa-volume-xmark');
+                  return;
+                }
+                [[880, 0], [1174.7, 0.12], [1396.9, 0.24]].forEach(([freq, delay]) => {
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  osc.type = 'sine';
+                  osc.frequency.value = freq;
+                  const t0 = ctx.currentTime + delay;
+                  gain.gain.setValueAtTime(0.0001, t0);
+                  gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+                  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+                  osc.connect(gain).connect(ctx.destination);
+                  osc.start(t0);
+                  osc.stop(t0 + 0.32);
+                });
+                RS.toast('Test chime played', 'fa-bell');
+              } catch (e) {
+                RS.toast('Could not play chime', 'fa-circle-exclamation');
+              }
+            };
+          }
+        })();
         const btnReset = $('#btn-client-reset-data');
         if(btnReset) {
           btnReset.onclick = async () => {

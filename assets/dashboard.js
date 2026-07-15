@@ -417,7 +417,7 @@
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
     // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v194-20260715-staff-amend';
+    return 'v195-20260715-partials';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -793,12 +793,13 @@
     const modal = document.createElement('div');
     modal.id = 'app-update-dialog';
     modal.className = 'app-update-dialog is-visible';
+    const shortVer = String(info.version || appVersionShort || '').split('-')[0] || 'latest';
     modal.innerHTML = `
       <div class="app-update-card" role="dialog" aria-modal="true" aria-labelledby="app-update-title">
-        <div class="app-update-eyebrow">System update</div>
-        <h2 id="app-update-title">New RestroSuite update is ready</h2>
-        <div class="app-update-version">${info.version || 'Latest version'}${info.date ? ' - ' + info.date : ''}</div>
-        <p>Your active work will be saved on this device before the update is applied.</p>
+        <div class="app-update-eyebrow">Smooth update · no data loss</div>
+        <h2 id="app-update-title">RestroSuite ${shortVer} is ready</h2>
+        <div class="app-update-version">${info.version || shortVer}${info.date ? ' · ' + info.date : ''}</div>
+        <p>Open cart, bills, and settings stay on this device. We snapshot first, then reload the new build — usually under 10 seconds.</p>
         <div class="app-update-release">
           <div class="app-update-release-title">${info.title || 'Workflow improvements'}</div>
           <p>${info.summary || 'This update improves billing, importing, exports, sync, and dashboard stability.'}</p>
@@ -806,14 +807,14 @@
         </div>
         <div class="app-update-save-row">
           <i class="fa-solid fa-shield-halved"></i>
-          <span id="app-update-save-status">Ready to save current dashboard data.</span>
+          <span id="app-update-save-status">Ready to save cart · open tables · preferences.</span>
         </div>
         <div class="app-update-progress-track" style="display:none; width:100%; height:4px; background:var(--stroke-2); border-radius:99px; margin-top:8px; overflow:hidden;">
           <div id="app-update-progress-bar" style="width:0%; height:100%; background:var(--orange); transition:width .2s var(--ease);"></div>
         </div>
         <div class="app-update-actions">
-          <button type="button" class="btn btn-ghost" id="app-update-later-btn">Later</button>
-          <button type="button" class="btn btn-primary" id="app-update-now-btn"><i class="fa-solid fa-rotate"></i> Save & Update</button>
+          <button type="button" class="btn btn-ghost" id="app-update-later-btn">Remind me later</button>
+          <button type="button" class="btn btn-primary" id="app-update-now-btn"><i class="fa-solid fa-rotate"></i> Save &amp; Update now</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -1277,33 +1278,117 @@
   function updateOfflineSyncIndicator() {
     const count = getSyncQueueLength();
     const isOffline = !navigator.onLine;
+    const cloudErr = window.RS_LAST_CLOUD_ERROR && (Date.now() - (window.RS_LAST_CLOUD_ERROR.time || 0) < 60000);
     let pill = document.getElementById('rs-offline-sync-pill');
-    if (!isOffline && count === 0) {
+    if (!isOffline && count === 0 && !cloudErr) {
       if (pill) pill.style.display = 'none';
+      document.body.classList.remove('rs-offline-banner-on');
       return;
     }
     if (!pill) {
       pill = document.createElement('div');
       pill.id = 'rs-offline-sync-pill';
-      pill.className = 'attention-blink';
+      pill.className = 'rs-offline-sync-banner attention-blink';
       pill.setAttribute('role', 'status');
-      pill.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:99997;' +
-        'background:var(--warning-color,#F59E0B);color:#1a1a1a;padding:8px 14px;border-radius:999px;' +
-        'font-size:12.5px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;gap:8px;max-width:88vw;';
-      pill.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i><span id="rs-offline-sync-text"></span>';
+      pill.setAttribute('aria-live', 'polite');
+      pill.style.cssText =
+        'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:99997;' +
+        'background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a1205;padding:10px 16px;border-radius:14px;' +
+        'font-size:12.5px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:10px;' +
+        'max-width:min(520px,calc(100vw - 24px));line-height:1.35;cursor:default;';
+      pill.innerHTML =
+        '<i class="fa-solid fa-cloud-arrow-up" id="rs-offline-sync-icon" aria-hidden="true"></i>' +
+        '<span style="flex:1;min-width:0">' +
+        '<span id="rs-offline-sync-text" style="display:block"></span>' +
+        '<span id="rs-offline-sync-sub" style="display:block;font-size:11px;font-weight:600;opacity:.88;margin-top:2px"></span>' +
+        '</span>' +
+        '<button type="button" id="rs-offline-sync-action" class="btn btn-sm" style="flex-shrink:0;background:#1a1205;color:#fff;border:none;border-radius:9px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer">OK</button>';
       document.body.appendChild(pill);
+      const act = document.getElementById('rs-offline-sync-action');
+      if (act) {
+        act.addEventListener('click', async () => {
+          if (!navigator.onLine) {
+            // Dismiss offline notice until next online/offline event or queue change
+            window.__rsOfflineBannerDismissedAt = Date.now();
+            pill.style.display = 'none';
+            document.body.classList.remove('rs-offline-banner-on');
+            toast('Got it — POS keeps working offline', 'fa-wifi');
+            return;
+          }
+          act.disabled = true;
+          act.textContent = '…';
+          try {
+            if (window.RS_DB && typeof RS_DB.flushSyncQueue === 'function') await RS_DB.flushSyncQueue();
+            else if (window.RS_DB && typeof RS_DB.sync === 'function') await RS_DB.sync();
+            window.dispatchEvent(new CustomEvent('rs:sync-queue-drained'));
+            toast('Sync retry started', 'fa-cloud-arrow-up');
+          } catch (e) {
+            toast('Sync will retry automatically', 'fa-cloud');
+          }
+          act.disabled = false;
+          act.textContent = 'Retry';
+          updateOfflineSyncIndicator();
+        });
+      }
     }
+    // Respect temporary dismiss while still offline and queue empty
+    if (
+      isOffline &&
+      count === 0 &&
+      window.__rsOfflineBannerDismissedAt &&
+      Date.now() - window.__rsOfflineBannerDismissedAt < 10 * 60 * 1000
+    ) {
+      pill.style.display = 'none';
+      document.body.classList.remove('rs-offline-banner-on');
+      return;
+    }
+    if (!isOffline) window.__rsOfflineBannerDismissedAt = 0;
     const textEl = document.getElementById('rs-offline-sync-text');
-    if (textEl) {
-      if (isOffline) {
-        textEl.textContent = count > 0
-          ? `Offline -- ${count} change${count === 1 ? '' : 's'} waiting to sync`
-          : 'Offline -- changes are being saved on this device';
-      } else {
-        textEl.textContent = `Syncing ${count} change${count === 1 ? '' : 's'} to the cloud...`;
+    const subEl = document.getElementById('rs-offline-sync-sub');
+    const icon = document.getElementById('rs-offline-sync-icon');
+    const act = document.getElementById('rs-offline-sync-action');
+    if (isOffline) {
+      pill.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+      pill.style.color = '#1a1205';
+      if (icon) icon.className = 'fa-solid fa-wifi';
+      if (textEl) {
+        textEl.textContent =
+          count > 0
+            ? `Offline · ${count} change${count === 1 ? '' : 's'} saved on this device`
+            : 'You are offline — billing still works';
+      }
+      if (subEl) subEl.textContent = 'Bills & KOTs save locally and upload when Wi‑Fi returns.';
+      if (act) {
+        act.textContent = 'Got it';
+        act.style.display = '';
+      }
+    } else if (count > 0) {
+      pill.style.background = 'linear-gradient(135deg,#0ea5e9,#0369a1)';
+      pill.style.color = '#fff';
+      if (icon) icon.className = 'fa-solid fa-cloud-arrow-up fa-fade';
+      if (textEl) textEl.textContent = `Syncing ${count} change${count === 1 ? '' : 's'} to cloud…`;
+      if (subEl) subEl.textContent = 'Keep this tab open a moment — no action needed.';
+      if (act) {
+        act.textContent = 'Retry';
+        act.style.display = '';
+        act.style.background = 'rgba(255,255,255,.2)';
+      }
+    } else if (cloudErr) {
+      pill.style.background = 'linear-gradient(135deg,#ef4444,#b91c1c)';
+      pill.style.color = '#fff';
+      if (icon) icon.className = 'fa-solid fa-cloud-bolt';
+      if (textEl) textEl.textContent = 'Cloud sync hiccup — data is safe on this device';
+      if (subEl) {
+        subEl.textContent = String((window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.message) || 'Will retry automatically.');
+      }
+      if (act) {
+        act.textContent = 'Retry';
+        act.style.display = '';
+        act.style.background = 'rgba(255,255,255,.2)';
       }
     }
     pill.style.display = 'flex';
+    document.body.classList.add('rs-offline-banner-on');
   }
   window.addEventListener('online', updateOfflineSyncIndicator);
   window.addEventListener('offline', updateOfflineSyncIndicator);

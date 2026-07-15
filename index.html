@@ -907,25 +907,24 @@
         <div class="section-head">
           <span class="eyebrow">Interactive sandbox</span>
           <h2>Try a 30-second bill</h2>
-          <p>Tap 2–3 items → see tax → print or send a demo WhatsApp invoice. Same feel as the real POS — no signup needed.</p>
+          <p>Tap items → tax adds automatically → <b>Print &amp; close</b> or send a demo WhatsApp invoice. Same flow as the real POS — no signup.</p>
         </div>
         <div class="demo-grid">
           <div>
             <div class="menu-selector" id="sim-menu-grid" role="group" aria-label="Menu items">
               <!-- populated by JS based on detected country -->
             </div>
-            <p class="muted" style="font-size:13.5px; margin-top:18px; display:flex; gap:9px; align-items:center;">
-              <i class="fa-solid fa-circle-info" style="color:var(--teal)" aria-hidden="true"></i>
-              Real checkout adds tax automatically and queues the KOT to your kitchen display.
+            <p class="muted" style="font-size:13.5px; margin-top:18px; display:flex; gap:9px; align-items:flex-start; line-height:1.45;">
+              <i class="fa-solid fa-circle-info" style="color:var(--teal);margin-top:3px" aria-hidden="true"></i>
+              <span><b>1</b> Tap menu · <b>2</b> Review tax total · <b>3</b> Print or WhatsApp. Live POS also queues a KOT to Kitchen Display.</span>
             </p>
           </div>
 
           <div class="terminal glass">
             <div class="terminal-header">
               <span class="th-title">POS Terminal · Table 4</span>
-              <span class="badge badge-success">
-                <!-- FIX: pulseDot animation now defined -->
-                <span class="dot" style="animation:pulseDot 1.6s infinite" aria-hidden="true"></span>Online
+              <span class="badge badge-success" id="sandbox-status-badge">
+                <span class="dot" style="animation:pulseDot 1.6s infinite" aria-hidden="true"></span><span id="sandbox-status-text">Ready</span>
               </span>
             </div>
             <div class="terminal-body">
@@ -934,7 +933,6 @@
                 <i class="fa-solid fa-receipt" aria-hidden="true"></i>
                 Your receipt is empty.<br>Tap menu items to start a bill.
               </div>
-              <!-- FIX: added class="sandbox-actions" so CSS applies correctly -->
               <div id="sandbox-actions" class="sandbox-actions" style="display:none;">
                 <div class="field-label">Send a demo WhatsApp invoice</div>
                 <div class="sandbox-phone-row">
@@ -947,9 +945,13 @@
                   onclick="sendRealWhatsAppReceipt()" disabled>
                   <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Send WhatsApp Invoice (Demo)
                 </button>
-                <button class="btn btn-ghost btn-block" id="btn-trigger-sim"
+                <button class="btn btn-primary btn-block" id="btn-trigger-sim"
                   onclick="triggerSimulatedReceipt()">
                   <i class="fa-solid fa-print" aria-hidden="true"></i> Print &amp; close bill
+                </button>
+                <button class="btn btn-ghost btn-block" type="button" id="btn-clear-sim"
+                  onclick="clearSimCart()" style="font-size:13px">
+                  Clear cart
                 </button>
               </div>
             </div>
@@ -1528,10 +1530,40 @@
     // ===== POS SIMULATOR =====
     let simCart = {};
 
+    function simCfg() {
+      return COUNTRY_CFG[SIM_COUNTRY] || COUNTRY_CFG.IN;
+    }
+    function simMoney(n) {
+      var cfg = simCfg();
+      var v = Math.round(Number(n) || 0);
+      return cfg.sym + v;
+    }
+    function simTaxFromCart() {
+      var cfg = simCfg();
+      var subtotal = 0;
+      var tax = 0;
+      Object.keys(simCart).forEach(function (name) {
+        var it = simCart[name];
+        var line = it.price * it.qty;
+        subtotal += line;
+        var rate = Number(it.taxRate != null ? it.taxRate : cfg.taxRate) || 0;
+        tax += Math.round(line * rate / 100);
+      });
+      return { subtotal: subtotal, tax: tax, total: subtotal + tax, cfg: cfg };
+    }
+    function setSandboxStatus(text, ok) {
+      var el = document.getElementById('sandbox-status-text');
+      var badge = document.getElementById('sandbox-status-badge');
+      if (el) el.textContent = text || 'Ready';
+      if (badge) {
+        badge.className = 'badge ' + (ok === false ? 'badge-warn' : 'badge-success');
+      }
+    }
     function addToSimCart(name, price, taxRate) {
-      var tr = taxRate || (COUNTRY_CFG[SIM_COUNTRY] ? COUNTRY_CFG[SIM_COUNTRY].taxRate : 5);
+      var tr = taxRate || (simCfg().taxRate || 5);
       if (simCart[name]) simCart[name].qty++;
       else simCart[name] = { price: price, qty: 1, taxRate: tr };
+      setSandboxStatus('Open bill', true);
       renderSimCart();
     }
     function changeQty(name, amount) {
@@ -1540,49 +1572,100 @@
       if (simCart[name].qty <= 0) delete simCart[name];
       renderSimCart();
     }
+    function clearSimCart() {
+      simCart = {};
+      var phone = document.getElementById('sandbox-phone');
+      if (phone) phone.value = '';
+      setSandboxStatus('Ready', true);
+      renderSimCart();
+      showSandboxToast('Cart cleared — tap menu items to start again', false);
+    }
     function renderSimCart() {
       const container = document.getElementById('sim-cart-content');
       const actions   = document.getElementById('sandbox-actions');
-      let itemsHtml = '', subtotal = 0, totalItems = 0;
+      var cfg = simCfg();
+      let itemsHtml = '', totalItems = 0;
       for (const name in simCart) {
         const it = simCart[name], lineTotal = it.price * it.qty;
-        subtotal += lineTotal; totalItems += it.qty;
+        totalItems += it.qty;
+        var safeName = String(name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         itemsHtml += `<div class="receipt-row">
           <div>
             <div class="ri-name">${name}</div>
             <div class="ri-meta">
-              <button class="qty-btn" onclick="changeQty('${name}',-1)" aria-label="Remove one ${name}"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
-              <span>${it.qty} &times; &#8377;${it.price}</span>
-              <button class="qty-btn" onclick="changeQty('${name}',1)" aria-label="Add one ${name}"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
+              <button class="qty-btn" onclick="changeQty('${safeName}',-1)" aria-label="Remove one ${name}"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
+              <span>${it.qty} &times; ${simMoney(it.price)}</span>
+              <button class="qty-btn" onclick="changeQty('${safeName}',1)" aria-label="Add one ${name}"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
             </div>
           </div>
-          <div class="ri-amt">&#8377;${lineTotal}</div>
+          <div class="ri-amt">${simMoney(lineTotal)}</div>
         </div>`;
       }
       if (totalItems === 0) {
         container.className = 'empty-cart-msg';
         container.innerHTML = '<i class="fa-solid fa-receipt" aria-hidden="true"></i>Your receipt is empty.<br>Tap menu items to start a bill.';
         if (actions) actions.style.display = 'none';
+        setSandboxStatus('Ready', true);
         return;
       }
-      const tax = Math.round(subtotal * 0.05), finalTotal = subtotal + tax;
+      var totals = simTaxFromCart();
+      var taxLabel = cfg.taxLabel + ' (' + cfg.taxRate + '%)';
+      if (cfg.taxMode === 'cgst_sgst') taxLabel = 'GST (5%)';
       container.className = '';
       container.innerHTML = `
         <div class="receipt-list">${itemsHtml}</div>
         <div class="receipt-summary">
-          <div class="sum-row"><span>Subtotal</span><span>&#8377;${subtotal}</span></div>
-          <div class="sum-row"><span>GST (5%)</span><span>&#8377;${tax}</span></div>
-          <div class="sum-total"><span>Total</span><span>&#8377;${finalTotal}</span></div>
+          <div class="sum-row"><span>Subtotal</span><span>${simMoney(totals.subtotal)}</span></div>
+          <div class="sum-row"><span>${taxLabel}</span><span>${simMoney(totals.tax)}</span></div>
+          <div class="sum-total"><span>Total</span><span>${simMoney(totals.total)}</span></div>
         </div>`;
-      if (actions) { actions.style.display = 'flex'; actions.dataset.total = finalTotal; }
-      document.getElementById('btn-trigger-sim').dataset.total = finalTotal;
+      if (actions) { actions.style.display = 'flex'; actions.dataset.total = totals.total; }
+      var printBtn = document.getElementById('btn-trigger-sim');
+      if (printBtn) printBtn.dataset.total = totals.total;
       validateSandboxPhone();
     }
     function validateSandboxPhone() {
       const phone = document.getElementById('sandbox-phone');
       const btn   = document.getElementById('btn-send-real');
       if (!phone || !btn) return;
-      btn.disabled = phone.value.replace(/\D/g,'').length !== 10;
+      var need = (simCfg().dialDigits) || 10;
+      var digits = phone.value.replace(/\D/g,'').length;
+      btn.disabled = digits !== need;
+    }
+    /** Print & close — demo receipt modal (was missing; button was a no-op). */
+    function triggerSimulatedReceipt() {
+      var totals = simTaxFromCart();
+      if (!totals.subtotal) {
+        showSandboxToast('Add items first', true);
+        return;
+      }
+      var billNo = buildBillNo();
+      var cfg = totals.cfg;
+      var lines = Object.keys(simCart).map(function (name) {
+        var it = simCart[name];
+        return it.qty + '× ' + name + ' — ' + simMoney(it.price * it.qty);
+      }).join('<br>');
+      setSandboxStatus('Bill closed', true);
+      showModal(
+        'Bill closed · ' + billNo,
+        '<div style="text-align:left;line-height:1.55;font-size:14px">' +
+          '<div style="margin-bottom:8px;color:var(--text-mute)">Demo print — same steps as live POS (KOT → pay → print).</div>' +
+          lines +
+          '<hr style="border:none;border-top:1px dashed var(--border);margin:12px 0">' +
+          '<div>Subtotal <b style="float:right">' + simMoney(totals.subtotal) + '</b></div>' +
+          '<div>' + cfg.taxLabel + ' <b style="float:right">' + simMoney(totals.tax) + '</b></div>' +
+          '<div style="font-size:16px;font-weight:800;margin-top:6px">Total <b style="float:right">' + simMoney(totals.total) + '</b></div>' +
+          '<p style="margin:14px 0 0;font-size:13px;color:var(--text-mute)">Create a free outlet to print on real thermal printers and send WhatsApp from your number.</p>' +
+          '<a class="btn btn-primary btn-block" href="login.html?tab=register" style="margin-top:12px">Create free outlet</a>' +
+        '</div>'
+      );
+      var icon = document.getElementById('sim-modal-icon');
+      if (icon) icon.innerHTML = '<i class="fa-solid fa-print" aria-hidden="true"></i>';
+      showSandboxToast('✓ Bill ' + billNo + ' closed · total ' + simMoney(totals.total), false);
+      simCart = {};
+      var phone = document.getElementById('sandbox-phone');
+      if (phone) phone.value = '';
+      renderSimCart();
     }
     function showModal(title, desc) {
       document.getElementById('sim-modal-title').innerText = title;
@@ -1876,9 +1959,10 @@
       if (num.length < 7) return;
 
       const items    = Object.entries(simCart).map(([name, v]) => ({ name, price: v.price, qty: v.qty, taxRate: v.taxRate || cfg.taxRate }));
-      const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-      const tax      = Math.round(subtotal * cfg.taxRate / 100);
-      const total    = subtotal + tax;
+      const taxCalc  = simTaxFromCart();
+      const subtotal = taxCalc.subtotal;
+      const tax      = taxCalc.tax;
+      const total    = taxCalc.total;
       const billNo   = buildBillNo();
       const fullPhone = cfg.dial + num;
 

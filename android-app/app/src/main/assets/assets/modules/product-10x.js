@@ -930,60 +930,100 @@
     }
   }
 
-  /* ───────────── Employee deactivate + session revoke ───────────── */
+  /* ───────────── Employee deactivate + session revoke ─────────────
+     Primary UX lives in employees-ui.js (emp-toggle-active).
+     This layer hardens staff login suspend + session kill when any
+     deactivate control fires, and injects buttons only if missing. */
   function installStaffSecurity() {
+    async function hardDeactivate({ empId, staffUserId, name }) {
+      const label = name || 'Staff';
+      // 1) Staff login suspend + session revoke (source of truth for access)
+      if (global.RS_API && typeof RS_API.staffUsers === 'function') {
+        let sid = staffUserId || null;
+        if (!sid && empId) {
+          try {
+            const res = await RS_API.staffUsers({ action: 'list_users' });
+            const users = (res && res.users) || [];
+            const hit = users.find(
+              (u) =>
+                String(u.employee_id || '') === String(empId) ||
+                String(u.display_name || '').toLowerCase() === String(label).toLowerCase()
+            );
+            if (hit) sid = hit.id;
+          } catch (_) {}
+        }
+        if (sid) {
+          try {
+            await RS_API.staffUsers({ action: 'update_user', user_id: sid, status: 'suspended' });
+          } catch (_) {}
+          try {
+            await RS_API.staffUsers({ action: 'revoke_user_sessions', user_id: sid });
+          } catch (_) {
+            try {
+              if (typeof RS_API.data === 'function') {
+                await RS_API.data({ operation: 'revoke_user_sessions', userId: sid });
+              }
+            } catch (__) {}
+          }
+        }
+      }
+      // 2) Directory flag
+      if (global.RS_DB && empId) {
+        try {
+          const emp = await RS_DB.get('employees', empId);
+          if (emp) {
+            emp.active = false;
+            emp.status = 'Inactive';
+            emp.disabledAt = new Date().toISOString();
+            await RS_DB.put('employees', empId, emp);
+          }
+        } catch (_) {}
+      }
+      toast(label + ' deactivated · sessions revoked', 'fa-user-slash');
+    }
+
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest && e.target.closest('[data-rs10-deactivate]');
       if (!btn) return;
+      // Let employees-ui handle its native toggle unless this is our inject only
+      if (btn.classList.contains('emp-toggle-active')) return;
       e.preventDefault();
       const userId = btn.getAttribute('data-user-id') || btn.getAttribute('data-id');
+      const staffUserId = btn.getAttribute('data-staff-user-id') || '';
       const name = btn.getAttribute('data-name') || 'Staff';
-      if (!userId) return;
+      if (!userId && !staffUserId) return;
       if (!confirm('Deactivate ' + name + '?\n\nThey cannot login. Active sessions will be revoked.'))
         return;
       try {
-        if (global.RS_API && typeof RS_API.data === 'function') {
-          await RS_API.data({ operation: 'deactivate_user', userId });
-          try {
-            await RS_API.data({ operation: 'revoke_user_sessions', userId });
-          } catch (_) {}
-        }
-        // Local employee flag
-        if (global.RS_DB) {
-          try {
-            const emp = await RS_DB.get('employees', userId);
-            if (emp) {
-              emp.active = false;
-              emp.status = 'Inactive';
-              emp.disabledAt = new Date().toISOString();
-              await RS_DB.put('employees', userId, emp);
-            }
-          } catch (_) {}
-        }
-        toast(name + ' deactivated · sessions revoked', 'fa-user-slash');
-        btn.closest('tr')?.classList.add('rs10-deactivated');
+        await hardDeactivate({ empId: userId, staffUserId, name });
+        const row = btn.closest('tr, .emp-line-row, .emp-card');
+        if (row) row.classList.add('rs10-deactivated');
       } catch (err) {
-        toast('Deactivate failed — try Team & Roles in Settings', 'fa-circle-exclamation');
+        toast('Deactivate failed — open Employees → Logins and Suspend', 'fa-circle-exclamation');
       }
     });
 
-    // Inject deactivate buttons on employees table when present
+    // Inject deactivate only on legacy tables missing native toggle
     const obs = new MutationObserver(() => {
-      document.querySelectorAll('#employees-tab tr[data-id], #employees-tab [data-emp-id]').forEach((row) => {
-        if (row.querySelector('[data-rs10-deactivate]')) return;
-        const id = row.getAttribute('data-id') || row.getAttribute('data-emp-id');
-        if (!id) return;
-        const cell = row.querySelector('td:last-child') || row;
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn btn-ghost btn-sm';
-        b.setAttribute('data-rs10-deactivate', '1');
-        b.setAttribute('data-user-id', id);
-        b.setAttribute('data-name', row.getAttribute('data-name') || '');
-        b.title = t('deactivate');
-        b.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
-        cell.appendChild(b);
-      });
+      document
+        .querySelectorAll('#employees-tab tr[data-id], #employees-tab [data-emp-id], #employees-tab .emp-line-row[data-id]')
+        .forEach((row) => {
+          if (row.querySelector('[data-rs10-deactivate], .emp-toggle-active')) return;
+          const id = row.getAttribute('data-id') || row.getAttribute('data-emp-id');
+          if (!id) return;
+          const cell =
+            row.querySelector('.rl-acts, td:last-child, .emp-actions') || row;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn btn-ghost btn-sm';
+          b.setAttribute('data-rs10-deactivate', '1');
+          b.setAttribute('data-user-id', id);
+          b.setAttribute('data-staff-user-id', row.getAttribute('data-staff-user-id') || '');
+          b.setAttribute('data-name', row.getAttribute('data-name') || '');
+          b.title = t('deactivate');
+          b.innerHTML = '<i class="fa-solid fa-user-slash"></i>';
+          cell.appendChild(b);
+        });
     });
     obs.observe(document.body, { childList: true, subtree: true });
   }

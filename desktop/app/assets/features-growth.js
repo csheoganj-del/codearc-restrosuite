@@ -1680,7 +1680,7 @@
       const tagline =
         s.set_tagline ||
         s.set_guest_welcome ||
-        'Scan to order food or call your waiter';
+        'This table only · Order food or call waiter';
       return {
         name: formatOutletTitle(name),
         phone: String(phone || '').trim(),
@@ -2092,7 +2092,7 @@
       const phone = esc(phoneRaw);
       const wifi = esc(wifiRaw);
       const wifiPass = esc(wifiPassRaw);
-      const taglineRaw = String((p && p.tagline) || 'Scan to order food or call your waiter').trim();
+      const taglineRaw = String((p && p.tagline) || 'This table only · Order food or call waiter').trim();
       const tagline = esc(taglineRaw);
       const opts = (p && p.printOpts) || getQrPrintOpts();
 
@@ -2118,6 +2118,10 @@
       const isMini = sizeId === 'mini';
       const padX = isMini ? 8 : 14;
       const padY = isMini ? 8 : 12;
+      // Purpose line: guests/staff know what the QR is for (dual workflow)
+      const purposeLine = isMini
+        ? 'Table QR · order or call waiter'
+        : 'What this is for: guest self-order OR call waiter · same bill as staff';
 
       // —— Dual purpose strip (hero message) ——
       let usesHtml = '';
@@ -2245,9 +2249,13 @@
                 <img src="${qrCodeUrl}" alt="Table ${tbl} — order or call waiter" width="${qr}" height="${qr}" style="display:block;width:${qr}px;height:${qr}px;max-width:100%" />
               </div>
             </div>
-            <div style="font-size:${scanPx}px;font-weight:700;color:${B.inkSoft};margin:0 0 ${
+            <div style="font-size:${scanPx}px;font-weight:700;color:${B.inkSoft};margin:0 0 4px">Point camera at the code</div>
+            <div style="font-size:${Math.max(
+              7,
+              metaPx
+            )}px;font-weight:700;color:${B.mute};margin:0 0 ${
               showSteps ? 6 : 2
-            }px">Point camera at the code</div>
+            }px;line-height:1.3;letter-spacing:.01em">${esc(purposeLine)}</div>
             ${stepsHtml}
             ${metaHtml}
           </div>

@@ -284,6 +284,33 @@
   const grid = $('#emp-grid');
   if (!grid) return;
 
+  var empView =
+    global.RSViewMode && RSViewMode.get
+      ? RSViewMode.get('employees', 'list')
+      : 'list';
+
+  // Toolbar view toggle above the grid (once)
+  (function ensureEmpViewToggle() {
+    const tab = document.getElementById('employees-tab');
+    if (!tab) return;
+    let bar = tab.querySelector('.emp-view-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'emp-view-bar';
+      bar.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 12px;';
+      const host = grid.parentElement;
+      if (host) host.insertBefore(bar, grid);
+      else tab.insertBefore(bar, grid);
+    }
+    if (global.RSViewMode && RSViewMode.toggleHtml) {
+      bar.innerHTML = RSViewMode.toggleHtml('employees', empView);
+      empView = RSViewMode.wire(bar, 'employees', function (m) {
+        empView = m;
+        renderEmployees();
+      }, 'list');
+    }
+  })();
+
   if (EMPLOYEES.length === 0) {
     // Soft-link: staff login accounts exist but employee directory is empty
     grid.innerHTML = `
@@ -410,20 +437,162 @@
     return;
   }
 
-  grid.innerHTML = EMPLOYEES.map((e,i)=>`
-    <div class="emp-card">
-      <div class="emp-top"><div class="emp-av" style="background:${avatarColors_[i%avatarColors_.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}</div><div class="ee">${_e(e.email || '—')}</div></div></div>
+  if (empView === 'list') {
+    grid.classList.add('emp-grid-list');
+    grid.classList.remove('emp-grid');
+    grid.style.display = 'block';
+    grid.innerHTML = `
+      <div class="rs-line-list emp-line-list">
+        <div class="rs-line-head emp-line-head">
+          <span>Team member</span>
+          <span>Role</span>
+          <span>Shift</span>
+          <span class="rl-num">Sales</span>
+          <span class="rl-num">Orders</span>
+          <span>Payroll</span>
+          <span class="rl-acts">Actions</span>
+        </div>
+        ${EMPLOYEES.map((e, i) => {
+          const inactive = e.active === false || String(e.status || '').toLowerCase() === 'inactive';
+          return `
+        <div class="rs-line-row emp-line-row${inactive ? ' rs10-deactivated' : ''}" data-idx="${i}" data-id="${_e(e.id || '')}" data-name="${_e(e.name || '')}" data-staff-user-id="${_e(e.staffUserId || '')}" style="${inactive ? 'opacity:.62' : ''}">
+          <span class="emp-line-guest">
+            <span class="emp-av" style="width:32px;height:32px;border-radius:9px;font-size:11px;background:${avatarColors_[i % avatarColors_.length]}">${_e(initials(e.name))}</span>
+            <span>
+              <div class="rl-name">${_e(e.name)}${inactive ? ' <span class="pill pill-red" style="padding:1px 7px;font-size:10px;margin-left:4px">Inactive</span>' : ''}</div>
+              <div class="rl-mute">${_e(e.email || e.phone || '—')}</div>
+            </span>
+          </span>
+          <span><span class="role-tag ${_e(e.rc || '')}">${_e(e.role || 'Staff')}</span></span>
+          <span class="rl-mute"><i class="fa-solid fa-clock" style="font-size:9px;opacity:.6"></i> ${_e(e.shift || '—')}</span>
+          <span class="rl-num">${_e(e.sales || '—')}</span>
+          <span class="rl-num">${_e(e.orders || '—')}</span>
+          <span class="rl-mute">${e.payroll ? rs(parseFloat(String(e.payroll).replace(/[^0-9.]/g, '')) || 0) : '—'}</span>
+          <span class="rl-acts">
+            <button type="button" class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}"><i class="fa-solid fa-pen"></i> Role</button>
+            <button type="button" class="icon-act emp-toggle-active" data-idx="${i}" title="${inactive ? 'Reactivate login' : 'Deactivate login'}" aria-label="${inactive ? 'Reactivate' : 'Deactivate'} ${_e(e.name)}"><i class="fa-solid ${inactive ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+            <button type="button" class="icon-act emp-reset-pin" data-idx="${i}" title="PIN"><i class="fa-solid fa-key"></i></button>
+            <button type="button" class="icon-act danger emp-remove" data-idx="${i}" title="Remove"><i class="fa-solid fa-user-minus"></i></button>
+          </span>
+        </div>`;
+        }).join('')}
+      </div>`;
+  } else {
+    grid.classList.remove('emp-grid-list');
+    grid.classList.add('emp-grid');
+    grid.style.display = '';
+    grid.innerHTML = EMPLOYEES.map((e,i)=>{
+      const inactive = e.active === false || String(e.status || '').toLowerCase() === 'inactive';
+      return `
+    <div class="emp-card${inactive ? ' rs10-deactivated' : ''}" data-id="${_e(e.id || '')}" data-name="${_e(e.name || '')}" data-staff-user-id="${_e(e.staffUserId || '')}" style="${inactive ? 'opacity:.72' : ''}">
+      <div class="emp-top"><div class="emp-av" style="background:${avatarColors_[i%avatarColors_.length]}">${_e(initials(e.name))}</div><div style="flex:1"><div class="en">${_e(e.name)}${inactive ? ' · Inactive' : ''}</div><div class="ee">${_e(e.email || '—')}</div></div></div>
       <div style="margin-bottom:14px"><span class="role-tag ${_e(e.rc || '')}">${_e(e.role)}</span> <span class="pill" style="padding:3px 9px;font-size:11px"><i class="fa-solid fa-clock" style="font-size:9px"></i> ${_e(e.shift || '—')}</span></div>
       <div class="emp-stats"><div class="es"><div class="esv">${_e(e.sales || '—')}</div><div class="esl">Sales (30d)</div></div><div class="es"><div class="esv">${_e(e.orders || '—')}</div><div class="esl">Orders</div></div></div>
       <div class="emp-actions">
         <button type="button" class="btn btn-ghost btn-sm edit-role-btn" data-idx="${i}" style="flex:1" aria-label="Edit role for ${_e(e.name)}"><i class="fa-solid fa-pen"></i> Edit role</button>
+        <button type="button" class="icon-act emp-toggle-active" data-idx="${i}" title="${inactive ? 'Reactivate' : 'Deactivate login'}" aria-label="${inactive ? 'Reactivate' : 'Deactivate'} ${_e(e.name)}"><i class="fa-solid ${inactive ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
         <button type="button" class="icon-act emp-reset-pin" data-idx="${i}" title="Set / reset staff PIN" aria-label="Reset PIN for ${_e(e.name)}"><i class="fa-solid fa-key"></i></button>
         <button type="button" class="icon-act danger emp-remove" data-idx="${i}" title="Remove from directory" aria-label="Remove ${_e(e.name)}"><i class="fa-solid fa-user-minus"></i></button>
       </div>
-    </div>`).join('');
+    </div>`;
+    }).join('');
+  }
   $$('#emp-grid .edit-role-btn').forEach((b) =>
     b.addEventListener('click', () => openEditRoleModal(+b.dataset.idx))
   );
+
+  async function revokeLinkedStaffLogin(emp, suspend) {
+    if (!window.RS_API || typeof RS_API.staffUsers !== 'function') return;
+    let staffId = emp.staffUserId || null;
+    // Match by username/email/display name when staffUserId missing
+    if (!staffId) {
+      try {
+        const res = await RS_API.staffUsers({ action: 'list_users' });
+        const users = (res && res.users) || [];
+        const name = String(emp.name || '').toLowerCase();
+        const email = String(emp.email || '').toLowerCase();
+        const hit = users.find(
+          (u) =>
+            (emp.staffUserId && u.id === emp.staffUserId) ||
+            (email && String(u.username || '').toLowerCase() === email.split('@')[0]) ||
+            (name && String(u.display_name || '').toLowerCase() === name)
+        );
+        if (hit) {
+          staffId = hit.id;
+          emp.staffUserId = staffId;
+        }
+      } catch (_) {}
+    }
+    if (!staffId) return;
+    try {
+      await RS_API.staffUsers({
+        action: 'update_user',
+        user_id: staffId,
+        status: suspend ? 'suspended' : 'active',
+      });
+    } catch (e) {
+      console.warn('[employees] staff status update', e);
+    }
+    try {
+      await RS_API.staffUsers({ action: 'revoke_user_sessions', user_id: staffId });
+    } catch (_) {
+      try {
+        if (typeof RS_API.data === 'function') {
+          await RS_API.data({ operation: 'revoke_user_sessions', userId: staffId });
+        }
+      } catch (__) {}
+    }
+  }
+
+  $$('#emp-grid .emp-toggle-active').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const emp = EMPLOYEES[+b.dataset.idx];
+      if (!emp) return;
+      const inactive = emp.active === false || String(emp.status || '').toLowerCase() === 'inactive';
+      if (!inactive) {
+        const ok = window.confirm(
+          'Deactivate ' +
+            emp.name +
+            '?\n\n• They cannot use staff login (if linked)\n• Active sessions are revoked\n• Directory row stays for payroll history\n\nYou can reactivate later.'
+        );
+        if (!ok) return;
+        emp.active = false;
+        emp.status = 'Inactive';
+        emp.disabledAt = new Date().toISOString();
+        emp.shift = emp.shift === 'Off' ? emp.shift : emp.shift;
+        try {
+          await revokeLinkedStaffLogin(emp, true);
+        } catch (_) {}
+        try {
+          if (window.RS && typeof RS.save === 'function') await RS.save('employees');
+          else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
+          if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+        } catch (e) {
+          console.warn('Deactivate save failed', e);
+        }
+        toast(emp.name + ' deactivated · sessions revoked', 'fa-user-slash');
+      } else {
+        const ok = window.confirm('Reactivate ' + emp.name + '? Their staff login will be re-enabled if linked.');
+        if (!ok) return;
+        emp.active = true;
+        emp.status = 'Active';
+        emp.disabledAt = null;
+        try {
+          await revokeLinkedStaffLogin(emp, false);
+        } catch (_) {}
+        try {
+          if (window.RS && typeof RS.save === 'function') await RS.save('employees');
+          else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
+          if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+        } catch (e) {
+          console.warn('Reactivate save failed', e);
+        }
+        toast(emp.name + ' reactivated', 'fa-user-check');
+      }
+      renderEmployees();
+    })
+  );
+
   $$('#emp-grid .emp-reset-pin').forEach((b) =>
     b.addEventListener('click', async () => {
       const emp = EMPLOYEES[+b.dataset.idx];
@@ -450,7 +619,11 @@
       const idx = +b.dataset.idx;
       const emp = EMPLOYEES[idx];
       if (!emp) return;
-      const ok = window.confirm('Remove ' + emp.name + ' from the employee directory?\n(Does not delete their staff login.)');
+      const ok = window.confirm(
+        'Remove ' +
+          emp.name +
+          ' from the employee directory?\n\nTip: use Deactivate (user-slash icon) if they left the job but you want payroll history. Remove does not delete staff login — suspend that under Logins.'
+      );
       if (!ok) return;
       const id = emp.id;
       EMPLOYEES.splice(idx, 1);

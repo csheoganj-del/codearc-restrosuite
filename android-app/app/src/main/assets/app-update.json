@@ -1,11 +1,13 @@
 {
-  "version": "v194-20260715-staff-amend",
+  "version": "v195-20260715-partials",
   "date": "2026-07-15",
-  "title": "Staff QR amend",
-  "summary": "QR Orders tab: staff can amend pending shared-table orders (qty, covers) with kitchen/guest notify and prep locks.",
+  "title": "Partials polish",
+  "summary": "Homepage sandbox print path, offline sync banner, employee deactivate + session revoke, clearer table QR purpose labels, smoother updates and alert sound settings.",
   "highlights": [
-    "QR Orders: Amend button on pending cards (qty + guests)",
-    "Preparing orders show Locked — no silent deletes",
-    "Shared table guest + waiter amend until kitchen starts"
+    "Sandbox: Print & close bill works; country tax/currency fixed",
+    "Offline banner: clear save-local / syncing / retry states",
+    "Employees: deactivate login revokes sessions; staff suspend hardened",
+    "Table QR: purpose line — guest order or call waiter, this table only",
+    "Settings → Printers: sound on/mute + test chime; safer update dialog"
   ]
 }
