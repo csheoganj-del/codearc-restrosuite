@@ -2143,42 +2143,167 @@ body.rs-role-brandadmin #klc-mobile-setup {
 @media (max-width: 760px){
   .app { grid-template-columns: 1fr !important; }
   .sidebar { display: none; }
-  .main { height: 100vh; height: 100dvh; overflow: hidden; padding-bottom: 70px; }
-  .content { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 10px calc(92px + env(safe-area-inset-bottom)); }
-  .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 4px; justify-content: space-around;
-    background: var(--panel); border-top: 1px solid var(--stroke);  }
-  /* Tab bar: equal-width links, one clean row, no zigzag (labels never wrap).
-     Styled after Material 3's bottom-navigation "active pill" indicator so
-     it reads as a native Android control rather than a row of web icons. */
+  .main {
+    height: 100vh; height: 100dvh; overflow: hidden;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+  .content {
+    height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 10px 10px calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ---- Bottom tab bar: clear icons + readable labels ---- */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 50;
+    min-height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 2px calc(8px + env(safe-area-inset-bottom, 0px));
+    gap: 0;
+    justify-content: space-around;
+    align-items: stretch;
+    background: var(--panel);
+    border-top: 1px solid var(--stroke);
+    box-shadow: 0 -6px 24px rgba(15, 14, 12, 0.07);
+  }
   .mnav-link {
-    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 2px; height: 54px; padding: 6px 2px 4px; border-radius: var(--r-sm); color: var(--text-mute);
-    cursor: pointer; transition: color 0.2s var(--t, ease); text-align: center; position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 56px;
+    height: auto;
+    padding: 6px 1px 5px;
+    border-radius: 12px;
+    color: var(--text-mute);
+    cursor: pointer;
+    transition: color 0.2s var(--t, ease);
+    text-align: center;
+    position: relative;
     -webkit-tap-highlight-color: transparent;
   }
   .mnav-link i {
-    font-size: 18px; width: 30px; height: 22px; line-height: 22px; display: inline-flex; align-items: center; justify-content: center;
-    margin-bottom: 2px; border-radius: 999px; transition: background-color 0.22s cubic-bezier(0.2,0,0,1), color 0.22s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+    font-size: 21px;
+    width: 44px;
+    height: 28px;
+    line-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0;
+    border-radius: 999px;
+    transition: background-color 0.22s cubic-bezier(0.2,0,0,1), color 0.22s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
   }
-  .mnav-link span { font-size: 9.5px; font-weight: 600; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; transition: font-weight 0.2s; }
+  .mnav-link span {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+    transition: font-weight 0.2s, color 0.2s;
+  }
   .mnav-link.active { color: var(--orange); }
   .mnav-link.active i {
-    background: var(--orange-tint, rgba(255,79,0,0.14));
+    background: var(--orange-tint, rgba(255,79,0,0.16));
     color: var(--orange);
-    transform: scale(1.02);
-    width: 46px;
+    transform: none;
+    width: 52px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 22px;
   }
-  .mnav-link.active span { font-weight: 800; }
-  .mnav-link:active i { transform: scale(0.9); }
+  .mnav-link.active span { font-weight: 800; color: var(--orange); }
+  .mnav-link:active i { transform: scale(0.92); }
   .mnav-link .badge-count {
-    position: absolute; top: 2px; right: calc(50% - 20px); min-width: 15px; height: 15px; padding: 0 4px;
-    border-radius: 99px; background: var(--red, #EF4444); color: #fff; font-size: 9px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--panel);
+    position: absolute; top: 2px; right: calc(50% - 22px);
+    min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 99px; background: var(--red, #EF4444); color: #fff;
+    font-size: 9px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--panel);
   }
 
   .stat-row { grid-template-columns: 1fr 1fr; }
-  .topbar { padding: calc(10px + env(safe-area-inset-top)) 12px 10px !important; }
-  .topbar .tb-title h1 { font-size: 17px; }
+
+  /* ---- Top bar: never clip icons / station chip ---- */
+  .topbar,
+  .topbar-calm {
+    height: auto !important;
+    min-height: 52px !important;
+    max-height: none !important;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 10px !important;
+    gap: 6px !important;
+    overflow: visible !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+  .tb-left {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    gap: 6px !important;
+    overflow: hidden;
+  }
+  .rs-station-chip,
+  #rs-station-chip {
+    padding: 5px 9px !important;
+    font-size: 10.5px !important;
+    max-width: 92px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tb-title { min-width: 0; flex: 1 1 auto; }
+  .tb-title h1 {
+    font-size: 14.5px !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .tb-title p,
+  .tb-sub { display: none !important; }
+  .tb-spacer { flex: 0 0 4px !important; min-width: 0 !important; }
+  .tb-right {
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    gap: 5px !important;
+    overflow: visible !important;
+    flex-shrink: 0 !important;
+  }
+  .tb-search,
+  .tb-search-compact { display: none !important; }
+  .clock-pill,
+  #app-version-pill,
+  .tb-version { display: none !important; }
+  .topbar .tb-pill:not(.clock-pill),
+  .topbar .support-dropdown {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    overflow: visible !important;
+    flex-shrink: 0 !important;
+  }
+  .topbar .tb-pill:not(.clock-pill) i,
+  .topbar .tb-pill:not(.clock-pill) span i,
+  .topbar .support-dropdown .dropdown-trigger i {
+    font-size: 16px !important;
+  }
+  .tb-icon-btn {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    flex-shrink: 0 !important;
+  }
+  .tb-icon-btn i { font-size: 15px !important; }
   .table-scroll { overflow-x: auto; }
 
   #pos-tab.active { min-height: 100%; }
@@ -2209,10 +2334,14 @@ body.rs-role-brandadmin #klc-mobile-setup {
   #pos-tab .cart-payment { padding: 10px; margin-bottom: 10px; }
   #pos-tab .cpay-methods { margin-bottom: 0; }
   #pos-tab .cart-actions .btn { padding: 11px 9px; font-size: 12.5px; }
-  .pos-m-cart-bar { display: flex; bottom: calc(68px + env(safe-area-inset-bottom)); left: 10px; right: 10px; height: 50px; z-index: 120; }
+  .pos-m-cart-bar {
+    display: flex;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    left: 10px; right: 10px; height: 50px; z-index: 120;
+  }
   .pos-m-cart-bar.hidden { transform: translateY(130px); box-shadow: none; }
 
-  .toast { bottom: calc(82px + env(safe-area-inset-bottom)); max-width: calc(100vw - 24px); }
+  .toast { bottom: calc(90px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 24px); }
   .rs-impersonation-banner { top: 8px; align-items: flex-start; flex-direction: column; gap: 8px; }
   .rs-impersonation-banner button { width: 100%; justify-content: center; }
 
@@ -4490,12 +4619,14 @@ textarea:focus-visible,
    REIMAGINED COMPACT HEADER & STATUS BADGES WITH DYNAMIC MICRO-INTERACTIONS
    ========================================================================== */
 
-/* Shorter header height & refined layout */
+/* Compact header — min-height (not fixed height) so icons never clip */
 .topbar {
   padding: 8px clamp(12px, 2vw, 20px) !important;
   gap: 10px !important;
-  height: 54px !important;
+  height: auto !important;
+  min-height: 54px !important;
   box-sizing: border-box;
+  overflow: visible !important;
 }
 
 /* Make title area more compact */
@@ -4554,7 +4685,7 @@ textarea:focus-visible,
 }
 
 .topbar .tb-pill:not(.clock-pill) {
-  overflow: hidden !important;
+  overflow: visible !important;
 }
 
 .topbar .support-dropdown {

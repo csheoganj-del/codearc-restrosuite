@@ -5,16 +5,18 @@
 /* ---- Topbar: prevent cut-off, overflow menu ---- */
 .topbar.topbar-calm {
   min-height: 56px;
+  height: auto;
   gap: 8px;
-  overflow: visible;
+  overflow: visible !important;
 }
 .tb-right {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 1;
+  flex-shrink: 0;
   min-width: 0;
-  max-width: 58vw;
+  max-width: none;
+  overflow: visible;
 }
 .tb-right .tb-search-compact {
   min-width: 0;
@@ -93,9 +95,17 @@
 
 /* ---- Mobile topbar compaction ---- */
 @media (max-width: 900px) {
+  .topbar.topbar-calm,
+  .topbar {
+    height: auto !important;
+    min-height: 52px !important;
+    overflow: visible !important;
+  }
   .tb-right {
-    max-width: none;
-    gap: 4px;
+    max-width: none !important;
+    flex-shrink: 0 !important;
+    gap: 5px;
+    overflow: visible !important;
   }
   .tb-right .tb-search-compact { display: none !important; }
   .tb-right .clock-pill { display: none !important; }
@@ -103,17 +113,35 @@
   .tb-right .theme-toggle { display: none !important; }
   .tb-more-btn { display: inline-grid !important; place-items: center; }
   .rs-topbar-shift {
-    max-width: 46vw;
+    max-width: 38vw;
   }
   .rs-shift-open-lbl { display: none; }
   .rs-shift-compact .rs-shift-amt { display: none; }
   .topbar .tb-left #page-sub { display: none; }
+  .topbar .tb-left {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
   .topbar .tb-left h1 {
-    font-size: 15px !important;
+    font-size: 14.5px !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 36vw;
+    max-width: min(42vw, 180px);
+  }
+  .rs-station-chip,
+  #rs-station-chip {
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Icon actions always fully visible — no clipping */
+  .tb-right .tb-icon-btn,
+  .tb-right .tb-pill,
+  .tb-right .tb-wa-pill {
+    flex-shrink: 0 !important;
+    overflow: visible !important;
   }
 }
 
@@ -127,8 +155,17 @@
   .rs-shift-bar {
     overflow: visible !important;
   }
-  .tb-right .tb-wa-pill .tb-badge-label { display: none; }
-  .tb-right .tb-wa-pill { padding: 0 8px; min-width: 36px; justify-content: center; }
+  .tb-right .tb-wa-pill .tb-badge-label { display: none !important; }
+  .tb-right .tb-wa-pill {
+    padding: 0 !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    justify-content: center;
+  }
+  .topbar .tb-left h1 {
+    max-width: min(38vw, 150px);
+  }
 }
 
 /* ---- POS cart mobile sheet ---- */
