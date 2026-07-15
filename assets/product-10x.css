@@ -254,76 +254,223 @@
   }
 }
 
-/* ---- Global mobile table scroll (all tabs) ---- */
-@media (max-width: 760px) {
-  .table-scroll {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    max-width: 100% !important;
-  }
-  .table-scroll .data-table {
-    width: max-content !important;
-    min-width: 640px !important;
-  }
-  .table-scroll .data-table th,
-  .table-scroll .data-table td {
-    white-space: nowrap !important;
-  }
-  /* Smaller tables (3–4 cols) still scroll if needed */
-  .table-scroll .data-table.compact,
-  .table-scroll table[data-cols="3"] {
-    min-width: 420px !important;
-  }
-}
-
-/* ---- Bills / inventory: cards on mobile (optional card UI; tables still scroll) ---- */
+/* ---- Mobile data cards (Menu, Inventory, Bills) ---- */
 .rs10-bill-cards,
-.rs10-inv-cards {
+.rs10-inv-cards,
+.rs10-menu-cards {
   display: none;
   flex-direction: column;
-  gap: 8px;
-  padding: 4px 0 12px;
+  gap: 10px;
+  padding: 4px 0 16px;
+  width: 100%;
 }
-.rs10-bill-card,
-.rs10-inv-card {
-  display: block;
+.rs10-empty-card {
+  text-align: center;
+  padding: 28px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-mute, #8a8780);
+  border: 1px dashed var(--stroke, #e5e7eb);
+  border-radius: 14px;
+  background: var(--glass, rgba(0,0,0,.02));
+}
+.rs10-mcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
   text-align: left;
   border: 1px solid var(--stroke, #e5e7eb);
-  background: var(--panel, #fff);
-  border-radius: 14px;
-  padding: 12px 14px;
+  background: var(--panel-solid, var(--panel, #fff));
+  border-radius: 16px;
+  padding: 14px 14px 12px;
   font: inherit;
   color: inherit;
-  cursor: pointer;
-  box-shadow: 0 1px 0 rgba(0,0,0,.03);
+  box-shadow: 0 2px 10px rgba(20, 18, 16, 0.04);
+  box-sizing: border-box;
 }
-.rs10-bill-card:active { transform: scale(.99); }
-.rs10-bc-top {
+button.rs10-mcard {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button.rs10-mcard:active { transform: scale(0.99); }
+.rs10-mcard-top {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 800;
+  align-items: flex-start;
+  gap: 12px;
 }
-.rs10-bc-sub {
-  margin-top: 4px;
+.rs10-mcard-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.rs10-mcard-title b,
+.rs10-ic-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text, #1a1917);
+  line-height: 1.25;
+  display: block;
+}
+.rs10-mcard-sub {
+  margin-top: 3px;
   font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft, #6b7280);
+  line-height: 1.3;
+}
+.rs10-mcard-price {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--orange, #FF4F00);
+  flex: none;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+.rs10-mcard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rs10-mcard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
   color: var(--text-soft, #6b7280);
 }
-.rs10-ic-name { font-weight: 800; font-size: 14px; }
-.rs10-ic-meta { font-size: 12px; color: var(--text-soft, #6b7280); margin-top: 4px; }
+.rs10-mcard-meta i {
+  margin-right: 4px;
+  opacity: 0.75;
+  color: var(--orange, #FF4F00);
+}
+.rs10-mcard-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-soft);
+  cursor: pointer;
+  user-select: none;
+}
+.rs10-mcard-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--orange, #FF4F00);
+}
+.rs10-mcard-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+  border-top: 1px solid var(--stroke, #eee);
+  margin-top: 2px;
+}
+.rs10-mcard-acts .btn {
+  flex: 1 1 auto;
+  min-height: 38px;
+  justify-content: center;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  border-radius: 10px !important;
+}
+.rs10-mcard-acts .rs10-danger {
+  flex: 0 0 auto;
+  color: var(--red, #ef4444) !important;
+  min-width: 42px;
+}
+.rs10-inv-meter {
+  height: 7px;
+  border-radius: 99px;
+  background: var(--glass-2, #f0f0f0);
+  overflow: hidden;
+}
+.rs10-inv-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  min-width: 4px;
+  transition: width 0.25s ease;
+}
+.rs10-inv-cost {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px dashed var(--stroke-2, #e5e7eb);
+  background: var(--glass, rgba(0,0,0,.02));
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-family: inherit;
+}
+.rs10-inv-cost:hover {
+  border-color: rgba(255, 79, 0, 0.35);
+  color: var(--orange, #FF4F00);
+}
+/* Veg badge inside cards */
+.rs10-mcard .veg {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--green, #16a34a);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 3px;
+  position: relative;
+}
+.rs10-mcard .veg::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green, #16a34a);
+}
+.rs10-mcard .veg.nonveg { border-color: var(--red, #ef4444); }
+.rs10-mcard .veg.nonveg::after { background: var(--red, #ef4444); }
 
-@media (max-width: 700px) {
-  /* Prefer cards when JS injects them; keep table-scroll available as fallback */
-  #bills-tab .rs10-bill-cards:not(:empty),
-  #inventory-tab .rs10-inv-cards:not(:empty) {
+@media (max-width: 760px) {
+  /* Show card lists; hide wide desktop tables for menu + inventory stock + bills */
+  .rs10-bill-cards:not(:empty),
+  .rs10-inv-cards:not(:empty),
+  .rs10-menu-cards:not(:empty) {
     display: flex !important;
   }
-  #bills-tab:has(.rs10-bill-cards:not(:empty)) .table-scroll,
-  #inventory-tab:has(.rs10-inv-cards:not(:empty)) .table-scroll {
+  #editor-tab:has(.rs10-menu-cards:not(:empty)) .table-scroll,
+  #inv-panel-stock:has(.rs10-inv-cards:not(:empty)) .table-scroll,
+  #inventory-tab:has(.rs10-inv-cards:not(:empty)) #inv-panel-stock .table-scroll,
+  #bills-tab:has(.rs10-bill-cards:not(:empty)) .table-scroll {
     display: none !important;
   }
+  /* Menu editor: form stacks above list on phone */
+  #editor-tab .report-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  #editor-tab .panel-pad {
+    padding: 14px !important;
+  }
+  /* Inventory: segment control scrolls; less toolbar clutter */
+  #inventory-tab .inv-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+  #inventory-tab .inv-toolbar > * { flex-shrink: 0; }
 }
 
 /* ---- Denomination modal ---- */

@@ -1028,91 +1028,273 @@
     obs.observe(document.body, { childList: true, subtree: true });
   }
 
-  /* ───────────── Mobile bills + inventory card mode ───────────── */
+  /* ───────────── Mobile: Menu + Inventory (+ bills) as cards ───────────── */
   function installMobileDataCards() {
-    const style = document.getElementById('rs10-mobile-cards-css');
-    if (style) return;
-    // CSS is in product-10x.css; here we add card markup after table renders
+    if (document.documentElement.dataset.rs10Cards === '1') return;
+    document.documentElement.dataset.rs10Cards = '1';
+
+    function ensureCardsHost(tabEl, className, afterScroll) {
+      let cards = tabEl.querySelector('.' + className);
+      if (cards) return cards;
+      cards = document.createElement('div');
+      cards.className = className;
+      cards.setAttribute('data-rs10-mobile-cards', '1');
+      const scroll =
+        afterScroll ||
+        tabEl.querySelector('.table-scroll') ||
+        tabEl.querySelector('.panel .table-scroll');
+      if (scroll && scroll.parentNode) scroll.parentNode.insertBefore(cards, scroll.nextSibling || scroll);
+      else tabEl.appendChild(cards);
+      return cards;
+    }
+
+    function isMobileCards() {
+      try {
+        return window.matchMedia('(max-width: 760px)').matches;
+      } catch (_) {
+        return window.innerWidth <= 760;
+      }
+    }
+
     const enhanceBills = () => {
       const body = document.getElementById('bills-table-body');
       const wrap = document.getElementById('bills-tab');
       if (!body || !wrap) return;
-      let cards = wrap.querySelector('.rs10-bill-cards');
-      if (!cards) {
-        cards = document.createElement('div');
-        cards.className = 'rs10-bill-cards';
-        const scroll = wrap.querySelector('.table-scroll') || body.closest('.table-scroll');
-        if (scroll && scroll.parentNode) scroll.parentNode.insertBefore(cards, scroll);
-        else wrap.appendChild(cards);
-      }
-      const rows = Array.from(body.querySelectorAll('tr')).slice(0, 40);
-      if (!rows.length) {
+      const cards = ensureCardsHost(wrap, 'rs10-bill-cards');
+      if (!isMobileCards()) {
         cards.innerHTML = '';
         return;
       }
+      const rows = Array.from(body.querySelectorAll('tr')).filter((tr) => tr.querySelectorAll('td').length >= 3).slice(0, 60);
+      if (!rows.length) {
+        cards.innerHTML = '<div class="rs10-empty-card">No bills yet</div>';
+        return;
+      }
       cards.innerHTML = rows
-        .map((tr) => {
+        .map((tr, idx) => {
           const cells = tr.querySelectorAll('td');
-          if (cells.length < 3) return '';
           const no = (cells[0] && cells[0].textContent) || '';
           const cust = (cells[1] && cells[1].textContent) || '';
           const amt = (cells[cells.length - 2] && cells[cells.length - 2].textContent) || '';
           const pay = (cells[3] && cells[3].textContent) || '';
-          return `<button type="button" class="rs10-bill-card" data-mirror-row>
-            <div class="rs10-bc-top"><b>${esc(no.trim())}</b><span>${esc(amt.trim())}</span></div>
-            <div class="rs10-bc-sub">${esc(cust.trim())} · ${esc(pay.trim())}</div>
+          return `<button type="button" class="rs10-mcard rs10-bill-card" data-i="${idx}">
+            <div class="rs10-mcard-top"><b>${esc(no.trim())}</b><span class="rs10-mcard-price">${esc(amt.trim())}</span></div>
+            <div class="rs10-mcard-sub">${esc(cust.trim())}${pay ? ' · ' + esc(pay.trim()) : ''}</div>
           </button>`;
         })
         .join('');
-      cards.querySelectorAll('[data-mirror-row]').forEach((btn, i) => {
+      cards.querySelectorAll('[data-i]').forEach((btn) => {
         btn.onclick = () => {
-          const tr = rows[i];
-          const clickable = tr && tr.querySelector('button, a, [data-open]');
+          const tr = rows[+btn.getAttribute('data-i')];
+          if (!tr) return;
+          const clickable = tr.querySelector('button.go, button.icon-act, a, [data-open]');
           if (clickable) clickable.click();
-          else tr && tr.click();
+          else tr.click();
         };
       });
     };
 
+    /** Menu editor — full card with veg badge, price, stock, toggle + actions */
+    const enhanceEditor = () => {
+      const wrap = document.getElementById('editor-tab');
+      const body = document.getElementById('editor-list');
+      if (!wrap || !body) return;
+      const listPanel = body.closest('.panel') || wrap;
+      const cards = ensureCardsHost(listPanel, 'rs10-menu-cards', body.closest('.table-scroll'));
+      if (!isMobileCards()) {
+        cards.innerHTML = '';
+        return;
+      }
+      const rows = Array.from(body.querySelectorAll('tr[data-id]'));
+      if (!rows.length) {
+        const empty = body.querySelector('.sr-empty');
+        cards.innerHTML = empty
+          ? `<div class="rs10-empty-card">${esc(empty.textContent || 'No menu items')}</div>`
+          : '<div class="rs10-empty-card">No menu items yet</div>';
+        return;
+      }
+      cards.innerHTML = rows
+        .map((tr, idx) => {
+          const id = tr.getAttribute('data-id') || '';
+          const name = (tr.querySelector('b') && tr.querySelector('b').textContent) || '';
+          const meta = (tr.querySelector('td div[style*="font-size:11px"]') &&
+            tr.querySelector('td div[style*="font-size:11px"]').textContent) || '';
+          const vegEl = tr.querySelector('.veg');
+          const isNonVeg = vegEl && vegEl.classList.contains('nonveg');
+          const cells = tr.querySelectorAll('td');
+          const price = (cells[2] && cells[2].textContent) || '';
+          const stockEl = tr.querySelector('.stock-dot');
+          const stockTxt = stockEl ? stockEl.textContent.trim() : '';
+          const stockCls = stockEl ? stockEl.className.replace('stock-dot', '').trim() : '';
+          const av = tr.querySelector('input[data-av]');
+          const checked = av && av.checked ? 'checked' : '';
+          return `<article class="rs10-mcard rs10-menu-card" data-i="${idx}" data-id="${esc(id)}">
+            <div class="rs10-mcard-top">
+              <div class="rs10-mcard-title">
+                <span class="veg ${isNonVeg ? 'nonveg' : ''}" aria-hidden="true"></span>
+                <div>
+                  <b>${esc(name.trim())}</b>
+                  <div class="rs10-mcard-sub">${esc(meta.trim())}</div>
+                </div>
+              </div>
+              <span class="rs10-mcard-price">${esc(price.trim())}</span>
+            </div>
+            <div class="rs10-mcard-row">
+              <span class="stock-dot ${esc(stockCls)}">${esc(stockTxt || '—')}</span>
+              <label class="rs10-mcard-toggle">
+                <input type="checkbox" data-card-av ${checked}>
+                <span>${checked ? 'Available' : 'Sold out'}</span>
+              </label>
+            </div>
+            <div class="rs10-mcard-acts">
+              <button type="button" class="btn btn-ghost btn-sm" data-card-edit><i class="fa-solid fa-pen"></i> Edit</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-card-recipe><i class="fa-solid fa-flask"></i> Recipe</button>
+              <button type="button" class="btn btn-ghost btn-sm rs10-danger" data-card-del><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </article>`;
+        })
+        .join('');
+      cards.querySelectorAll('.rs10-menu-card').forEach((card) => {
+        const tr = rows[+card.getAttribute('data-i')];
+        if (!tr) return;
+        const av = card.querySelector('[data-card-av]');
+        if (av) {
+          av.onchange = () => {
+            const src = tr.querySelector('input[data-av]');
+            if (!src) return;
+            src.checked = av.checked;
+            src.dispatchEvent(new Event('change', { bubbles: true }));
+            const lab = card.querySelector('.rs10-mcard-toggle span');
+            if (lab) lab.textContent = av.checked ? 'Available' : 'Sold out';
+          };
+        }
+        const map = [
+          ['[data-card-edit]', '[data-edit]'],
+          ['[data-card-recipe]', '[data-recipe]'],
+          ['[data-card-del]', '[data-del]'],
+        ];
+        map.forEach(([sel, srcSel]) => {
+          const b = card.querySelector(sel);
+          if (b)
+            b.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const src = tr.querySelector(srcSel);
+              if (src) src.click();
+            };
+        });
+      });
+    };
+
+    /** Inventory stock list as cards */
     const enhanceInv = () => {
       const wrap = document.getElementById('inventory-tab');
       if (!wrap) return;
-      const tbody = wrap.querySelector('tbody');
+      const tbody =
+        document.getElementById('inv-table-body') ||
+        wrap.querySelector('#inv-panel-stock tbody') ||
+        wrap.querySelector('.inv-stock-table tbody');
       if (!tbody) return;
-      let cards = wrap.querySelector('.rs10-inv-cards');
-      if (!cards) {
-        cards = document.createElement('div');
-        cards.className = 'rs10-inv-cards';
-        const scroll = wrap.querySelector('.table-scroll');
-        if (scroll && scroll.parentNode) scroll.parentNode.insertBefore(cards, scroll);
+      const stockPanel = document.getElementById('inv-panel-stock') || tbody.closest('.panel') || wrap;
+      const cards = ensureCardsHost(stockPanel, 'rs10-inv-cards', tbody.closest('.table-scroll'));
+      if (!isMobileCards()) {
+        cards.innerHTML = '';
+        return;
       }
-      const rows = Array.from(tbody.querySelectorAll('tr')).slice(0, 50);
+      // Hide cards when not on stock sub-tab
+      const stockPane = document.getElementById('inv-panel-stock');
+      if (stockPane && stockPane.style.display === 'none') {
+        cards.innerHTML = '';
+        cards.style.display = 'none';
+        return;
+      }
+      cards.style.display = '';
+      const rows = Array.from(tbody.querySelectorAll('tr[data-inv-id]'));
+      if (!rows.length) {
+        cards.innerHTML = '<div class="rs10-empty-card">No stock items yet — tap Add stock item</div>';
+        return;
+      }
       cards.innerHTML = rows
-        .map((tr) => {
+        .map((tr, idx) => {
+          const name = (tr.querySelector('.inv-name') && tr.querySelector('.inv-name').textContent) || '';
+          const cat = (tr.querySelector('.inv-cat-pill') && tr.querySelector('.inv-cat-pill').textContent) || '';
           const cells = tr.querySelectorAll('td');
-          if (!cells.length) return '';
-          const name = (cells[0] && cells[0].textContent) || '';
-          const stock = (cells[1] && cells[1].textContent) || '';
-          const min = (cells[2] && cells[2].textContent) || '';
-          return `<div class="rs10-inv-card">
-            <div class="rs10-ic-name">${esc(name.trim())}</div>
-            <div class="rs10-ic-meta">Stock <b>${esc(stock.trim())}</b> · Min ${esc(min.trim())}</div>
-          </div>`;
+          const stockTxt = (cells[2] && cells[2].querySelector('.td-strong') && cells[2].querySelector('.td-strong').textContent) ||
+            (cells[2] && cells[2].textContent) || '';
+          const minTxt = (cells[3] && cells[3].textContent) || '';
+          const status = tr.querySelector('.stock-dot');
+          const statusTxt = status ? status.textContent.trim() : '';
+          const statusCls = status ? status.className.replace('stock-dot', '').trim() : '';
+          const costBtn = tr.querySelector('[data-set-cost]');
+          const costTxt = costBtn ? costBtn.textContent.replace(/\s+/g, ' ').trim() : '';
+          const bar = tr.querySelector('td:nth-child(3) span[style*="width"]');
+          const pct = bar && bar.style && bar.style.width ? bar.style.width : '0%';
+          const barColor = bar && bar.style && bar.style.background ? bar.style.background : 'var(--green)';
+          return `<article class="rs10-mcard rs10-inv-card" data-i="${idx}">
+            <div class="rs10-mcard-top">
+              <div>
+                <b class="rs10-ic-name">${esc(name.trim())}</b>
+                ${cat ? `<div class="rs10-mcard-sub">${esc(cat.trim())}</div>` : ''}
+              </div>
+              <span class="stock-dot ${esc(statusCls)}">${esc(statusTxt || '—')}</span>
+            </div>
+            <div class="rs10-inv-meter" aria-hidden="true"><span style="width:${esc(pct)};background:${esc(barColor)}"></span></div>
+            <div class="rs10-mcard-meta">
+              <span><i class="fa-solid fa-box"></i> ${esc(stockTxt.trim())}</span>
+              <span>Min ${esc(minTxt.trim())}</span>
+            </div>
+            ${costTxt ? `<button type="button" class="rs10-inv-cost" data-card-cost>${esc(costTxt)}</button>` : ''}
+            <div class="rs10-mcard-acts">
+              <button type="button" class="btn btn-ghost btn-sm" data-card-batches><i class="fa-solid fa-layer-group"></i> Batches</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-card-restock><i class="fa-solid fa-truck"></i> Restock</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-card-edit><i class="fa-solid fa-pen"></i> Edit</button>
+            </div>
+          </article>`;
         })
         .join('');
+      cards.querySelectorAll('.rs10-inv-card').forEach((card) => {
+        const tr = rows[+card.getAttribute('data-i')];
+        if (!tr) return;
+        const wire = (sel, srcSel) => {
+          const b = card.querySelector(sel);
+          if (!b) return;
+          b.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const src = tr.querySelector(srcSel);
+            if (src) src.click();
+          };
+        };
+        wire('[data-card-batches]', '.inv-name-btn, [data-batches]');
+        wire('[data-card-restock]', '.icon-act.go');
+        wire('[data-card-edit]', '.icon-act.inv-edit');
+        wire('[data-card-cost]', '[data-set-cost]');
+      });
     };
 
     const run = () => {
-      if (!isTouchMobile() && window.innerWidth > 700) return;
+      if (!isMobileCards()) {
+        document.querySelectorAll('[data-rs10-mobile-cards]').forEach((el) => {
+          el.innerHTML = '';
+        });
+        return;
+      }
       enhanceBills();
+      enhanceEditor();
       enhanceInv();
     };
     const obs = new MutationObserver(() => {
       clearTimeout(run._t);
-      run._t = setTimeout(run, 120);
+      run._t = setTimeout(run, 100);
     });
     obs.observe(document.body, { childList: true, subtree: true });
-    setTimeout(run, 800);
+    window.addEventListener('resize', () => {
+      clearTimeout(run._r);
+      run._r = setTimeout(run, 200);
+    });
+    setTimeout(run, 400);
+    document.addEventListener('rs:render-inventory', () => setTimeout(run, 80));
+    document.addEventListener('rs:tab-change', () => setTimeout(run, 80));
   }
 
   /* ───────────── Settings mobile: ensure all sub-tabs work + labels ───────────── */

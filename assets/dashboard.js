@@ -294,6 +294,9 @@
     try{ history.replaceState(null,'','#'+id); }catch(e){}
     // Save active tab to localStorage
     try { localStorage.setItem('rs_active_tab', id); } catch(e){}
+    try {
+      document.dispatchEvent(new CustomEvent('rs:tab-change', { detail: { tab: id } }));
+    } catch (e) {}
   }
 
   // Early role-home map (must exist before hydrate may call loadSavedTab)
