@@ -1,11 +1,11 @@
 ﻿{
-  "version": "v199-20260715-hero-codearc",
+  "version": "v200-20260715-sandbox-auto-wa",
   "date": "2026-07-15",
-  "title": "Hero CodeArc constellation",
-  "summary": "Homepage hero rebuilt: solid teal flow lines with nodes, window-chrome dashboard modules (POS cart, Kitchen KDS, Floor map, Bills, WhatsApp), live packet along paths.",
+  "title": "Sandbox auto WhatsApp on pay",
+  "summary": "Homepage cart matches live POS billing: optional customer mobile on cart, Print and Pay auto-sends WhatsApp bill when number present, success banner on receipt — no separate WhatsApp button.",
   "highlights": [
-    "Solid CodeArc-style curved connectors (not dashed marketing lines)",
-    "POS window shows real cart chrome: order types, lines, totals, pay strip, Print and Pay",
-    "Kitchen tickets, floor table pills, bills list, WhatsApp bubble match dashboard tabs"
+    "Removed WhatsApp toggle and Send demo invoice section",
+    "Customer WhatsApp field on cart like POS customer phone",
+    "Print and Pay auto-sends PDF when number is valid; green success on bill settled"
   ]
 }
