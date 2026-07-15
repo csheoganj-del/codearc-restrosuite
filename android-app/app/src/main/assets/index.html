@@ -227,53 +227,43 @@
     .hero-trust .t-item i { color: var(--green); }
 
     /* ============================================================
-       Hero constellation v204 — art-directed 10/10 (CodeArc quality)
-       Premium static composition + soft float; exact text in image
+       Hero constellation v206 — live modules (CodeArc quality)
+       Animated connectors + changing order data across POS→KDS→Floor→Bills→WA
        ============================================================ */
     .hero-visual {
       position: relative;
       animation: fadeUp .55s .15s both;
-      min-height: 0;
-      padding: 0;
+      min-height: 560px;
+      padding: 4px 0 0;
     }
-    .hero-constellation {
-      position: relative;
-      width: 100%;
-      border-radius: 24px;
-      overflow: hidden;
-      background: #EDE8DF;
-      box-shadow:
-        0 1px 0 rgba(255,255,255,.7) inset,
-        0 28px 64px -24px rgba(20,18,16,.22);
-      border: 1px solid rgba(20,18,16,.06);
-    }
-    .hero-constellation img {
-      display: block;
-      width: 100%;
-      height: auto;
-      vertical-align: middle;
-      animation: heroFloat 8s ease-in-out infinite;
-    }
-    @keyframes heroFloat {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-    .hero-constellation-caption {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 0 2px;
-      font-size: 12.5px; color: var(--text-mute);
-    }
-    .hero-constellation-caption b { color: var(--text); font-weight: 800; }
-    .hero-constellation-caption .hc-badge {
-      font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 999px;
-      background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
-    }
-    /* Legacy flow-stage kept inert if any residual markup */
     .flow-stage {
       --line: #2A6B5A;
       --accent: #FF4F00;
       --paper: #FFFEFB;
-      display: none;
+      position: relative;
+      width: 100%;
+      height: 540px;
+      min-height: 540px;
+      border-radius: 24px;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 60% at 70% 20%, rgba(42,107,90,.06), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 20% 80%, rgba(255,79,0,.05), transparent 50%),
+        #EDE8DF;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.7) inset,
+        0 28px 64px -24px rgba(20,18,16,.18);
+      border: 1px solid rgba(20,18,16,.06);
+      padding: 14px 12px 10px;
+      box-sizing: border-box;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .flow-stage .pulse,
+      .flow-card.active,
+      .flow-card.recv,
+      .flow-card .cline.new-in,
+      .flow-card .kds-ticket.new-in,
+      .flow-card .bill-row.new-in { animation: none !important; }
     }
     .flow-svg {
       position: absolute;
@@ -291,14 +281,21 @@
       stroke-linecap: round;
       stroke-linejoin: round;
       opacity: 0.55;
-      transition: opacity .4s, stroke .4s, stroke-width .4s;
+      stroke-dasharray: 8 10;
+      animation: pathDrift 12s linear infinite;
+      transition: opacity .4s, stroke .4s, stroke-width .4s, filter .4s;
     }
     .flow-svg .flow-path.dim { opacity: 0.32; stroke-width: 1.75; }
     .flow-svg .flow-path.active {
       opacity: 1;
       stroke: var(--accent);
       stroke-width: 2.5;
+      stroke-dasharray: 6 8;
+      animation: pathDrift 4s linear infinite;
       filter: drop-shadow(0 0 5px rgba(255,79,0,.3));
+    }
+    @keyframes pathDrift {
+      to { stroke-dashoffset: -72; }
     }
     .flow-svg .flow-node {
       fill: #FFFEFB;
@@ -446,18 +443,20 @@
 
     .flow-card.wa .fc-ico { background: #DCFCE7; color: #16A34A; }
     .flow-card.wa {
-      width: 168px; right: 28%; top: 38%;
+      width: 168px; right: 30%; top: 36%;
       border-radius: 16px;
     }
+    .flow-card.wa .fc-body { padding: 10px 11px 12px; }
     .flow-card.wa .wa-bubble {
       background: #fff; border-radius: 12px; padding: 10px 11px;
       border: 1px solid rgba(22,163,74,.15);
       font-size: 11px; line-height: 1.45; color: #3d4a42;
       box-shadow: 0 2px 10px rgba(22,163,74,.08);
+      animation: rowIn .4s ease;
     }
     .flow-card.wa .wa-bubble b { color: #15803D; }
     /* --- POS (anchor, larger) --- */
-    .flow-card.pos { width: 236px; left: 3%; top: 12%; }
+    .flow-card.pos { width: 236px; left: 3%; top: 14%; }
     .flow-card .cline {
       display: flex; align-items: center; gap: 7px;
       padding: 7px 8px; border-radius: 10px; margin-bottom: 5px;
@@ -1157,8 +1156,8 @@
     /* ===== RESPONSIVE ===== */
     @media (max-width: 980px) {
       .hero-grid { grid-template-columns: 1fr; gap: 40px; }
-      .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; min-height: 0; }
-      .hero-constellation { border-radius: 18px; }
+      .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; min-height: 500px; }
+      .flow-stage { height: 500px; min-height: 500px; border-radius: 18px; }
       .features-grid { grid-template-columns: repeat(2, 1fr); }
       .empathy-grid, .demo-grid, .pricing-grid { grid-template-columns: 1fr; }
       .pricing-card.featured { order: -1; }
@@ -1180,9 +1179,15 @@
       .hero-actions { gap: 10px; }
       .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
       .hero-trust { gap: 12px; flex-wrap: wrap; }
-      .hero-visual { min-height: 0; }
-      .hero-constellation { border-radius: 16px; }
-      .hero-constellation img { animation: none; }
+      .hero-visual { min-height: 420px; }
+      .flow-stage {
+        height: 420px; min-height: 420px; border-radius: 16px;
+        transform: scale(0.92); transform-origin: top center;
+      }
+      .flow-card.pos { width: 200px; }
+      .flow-card.kds, .flow-card.bills, .flow-card.floor { width: 168px; }
+      .flow-card.wa { width: 148px; }
+      .flow-label { font-size: 11px; }
       .float-chip.sync { display: none; }
       .float-chip.wa { right: 4%; top: -14px; }
 
@@ -1326,20 +1331,100 @@
           </div>
         </div>
 
-        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite one console — POS, Kitchen, Floor, Bills and WhatsApp connected">
-          <figure class="hero-constellation">
-            <img
-              src="assets/hero-constellation.jpg?v=204"
-              width="1200"
-              height="900"
-              alt="RestroSuite product map: POS cart, kitchen display, floor plan, bills and WhatsApp receipt connected as one console"
-              decoding="async"
-              fetchpriority="high"
-            >
-          </figure>
-          <div class="hero-constellation-caption">
+        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite live console — POS, Kitchen, Floor, Bills and WhatsApp connected">
+          <div class="flow-stage" id="sync-stage">
+            <span class="flow-live-pill"><span class="pulse" aria-hidden="true"></span> Live · one console</span>
+            <span class="flow-status" id="sync-msg">Order data flows between modules</span>
+
+            <svg class="flow-svg" viewBox="0 0 560 520" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <path id="path-pos-kds" class="flow-path" d="M 230 150 C 300 85, 370 85, 430 120" />
+              <path id="path-kds-bills" class="flow-path dim" d="M 470 185 C 500 255, 495 325, 455 385" />
+              <path id="path-pos-floor" class="flow-path dim" d="M 140 275 C 120 335, 125 385, 160 440" />
+              <path id="path-floor-bills" class="flow-path dim" d="M 250 465 C 320 490, 380 485, 430 435" />
+              <path id="path-bills-wa" class="flow-path dim" d="M 430 390 C 390 350, 370 310, 380 270" />
+              <circle class="flow-node" cx="230" cy="150" r="5" />
+              <circle class="flow-node" cx="430" cy="120" r="5" />
+              <circle class="flow-node" cx="160" cy="440" r="5" />
+              <circle class="flow-node" cx="455" cy="385" r="5" />
+              <circle class="flow-node" cx="380" cy="270" r="4.5" />
+              <circle id="flow-packet" class="flow-packet" r="6" cx="0" cy="0" />
+            </svg>
+
+            <span class="flow-label" style="left:36%;top:6%">one clear experience</span>
+            <span class="flow-label" style="right:3%;top:46%">works everywhere</span>
+            <span class="flow-label" style="left:32%;bottom:1%">built around your floor</span>
+
+            <article class="flow-card pos active" data-seg="pos" id="seg-pos">
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-cash-register"></i></span>
+                <span class="fc-name">POS Cart · Table 12</span>
+                <span class="fc-badge on" id="pos-badge">Ready</span>
+              </div>
+              <div class="fc-body" id="pos-body">
+                <div class="meta-line"><i class="fa-solid fa-chair" style="color:#FF4F00"></i> Table 12 · 4 pax · Dine-in</div>
+                <div class="cline"><span class="cdot" style="--cc:#FF4F00"></span><span class="cn">2× Butter Chicken</span><span class="amt">₹640</span></div>
+                <div class="cline"><span class="cdot" style="--cc:#C47B16"></span><span class="cn">1× Paneer Tikka</span><span class="amt">₹280</span></div>
+                <div class="cline"><span class="cdot" style="--cc:#0F9F6E"></span><span class="cn">3× Sparkling Water</span><span class="amt">₹105</span></div>
+                <div class="tot-row"><span>Total</span><b id="pos-total">₹1,025</b></div>
+              </div>
+              <div class="fc-foot"><span>Pay Now</span><b>Host View</b></div>
+            </article>
+
+            <article class="flow-card kds" data-seg="kds" id="seg-kds">
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-fire-burner"></i></span>
+                <span class="fc-name">Kitchen Display</span>
+                <span class="fc-badge warn" id="kds-badge">Waiting</span>
+              </div>
+              <div class="fc-body" id="kds-body">
+                <div class="empty-soft">Queue empty — standing by</div>
+              </div>
+              <div class="fc-foot"><span>Open tickets</span><b id="kds-count">0</b></div>
+            </article>
+
+            <article class="flow-card floor" data-seg="qr" id="seg-qr">
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-border-all"></i></span>
+                <span class="fc-name">Floor Plan</span>
+                <span class="fc-badge" id="qr-badge">Tables</span>
+              </div>
+              <div class="fc-body" id="qr-body">
+                <div class="tbl-grid">
+                  <div class="tbl-pill free"><b>T12</b><span class="st">Free</span></div>
+                  <div class="tbl-pill free"><b>T04</b><span class="st">Free</span></div>
+                  <div class="tbl-pill free"><b>T08</b><span class="st">Free</span></div>
+                  <div class="tbl-pill free"><b>T02</b><span class="st">QR on</span></div>
+                </div>
+              </div>
+              <div class="fc-foot"><span>Occupied</span><b id="qr-count">0 / 12</b></div>
+            </article>
+
+            <article class="flow-card bills" data-seg="bills" id="seg-bills">
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-file-invoice"></i></span>
+                <span class="fc-name">Bills · Today</span>
+                <span class="fc-badge" id="bills-badge">Ready</span>
+              </div>
+              <div class="fc-body" id="bills-body">
+                <div class="empty-soft">No bill for this table yet</div>
+              </div>
+              <div class="fc-foot"><span>Today</span><b id="bills-total">₹0</b></div>
+            </article>
+
+            <article class="flow-card wa" data-seg="wa" id="seg-wa">
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-brands fa-whatsapp"></i></span>
+                <span class="fc-name">WhatsApp</span>
+                <span class="fc-badge" id="wa-badge">Idle</span>
+              </div>
+              <div class="fc-body" id="wa-body">
+                <div class="wa-bubble">Waiting for paid bill…</div>
+              </div>
+            </article>
+          </div>
+          <div class="flow-caption">
             <div><b>One console</b> · POS → Kitchen → Floor → Bills → WhatsApp</div>
-            <span class="hc-badge">CodeArc design · RestroSuite</span>
+            <span class="hc-badge">Live data · animated sync</span>
           </div>
         </div>
       </div>
@@ -1953,10 +2038,10 @@
         closeMobileNav();
     });
 
-    // ===== HERO constellation — art image is static; no live DOM stage required =====
+    // ===== HERO constellation — live modules + rotating order data =====
     (function initHeroSync() {
       var stage = document.getElementById('sync-stage');
-      if (!stage) return; // v204+ uses hero-constellation.jpg
+      if (!stage) return;
       var msg = document.getElementById('sync-msg');
       var packet = document.getElementById('flow-packet');
       var cards = {
@@ -1980,10 +2065,54 @@
         'floor-bills': document.getElementById('path-floor-bills'),
         'bills-wa': document.getElementById('path-bills-wa')
       };
-      var step = 0;
+      var reduceMotion = false;
+      try {
+        reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      } catch (_) {}
+
+      /* Rotating demo tickets so totals, tables, guests visibly change */
+      var ORDERS = [
+        {
+          table: '12', guest: 'Priya', bill: 'RS-24102', pax: 4,
+          items: [
+            { name: '2× Butter Chicken', amt: '₹640', cc: '#FF4F00' },
+            { name: '1× Paneer Tikka', amt: '₹280', cc: '#C47B16' },
+            { name: '3× Sparkling Water', amt: '₹105', cc: '#0F9F6E' }
+          ],
+          total: '₹1,025', kdsLabel: '3 items'
+        },
+        {
+          table: '7', guest: 'Arjun', bill: 'RS-24107', pax: 2,
+          items: [
+            { name: '1× Masala Dosa', amt: '₹160', cc: '#FF4F00' },
+            { name: '2× Filter Coffee', amt: '₹120', cc: '#C47B16' },
+            { name: '1× Vada', amt: '₹80', cc: '#6366F1' }
+          ],
+          total: '₹360', kdsLabel: '3 items'
+        },
+        {
+          table: '5', guest: 'Neha', bill: 'RS-24115', pax: 6,
+          items: [
+            { name: '1× Family Thali', amt: '₹899', cc: '#FF4F00' },
+            { name: '4× Soft Drink', amt: '₹200', cc: '#0F9F6E' },
+            { name: '2× Gulab Jamun', amt: '₹160', cc: '#DB2777' }
+          ],
+          total: '₹1,259', kdsLabel: '3 items'
+        }
+      ];
+      var orderIdx = 0;
+      var scene = 0;
       var timer = null;
       var packetAnim = null;
+      var dayTotal = 0;
 
+      function order() { return ORDERS[orderIdx % ORDERS.length]; }
+      function inr(n) {
+        return '₹' + Math.round(n).toLocaleString('en-IN');
+      }
+      function parseTotal(s) {
+        return Number(String(s || '').replace(/[^\d]/g, '')) || 0;
+      }
       function setActive(key) {
         Object.keys(cards).forEach(function (k) {
           if (cards[k]) cards[k].classList.toggle('active', k === key);
@@ -1993,7 +2122,7 @@
         if (!msg) return;
         msg.textContent = text;
         msg.classList.add('flash');
-        setTimeout(function () { msg.classList.remove('flash'); }, 1200);
+        setTimeout(function () { msg.classList.remove('flash'); }, 1400);
       }
       function lightPath(id, on) {
         var p = pathMap[id];
@@ -2004,11 +2133,15 @@
       }
       function animatePacketAlong(pathEl, duration) {
         if (!packet || !pathEl || typeof pathEl.getTotalLength !== 'function') return;
+        if (reduceMotion) {
+          packet.setAttribute('opacity', '0');
+          return;
+        }
         if (packetAnim) cancelAnimationFrame(packetAnim);
         var len = pathEl.getTotalLength();
         if (!len) return;
         var start = null;
-        duration = duration || 1100;
+        duration = duration || 1000;
         packet.setAttribute('opacity', '1');
         function frame(ts) {
           if (!start) start = ts;
@@ -2017,7 +2150,7 @@
           var pt = pathEl.getPointAtLength(ease * len);
           packet.setAttribute('cx', pt.x);
           packet.setAttribute('cy', pt.y);
-          packet.setAttribute('opacity', String(t < 0.9 ? 1 : 1 - (t - 0.9) / 0.1));
+          packet.setAttribute('opacity', String(t < 0.88 ? 1 : 1 - (t - 0.88) / 0.12));
           if (t < 1) packetAnim = requestAnimationFrame(frame);
           else packet.setAttribute('opacity', '0');
         }
@@ -2026,7 +2159,7 @@
       function flow(pathKey) {
         clearPaths();
         lightPath(pathKey, true);
-        animatePacketAlong(pathMap[pathKey], 1100);
+        animatePacketAlong(pathMap[pathKey], 1050);
       }
       function recv(card) {
         if (!card) return;
@@ -2034,140 +2167,177 @@
         void card.offsetWidth;
         card.classList.add('recv');
       }
-      function posHtml(mode) {
+      function setPosTitle(o) {
+        var nameEl = cards.pos && cards.pos.querySelector('.fc-name');
+        if (nameEl) nameEl.textContent = 'POS Cart · Table ' + o.table;
+      }
+      function posHtml(mode, o) {
+        o = o || order();
         if (mode === 'empty') {
           return '<div class="empty-soft">Cart cleared · ready for next guest</div>';
         }
-        return '<div class="meta-line"><i class="fa-solid fa-chair" style="color:#FF4F00"></i> Table 12 · 4 pax · Dine-in</div>' +
-          '<div class="cline' + (mode === 'new' ? ' new-in' : '') + '"><span class="cdot" style="--cc:#FF4F00"></span><span class="cn">Butter Chicken</span><span class="amt">₹320</span></div>' +
-          '<div class="cline' + (mode === 'new' ? ' new-in' : '') + '"><span class="cdot" style="--cc:#C47B16"></span><span class="cn">Paneer Tikka ×2</span><span class="amt">₹498</span></div>' +
-          '<div class="tot-row"><span>Total</span><b id="pos-total">₹859</b></div>';
+        var rows = o.items.map(function (it, i) {
+          return '<div class="cline' + (mode === 'new' ? ' new-in' : '') + '" style="' + (mode === 'new' ? 'animation-delay:' + (i * 80) + 'ms' : '') + '">' +
+            '<span class="cdot" style="--cc:' + it.cc + '"></span>' +
+            '<span class="cn">' + it.name + '</span>' +
+            '<span class="amt">' + it.amt + '</span></div>';
+        }).join('');
+        return '<div class="meta-line"><i class="fa-solid fa-chair" style="color:#FF4F00"></i> Table ' + o.table +
+          ' · ' + o.pax + ' pax · Dine-in · ' + o.guest + '</div>' + rows +
+          '<div class="tot-row"><span>Total</span><b id="pos-total">' + o.total + '</b></div>';
+      }
+      function freeFloorHtml(highlightFree) {
+        var t = order().table;
+        return '<div class="tbl-grid">' +
+          '<div class="tbl-pill free"><b>T' + t + '</b><span class="st">' + (highlightFree ? 'Just free' : 'Free') + '</span></div>' +
+          '<div class="tbl-pill free"><b>T04</b><span class="st">Free</span></div>' +
+          '<div class="tbl-pill free"><b>T08</b><span class="st">Free</span></div>' +
+          '<div class="tbl-pill free"><b>T02</b><span class="st">QR on</span></div>' +
+          '</div>';
+      }
+      function occFloorHtml(o) {
+        return '<div class="tbl-grid">' +
+          '<div class="tbl-pill occ"><b>T' + o.table + '</b><span class="st">Dining · ' + o.total + '</span></div>' +
+          '<div class="tbl-pill free"><b>T04</b><span class="st">Free</span></div>' +
+          '<div class="tbl-pill free"><b>T08</b><span class="st">Free</span></div>' +
+          '<div class="tbl-pill free"><b>T02</b><span class="st">QR on</span></div>' +
+          '</div>';
       }
 
       var scenes = [
         function () {
+          var o = order();
+          setPosTitle(o);
           setActive('pos');
           if (badges.pos) { badges.pos.textContent = 'Sending'; badges.pos.className = 'fc-badge live'; }
           if (badges.kds) { badges.kds.textContent = 'Waiting'; badges.kds.className = 'fc-badge warn'; }
+          if (badges.wa) { badges.wa.textContent = 'Idle'; badges.wa.className = 'fc-badge'; }
           var pb = document.getElementById('pos-body');
-          if (pb) pb.innerHTML = posHtml('open');
-          flashMsg('POS · Table 12 order → kitchen');
+          if (pb) pb.innerHTML = posHtml('new', o);
+          var wa = document.getElementById('wa-body');
+          if (wa) wa.innerHTML = '<div class="wa-bubble">Waiting for paid bill…</div>';
+          flashMsg('POS · Table ' + o.table + ' · ' + o.guest + ' → kitchen');
           flow('pos-kds');
         },
         function () {
+          var o = order();
           setActive('kds');
           if (badges.pos) { badges.pos.textContent = 'Synced'; badges.pos.className = 'fc-badge on'; }
           if (badges.kds) { badges.kds.textContent = 'Prep'; badges.kds.className = 'fc-badge live'; }
           var kds = document.getElementById('kds-body');
           if (kds) {
-            kds.innerHTML =
-              '<div class="kds-ticket new-in"><span><span class="tok">T12</span>Butter Chicken</span><span class="st">Prep</span></div>' +
-              '<div class="kds-ticket new-in"><span><span class="tok">T12</span>Paneer Tikka ×2</span><span class="st">Prep</span></div>';
+            kds.innerHTML = o.items.map(function (it) {
+              var short = it.name.replace(/^[\d×xX]+\s*/, '');
+              return '<div class="kds-ticket new-in"><span><span class="tok">T' + o.table + '</span>' + short + '</span><span class="st">Prep</span></div>';
+            }).join('');
           }
           var kc = document.getElementById('kds-count');
-          if (kc) kc.textContent = '1';
-          flashMsg('Kitchen · same lines · no re-type');
+          if (kc) kc.textContent = String(o.items.length);
+          flashMsg('Kitchen · same lines · Table ' + o.table);
           recv(cards.kds);
           flow('pos-floor');
         },
         function () {
+          var o = order();
           setActive('qr');
           if (badges.qr) { badges.qr.textContent = 'Occupied'; badges.qr.className = 'fc-badge live'; }
           var qr = document.getElementById('qr-body');
-          if (qr) {
-            qr.innerHTML =
-              '<div class="tbl-grid">' +
-              '<div class="tbl-pill occ"><b>T12</b><span class="st">Dining · ₹859</span></div>' +
-              '<div class="tbl-pill free"><b>T04</b><span class="st">Free</span></div>' +
-              '<div class="tbl-pill free"><b>T08</b><span class="st">Free</span></div>' +
-              '<div class="tbl-pill free"><b>T02</b><span class="st">QR on</span></div>' +
-              '</div>';
-          }
+          if (qr) qr.innerHTML = occFloorHtml(o);
           var qc = document.getElementById('qr-count');
           if (qc) qc.textContent = '1 / 12';
-          flashMsg('Floor · Table 12 occupied');
+          flashMsg('Floor · Table ' + o.table + ' occupied · ' + o.total);
           recv(cards.qr);
         },
         function () {
+          var o = order();
           setActive('kds');
           if (badges.kds) { badges.kds.textContent = 'Ready'; badges.kds.className = 'fc-badge on'; }
           var kds2 = document.getElementById('kds-body');
           if (kds2) {
             kds2.innerHTML =
-              '<div class="kds-ticket ready"><span><span class="tok">T12</span>All items ready</span><span class="st">Serve</span></div>';
+              '<div class="kds-ticket ready"><span><span class="tok">T' + o.table + '</span>All items ready</span><span class="st">Serve</span></div>';
           }
-          flashMsg('Kitchen ready → bills update');
+          flashMsg('Kitchen ready · Table ' + o.table + ' → bills');
           flow('kds-bills');
         },
         function () {
+          var o = order();
           setActive('bills');
           if (badges.bills) { badges.bills.textContent = 'Paid'; badges.bills.className = 'fc-badge on'; }
           if (badges.pos) { badges.pos.textContent = 'Idle'; badges.pos.className = 'fc-badge'; }
+          dayTotal += parseTotal(o.total);
           var bb = document.getElementById('bills-body');
           if (bb) {
             bb.innerHTML =
-              '<div class="bill-row new-in"><span>RS-23041 · T12 <span class="paid">PAID</span></span><span class="amt">₹859</span></div>';
+              '<div class="bill-row new-in"><span>' + o.bill + ' · T' + o.table + ' <span class="paid">PAID</span></span><span class="amt">' + o.total + '</span></div>' +
+              '<div class="bill-row"><span>Guest <b>' + o.guest + '</b></span><span class="amt">UPI</span></div>';
           }
           var bt = document.getElementById('bills-total');
-          if (bt) bt.textContent = '₹859';
+          if (bt) bt.textContent = inr(dayTotal);
           var pb = document.getElementById('pos-body');
-          if (pb) pb.innerHTML = posHtml('empty');
+          if (pb) pb.innerHTML = posHtml('empty', o);
           var kds = document.getElementById('kds-body');
           if (kds) kds.innerHTML = '<div class="empty-soft">Queue empty — standing by</div>';
           var kc = document.getElementById('kds-count');
           if (kc) kc.textContent = '0';
           if (badges.kds) { badges.kds.textContent = 'Waiting'; badges.kds.className = 'fc-badge warn'; }
           var qr = document.getElementById('qr-body');
-          if (qr) {
-            qr.innerHTML =
-              '<div class="tbl-grid">' +
-              '<div class="tbl-pill free"><b>T12</b><span class="st">Free</span></div>' +
-              '<div class="tbl-pill free"><b>T04</b><span class="st">Free</span></div>' +
-              '<div class="tbl-pill free"><b>T08</b><span class="st">Free</span></div>' +
-              '<div class="tbl-pill free"><b>T02</b><span class="st">QR on</span></div>' +
-              '</div>';
-          }
+          if (qr) qr.innerHTML = freeFloorHtml(true);
           var qc = document.getElementById('qr-count');
           if (qc) qc.textContent = '0 / 12';
           if (badges.qr) { badges.qr.textContent = 'Tables'; badges.qr.className = 'fc-badge'; }
-          flashMsg('Bill paid · WhatsApp next');
+          flashMsg('Bill ' + o.bill + ' paid · ' + o.total);
           recv(cards.bills);
           flow('bills-wa');
         },
         function () {
+          var o = order();
           setActive('wa');
           if (badges.wa) { badges.wa.textContent = 'Sent'; badges.wa.className = 'fc-badge on'; }
           var wa = document.getElementById('wa-body');
           if (wa) {
-            wa.innerHTML = '<div class="wa-bubble"><b>Priya</b><br>Bill RS-23041 · T12<br>Total <b>₹859</b><br>Thank you!</div>';
+            wa.innerHTML = '<div class="wa-bubble"><b>' + o.guest + '</b><br>Bill ' + o.bill + ' · T' + o.table +
+              '<br>Total <b>' + o.total + '</b><br>Thank you!</div>';
           }
-          flashMsg('WhatsApp invoice delivered');
+          flashMsg('WhatsApp → ' + o.guest + ' · ' + o.total);
           recv(cards.wa);
           flow('floor-bills');
         },
         function () {
+          var prev = order();
+          orderIdx++;
+          var next = order();
+          setPosTitle(next);
           if (badges.pos) { badges.pos.textContent = 'Ready'; badges.pos.className = 'fc-badge on'; }
           if (badges.bills) { badges.bills.textContent = 'Ready'; badges.bills.className = 'fc-badge'; }
           if (badges.wa) { badges.wa.textContent = 'Idle'; badges.wa.className = 'fc-badge'; }
           var pb = document.getElementById('pos-body');
-          if (pb) pb.innerHTML = posHtml('open');
+          if (pb) pb.innerHTML = posHtml('open', next);
           var bb = document.getElementById('bills-body');
-          if (bb) bb.innerHTML = '<div class="bill-row"><span>Last bill <span class="paid">PAID</span></span><span class="amt">₹859</span></div>';
+          if (bb) {
+            bb.innerHTML = '<div class="bill-row"><span>Last · ' + prev.bill + ' <span class="paid">PAID</span></span><span class="amt">' + prev.total + '</span></div>';
+          }
+          var bt = document.getElementById('bills-total');
+          if (bt) bt.textContent = inr(dayTotal);
           var wa = document.getElementById('wa-body');
           if (wa) wa.innerHTML = '<div class="wa-bubble">Waiting for paid bill…</div>';
           setActive('pos');
           clearPaths();
-          flashMsg('Loop resets · every tab shares one truth');
+          flashMsg('Next guest · Table ' + next.table + ' · ' + next.guest);
         }
       ];
 
       function run() {
-        scenes[step % scenes.length]();
-        step++;
+        scenes[scene % scenes.length]();
+        scene++;
       }
       function start() {
         stop();
-        timer = setInterval(run, 3000);
+        if (reduceMotion) {
+          run();
+          return;
+        }
+        timer = setInterval(run, 2800);
       }
       function stop() {
         if (timer) clearInterval(timer);
@@ -2178,12 +2348,18 @@
         cards[k].style.cursor = 'pointer';
         cards[k].addEventListener('click', function () {
           setActive(k);
-          var n = cards[k].querySelector('.fc-name');
-          flashMsg((n ? n.textContent.trim() : k) + ' · same live order data');
+          var o = order();
+          var nEl = cards[k].querySelector('.fc-name');
+          var label = nEl ? nEl.textContent.trim() : k;
+          flashMsg(label + ' · live · T' + o.table + ' · ' + o.total);
         });
       });
       stage.addEventListener('mouseenter', stop);
       stage.addEventListener('mouseleave', start);
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stop();
+        else start();
+      });
       run();
       start();
     })();
