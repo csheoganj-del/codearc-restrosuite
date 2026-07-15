@@ -20,11 +20,11 @@
   <meta property="og:url" content="https://restrosuite.codearc.co.in/">
   <meta property="og:title" content="RestroSuite — Offline-First Restaurant POS &amp; Billing">
   <meta property="og:description" content="Offline-first POS, kitchen display, WhatsApp receipts, and QR table ordering. Free to start — no credit card required.">
-  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/screenshot-pos.png?v=9">
+  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=10">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="RestroSuite — Restaurant POS &amp; Billing">
   <meta name="twitter:description" content="Offline-first restaurant POS. WhatsApp receipts, KDS, QR orders. Free to start.">
-  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/screenshot-pos.png?v=9">
+  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=10">
   <link rel="canonical" href="https://restrosuite.codearc.co.in/">
   <!-- Favicons — SVG preferred, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=7">
@@ -226,227 +226,275 @@
     .hero-trust .t-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); }
     .hero-trust .t-item i { color: var(--green); }
 
-    /* Hero product stage — real UI + connected workflow */
+    /* Hero product mock — matches REAL RestroSuite (text menu, no dish photos) */
     .hero-visual {
       position: relative;
       animation: fadeUp .55s .15s both;
-      padding: 8px 4px 4px;
+      perspective: 1200px;
     }
     .hero-stage {
       position: relative;
-      border-radius: 22px;
-      padding: 14px 14px 16px;
-      background:
-        radial-gradient(120% 80% at 80% 0%, rgba(255,79,0,.12), transparent 55%),
-        radial-gradient(90% 70% at 10% 100%, rgba(42,155,143,.10), transparent 50%),
-        var(--panel-solid, #fff);
+      border-radius: 20px;
+      overflow: hidden;
       border: 1px solid var(--border);
+      background: #F6F4F1;
       box-shadow:
         0 4px 8px rgba(20,18,16,.04),
-        0 24px 48px -16px rgba(20,18,16,.18),
-        0 0 0 1px rgba(255,255,255,.4) inset;
+        0 28px 56px -18px rgba(20,18,16,.22);
+    }
+    .hero-ui {
+      display: grid;
+      grid-template-columns: 56px 1fr 168px;
+      min-height: 340px;
+      max-height: 380px;
+    }
+    /* Slim sidebar */
+    .hui-sb {
+      background: #fff;
+      border-right: 1px solid var(--border);
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .hui-logo {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, #FF4F00, #FF7A3D);
+      display: grid; place-items: center; color: #fff; font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .hui-nav {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: grid; place-items: center; font-size: 13px;
+      color: var(--text-mute); cursor: default;
+    }
+    .hui-nav.on {
+      background: rgba(255,79,0,.12); color: var(--accent);
+    }
+    /* Main POS area */
+    .hui-main {
+      padding: 12px 12px 10px;
+      display: flex; flex-direction: column; gap: 10px;
+      min-width: 0;
       overflow: hidden;
     }
-    .hero-stage::before {
-      content: "";
-      position: absolute;
-      inset: -40% -20% auto auto;
-      width: 60%;
-      height: 70%;
-      background: radial-gradient(circle, rgba(255,79,0,.14), transparent 70%);
-      pointer-events: none;
-      animation: heroGlow 6s ease-in-out infinite alternate;
+    .hui-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
-    @keyframes heroGlow {
-      from { opacity: .55; transform: translate(0,0); }
-      to { opacity: 1; transform: translate(-8%, 6%); }
+    .hui-top h3 {
+      margin: 0; font-size: 14px; font-weight: 800; letter-spacing: -.02em;
+    }
+    .hui-top .live {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 800; color: #0F9F6E;
+      background: #E8F8F1; padding: 3px 8px; border-radius: 999px;
+    }
+    .hui-top .live i { font-size: 6px; animation: pulseDot 1.6s infinite; }
+    .hui-cats {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .hui-cat {
+      font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+      background: #fff; border: 1px solid var(--border); color: var(--text-soft);
+    }
+    .hui-cat.on {
+      background: var(--accent); color: #fff; border-color: transparent;
+    }
+    /* TEXT-ONLY menu tiles — no food photos */
+    .hui-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      flex: 1;
+      min-height: 0;
+    }
+    .hui-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 10px 9px;
+      display: flex; flex-direction: column; gap: 4px;
+      min-height: 72px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .hui-item:hover, .hui-item.pick {
+      border-color: rgba(255,79,0,.35);
+      box-shadow: 0 0 0 3px rgba(255,79,0,.1);
+    }
+    .hui-item .nm {
+      font-size: 12px; font-weight: 800; color: var(--text);
+      line-height: 1.25; letter-spacing: -.01em;
+    }
+    .hui-item .meta {
+      display: flex; align-items: center; justify-content: space-between; gap: 4px;
+      margin-top: auto;
+    }
+    .hui-item .pr { font-size: 12px; font-weight: 800; color: var(--accent); }
+    .hui-item .badge {
+      font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
+      background: #E8F8F1; color: #0F9F6E;
+    }
+    .hui-item .badge.nv { background: #FEE2E2; color: #B91C1C; }
+    /* Cart rail */
+    .hui-cart {
+      background: #fff;
+      border-left: 1px solid var(--border);
+      padding: 12px 11px;
+      display: flex; flex-direction: column; gap: 8px;
+      min-width: 0;
+    }
+    .hui-cart h4 {
+      margin: 0; font-size: 12px; font-weight: 800;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .hui-cart h4 span {
+      font-size: 10px; font-weight: 700; color: var(--text-mute);
+      background: var(--surface-2); padding: 2px 7px; border-radius: 999px;
+    }
+    .hui-line {
+      display: flex; justify-content: space-between; gap: 6px;
+      font-size: 11px; padding: 6px 0;
+      border-bottom: 1px dashed var(--border);
+    }
+    .hui-line .ln { font-weight: 700; color: var(--text); line-height: 1.3; }
+    .hui-line .lq { color: var(--text-mute); font-size: 10px; font-weight: 600; }
+    .hui-line .lp { font-weight: 800; color: var(--text); white-space: nowrap; }
+    .hui-tot {
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .hui-tot .row {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--text-soft); padding: 2px 0;
+    }
+    .hui-tot .grand {
+      display: flex; justify-content: space-between;
+      font-size: 14px; font-weight: 800; color: var(--text); margin-top: 4px;
+    }
+    .hui-tot .grand b { color: var(--accent); }
+    .hui-pay {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px;
+    }
+    .hui-pay button {
+      border: 1px solid var(--border); background: #FAF8F5;
+      border-radius: 9px; padding: 7px 4px; font-size: 10px; font-weight: 800;
+      color: var(--text-soft); cursor: default; font-family: inherit;
+    }
+    .hui-pay button.on {
+      background: var(--accent); color: #fff; border-color: transparent;
+      box-shadow: 0 6px 14px -6px rgba(255,79,0,.5);
+    }
+    .hui-cta {
+      margin-top: 6px; width: 100%; border: 0; border-radius: 11px;
+      padding: 10px; font-size: 12px; font-weight: 800; font-family: inherit;
+      background: linear-gradient(135deg, #FF4F00, #FF7A3D); color: #fff;
+      box-shadow: 0 8px 18px -8px rgba(255,79,0,.55); cursor: default;
     }
 
+    /* Kitchen / Bill view panels (swap inside stage) */
+    .hui-view { display: none; }
+    .hui-view.on { display: contents; }
+    .hui-kds, .hui-bill {
+      display: none;
+      padding: 14px;
+      flex-direction: column; gap: 10px;
+      min-height: 340px;
+      background: #F6F4F1;
+    }
+    .hero-stage[data-view="kitchen"] .hui-ui { display: none; }
+    .hero-stage[data-view="kitchen"] .hui-kds { display: flex; }
+    .hero-stage[data-view="bill"] .hui-ui { display: none; }
+    .hero-stage[data-view="bill"] .hui-bill { display: flex; }
+
+    .hui-kds-head, .hui-bill-head {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hui-kds-head h3, .hui-bill-head h3 {
+      margin: 0; font-size: 14px; font-weight: 800;
+    }
+    .hui-tickets {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1;
+    }
+    .hui-ticket {
+      background: #fff; border: 1px solid var(--border); border-radius: 14px;
+      padding: 12px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .hui-ticket .th {
+      display: flex; justify-content: space-between; font-size: 11px; font-weight: 800;
+    }
+    .hui-ticket .th em {
+      font-style: normal; font-size: 10px; padding: 2px 7px; border-radius: 999px;
+      background: #FEF3C7; color: #B45309;
+    }
+    .hui-ticket .th em.hot { background: #FFEDD5; color: #C2410C; }
+    .hui-ticket li {
+      list-style: none; font-size: 12px; font-weight: 600; color: var(--text);
+      padding: 3px 0; border-bottom: 1px dashed var(--border);
+    }
+    .hui-ticket .tbtn {
+      margin-top: auto; border: 0; border-radius: 9px; padding: 8px;
+      font-size: 11px; font-weight: 800; font-family: inherit;
+      background: var(--accent); color: #fff;
+    }
+    .hui-bill-card {
+      background: #fff; border: 1px solid var(--border); border-radius: 16px;
+      padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 8px;
+    }
+    .hui-bill-card .br {
+      display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-soft);
+    }
+    .hui-bill-card .br.tot {
+      margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border);
+      font-size: 16px; font-weight: 800; color: var(--text);
+    }
+    .hui-bill-card .br.tot b { color: var(--accent); }
+    .hui-bill-pays {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .hui-bill-pays span {
+      text-align: center; font-size: 11px; font-weight: 800; padding: 10px 4px;
+      border-radius: 11px; border: 1px solid var(--border); background: #FAF8F5;
+      color: var(--text-soft);
+    }
+    .hui-bill-pays span.on {
+      background: var(--accent); color: #fff; border-color: transparent;
+    }
+
+    /* Workflow strip under mock */
     .hero-flow {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      margin-bottom: 14px;
-      padding: 4px;
-      border-radius: 999px;
-      background: rgba(20,18,16,.04);
-      border: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 12px;
+      background: #fff;
+      border-top: 1px solid var(--border);
     }
     .hero-flow-step {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 9px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--text-soft);
-      letter-spacing: -.01em;
-      transition: background .25s, color .25s, box-shadow .25s, transform .25s;
-      cursor: default;
-      white-space: nowrap;
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 9px 8px; border-radius: 11px;
+      font-size: 12px; font-weight: 800; color: var(--text-soft);
+      border: 1px solid transparent; cursor: pointer;
+      background: transparent; font-family: inherit;
+      transition: .2s;
     }
-    .hero-flow-step i {
-      width: 22px; height: 22px; border-radius: 7px;
-      display: grid; place-items: center;
-      font-size: 11px;
-      background: var(--surface-2);
-      color: var(--text-mute);
-    }
+    .hero-flow-step i { font-size: 12px; opacity: .75; }
     .hero-flow-step.active {
-      background: linear-gradient(135deg, #FF4F00, #FF7A3D);
-      color: #fff;
-      box-shadow: 0 8px 18px -6px rgba(255,79,0,.55);
-      transform: translateY(-1px);
+      background: rgba(255,79,0,.1); color: var(--accent);
+      border-color: rgba(255,79,0,.22);
     }
-    .hero-flow-step.active i {
-      background: rgba(255,255,255,.22);
-      color: #fff;
-    }
-    .hero-flow-arrow {
-      flex: none;
-      color: var(--text-mute);
-      font-size: 10px;
-      opacity: .55;
-    }
-
-    .hero-panels {
-      position: relative;
-      z-index: 2;
-      display: grid;
-      grid-template-columns: 1.35fr .95fr;
-      gap: 12px;
-      min-height: 280px;
-    }
-    .hero-panel {
-      position: relative;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #0f0e0d;
-      box-shadow: 0 12px 28px -14px rgba(20,18,16,.35);
-      transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s;
-    }
-    .hero-panel:hover {
-      transform: translateY(-4px) scale(1.01);
-      box-shadow: 0 20px 40px -16px rgba(20,18,16,.4);
-    }
-    .hero-panel-main {
-      grid-row: 1 / span 2;
-      min-height: 300px;
-    }
-    .hero-panel img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: top left;
-      display: block;
-      min-height: 140px;
-    }
-    .hero-panel-main img { min-height: 300px; max-height: 340px; }
-    .hero-panel-side img { min-height: 140px; max-height: 160px; }
-    .hero-panel-side { opacity: .88; filter: saturate(.92); }
-    .hero-panel-side.is-focus {
-      opacity: 1;
-      filter: none;
-      outline: 2px solid rgba(255,79,0,.45);
-      outline-offset: 2px;
-    }
-    .hero-panel-tag {
-      position: absolute;
-      left: 10px; top: 10px;
-      z-index: 3;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 800;
-      color: #fff;
-      background: rgba(15,14,13,.72);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,.12);
-      letter-spacing: .01em;
-    }
-    .hero-panel-tag .dot-live {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: #34D399;
-      box-shadow: 0 0 0 3px rgba(52,211,153,.25);
-      animation: pulseDot 1.6s infinite;
-    }
-    .hero-panel-tag.kit { background: rgba(255,79,0,.88); border-color: transparent; }
-    .hero-panel-tag.bill { background: rgba(42,155,143,.92); border-color: transparent; }
-
+    .hero-flow-arrow { color: var(--text-mute); font-size: 9px; opacity: .5; flex: none; }
     .hero-caption-bar {
-      position: relative;
-      z-index: 2;
-      margin-top: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-      padding: 2px 4px 0;
-    }
-    .hero-caption-bar .hc-left {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap;
+      padding: 0 2px; margin-top: 12px;
       font-size: 12.5px; color: var(--text-mute);
     }
-    .hero-caption-bar .hc-left b { color: var(--text); font-weight: 700; }
+    .hero-caption-bar b { color: var(--text); font-weight: 700; }
     .hero-caption-bar .hc-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11px; font-weight: 800;
-      padding: 5px 10px; border-radius: 999px;
-      background: var(--accent-soft); color: var(--accent);
-      border: 1px solid var(--accent-line);
+      font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
     }
-
-    /* Floating micro chips around stage */
-    .hero-float {
-      position: absolute;
-      z-index: 4;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
-      border-radius: 14px;
-      background: rgba(255,255,255,.92);
-      border: 1px solid var(--border);
-      box-shadow: 0 12px 28px -10px rgba(20,18,16,.22);
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text);
-      backdrop-filter: blur(12px);
-      animation: heroFloat 4.5s ease-in-out infinite;
-      pointer-events: none;
-    }
-    .hero-float i {
-      width: 26px; height: 26px; border-radius: 8px;
-      display: grid; place-items: center; font-size: 12px;
-    }
-    .hero-float.wa {
-      right: -6px; top: 18%;
-      animation-delay: .4s;
-    }
-    .hero-float.wa i { background: #E8F8F1; color: #0F9F6E; }
-    .hero-float.qr {
-      left: -8px; bottom: 22%;
-      animation-delay: 1.1s;
-    }
-    .hero-float.qr i { background: var(--accent-soft); color: var(--accent); }
-    .hero-float .hf-sub {
-      display: block; font-size: 10px; font-weight: 600; color: var(--text-mute); margin-top: 1px;
-    }
-    @keyframes heroFloat {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-7px); }
-    }
+    .hero-float { display: none; }
 
     /* Logo strip */
     .logo-strip { padding: 16px 0 40px; }
@@ -660,8 +708,7 @@
     /* ===== RESPONSIVE ===== */
     @media (max-width: 980px) {
       .hero-grid { grid-template-columns: 1fr; gap: 40px; }
-      .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; }
-      .hero-float { display: none; }
+      .hero-visual { max-width: 520px; margin: 0 auto; width: 100%; }
       .features-grid { grid-template-columns: repeat(2, 1fr); }
       .empathy-grid, .demo-grid, .pricing-grid { grid-template-columns: 1fr; }
       .pricing-card.featured { order: -1; }
@@ -683,14 +730,11 @@
       .hero-actions { gap: 10px; }
       .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
       .hero-trust { gap: 12px; flex-wrap: wrap; }
-      .hero-panels { grid-template-columns: 1fr; min-height: 0; }
-      .hero-panel-main { grid-row: auto; }
-      .hero-panel-main img { min-height: 200px; max-height: 240px; }
-      .hero-panel-side { display: none; }
-      .hero-float { display: none; }
-      .hero-flow-step { font-size: 11px; padding: 8px 6px; gap: 5px; }
-      .hero-flow-step span.hf-lbl { display: none; }
-      .hero-flow-step i { width: 28px; height: 28px; font-size: 12px; }
+      .hero-ui { grid-template-columns: 1fr 150px; min-height: 300px; }
+      .hui-sb { display: none; }
+      .hui-grid { grid-template-columns: repeat(2, 1fr); }
+      .hui-tickets { grid-template-columns: 1fr; }
+      .hero-flow-step { font-size: 11px; padding: 8px 4px; }
       .float-chip.sync { display: none; }
       .float-chip.wa { right: 4%; top: -14px; }
 
@@ -835,79 +879,121 @@
           </div>
         </div>
 
-        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite product workflow preview">
-          <div class="hero-float qr" aria-hidden="true">
-            <i class="fa-solid fa-qrcode"></i>
-            <span>QR table order<span class="hf-sub">Guest scans · order lands</span></span>
-          </div>
-          <div class="hero-float wa" aria-hidden="true">
-            <i class="fa-brands fa-whatsapp"></i>
-            <span>WhatsApp bill<span class="hf-sub">Instant PDF receipt</span></span>
-          </div>
-
-          <div class="hero-stage">
-            <!-- Connected workflow steps -->
-            <div class="hero-flow" role="list" aria-label="How RestroSuite connects">
-              <div class="hero-flow-step active" role="listitem" data-hero-step="0">
-                <i class="fa-solid fa-cash-register" aria-hidden="true"></i>
-                <span class="hf-lbl">1 · Order</span>
+        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite product workflow">
+          <div class="hero-stage" id="hero-stage" data-view="order">
+            <!-- POS view: text menu only (matches real app — no dish photos) -->
+            <div class="hui-ui hero-ui" id="hui-ui">
+              <aside class="hui-sb" aria-hidden="true">
+                <div class="hui-logo"><i class="fa-solid fa-utensils"></i></div>
+                <div class="hui-nav on" title="POS"><i class="fa-solid fa-cash-register"></i></div>
+                <div class="hui-nav" title="Kitchen"><i class="fa-solid fa-fire-burner"></i></div>
+                <div class="hui-nav" title="Bills"><i class="fa-solid fa-file-invoice"></i></div>
+                <div class="hui-nav" title="Tables"><i class="fa-solid fa-chair"></i></div>
+              </aside>
+              <div class="hui-main">
+                <div class="hui-top">
+                  <h3>Point of Sale</h3>
+                  <span class="live"><i class="fa-solid fa-circle"></i> Live</span>
+                </div>
+                <div class="hui-cats">
+                  <span class="hui-cat on">All</span>
+                  <span class="hui-cat">Mains</span>
+                  <span class="hui-cat">Breads</span>
+                  <span class="hui-cat">Drinks</span>
+                </div>
+                <div class="hui-grid" aria-label="Menu — name and price only">
+                  <div class="hui-item pick"><span class="nm">Butter Chicken</span><div class="meta"><span class="pr">₹320</span><span class="badge nv">Non-veg</span></div></div>
+                  <div class="hui-item pick"><span class="nm">Paneer Tikka</span><div class="meta"><span class="pr">₹249</span><span class="badge">Veg</span></div></div>
+                  <div class="hui-item"><span class="nm">Garlic Naan</span><div class="meta"><span class="pr">₹50</span><span class="badge">Veg</span></div></div>
+                  <div class="hui-item"><span class="nm">Dal Makhani</span><div class="meta"><span class="pr">₹220</span><span class="badge">Veg</span></div></div>
+                  <div class="hui-item pick"><span class="nm">Mango Lassi</span><div class="meta"><span class="pr">₹120</span><span class="badge">Veg</span></div></div>
+                  <div class="hui-item"><span class="nm">Jeera Rice</span><div class="meta"><span class="pr">₹160</span><span class="badge">Veg</span></div></div>
+                </div>
               </div>
+              <aside class="hui-cart">
+                <h4>Current order <span>T12 · 3</span></h4>
+                <div class="hui-line"><div><div class="ln">Butter Chicken</div><div class="lq">1 × ₹320</div></div><div class="lp">₹320</div></div>
+                <div class="hui-line"><div><div class="ln">Paneer Tikka</div><div class="lq">2 × ₹249</div></div><div class="lp">₹498</div></div>
+                <div class="hui-line"><div><div class="ln">Mango Lassi</div><div class="lq">1 × ₹120</div></div><div class="lp">₹120</div></div>
+                <div class="hui-tot">
+                  <div class="row"><span>Subtotal</span><span>₹938</span></div>
+                  <div class="row"><span>GST</span><span>₹47</span></div>
+                  <div class="grand"><span>Total</span><b>₹985</b></div>
+                  <div class="hui-pay">
+                    <button type="button" class="on">Cash</button>
+                    <button type="button">UPI</button>
+                    <button type="button">Card</button>
+                    <button type="button">Due</button>
+                  </div>
+                  <button type="button" class="hui-cta">Print &amp; Pay</button>
+                </div>
+              </aside>
+            </div>
+
+            <!-- Kitchen view -->
+            <div class="hui-kds" id="hui-kds" aria-hidden="true">
+              <div class="hui-kds-head">
+                <h3><i class="fa-solid fa-fire-burner" style="color:var(--accent);margin-right:6px"></i>Kitchen Display</h3>
+                <span class="live" style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;color:#0F9F6E;background:#E8F8F1;padding:3px 8px;border-radius:999px"><i class="fa-solid fa-circle" style="font-size:6px"></i> Queue live</span>
+              </div>
+              <div class="hui-tickets">
+                <div class="hui-ticket">
+                  <div class="th"><span>Table 12</span><em class="hot">8 min</em></div>
+                  <ul style="margin:0;padding:0">
+                    <li>1× Butter Chicken</li>
+                    <li>2× Paneer Tikka</li>
+                    <li>1× Garlic Naan</li>
+                  </ul>
+                  <button type="button" class="tbtn">Mark ready</button>
+                </div>
+                <div class="hui-ticket">
+                  <div class="th"><span>Table 04</span><em>3 min</em></div>
+                  <ul style="margin:0;padding:0">
+                    <li>1× Dal Makhani</li>
+                    <li>2× Jeera Rice</li>
+                  </ul>
+                  <button type="button" class="tbtn">Mark ready</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bill view — text only, no food photos -->
+            <div class="hui-bill" id="hui-bill" aria-hidden="true">
+              <div class="hui-bill-head">
+                <h3><i class="fa-solid fa-file-invoice" style="color:var(--accent);margin-right:6px"></i>Checkout</h3>
+                <span style="font-size:11px;font-weight:700;color:var(--text-mute)">Table 12 · 3 items</span>
+              </div>
+              <div class="hui-bill-card">
+                <div class="br"><span>1× Butter Chicken</span><span>₹320</span></div>
+                <div class="br"><span>2× Paneer Tikka</span><span>₹498</span></div>
+                <div class="br"><span>1× Mango Lassi</span><span>₹120</span></div>
+                <div class="br" style="margin-top:6px"><span>Subtotal</span><span>₹938</span></div>
+                <div class="br"><span>GST (5%)</span><span>₹47</span></div>
+                <div class="br tot"><span>Grand total</span><b>₹985</b></div>
+                <div class="hui-bill-pays" style="margin-top:8px">
+                  <span class="on">Cash</span><span>UPI</span><span>Card</span><span>Due</span>
+                </div>
+                <button type="button" class="hui-cta" style="margin-top:10px"><i class="fa-brands fa-whatsapp"></i> Complete &amp; send WhatsApp</button>
+              </div>
+            </div>
+
+            <div class="hero-flow" role="tablist" aria-label="Product workflow">
+              <button type="button" class="hero-flow-step active" data-hero-step="0" role="tab" aria-selected="true">
+                <i class="fa-solid fa-cash-register" aria-hidden="true"></i> Order
+              </button>
               <span class="hero-flow-arrow" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
-              <div class="hero-flow-step" role="listitem" data-hero-step="1">
-                <i class="fa-solid fa-fire-burner" aria-hidden="true"></i>
-                <span class="hf-lbl">2 · Kitchen</span>
-              </div>
+              <button type="button" class="hero-flow-step" data-hero-step="1" role="tab" aria-selected="false">
+                <i class="fa-solid fa-fire-burner" aria-hidden="true"></i> Kitchen
+              </button>
               <span class="hero-flow-arrow" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>
-              <div class="hero-flow-step" role="listitem" data-hero-step="2">
-                <i class="fa-solid fa-file-invoice" aria-hidden="true"></i>
-                <span class="hf-lbl">3 · Bill</span>
-              </div>
+              <button type="button" class="hero-flow-step" data-hero-step="2" role="tab" aria-selected="false">
+                <i class="fa-solid fa-receipt" aria-hidden="true"></i> Bill
+              </button>
             </div>
-
-            <!-- Real product panels -->
-            <div class="hero-panels">
-              <div class="hero-panel hero-panel-main" data-hero-panel="0">
-                <span class="hero-panel-tag"><span class="dot-live"></span> POS · live</span>
-                <img
-                  id="hero-main-img"
-                  src="assets/screenshot-pos.png?v=9"
-                  width="1400"
-                  height="900"
-                  alt="RestroSuite point of sale — menu grid and cart"
-                  fetchpriority="high"
-                  decoding="async">
-              </div>
-              <div class="hero-panel hero-panel-side" data-hero-panel="1">
-                <span class="hero-panel-tag kit"><i class="fa-solid fa-fire-burner" style="font-size:10px"></i> Kitchen</span>
-                <img
-                  src="assets/hero-kds.png?v=9"
-                  width="900"
-                  height="560"
-                  alt="RestroSuite kitchen display"
-                  loading="lazy"
-                  decoding="async"
-                  onerror="this.src='assets/screenshot-cart.png?v=9'">
-              </div>
-              <div class="hero-panel hero-panel-side" data-hero-panel="2">
-                <span class="hero-panel-tag bill"><i class="fa-solid fa-receipt" style="font-size:10px"></i> Bills</span>
-                <img
-                  src="assets/hero-bills.png?v=9"
-                  width="900"
-                  height="560"
-                  alt="RestroSuite bills history"
-                  loading="lazy"
-                  decoding="async"
-                  onerror="this.src='assets/screenshot-cart.png?v=9'">
-              </div>
-            </div>
-
-            <div class="hero-caption-bar">
-              <div class="hc-left">
-                <b id="hero-cap-title">One clear console</b>
-                <span id="hero-cap-sub">· floor → kitchen → bill, same system</span>
-              </div>
-              <span class="hc-badge"><i class="fa-solid fa-camera" aria-hidden="true"></i> Actual product UI</span>
-            </div>
+          </div>
+          <div class="hero-caption-bar">
+            <div><b id="hero-cap-title">1 · Take the order</b> <span id="hero-cap-sub">· text menu, cart, table — no dish photos needed</span></div>
+            <span class="hc-badge">Matches real product UI</span>
           </div>
         </div>
       </div>
@@ -1441,91 +1527,50 @@
         closeMobileNav();
     });
 
-    // ===== HERO WORKFLOW SHOWCASE =====
+    // ===== HERO WORKFLOW (text UI only — no dish photos) =====
     (function initHeroWorkflow() {
+      var stage = document.getElementById('hero-stage');
       var steps = document.querySelectorAll('[data-hero-step]');
-      var mainImg = document.getElementById('hero-main-img');
       var capTitle = document.getElementById('hero-cap-title');
       var capSub = document.getElementById('hero-cap-sub');
-      if (!steps.length || !mainImg) return;
+      if (!stage || !steps.length) return;
 
-      var scenes = [
-        {
-          src: 'assets/screenshot-pos.png?v=9',
-          title: '1 · Take the order',
-          sub: '· POS menu, cart, tables — ring it up in seconds',
-          alt: 'RestroSuite point of sale — menu and cart'
-        },
-        {
-          src: 'assets/hero-kds.png?v=9',
-          fallback: 'assets/screenshot-cart.png?v=9',
-          title: '2 · Kitchen fires',
-          sub: '· KOT lands on kitchen display the moment you send',
-          alt: 'RestroSuite kitchen display'
-        },
-        {
-          src: 'assets/hero-bills.png?v=9',
-          fallback: 'assets/screenshot-cart.png?v=9',
-          title: '3 · Bill & collect',
-          sub: '· Print, UPI, WhatsApp PDF — guest pays, you move on',
-          alt: 'RestroSuite bills and payments'
-        }
+      var views = ['order', 'kitchen', 'bill'];
+      var copy = [
+        { title: '1 · Take the order', sub: '· text menu + cart — no dish photos needed' },
+        { title: '2 · Kitchen fires', sub: '· tickets land on KDS the moment you send' },
+        { title: '3 · Bill & collect', sub: '· cash, UPI, WhatsApp — guest pays, you move on' }
       ];
-
       var i = 0;
       var timer = null;
 
       function setScene(idx) {
-        i = ((idx % scenes.length) + scenes.length) % scenes.length;
-        var s = scenes[i];
+        i = ((idx % 3) + 3) % 3;
+        stage.setAttribute('data-view', views[i]);
         steps.forEach(function (el, n) {
-          el.classList.toggle('active', n === i);
+          var on = n === i;
+          el.classList.toggle('active', on);
+          el.setAttribute('aria-selected', on ? 'true' : 'false');
         });
-        document.querySelectorAll('.hero-panel-side').forEach(function (panel, n) {
-          // side panels: 0=kitchen, 1=bills → focus when step 1 or 2
-          panel.classList.toggle('is-focus', (i === 1 && n === 0) || (i === 2 && n === 1));
-        });
-        // Crossfade main image
-        mainImg.style.opacity = '0.35';
-        mainImg.style.transition = 'opacity .28s ease';
-        setTimeout(function () {
-          mainImg.alt = s.alt;
-          mainImg.onerror = function () {
-            if (s.fallback) mainImg.src = s.fallback;
-          };
-          mainImg.src = s.src;
-          mainImg.style.opacity = '1';
-        }, 160);
-        if (capTitle) capTitle.textContent = s.title;
-        if (capSub) capSub.textContent = s.sub;
+        if (capTitle) capTitle.textContent = copy[i].title;
+        if (capSub) capSub.textContent = copy[i].sub;
       }
-
       function start() {
         stop();
-        timer = setInterval(function () { setScene(i + 1); }, 3200);
+        timer = setInterval(function () { setScene(i + 1); }, 3400);
       }
       function stop() {
         if (timer) clearInterval(timer);
         timer = null;
       }
-
       steps.forEach(function (el) {
-        el.style.cursor = 'pointer';
         el.addEventListener('click', function () {
-          var n = Number(el.getAttribute('data-hero-step'));
-          setScene(n);
+          setScene(Number(el.getAttribute('data-hero-step')) || 0);
           start();
         });
       });
-
-      // Pause auto-cycle when user hovers the stage
-      var stage = document.querySelector('.hero-stage');
-      if (stage) {
-        stage.addEventListener('mouseenter', stop);
-        stage.addEventListener('mouseleave', start);
-        stage.addEventListener('touchstart', function () { stop(); }, { passive: true });
-      }
-
+      stage.addEventListener('mouseenter', stop);
+      stage.addEventListener('mouseleave', start);
       setScene(0);
       start();
     })();
