@@ -243,13 +243,20 @@
       --paper: #FFFEFB;
       position: relative;
       width: 100%;
-      height: 540px;
-      min-height: 540px;
-      /* Open canvas — no heavy frame (like CodeArc) */
-      background: transparent;
-      border: none;
-      box-shadow: none;
-      overflow: visible;
+      height: 560px;
+      min-height: 560px;
+      /* Soft stage like CodeArc cream panel */
+      background:
+        radial-gradient(ellipse 80% 70% at 70% 40%, rgba(255,255,255,.65), transparent 70%),
+        linear-gradient(165deg, #F3EFE8 0%, #EBE6DD 100%);
+      border: 1px solid rgba(20,18,16,.06);
+      border-radius: 28px;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.8) inset,
+        0 24px 56px -28px rgba(20,18,16,.2);
+      overflow: hidden;
+      padding: 12px;
+      box-sizing: border-box;
     }
     .flow-svg {
       position: absolute;
@@ -420,8 +427,20 @@
     }
     .flow-card .fc-foot b { color: #1a1917; font-weight: 800; }
 
+    .flow-card.wa .fc-ico { background: #DCFCE7; color: #16A34A; }
+    .flow-card.wa {
+      width: 168px; right: 28%; top: 38%;
+      border-radius: 16px;
+    }
+    .flow-card.wa .wa-bubble {
+      background: #fff; border-radius: 12px; padding: 10px 11px;
+      border: 1px solid rgba(22,163,74,.15);
+      font-size: 11px; line-height: 1.45; color: #3d4a42;
+      box-shadow: 0 2px 10px rgba(22,163,74,.08);
+    }
+    .flow-card.wa .wa-bubble b { color: #15803D; }
     /* --- POS (anchor, larger) --- */
-    .flow-card.pos { width: 236px; left: 2%; top: 14%; }
+    .flow-card.pos { width: 236px; left: 3%; top: 12%; }
     .flow-card .cline {
       display: flex; align-items: center; gap: 7px;
       padding: 7px 8px; border-radius: 10px; margin-bottom: 5px;
@@ -453,7 +472,7 @@
     }
 
     /* --- Kitchen --- */
-    .flow-card.kds { width: 200px; right: 3%; top: 10%; }
+    .flow-card.kds { width: 200px; right: 4%; top: 9%; }
     .flow-card .kds-ticket {
       display: flex; justify-content: space-between; align-items: center; gap: 6px;
       padding: 8px 9px; border-radius: 10px; margin-bottom: 6px;
@@ -478,7 +497,7 @@
     }
 
     /* --- Floor --- */
-    .flow-card.floor { width: 196px; left: 8%; bottom: 4%; }
+    .flow-card.floor { width: 196px; left: 6%; bottom: 6%; }
     .flow-card .tbl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
     .flow-card .tbl-pill {
       padding: 9px 8px 8px; border-radius: 12px;
@@ -494,7 +513,7 @@
     .flow-card .tbl-pill.occ .st { color: #FF4F00; }
 
     /* --- Bills --- */
-    .flow-card.bills { width: 200px; right: 4%; bottom: 5%; }
+    .flow-card.bills { width: 200px; right: 5%; bottom: 7%; }
     .flow-card .bill-row {
       display: flex; justify-content: space-between; align-items: center; gap: 6px;
       padding: 8px 9px; border-radius: 10px; margin-bottom: 6px;
@@ -846,38 +865,43 @@
       min-height: 44px; font-size: 13px; font-weight: 800; border-radius: 10px;
     }
     /* Customer phone on cart — same idea as live POS (optional; auto-WA on pay) */
-    /* Customer chip + expand — same pattern as live POS cart-cust-toggle */
-    .rs-pos-sandbox .cart-meta-row {
-      flex-wrap: wrap;
+    /* Guest name + WhatsApp — always visible, required for sandbox bill */
+    .rs-pos-sandbox .cart-guest-required {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 10px 10px 10px;
+      border-bottom: 1px solid var(--rs-pos-stroke);
+      background: color-mix(in srgb, var(--rs-pos-panel) 92%, #fff7ed);
     }
-    .rs-pos-sandbox .cart-cust-toggle {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 6px 10px; border-radius: 9px; cursor: pointer;
-      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-glass);
-      font-size: 12px; font-weight: 700; color: var(--rs-pos-soft);
-      font-family: inherit;
+    .rs-pos-sandbox .sandbox-guest-head {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     }
-    .rs-pos-sandbox .cart-cust-toggle:hover { border-color: rgba(255,79,0,.35); color: var(--rs-pos-orange); }
-    .rs-pos-sandbox .cart-cust-toggle i.fa-user { color: var(--rs-pos-orange); }
-    .rs-pos-sandbox .cart-cust-toggle .cart-cust-hint {
-      font-size: 10px; font-weight: 700; opacity: .7; text-transform: lowercase;
+    .rs-pos-sandbox .req-pill {
+      margin-left: auto; font-size: 10px; font-weight: 800;
+      padding: 2px 8px; border-radius: 999px;
+      background: rgba(255,79,0,.12); color: #FF4F00;
+      border: 1px solid rgba(255,79,0,.25);
     }
-    .rs-pos-sandbox .cart-cust-toggle .cart-cust-chevron { font-size: 10px; opacity: .55; margin-left: 2px; }
-    .rs-pos-sandbox .cart-cust-toggle.is-open .cart-cust-chevron { transform: rotate(180deg); }
-    .rs-pos-sandbox .cart-cust-toggle.has-phone {
-      border-color: rgba(37,211,102,.4); background: rgba(37,211,102,.08); color: #0F9F6E;
+    .rs-pos-sandbox .req-pill.ok {
+      background: #E8F8F1; color: #0F9F6E; border-color: #BBF7D0;
     }
-    .rs-pos-sandbox .cart-cust-direct {
-      display: none; flex-direction: column; gap: 6px;
-      width: 100%; margin-top: 8px; padding: 10px;
-      border-radius: 12px; border: 1px solid var(--rs-pos-stroke-2);
-      background: var(--rs-pos-panel); box-shadow: 0 8px 22px rgba(0,0,0,.06);
+    .rs-pos-sandbox .sandbox-guest-fields {
+      display: grid; grid-template-columns: 1fr 1.15fr; gap: 8px;
     }
-    .rs-pos-sandbox .cart-cust-direct.is-open { display: flex; }
-    .rs-pos-sandbox .cart-cust-fields {
-      display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 6px;
+    .rs-pos-sandbox .sg-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .rs-pos-sandbox .sg-label {
+      font-size: 10.5px; font-weight: 800; color: var(--rs-pos-soft);
     }
-    .rs-pos-sandbox .cart-cust-fields .form-input { height: 38px; font-size: 13px; min-width: 0; }
+    .rs-pos-sandbox .sg-label span { color: #FF4F00; }
+    .rs-pos-sandbox .sandbox-guest-fields .form-input {
+      height: 40px; font-size: 13px; font-weight: 600; min-width: 0;
+    }
+    .rs-pos-sandbox .sandbox-guest-fields .form-input.is-invalid {
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.12);
+    }
+    .rs-pos-sandbox .sandbox-guest-fields .form-input.is-valid {
+      border-color: rgba(15,159,110,.45) !important;
+    }
     .rs-pos-sandbox .sandbox-phone-row { display: flex; gap: 6px; align-items: stretch; }
     .rs-pos-sandbox .sandbox-prefix {
       display: grid; place-items: center; padding: 0 10px; border-radius: 9px;
@@ -885,43 +909,19 @@
       font-weight: 800; font-size: 12.5px; color: var(--rs-pos-text); flex: none;
     }
     .rs-pos-sandbox .sandbox-phone-row .form-input {
-      flex: 1; min-width: 0; height: 38px; font-weight: 600;
+      flex: 1; min-width: 0; height: 40px; font-weight: 600;
       font-variant-numeric: tabular-nums; letter-spacing: .02em;
     }
-    .rs-pos-sandbox .cart-cust-direct .ph-hint {
+    .rs-pos-sandbox .cart-guest-required .ph-hint {
       font-size: 10.5px; font-weight: 600; color: var(--rs-pos-mute); line-height: 1.35;
     }
-    .rs-pos-sandbox .cart-cust-direct .ph-hint.has-num { color: #0F9F6E; }
-    /* Ask-for-number modal (Print & Pay when no mobile) — same idea as live POS */
-    .sim-ask-phone-overlay {
-      position: fixed; inset: 0; z-index: 3100;
-      background: rgba(0,0,0,.55); display: none;
-      align-items: center; justify-content: center; padding: 20px;
+    .rs-pos-sandbox .cart-guest-required .ph-hint.has-num { color: #0F9F6E; }
+    .rs-pos-sandbox .cart-guest-required .ph-hint.err { color: #dc2626; }
+    @media (max-width: 520px) {
+      .rs-pos-sandbox .sandbox-guest-fields { grid-template-columns: 1fr; }
     }
-    .sim-ask-phone-overlay.show { display: flex; }
-    .sim-ask-phone-card {
-      width: min(400px, 100%); background: var(--panel-solid, #fff);
-      border-radius: 16px; border: 1px solid var(--border);
-      box-shadow: 0 24px 60px rgba(0,0,0,.28); overflow: hidden;
-    }
-    .sim-ask-phone-card .aph-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px; border-bottom: 1px solid var(--border);
-      font-size: 15px; font-weight: 800;
-    }
-    .sim-ask-phone-card .aph-head i { color: #25d366; margin-right: 8px; }
-    .sim-ask-phone-card .aph-body { padding: 16px; }
-    .sim-ask-phone-card .aph-body label {
-      display: block; font-size: 12px; font-weight: 700; color: var(--text-soft); margin-bottom: 6px;
-    }
-    .sim-ask-phone-card .aph-body .sandbox-phone-row { margin-bottom: 8px; }
-    .sim-ask-phone-card .aph-body p {
-      margin: 0; font-size: 12px; color: var(--text-mute); line-height: 1.4;
-    }
-    .sim-ask-phone-card .aph-foot {
-      display: flex; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--border);
-    }
-    .sim-ask-phone-card .aph-foot .btn { flex: 1; min-height: 42px; font-weight: 800; }
+    /* Keep ask-phone modal CSS for fallback but rarely used when fields always shown */
+    .sim-ask-phone-overlay { display: none !important; }
     /* Success banner on bill settled (auto WhatsApp) */
     .sim-wa-banner {
       display: none; align-items: flex-start; gap: 10px;
@@ -1328,24 +1328,27 @@
 
             <!-- Solid green connectors — routed in open space (CodeArc style) -->
             <svg class="flow-svg" viewBox="0 0 560 540" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <!-- POS → Kitchen -->
-              <path id="path-pos-kds" class="flow-path" d="M 230 160 C 300 95, 370 95, 430 130" />
-              <!-- Kitchen → Bills -->
-              <path id="path-kds-bills" class="flow-path dim" d="M 470 200 C 500 270, 495 340, 460 400" />
-              <!-- POS → Floor -->
-              <path id="path-pos-floor" class="flow-path dim" d="M 140 290 C 120 350, 125 400, 160 455" />
-              <!-- Floor → Bills -->
-              <path id="path-floor-bills" class="flow-path dim" d="M 250 480 C 320 505, 380 500, 430 450" />
-              <circle class="flow-node" cx="230" cy="160" r="5" />
-              <circle class="flow-node" cx="430" cy="130" r="5" />
-              <circle class="flow-node" cx="160" cy="455" r="5" />
-              <circle class="flow-node" cx="460" cy="400" r="5" />
+              <defs>
+                <marker id="flow-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#2A6B5A" opacity=".7"/>
+                </marker>
+              </defs>
+              <path id="path-pos-kds" class="flow-path" d="M 230 155 C 310 90, 380 95, 430 125" marker-end="url(#flow-arrow)" />
+              <path id="path-kds-bills" class="flow-path dim" d="M 475 200 C 510 280, 500 360, 455 415" marker-end="url(#flow-arrow)" />
+              <path id="path-pos-floor" class="flow-path dim" d="M 135 290 C 115 360, 120 410, 155 460" marker-end="url(#flow-arrow)" />
+              <path id="path-floor-bills" class="flow-path dim" d="M 245 485 C 320 515, 385 505, 430 455" marker-end="url(#flow-arrow)" />
+              <path id="path-bills-wa" class="flow-path dim" d="M 430 400 C 390 350, 370 300, 360 255" marker-end="url(#flow-arrow)" />
+              <circle class="flow-node" cx="230" cy="155" r="5" />
+              <circle class="flow-node" cx="430" cy="125" r="5" />
+              <circle class="flow-node" cx="155" cy="460" r="5" />
+              <circle class="flow-node" cx="455" cy="415" r="5" />
+              <circle class="flow-node" cx="360" cy="255" r="4.5" />
               <circle id="flow-packet" class="flow-packet" r="6" cx="0" cy="0" />
             </svg>
 
-            <span class="flow-label" style="left:38%;top:7%">one clear experience</span>
-            <span class="flow-label" style="right:2%;top:48%">works everywhere</span>
-            <span class="flow-label" style="left:34%;bottom:0">built around your floor</span>
+            <span class="flow-label" style="left:36%;top:5%">one clear experience</span>
+            <span class="flow-label" style="right:4%;top:46%">works everywhere</span>
+            <span class="flow-label" style="left:30%;bottom:2%">built around your floor</span>
 
             <!-- POS -->
             <article class="flow-card pos active" data-seg="pos" id="seg-pos">
@@ -1405,9 +1408,21 @@
               </div>
               <div class="fc-foot"><span>Today</span><b id="bills-total">₹0</b></div>
             </article>
+
+            <!-- WhatsApp -->
+            <article class="flow-card wa" data-seg="wa" id="seg-wa">
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-brands fa-whatsapp"></i></span>
+                <span class="fc-name">WhatsApp</span>
+                <span class="fc-badge" id="wa-badge">Idle</span>
+              </div>
+              <div class="fc-body" id="wa-body">
+                <div class="wa-bubble">Waiting for paid bill…</div>
+              </div>
+            </article>
           </div>
           <div class="flow-caption">
-            <div><b>One console</b> · POS → Kitchen → Floor → Bills</div>
+            <div><b>One console</b> · POS → Kitchen → Floor → Bills → WhatsApp</div>
             <span class="hc-badge">Live sync · same order data</span>
           </div>
         </div>
@@ -1502,20 +1517,20 @@
         <div class="section-head">
           <span class="eyebrow">Interactive sandbox</span>
           <h2>Try a 30-second bill</h2>
-          <p>Tap items → tax adds automatically → <b>Print &amp; close</b> or send a demo WhatsApp invoice. Same flow as the real POS — no signup.</p>
+          <p>Enter guest <b>name + mobile</b> (required) → add items → <b>Print &amp; Pay</b>. WhatsApp bill sends automatically. Same as live POS — no signup.</p>
         </div>
         <div class="demo-grid rs-pos-sandbox">
           <div class="pos-menu-pane">
             <div class="pos-menu-toolbar">
               <h3><i class="fa-solid fa-utensils" aria-hidden="true"></i> Menu</h3>
-              <span class="pos-menu-hint" id="sandbox-status-text">Tap to add · same as live POS</span>
+              <span class="pos-menu-hint" id="sandbox-status-text">Name + mobile required · then tap items</span>
             </div>
             <div class="pos-grid" id="sim-menu-grid" role="group" aria-label="Menu items">
               <!-- populated by JS — exact POS item tiles -->
             </div>
             <p class="demo-foot-note">
               <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-              <span>Same menu tiles &amp; cart as the real POS. Live outlet also sends KOT to Kitchen Display.</span>
+              <span>Guest name and WhatsApp number must be filled before billing — same idea as live POS.</span>
             </p>
           </div>
 
@@ -1530,36 +1545,35 @@
                 </button>
               </div>
             </div>
-            <div class="cart-meta-row" style="flex-direction:column;align-items:stretch;gap:0">
-              <div style="display:flex;align-items:center;gap:8px;width:100%">
-                <button type="button" class="cart-cust-toggle is-walkin" id="sandbox-cust-toggle"
-                  aria-expanded="false" aria-controls="sandbox-cust-direct" title="Add customer (optional)"
-                  onclick="toggleSandboxCustomer()">
-                  <i class="fa-solid fa-user" aria-hidden="true"></i>
-                  <span class="cart-cust-label" id="sandbox-cust-label">Walk-in</span>
-                  <span class="cart-cust-hint">optional</span>
-                  <i class="fa-solid fa-chevron-down cart-cust-chevron" aria-hidden="true"></i>
-                </button>
-                <span class="cart-walkin-chip" style="margin-left:auto"><i class="fa-solid fa-chair" aria-hidden="true"></i> Table 4</span>
+            <!-- Always-visible guest fields — required for sandbox bill -->
+            <div class="cart-meta-row cart-guest-required" id="sandbox-guest-block">
+              <div class="sandbox-guest-head">
+                <span class="cart-walkin-chip"><i class="fa-solid fa-user" aria-hidden="true"></i> Guest</span>
+                <span class="cart-walkin-chip"><i class="fa-solid fa-chair" aria-hidden="true"></i> Table 4</span>
+                <span class="req-pill" id="sandbox-req-pill">Required</span>
               </div>
-              <div class="cart-cust-direct" id="sandbox-cust-direct" hidden>
-                <div class="cart-cust-fields">
-                  <input type="text" id="sandbox-cust-name" class="form-input" placeholder="Name" autocomplete="name" title="Guest name" oninput="refreshSandboxCustChip()">
+              <div class="cart-cust-fields sandbox-guest-fields">
+                <div class="sg-field">
+                  <label class="sg-label" for="sandbox-cust-name">Name <span>*</span></label>
+                  <input type="text" id="sandbox-cust-name" class="form-input" placeholder="Guest name"
+                    autocomplete="name" required oninput="onSandboxGuestInput()">
+                </div>
+                <div class="sg-field">
+                  <label class="sg-label" for="sandbox-phone">WhatsApp <span>*</span></label>
                   <div class="sandbox-phone-row">
                     <span class="sandbox-prefix" id="sandbox-prefix">+91</span>
-                    <input type="tel" id="sandbox-phone" placeholder="10-digit mobile"
-                      class="form-input" oninput="onSandboxPhoneInput()"
-                      inputmode="numeric" maxlength="10" autocomplete="tel-national"
-                      aria-label="Customer WhatsApp number">
+                    <input type="tel" id="sandbox-phone" placeholder="10-digit mobile" class="form-input"
+                      inputmode="numeric" maxlength="10" autocomplete="tel-national" required
+                      aria-label="Customer WhatsApp number" oninput="onSandboxGuestInput()">
                   </div>
                 </div>
-                <div class="ph-hint" id="sandbox-phone-hint">Mobile for WhatsApp bill — auto-sends on Print &amp; Pay</div>
               </div>
+              <div class="ph-hint" id="sandbox-phone-hint">Name + mobile required — bill and WhatsApp will not run without them</div>
             </div>
             <div class="cart-items" id="sim-cart-content" aria-live="polite" aria-label="Shopping cart">
               <div class="cart-empty">
                 <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
-                <div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div>
+                <div>Cart is empty<br><span style="font-size:12px">Fill name + mobile, then tap menu items</span></div>
               </div>
             </div>
             <div class="cart-foot" id="sandbox-cart-foot" style="display:none">
@@ -2033,19 +2047,22 @@
         pos: document.getElementById('seg-pos'),
         kds: document.getElementById('seg-kds'),
         qr: document.getElementById('seg-qr'),
-        bills: document.getElementById('seg-bills')
+        bills: document.getElementById('seg-bills'),
+        wa: document.getElementById('seg-wa')
       };
       var badges = {
         pos: document.getElementById('pos-badge'),
         kds: document.getElementById('kds-badge'),
         qr: document.getElementById('qr-badge'),
-        bills: document.getElementById('bills-badge')
+        bills: document.getElementById('bills-badge'),
+        wa: document.getElementById('wa-badge')
       };
       var pathMap = {
         'pos-kds': document.getElementById('path-pos-kds'),
         'pos-floor': document.getElementById('path-pos-floor'),
         'kds-bills': document.getElementById('path-kds-bills'),
-        'floor-bills': document.getElementById('path-floor-bills')
+        'floor-bills': document.getElementById('path-floor-bills'),
+        'bills-wa': document.getElementById('path-bills-wa')
       };
       var step = 0;
       var timer = null;
@@ -2197,17 +2214,31 @@
           var qc = document.getElementById('qr-count');
           if (qc) qc.textContent = '0 / 12';
           if (badges.qr) { badges.qr.textContent = 'Tables'; badges.qr.className = 'fc-badge'; }
-          flashMsg('Bill paid · table free · same total');
+          flashMsg('Bill paid · WhatsApp next');
           recv(cards.bills);
+          flow('bills-wa');
+        },
+        function () {
+          setActive('wa');
+          if (badges.wa) { badges.wa.textContent = 'Sent'; badges.wa.className = 'fc-badge on'; }
+          var wa = document.getElementById('wa-body');
+          if (wa) {
+            wa.innerHTML = '<div class="wa-bubble"><b>Priya</b><br>Bill RS-23041 · T12<br>Total <b>₹859</b><br>Thank you!</div>';
+          }
+          flashMsg('WhatsApp invoice delivered');
+          recv(cards.wa);
           flow('floor-bills');
         },
         function () {
           if (badges.pos) { badges.pos.textContent = 'Ready'; badges.pos.className = 'fc-badge on'; }
           if (badges.bills) { badges.bills.textContent = 'Ready'; badges.bills.className = 'fc-badge'; }
+          if (badges.wa) { badges.wa.textContent = 'Idle'; badges.wa.className = 'fc-badge'; }
           var pb = document.getElementById('pos-body');
           if (pb) pb.innerHTML = posHtml('open');
           var bb = document.getElementById('bills-body');
           if (bb) bb.innerHTML = '<div class="bill-row"><span>Last bill <span class="paid">PAID</span></span><span class="amt">₹859</span></div>';
+          var wa = document.getElementById('wa-body');
+          if (wa) wa.innerHTML = '<div class="wa-bubble">Waiting for paid bill…</div>';
           setActive('pos');
           clearPaths();
           flashMsg('Loop resets · every tab shares one truth');
@@ -2270,53 +2301,9 @@
       var el = document.getElementById('sandbox-status-text');
       if (el) el.textContent = text || 'Tap to add · same as live POS';
     }
-    function toggleSandboxCustomer(forceOpen) {
-      var panel = document.getElementById('sandbox-cust-direct');
-      var btn = document.getElementById('sandbox-cust-toggle');
-      if (!panel || !btn) return;
-      var open = forceOpen === true ? true : forceOpen === false ? false : !panel.classList.contains('is-open');
-      panel.classList.toggle('is-open', open);
-      if (open) panel.removeAttribute('hidden');
-      else panel.setAttribute('hidden', '');
-      btn.classList.toggle('is-open', open);
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) {
-        var ph = document.getElementById('sandbox-phone');
-        if (ph) setTimeout(function () { ph.focus(); }, 40);
-      }
-    }
-    function refreshSandboxCustChip() {
-      var btn = document.getElementById('sandbox-cust-toggle');
-      var label = document.getElementById('sandbox-cust-label');
-      var nameEl = document.getElementById('sandbox-cust-name');
-      var full = getSandboxFullPhone();
-      var name = nameEl ? String(nameEl.value || '').trim() : '';
-      if (!btn || !label) return;
-      if (full || name) {
-        btn.classList.add('has-phone');
-        label.textContent = name || full || 'Customer';
-      } else {
-        btn.classList.remove('has-phone');
-        label.textContent = 'Walk-in';
-      }
-    }
-    function onSandboxPhoneInput() {
-      var phone = document.getElementById('sandbox-phone');
-      var hint = document.getElementById('sandbox-phone-hint');
-      if (!phone || !hint) return;
-      var need = (simCfg().dialDigits) || 10;
-      var digits = phone.value.replace(/\D/g, '');
-      if (digits.length === need) {
-        hint.textContent = '✓ WhatsApp bill will send automatically on Print & Pay';
-        hint.classList.add('has-num');
-      } else if (digits.length > 0) {
-        hint.textContent = 'Enter full ' + need + '-digit mobile';
-        hint.classList.remove('has-num');
-      } else {
-        hint.textContent = 'Mobile for WhatsApp bill — auto-sends on Print & Pay';
-        hint.classList.remove('has-num');
-      }
-      refreshSandboxCustChip();
+    function getSandboxGuestName() {
+      var el = document.getElementById('sandbox-cust-name');
+      return el ? String(el.value || '').trim() : '';
     }
     function getSandboxFullPhone() {
       var phoneEl = document.getElementById('sandbox-phone');
@@ -2331,54 +2318,86 @@
       if (raw.length !== need) return '';
       return (cfg.dial || '+91') + raw;
     }
-    var _simAskPhoneResolve = null;
-    function askSandboxWhatsAppPhone() {
-      return new Promise(function (resolve) {
-        var ov = document.getElementById('sim-ask-phone');
-        var inp = document.getElementById('sim-ask-phone-input');
-        var pre = document.getElementById('sim-ask-phone-prefix');
-        var cfg = simCfg();
-        if (pre) pre.textContent = cfg.dial || '+91';
-        if (inp) {
-          inp.maxLength = cfg.dialDigits || 10;
-          inp.placeholder = (cfg.dialDigits || 10) + '-digit mobile';
-          inp.value = '';
-        }
-        _simAskPhoneResolve = resolve;
-        if (ov) ov.classList.add('show');
-        if (inp) setTimeout(function () { inp.focus(); }, 50);
-      });
+    /** Name + valid mobile required — without these, sandbox billing is blocked. */
+    function isSandboxGuestReady() {
+      return !!(getSandboxGuestName() && getSandboxFullPhone());
     }
-    function closeSimAskPhone(val) {
-      var ov = document.getElementById('sim-ask-phone');
-      if (ov) ov.classList.remove('show');
-      var r = _simAskPhoneResolve;
-      _simAskPhoneResolve = null;
-      if (r) r(val);
-    }
-    function confirmSimAskPhone() {
-      var inp = document.getElementById('sim-ask-phone-input');
-      var cfg = simCfg();
-      var raw = inp ? inp.value.replace(/\D/g, '') : '';
-      var need = cfg.dialDigits || 10;
-      if (raw.length !== need) {
-        showSandboxToast('Enter a valid ' + need + '-digit mobile', true);
-        if (inp) inp.focus();
-        return;
+    function onSandboxGuestInput() {
+      var nameEl = document.getElementById('sandbox-cust-name');
+      var phoneEl = document.getElementById('sandbox-phone');
+      var hint = document.getElementById('sandbox-phone-hint');
+      var pill = document.getElementById('sandbox-req-pill');
+      var need = (simCfg().dialDigits) || 10;
+      var name = getSandboxGuestName();
+      var digits = phoneEl ? phoneEl.value.replace(/\D/g, '') : '';
+      var phoneOk = digits.length === need;
+      if (nameEl) {
+        nameEl.classList.toggle('is-valid', !!name);
+        nameEl.classList.toggle('is-invalid', !name && nameEl === document.activeElement);
       }
-      // Mirror into cart field so receipt + chip stay consistent
-      var cartPh = document.getElementById('sandbox-phone');
-      if (cartPh) cartPh.value = raw;
-      onSandboxPhoneInput();
-      closeSimAskPhone((cfg.dial || '+91') + raw);
+      if (phoneEl) {
+        phoneEl.classList.toggle('is-valid', phoneOk);
+        phoneEl.classList.toggle('is-invalid', digits.length > 0 && !phoneOk);
+      }
+      if (hint) {
+        hint.classList.remove('has-num', 'err');
+        if (name && phoneOk) {
+          hint.textContent = '✓ Guest ready — add items, then Print & Pay (WhatsApp auto-sends)';
+          hint.classList.add('has-num');
+        } else if (!name && !digits) {
+          hint.textContent = 'Name + mobile required — bill and WhatsApp will not run without them';
+        } else if (!name) {
+          hint.textContent = 'Enter guest name to continue';
+          hint.classList.add('err');
+        } else if (!phoneOk) {
+          hint.textContent = 'Enter full ' + need + '-digit WhatsApp mobile';
+          hint.classList.add('err');
+        }
+      }
+      if (pill) {
+        if (name && phoneOk) {
+          pill.textContent = 'Ready';
+          pill.classList.add('ok');
+        } else {
+          pill.textContent = 'Required';
+          pill.classList.remove('ok');
+        }
+      }
+      var btn = document.getElementById('btn-trigger-sim');
+      if (btn) {
+        btn.disabled = !isSandboxGuestReady() || Object.keys(simCart).length === 0;
+        btn.title = !isSandboxGuestReady()
+          ? 'Enter guest name and WhatsApp number first'
+          : Object.keys(simCart).length === 0
+            ? 'Add items first'
+            : 'Print & Pay + WhatsApp bill';
+      }
     }
-    document.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter' && e.key !== 'Escape') return;
-      var ov = document.getElementById('sim-ask-phone');
-      if (!ov || !ov.classList.contains('show')) return;
-      if (e.key === 'Enter') { e.preventDefault(); confirmSimAskPhone(); }
-      if (e.key === 'Escape') { e.preventDefault(); closeSimAskPhone(null); }
-    });
+    function requireSandboxGuest(focusField) {
+      if (isSandboxGuestReady()) return true;
+      onSandboxGuestInput();
+      var nameEl = document.getElementById('sandbox-cust-name');
+      var phoneEl = document.getElementById('sandbox-phone');
+      if (!getSandboxGuestName()) {
+        if (nameEl) {
+          nameEl.classList.add('is-invalid');
+          nameEl.focus();
+        }
+        showSandboxToast('Enter guest name — required for billing', true);
+        return false;
+      }
+      if (!getSandboxFullPhone()) {
+        if (phoneEl) {
+          phoneEl.classList.add('is-invalid');
+          phoneEl.focus();
+        }
+        showSandboxToast('Enter WhatsApp mobile — required for billing', true);
+        return false;
+      }
+      return true;
+    }
+    // legacy alias used by render paths
+    function onSandboxPhoneInput() { onSandboxGuestInput(); }
     function setSimWaBanner(state, title, sub) {
       var ban = document.getElementById('sim-wa-banner');
       var t = document.getElementById('sim-wa-title');
@@ -2393,6 +2412,7 @@
       if (ban) ban.className = 'sim-wa-banner';
     }
     function addToSimCart(name, price, taxRate, cat, color, veg) {
+      if (!requireSandboxGuest()) return;
       var tr = taxRate || (simCfg().taxRate || 5);
       if (simCart[name]) {
         simCart[name].qty++;
@@ -2419,13 +2439,12 @@
     }
     function clearSimCart() {
       simCart = {};
-      var phone = document.getElementById('sandbox-phone');
-      if (phone) phone.value = '';
-      onSandboxPhoneInput();
-      setSandboxStatus('Tap to add · same as live POS');
+      // Keep name + phone — guest stays for next bill (like live POS session)
+      setSandboxStatus(isSandboxGuestReady() ? 'Guest ready · add items' : 'Name + mobile required');
       renderSimCart();
       renderSimMenu();
-      showSandboxToast('Cart cleared — tap menu items to start again', false);
+      onSandboxGuestInput();
+      showSandboxToast('Cart cleared — guest name/mobile kept', false);
     }
     function renderSimCart() {
       const container = document.getElementById('sim-cart-content');
@@ -2475,10 +2494,10 @@
       if (grandEl) grandEl.textContent = simMoney(totals.total);
       var printBtn = document.getElementById('btn-trigger-sim');
       if (printBtn) printBtn.dataset.total = totals.total;
-      onSandboxPhoneInput();
+      onSandboxGuestInput();
     }
     /** Build thermal receipt HTML matching live POS Bill settled preview. */
-    function buildSandboxReceiptHtml(billNo, totals, payMethod) {
+    function buildSandboxReceiptHtml(billNo, totals, payMethod, guestName, fullPhone) {
       var cfg = totals.cfg || simCfg();
       var $ = function (n) { return simMoney(n); };
       var now = new Date();
@@ -2511,21 +2530,19 @@
           ' (' + (cfg.taxRate || 0) + '%)</span><span>' + $(totals.tax) + '</span></div>';
       }
       var pay = payMethod || 'Cash';
+      var cust = guestName || getSandboxGuestName() || 'Guest';
+      var wa = fullPhone || getSandboxFullPhone() || '';
       return (
         '<div class="receipt-paper">' +
           '<div class="rcp-center">' +
             '<div class="rcp-logo">RestroSuite Demo</div>' +
-            '<div class="rcp-sub">Table 4 · Walk-in / Takeaway</div>' +
-            '<div class="rcp-sub">Phone +919983721179</div>' +
+            '<div class="rcp-sub">Table 4 · Dine-in</div>' +
           '</div>' +
           '<hr class="rcp-hr">' +
           '<div class="rcp-meta"><span>' + billNo + '</span><span>' + timeStr + '</span></div>' +
           '<div class="rcp-meta"><span>Table:</span><span>Table 4</span></div>' +
-          '<div class="rcp-meta"><span>Customer:</span><span>Walk-in</span></div>' +
-          (function () {
-            var p = getSandboxFullPhone();
-            return p ? '<div class="rcp-meta"><span>WhatsApp:</span><span>' + p + '</span></div>' : '';
-          })() +
+          '<div class="rcp-meta"><span>Customer:</span><span>' + cust.replace(/</g, '&lt;') + '</span></div>' +
+          (wa ? '<div class="rcp-meta"><span>WhatsApp:</span><span>' + wa + '</span></div>' : '') +
           '<hr class="rcp-hr">' +
           itemsHtml +
           '<hr class="rcp-hr">' +
@@ -2538,8 +2555,9 @@
         '</div>'
       );
     }
-    /** Print & Pay — like live POS: ask for WhatsApp number if missing, then send. */
+    /** Print & Pay — blocked without name + mobile; then auto WhatsApp. */
     async function triggerSimulatedReceipt() {
+      if (!requireSandboxGuest()) return;
       var totals = simTaxFromCart();
       if (!totals.subtotal) {
         showSandboxToast('Add items first', true);
@@ -2548,53 +2566,34 @@
       var billNo = buildBillNo();
       var pay = simPayMethod || 'Cash';
       var fullPhone = getSandboxFullPhone();
-
-      // No number on cart → ask (same as live POS WhatsApp flow)
-      if (!fullPhone) {
-        toggleSandboxCustomer(true);
-        var asked = await askSandboxWhatsAppPhone();
-        if (asked === null) {
-          // User cancelled ask dialog — abort settle
-          return;
-        }
-        // '' = Print only; non-empty = full phone from confirm
-        fullPhone = asked || '';
-      }
+      var guestName = getSandboxGuestName();
 
       var cartSnap = {};
       Object.keys(simCart).forEach(function (k) {
         cartSnap[k] = Object.assign({}, simCart[k]);
       });
-      var html = buildSandboxReceiptHtml(billNo, totals, pay);
+      var html = buildSandboxReceiptHtml(billNo, totals, pay, guestName, fullPhone);
       setSandboxStatus('Bill closed');
       showModal('Bill settled', html);
       hideSimWaBanner();
 
-      if (fullPhone) {
-        setSimWaBanner('pending', 'Sending WhatsApp bill...', 'To ' + fullPhone + ' · same preview as receipt');
-        showSandboxToast('Bill settled · sending WhatsApp...', false);
-        try {
-          var ok = await autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone);
-          if (ok) {
-            setSimWaBanner('ok', 'WhatsApp bill sent', 'Receipt delivered to ' + fullPhone);
-            showSandboxToast('✓ WhatsApp bill sent to ' + fullPhone, false);
-          } else {
-            setSimWaBanner('err', 'WhatsApp could not send', 'Bill is saved on screen. You can still share it from a free outlet.');
-          }
-        } catch (e) {
-          setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled — try again when messaging is available.');
+      setSimWaBanner('pending', 'Sending WhatsApp bill…', 'To ' + guestName + ' · ' + fullPhone);
+      showSandboxToast('Bill settled · sending WhatsApp…', false);
+      try {
+        var ok = await autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone);
+        if (ok) {
+          setSimWaBanner('ok', 'WhatsApp bill sent', guestName + ' · ' + fullPhone);
+          showSandboxToast('✓ WhatsApp bill sent to ' + fullPhone, false);
+        } else {
+          setSimWaBanner('err', 'WhatsApp could not send', 'Bill is saved on screen. Try again later.');
         }
-      } else {
-        showSandboxToast('✓ Bill ' + billNo + ' closed · total ' + simMoney(totals.total), false);
+      } catch (e) {
+        setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled on this screen.');
       }
 
       simCart = {};
-      var phone = document.getElementById('sandbox-phone');
-      if (phone) phone.value = '';
-      var nameEl = document.getElementById('sandbox-cust-name');
-      if (nameEl) nameEl.value = '';
-      onSandboxPhoneInput();
-      toggleSandboxCustomer(false);
+      // Keep guest name + phone for next demo bill
+      onSandboxGuestInput();
       renderSimCart();
       renderSimMenu();
     }
@@ -3031,6 +3030,7 @@
     // ===== INIT SANDBOX (must run after COUNTRY_CFG is defined) =====
     SIM_COUNTRY = detectCountry();
     renderSimMenu();
+    onSandboxGuestInput();
 
   </script>
   <script src="pwa.js"></script>

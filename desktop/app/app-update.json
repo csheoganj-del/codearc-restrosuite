@@ -1,12 +1,11 @@
 ﻿{
-  "version": "v202-20260715-hero-codearc-clean",
+  "version": "v203-20260715-sandbox-guest-required",
   "date": "2026-07-15",
-  "title": "Hero CodeArc clean constellation",
-  "summary": "Homepage hero rebuilt as open CodeArc-style canvas: solid green connectors, four airy module cards (POS, Kitchen, Floor, Bills), no stacked clutter.",
+  "title": "Sandbox guest required + denser hero",
+  "summary": "Sandbox cart always shows required name and WhatsApp fields; billing blocked without them. Hero denser with WhatsApp node and arrow connectors.",
   "highlights": [
-    "Open canvas without heavy frame box",
-    "Solid teal/green curved connectors with nodes",
-    "Four clear cards with breathing room — no WhatsApp pile-up",
-    "Soft product chrome matching CodeArc reference composition"
+    "Name + mobile always visible and required for sandbox bill",
+    "Cannot add items or Print and Pay without guest fields",
+    "Hero adds WhatsApp card and arrowed flow lines on cream stage"
   ]
 }
