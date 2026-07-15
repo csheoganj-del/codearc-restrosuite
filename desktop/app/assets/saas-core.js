@@ -686,7 +686,9 @@
         }
       });
 
-      // Update navigation labels if vertical overrides them
+      // Update navigation labels if vertical overrides them.
+      // IMPORTANT: never set textContent on the whole .mnav-link — that strips
+      // the <i class="fa-solid …"> icon child (icons flash then vanish on load).
       const labelMap = {
         'pos-tab': v.labels.order || 'POS',
         'editor-tab': v.labels.catalogue || 'Menu',
@@ -696,14 +698,18 @@
       };
       Object.entries(labelMap).forEach(function(pair) {
         const tab = pair[0], label = pair[1];
-        document.querySelectorAll('.sidebar-link[data-tab="' + tab + '"] .link-text, .mnav-link[data-tab="' + tab + '"]').forEach(function(el) {
+        document.querySelectorAll(
+          '.sidebar-link[data-tab="' + tab + '"] .link-text, ' +
+          '.sidebar-link[data-tab="' + tab + '"] > span:not(.badge-count), ' +
+          '.mnav-link[data-tab="' + tab + '"] > span:not(.badge-count)'
+        ).forEach(function(el) {
           if (el.dataset.rsOriginalLabel === undefined) {
-            el.dataset.rsOriginalLabel = el.textContent;
+            el.dataset.rsOriginalLabel = (el.textContent || '').trim();
           }
           // Only relabel if this vertical has a non-default label
           if (!RS_SAAS.is('restaurant')) {
             el.textContent = label;
-          } else {
+          } else if (el.dataset.rsOriginalLabel) {
             el.textContent = el.dataset.rsOriginalLabel;
           }
         });
