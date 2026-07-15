@@ -254,7 +254,29 @@
   }
 }
 
-/* ---- Bills / inventory: cards on mobile (hide wide table scroll) ---- */
+/* ---- Global mobile table scroll (all tabs) ---- */
+@media (max-width: 760px) {
+  .table-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    max-width: 100% !important;
+  }
+  .table-scroll .data-table {
+    width: max-content !important;
+    min-width: 640px !important;
+  }
+  .table-scroll .data-table th,
+  .table-scroll .data-table td {
+    white-space: nowrap !important;
+  }
+  /* Smaller tables (3–4 cols) still scroll if needed */
+  .table-scroll .data-table.compact,
+  .table-scroll table[data-cols="3"] {
+    min-width: 420px !important;
+  }
+}
+
+/* ---- Bills / inventory: cards on mobile (optional card UI; tables still scroll) ---- */
 .rs10-bill-cards,
 .rs10-inv-cards {
   display: none;
@@ -293,13 +315,14 @@
 .rs10-ic-meta { font-size: 12px; color: var(--text-soft, #6b7280); margin-top: 4px; }
 
 @media (max-width: 700px) {
-  #bills-tab .table-scroll,
-  #inventory-tab .table-scroll {
-    display: none !important;
-  }
-  #bills-tab .rs10-bill-cards,
-  #inventory-tab .rs10-inv-cards {
+  /* Prefer cards when JS injects them; keep table-scroll available as fallback */
+  #bills-tab .rs10-bill-cards:not(:empty),
+  #inventory-tab .rs10-inv-cards:not(:empty) {
     display: flex !important;
+  }
+  #bills-tab:has(.rs10-bill-cards:not(:empty)) .table-scroll,
+  #inventory-tab:has(.rs10-inv-cards:not(:empty)) .table-scroll {
+    display: none !important;
   }
 }
 

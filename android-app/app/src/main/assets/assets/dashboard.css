@@ -463,7 +463,22 @@
 
 /* generic panel */
 .panel { border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--stroke);  min-width: 0; }
-.table-scroll { overflow-x: auto; max-width: 100%; }
+/* Horizontal tables: scroll container (never clip columns off-screen) */
+.table-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+}
+.table-scroll::-webkit-scrollbar { height: 8px; }
+.table-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--stroke-2) 90%, transparent);
+  border-radius: 99px;
+}
 .panel-pad { padding: 20px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .panel-head h3 { font-size: 16px; }
@@ -1483,6 +1498,12 @@ body > .dropdown-menu.is-portaled .dropdown-item.active {
 .data-table tbody tr { transition: background .2s; }
 .data-table tbody tr:hover { background: var(--glass); }
 .data-table tbody td b, .data-table .td-strong { color: var(--text); font-weight: 600; }
+
+/* Bare tables inside panels: still allow horizontal pan on small screens */
+.panel > table.data-table,
+.panel-pad > table.data-table {
+  max-width: none;
+}
 .row-actions { display: flex; gap: 6px; }
 .icon-act { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--stroke-2); background: var(--glass); color: var(--text-soft); cursor: pointer; font-size: 12px; display: grid; place-items: center; transition: var(--t); }
 .icon-act:hover { color: var(--text); border-color: var(--stroke-hi); transform: translateY(-1px); }
@@ -2358,7 +2379,94 @@ body.rs-role-brandadmin #klc-mobile-setup {
     flex-shrink: 0 !important;
   }
   .tb-icon-btn i { font-size: 15px !important; }
-  .table-scroll { overflow-x: auto; }
+
+  /* ── Horizontal data tables: swipe, never clip headers/cells ── */
+  .content {
+    overflow-x: hidden; /* page stays vertical; tables scroll inside */
+  }
+  .panel,
+  .panel-pad {
+    overflow: visible;
+    max-width: 100%;
+  }
+  .table-scroll {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-x: contain;
+    margin: 0 -4px 4px;
+    padding: 0 4px 10px;
+    /* subtle edge cue that more columns exist */
+    background:
+      linear-gradient(to right, var(--panel-solid, var(--panel)) 30%, transparent) left center / 18px 100% no-repeat,
+      linear-gradient(to left, var(--panel-solid, var(--panel)) 30%, transparent) right center / 18px 100% no-repeat;
+    background-attachment: local, local;
+  }
+  .table-scroll .data-table,
+  .data-table {
+    width: max-content !important;
+    min-width: 100%;
+    max-width: none !important;
+    table-layout: auto !important;
+  }
+  /* Editor / multi-col tables need a firm min width so STOCK/ACTIONS stay full */
+  .table-scroll .data-table {
+    min-width: 640px;
+  }
+  .data-table thead th,
+  .data-table tbody td {
+    white-space: nowrap;
+    padding: 10px 12px !important;
+    font-size: 12.5px;
+  }
+  .data-table thead th {
+    font-size: 10.5px !important;
+    letter-spacing: 0.04em;
+  }
+  /* Sticky first column so Item name stays readable while scrolling */
+  .table-scroll .data-table thead th:first-child,
+  .table-scroll .data-table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--panel-solid, var(--panel));
+    box-shadow: 4px 0 10px -6px rgba(0, 0, 0, 0.12);
+  }
+  .table-scroll .data-table thead th:first-child {
+    z-index: 3;
+    background: var(--panel-solid, var(--panel));
+  }
+  .table-scroll .data-table tbody tr:hover td:first-child {
+    background: var(--glass, var(--panel));
+  }
+  /* Toolbars that run wide (bills filters, etc.) */
+  .toolbar-row {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px !important;
+    padding-bottom: 4px;
+    max-width: 100%;
+  }
+  .toolbar-row > * { flex-shrink: 0; }
+  .toolbar-row .grow {
+    flex: 1 0 auto !important;
+    min-width: 160px;
+    max-width: 280px;
+  }
+  /* Category / chip rows */
+  .pos-cats,
+  .seg,
+  .bills-date-chips {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    max-width: 100%;
+  }
 
   #pos-tab.active { min-height: 100%; }
   #pos-tab .pos-wrap { display: block; }

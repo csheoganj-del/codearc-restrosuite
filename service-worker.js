@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v212-single-more-menu";
+const CACHE_NAME = "restrosuite-shell-v213-mobile-table-scroll";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
