@@ -1,11 +1,11 @@
 ﻿{
-  "version": "v196-20260715-pos-sandbox",
+  "version": "v197-20260715-hero-flow",
   "date": "2026-07-15",
-  "title": "POS-exact homepage sandbox",
-  "summary": "Homepage Live Demo menu tiles and cart match the real dashboard POS chrome (item cards, cart lines, pay methods, Print & Pay).",
+  "title": "Hero constellation live flow",
+  "summary": "Homepage hero: exact dashboard module UIs (POS cart, Kitchen, Floor, Bills, WhatsApp) connected with animated flow lines and live data packets like CodeArc.",
   "highlights": [
-    "Sandbox menu uses real .pos-item tiles with veg mark, category, price, qty badge",
-    "Sandbox cart uses real .cart-line + totals + Cash/UPI/Card/Due",
-    "Print & Pay closes demo bill like live POS checkout"
+    "Hero cards match real POS cart lines, KDS tickets, floor map, bills",
+    "SVG flow lines + moving packet between modules",
+    "Live status captions as order data moves POS to Kitchen to Floor to Bills to WhatsApp"
   ]
 }
