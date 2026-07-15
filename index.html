@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
@@ -13,24 +13,24 @@
   <!-- FIX: matched to manifest theme_color -->
   <meta name="theme-color" content="#FF4F00">
   <!-- SEO -->
-  <meta name="description" content="RestroSuite by CodeArc — offline-first restaurant POS, kitchen display, WhatsApp receipts, and QR ordering. Free to start. Built for Indian food businesses.">
+  <meta name="description" content="RestroSuite by CodeArc â€” offline-first restaurant POS, kitchen display, WhatsApp receipts, and QR ordering. Free to start. Built for Indian food businesses.">
   <meta name="robots" content="index, follow">
   <!-- Open Graph / Social sharing -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://restrosuite.codearc.co.in/">
-  <meta property="og:title" content="RestroSuite — Offline-First Restaurant POS &amp; Billing">
-  <meta property="og:description" content="Offline-first POS, kitchen display, WhatsApp receipts, and QR table ordering. Free to start — no credit card required.">
+  <meta property="og:title" content="RestroSuite â€” Offline-First Restaurant POS &amp; Billing">
+  <meta property="og:description" content="Offline-first POS, kitchen display, WhatsApp receipts, and QR table ordering. Free to start â€” no credit card required.">
   <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=10">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="RestroSuite — Restaurant POS &amp; Billing">
+  <meta name="twitter:title" content="RestroSuite â€” Restaurant POS &amp; Billing">
   <meta name="twitter:description" content="Offline-first restaurant POS. WhatsApp receipts, KDS, QR orders. Free to start.">
   <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=10">
   <link rel="canonical" href="https://restrosuite.codearc.co.in/">
-  <!-- Favicons — SVG preferred, PNG fallback -->
+  <!-- Favicons â€” SVG preferred, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=7">
   <link rel="icon" href="assets/restrosuite-mark.png?v=7" type="image/png">
-  <title>RestroSuite — Offline-First Restaurant POS &amp; Billing</title>
-  <!-- JSON-LD Structured Data (honest — no fabricated ratings) -->
+  <title>RestroSuite â€” Offline-First Restaurant POS &amp; Billing</title>
+  <!-- JSON-LD Structured Data (honest â€” no fabricated ratings) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -64,7 +64,7 @@
     /* ===== SMOOTH SCROLL ===== */
     html { scroll-behavior: smooth; }
 
-    /* ===== COMPAT SHIM — homepage → design tokens ===== */
+    /* ===== COMPAT SHIM â€” homepage â†’ design tokens ===== */
     :root {
       --bg: var(--bg-0); --bg-2: var(--bg-1);
       --glow-1: rgba(255,79,0,0.08); --glow-2: transparent;
@@ -205,7 +205,7 @@
 
     /* Hero */
     .hero { padding: 150px 0 90px; }
-    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+     .hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
     .hero-flag {
       display: inline-flex; align-items: center; gap: 9px; margin-bottom: 26px;
       padding: 7px 7px 7px 14px; border-radius: 999px;
@@ -227,85 +227,100 @@
     .hero-trust .t-item i { color: var(--green); }
 
     /* ============================================================
-       Hero constellation — CodeArc-style solid flow lines +
-       dashboard-accurate module windows (POS · KDS · Floor · Bills · WA)
+       Hero constellation v202 â€” CodeArc open canvas
+       Solid green connectors Â· airy layout Â· no stacked clutter
        ============================================================ */
     .hero-visual {
       position: relative;
       animation: fadeUp .55s .15s both;
-      min-height: 560px;
+      min-height: 540px;
+      padding: 8px 0 4px;
     }
     .flow-stage {
-      --flow-line: #2A9B8F;
-      --flow-accent: #FF4F00;
-      --flow-paper: #FFFEFB;
+      --line: #2A6B5A;
+      --line-soft: rgba(42, 107, 90, 0.38);
+      --accent: #FF4F00;
+      --paper: #FFFEFB;
       position: relative;
       width: 100%;
-      height: 560px;
-      min-height: 560px;
-      border-radius: 28px;
-      background:
-        radial-gradient(ellipse 70% 55% at 85% 12%, rgba(255,79,0,.07), transparent 60%),
-        radial-gradient(ellipse 55% 50% at 12% 88%, rgba(42,155,143,.08), transparent 55%),
-        linear-gradient(165deg, #F7F4EE 0%, #F0EBE3 100%);
-      border: 1px solid rgba(26, 61, 52, 0.08);
-      box-shadow:
-        0 1px 0 rgba(255,255,255,.7) inset,
-        0 4px 12px rgba(20,18,16,.04),
-        0 36px 72px -28px rgba(20,18,16,.22);
-      overflow: hidden;
+      height: 540px;
+      min-height: 540px;
+      /* Open canvas â€” no heavy frame (like CodeArc) */
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      overflow: visible;
     }
     .flow-svg {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      z-index: 1; pointer-events: none;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      overflow: visible;
     }
     .flow-svg .flow-path {
       fill: none;
-      stroke: var(--flow-line);
-      stroke-width: 2;
+      stroke: var(--line);
+      stroke-width: 2.25;
       stroke-linecap: round;
       stroke-linejoin: round;
-      opacity: 0.42;
-      transition: opacity .35s, stroke .35s, stroke-width .35s;
+      opacity: 0.55;
+      transition: opacity .4s, stroke .4s, stroke-width .4s;
     }
-    .flow-svg .flow-path.dim { opacity: 0.28; stroke-width: 1.6; }
+    .flow-svg .flow-path.dim { opacity: 0.32; stroke-width: 1.75; }
     .flow-svg .flow-path.active {
       opacity: 1;
-      stroke: var(--flow-accent);
-      stroke-width: 2.4;
-      filter: drop-shadow(0 0 6px rgba(255,79,0,.35));
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      filter: drop-shadow(0 0 5px rgba(255,79,0,.3));
     }
     .flow-svg .flow-node {
       fill: #FFFEFB;
-      stroke: var(--flow-line);
-      stroke-width: 2.2;
+      stroke: var(--line);
+      stroke-width: 2.5;
     }
     .flow-packet {
-      fill: var(--flow-accent);
+      fill: var(--accent);
       stroke: #fff;
-      stroke-width: 2;
-      filter: drop-shadow(0 2px 6px rgba(255,79,0,.45));
+      stroke-width: 2.5;
+      filter: drop-shadow(0 2px 8px rgba(255,79,0,.4));
       opacity: 0;
     }
     .flow-label {
-      position: absolute; z-index: 2;
+      position: absolute;
+      z-index: 2;
       font-family: Georgia, 'Times New Roman', serif;
-      font-size: 12px; font-style: italic; font-weight: 500;
-      color: #3d6b58; letter-spacing: -.01em;
-      white-space: nowrap; pointer-events: none; opacity: .88;
+      font-size: 13px;
+      font-style: italic;
+      font-weight: 500;
+      color: #3d6b58;
+      letter-spacing: -.01em;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0.9;
     }
     .flow-live-pill {
-      position: absolute; top: 16px; left: 16px; z-index: 6;
-      display: inline-flex; align-items: center; gap: 7px;
-      font-size: 11px; font-weight: 800; color: #0F9F6E;
-      background: rgba(255,255,255,.92); border: 1px solid #BBF7D0;
-      padding: 6px 12px; border-radius: 999px;
-      box-shadow: 0 4px 14px rgba(15,159,110,.1);
-      backdrop-filter: blur(8px);
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #0F9F6E;
+      background: rgba(255,255,255,.95);
+      border: 1px solid rgba(15,159,110,.22);
+      padding: 6px 12px;
+      border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(20,18,16,.06);
     }
     .flow-live-pill .pulse {
-      width: 7px; height: 7px; border-radius: 50%; background: #0F9F6E;
-      box-shadow: 0 0 0 0 rgba(15,159,110,.45);
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #0F9F6E;
       animation: syncPulse 1.6s infinite;
     }
     @keyframes syncPulse {
@@ -314,227 +329,196 @@
       100% { box-shadow: 0 0 0 0 rgba(15,159,110,0); }
     }
     .flow-status {
-      position: absolute; top: 16px; right: 16px; z-index: 6;
-      max-width: min(52%, 230px);
-      font-size: 11px; font-weight: 700; color: #4a4842;
-      background: rgba(255,255,255,.94); border: 1px solid rgba(26,61,52,.1);
-      padding: 6px 12px; border-radius: 999px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      box-shadow: 0 4px 14px rgba(0,0,0,.05);
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 6;
+      max-width: min(48%, 220px);
+      font-size: 11px;
+      font-weight: 700;
+      color: #4a4842;
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(20,18,16,.08);
+      padding: 6px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 4px 16px rgba(20,18,16,.06);
       transition: color .25s, border-color .25s, background .25s;
     }
     .flow-status.flash {
-      color: var(--flow-accent);
-      border-color: rgba(255,79,0,.3);
+      color: var(--accent);
+      border-color: rgba(255,79,0,.28);
       background: #FFF8F4;
     }
+
+    /* Soft product cards â€” CodeArc-like, not busy OS windows */
     .flow-card {
-      position: absolute; z-index: 3;
-      background: var(--flow-paper);
-      border: 1px solid rgba(26, 61, 52, 0.1);
-      border-radius: 16px;
+      position: absolute;
+      z-index: 3;
+      background: var(--paper);
+      border: 1px solid rgba(20, 18, 16, 0.08);
+      border-radius: 18px;
       box-shadow:
-        0 1px 0 rgba(255,255,255,.9) inset,
-        0 2px 4px rgba(20,18,16,.03),
-        0 16px 40px -16px rgba(20,18,16,.22);
+        0 1px 0 rgba(255,255,255,.95) inset,
+        0 2px 6px rgba(20,18,16,.04),
+        0 18px 40px -18px rgba(20,18,16,.18);
       overflow: hidden;
-      transition: border-color .3s, box-shadow .3s, transform .35s cubic-bezier(.22,1,.36,1);
+      transition: border-color .3s, box-shadow .3s, transform .4s cubic-bezier(.22,1,.36,1);
     }
     .flow-card.active {
-      border-color: rgba(255,79,0,.42);
+      border-color: rgba(255,79,0,.35);
       box-shadow:
-        0 0 0 3px rgba(255,79,0,.1),
-        0 20px 44px -14px rgba(255,79,0,.38);
-      transform: translateY(-4px);
+        0 0 0 3px rgba(255,79,0,.08),
+        0 22px 48px -16px rgba(255,79,0,.32);
+      transform: translateY(-3px);
       z-index: 5;
     }
     .flow-card.recv { animation: cardRecv .55s ease; }
     @keyframes cardRecv {
-      0% { box-shadow: 0 0 0 0 rgba(42,155,143,0); }
-      40% { box-shadow: 0 0 0 5px rgba(42,155,143,.2); }
-      100% { box-shadow: 0 0 0 0 rgba(42,155,143,0); }
+      0% { box-shadow: 0 0 0 0 rgba(42,107,90,0); }
+      40% { box-shadow: 0 0 0 5px rgba(42,107,90,.16); }
+      100% { box-shadow: 0 0 0 0 rgba(42,107,90,0); }
     }
-    .flow-card .win-bar {
-      display: flex; align-items: center; gap: 6px;
-      padding: 7px 10px 6px;
-      background: linear-gradient(180deg, #FAFAF8, #F4F3EF);
-      border-bottom: 1px solid rgba(26,61,52,.07);
+    .flow-card .fc-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 12px 9px;
+      border-bottom: 1px solid rgba(20,18,16,.06);
+      background: linear-gradient(180deg, #FFFEFB, #F9F7F3);
     }
-    .flow-card .win-dots { display: flex; gap: 4px; }
-    .flow-card .win-dots i {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: #D4D2CB; display: block;
+    .flow-card .fc-ico {
+      width: 28px; height: 28px; border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 12px; flex: none;
+      background: rgba(255,79,0,.1); color: #FF4F00;
     }
-    .flow-card .win-dots i:nth-child(1) { background: #FF5F57; }
-    .flow-card .win-dots i:nth-child(2) { background: #FEBC2E; }
-    .flow-card .win-dots i:nth-child(3) { background: #28C840; }
-    .flow-card .win-tab {
-      margin-left: 4px; font-size: 10px; font-weight: 800;
-      color: #4a4842; display: inline-flex; align-items: center; gap: 5px;
+    .flow-card.kds .fc-ico { background: #FFEDD5; color: #C2410C; }
+    .flow-card.floor .fc-ico { background: #E0E7FF; color: #4338CA; }
+    .flow-card.bills .fc-ico { background: #E8F8F1; color: #0F9F6E; }
+    .flow-card .fc-name {
+      font-size: 12.5px; font-weight: 800; color: #1a1917; letter-spacing: -.01em;
     }
-    .flow-card .win-tab i {
-      width: 16px; height: 16px; border-radius: 5px;
-      display: grid; place-items: center; font-size: 8px;
-      background: rgba(255,79,0,.12); color: #FF4F00;
-    }
-    .flow-card.kds .win-tab i { background: #FFEDD5; color: #C2410C; }
-    .flow-card.floor .win-tab i { background: #E0E7FF; color: #4338CA; }
-    .flow-card.bills .win-tab i { background: #E8F8F1; color: #0F9F6E; }
-    .flow-card.wa .win-tab i { background: #DCFCE7; color: #16A34A; }
     .flow-card .fc-badge {
-      margin-left: auto; font-size: 9px; font-weight: 800;
-      padding: 2px 7px; border-radius: 999px;
+      margin-left: auto;
+      font-size: 9.5px; font-weight: 800;
+      padding: 3px 8px; border-radius: 999px;
       background: #F0EEE8; color: #6b6960;
     }
     .flow-card .fc-badge.on { background: #E8F8F1; color: #0F9F6E; }
     .flow-card .fc-badge.warn { background: #FEF3C7; color: #B45309; }
     .flow-card .fc-badge.live { background: rgba(255,79,0,.12); color: #FF4F00; }
-    .flow-card .fc-body { padding: 8px 10px 10px; }
+    .flow-card .fc-body { padding: 10px 12px 12px; }
     .flow-card .fc-foot {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 7px 10px; border-top: 1px solid rgba(26,61,52,.07);
-      font-size: 10px; font-weight: 700; color: #6b6960;
+      padding: 8px 12px;
+      border-top: 1px solid rgba(20,18,16,.06);
+      font-size: 10.5px; font-weight: 700; color: #6b6960;
       background: #FAFAF8;
     }
-    .flow-card .fc-foot b { color: #16151c; font-weight: 800; }
-    .flow-card.pos { width: 248px; left: 5%; top: 15%; }
-    .flow-card.pos .cart-head-mini {
-      display: flex; align-items: center; gap: 5px;
-      padding: 0 0 7px; border-bottom: 1px solid rgba(26,61,52,.06);
-      margin-bottom: 7px;
-    }
-    .flow-card.pos .cart-head-mini .otype {
-      width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(26,61,52,.1);
-      display: grid; place-items: center; font-size: 10px; color: #6b6960; background: #fff;
-    }
-    .flow-card.pos .cart-head-mini .otype.on {
-      border-color: rgba(255,79,0,.4); background: rgba(255,79,0,.08); color: #FF4F00;
-    }
-    .flow-card.pos .cart-head-mini .pill {
-      margin-left: auto; font-size: 10px; font-weight: 800;
-      padding: 2px 7px; border-radius: 999px;
-      background: rgba(255,79,0,.12); color: #FF4F00;
-    }
+    .flow-card .fc-foot b { color: #1a1917; font-weight: 800; }
+
+    /* ---- POS (anchor, larger) ---- */
+    .flow-card.pos { width: 236px; left: 2%; top: 14%; }
     .flow-card .cline {
-      display: flex; align-items: center; gap: 6px;
-      padding: 6px 7px; border-radius: 9px; margin-bottom: 4px;
-      background: #F7F5F1; border: 1px solid rgba(26,61,52,.06);
-      font-size: 11.5px; font-weight: 700; color: #16151c;
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 8px; border-radius: 10px; margin-bottom: 5px;
+      background: #F6F4F0; border: 1px solid rgba(20,18,16,.05);
+      font-size: 12px; font-weight: 700; color: #1a1917;
     }
     .flow-card .cline .cdot {
-      width: 5px; height: 5px; border-radius: 2px; background: var(--cc, #FF4F00); flex: none;
+      width: 6px; height: 6px; border-radius: 2px;
+      background: var(--cc, #FF4F00); flex: none;
     }
     .flow-card .cline .cn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .flow-card .cline .qty-mini {
-      display: inline-flex; align-items: center; gap: 3px;
-      font-size: 10px; font-weight: 800; color: #6b6960;
-    }
-    .flow-card .cline .qty-mini em {
-      font-style: normal; min-width: 14px; text-align: center; color: #16151c;
-    }
     .flow-card .cline .amt { color: #FF4F00; font-weight: 800; flex: none; }
     .flow-card .cline.new-in {
       animation: rowIn .4s ease;
       background: rgba(255,79,0,.07);
-      border-color: rgba(255,79,0,.2);
+      border-color: rgba(255,79,0,.18);
     }
-    .flow-card .tot-mini {
-      display: flex; flex-direction: column; gap: 2px;
-      margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(26,61,52,.12);
-      font-size: 10.5px; color: #6b6960; font-weight: 600;
-    }
-    .flow-card .tot-mini .row { display: flex; justify-content: space-between; }
-    .flow-card .tot-mini .grand {
+    .flow-card .tot-row {
       display: flex; justify-content: space-between; align-items: baseline;
-      margin-top: 3px; font-weight: 800; color: #16151c; font-size: 13px;
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed rgba(20,18,16,.12);
+      font-size: 12px; font-weight: 700; color: #1a1917;
     }
-    .flow-card .tot-mini .grand b { color: #FF4F00; font-size: 16px; font-family: Georgia, serif; }
-    .flow-card .pay-strip {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 7px;
+    .flow-card .tot-row b {
+      font-family: Georgia, serif; font-size: 18px; color: #FF4F00; font-weight: 800;
     }
-    .flow-card .pay-strip span {
-      text-align: center; font-size: 8.5px; font-weight: 800;
-      padding: 5px 1px; border-radius: 6px;
-      border: 1px solid rgba(26,61,52,.1); color: #6b6960; background: #fff;
+    .flow-card .meta-line {
+      font-size: 10.5px; font-weight: 600; color: #6b6960; margin-bottom: 8px;
     }
-    .flow-card .pay-strip span.on {
-      border-color: rgba(255,79,0,.45); background: rgba(255,79,0,.08); color: #FF4F00;
-    }
-    .flow-card .pay-cta {
-      margin-top: 7px; text-align: center; font-size: 10.5px; font-weight: 800;
-      padding: 7px; border-radius: 9px; color: #fff;
-      background: linear-gradient(135deg, #FF4F00, #FF7A3D);
-      box-shadow: 0 4px 12px rgba(255,79,0,.28);
-    }
-    .flow-card.kds { width: 210px; right: 5%; top: 11%; }
+
+    /* ---- Kitchen ---- */
+    .flow-card.kds { width: 200px; right: 3%; top: 10%; }
     .flow-card .kds-ticket {
       display: flex; justify-content: space-between; align-items: center; gap: 6px;
-      padding: 7px 8px; border-radius: 9px; margin-bottom: 5px;
+      padding: 8px 9px; border-radius: 10px; margin-bottom: 6px;
       background: #FFF7ED; border: 1px solid #FED7AA;
-      font-size: 11px; font-weight: 700; color: #16151c;
+      font-size: 11.5px; font-weight: 700; color: #1a1917;
     }
     .flow-card .kds-ticket .tok {
       font-size: 9px; font-weight: 800; color: #C2410C;
-      background: #FFEDD5; padding: 1px 5px; border-radius: 4px; margin-right: 4px;
+      background: #FFEDD5; padding: 2px 5px; border-radius: 5px; margin-right: 5px;
     }
     .flow-card .kds-ticket .st {
-      font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
+      font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
       background: #FEF3C7; color: #B45309; flex: none;
     }
     .flow-card .kds-ticket.ready { background: #E8F8F1; border-color: #BBF7D0; }
     .flow-card .kds-ticket.ready .tok { background: #DCFCE7; color: #15803D; }
     .flow-card .kds-ticket.ready .st { background: #DCFCE7; color: #15803D; }
     .flow-card .kds-ticket.new-in { animation: rowIn .4s ease; }
-    .flow-card.floor { width: 206px; left: 6%; bottom: 9%; }
-    .flow-card .tbl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .flow-card .empty-soft {
+      font-size: 11.5px; font-weight: 600; color: #6b6960;
+      text-align: center; padding: 14px 6px;
+    }
+
+    /* ---- Floor ---- */
+    .flow-card.floor { width: 196px; left: 8%; bottom: 4%; }
+    .flow-card .tbl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
     .flow-card .tbl-pill {
-      padding: 8px 8px 7px; border-radius: 10px;
-      border: 1.5px solid rgba(26,61,52,.1); background: #FAFAF8;
+      padding: 9px 8px 8px; border-radius: 12px;
+      border: 1.5px solid rgba(20,18,16,.08); background: #FAFAF8;
       font-size: 10px; font-weight: 700; text-align: center;
     }
-    .flow-card .tbl-pill b { display: block; font-size: 13px; margin-bottom: 2px; color: #16151c; }
-    .flow-card .tbl-pill .st { font-size: 9.5px; font-weight: 700; color: #6b6960; }
-    .flow-card .tbl-pill.free { border-color: rgba(15,159,110,.25); background: #F3FBF7; }
+    .flow-card .tbl-pill b { display: block; font-size: 14px; margin-bottom: 2px; color: #1a1917; }
+    .flow-card .tbl-pill .st { font-size: 10px; font-weight: 700; color: #6b6960; }
+    .flow-card .tbl-pill.free { border-color: rgba(15,159,110,.28); background: #F3FBF7; }
     .flow-card .tbl-pill.free .st { color: #0F9F6E; }
-    .flow-card .tbl-pill.occ { border-color: rgba(255,79,0,.35); background: #FFF6F1; }
+    .flow-card .tbl-pill.occ { border-color: rgba(255,79,0,.32); background: #FFF6F1; }
     .flow-card .tbl-pill.occ b { color: #FF4F00; }
     .flow-card .tbl-pill.occ .st { color: #FF4F00; }
-    .flow-card.bills { width: 210px; right: 5%; bottom: 10%; }
+
+    /* ---- Bills ---- */
+    .flow-card.bills { width: 200px; right: 4%; bottom: 5%; }
     .flow-card .bill-row {
       display: flex; justify-content: space-between; align-items: center; gap: 6px;
-      padding: 7px 8px; border-radius: 9px; margin-bottom: 5px;
-      background: #F7F5F1; border: 1px solid rgba(26,61,52,.06);
-      font-size: 11px; font-weight: 700; color: #16151c;
+      padding: 8px 9px; border-radius: 10px; margin-bottom: 6px;
+      background: #F6F4F0; border: 1px solid rgba(20,18,16,.05);
+      font-size: 11.5px; font-weight: 700; color: #1a1917;
     }
     .flow-card .bill-row .amt { color: #0F9F6E; font-weight: 800; }
     .flow-card .bill-row .paid {
-      font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 999px;
+      font-size: 8.5px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
       background: #E8F8F1; color: #0F9F6E; margin-left: 4px;
     }
     .flow-card .bill-row.new-in {
       animation: rowIn .4s ease;
       background: rgba(15,159,110,.08);
-      border-color: rgba(15,159,110,.22);
+      border-color: rgba(15,159,110,.2);
     }
-    .flow-card.wa { width: 176px; right: 26%; top: 40%; border-radius: 14px; }
-    .flow-card.wa .wa-preview {
-      margin: 0; padding: 10px 11px; font-size: 10.5px; line-height: 1.45; color: #3d4a42;
-      background: linear-gradient(180deg, #F0FDF4, #E8F8F1);
-      border-radius: 0 0 14px 14px;
-    }
-    .flow-card.wa .wa-preview b { color: #15803D; }
-    .flow-card.wa .wa-bubble {
-      background: #fff; border-radius: 10px; padding: 8px 9px;
-      border: 1px solid rgba(22,163,74,.15);
-      box-shadow: 0 2px 8px rgba(22,163,74,.08);
-    }
+
     @keyframes rowIn {
       from { opacity: 0; transform: translateY(5px); }
       to { opacity: 1; transform: none; }
     }
     .flow-caption {
       display: flex; justify-content: space-between; align-items: center;
-      gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 0 2px;
+      gap: 8px; flex-wrap: wrap; margin-top: 14px; padding: 0 2px;
       font-size: 12.5px; color: var(--text-mute);
     }
     .flow-caption b { color: var(--text); font-weight: 800; }
@@ -589,7 +573,7 @@
     .empathy-col.new li i { color: var(--success); }
     .empathy-col.new li b { color: var(--text); font-weight: 600; }
 
-    /* Interactive demo — exact POS menu tiles + cart chrome (matches dashboard POS) */
+    /* Interactive demo â€” exact POS menu tiles + cart chrome (matches dashboard POS) */
     .demo-grid {
       display: grid;
       grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
@@ -721,7 +705,7 @@
     .rs-pos-sandbox .pos-item .veg.nonveg { border-color: var(--rs-pos-red); }
     .rs-pos-sandbox .pos-item .veg.nonveg::after { background: var(--rs-pos-red); }
 
-    /* Cart — same structure as live POS */
+    /* Cart â€” same structure as live POS */
     .rs-pos-sandbox .pos-cart {
       display: flex; flex-direction: column;
       border-radius: var(--rs-pos-r-lg);
@@ -861,8 +845,8 @@
     .rs-pos-sandbox .cart-actions-final .btn {
       min-height: 44px; font-size: 13px; font-weight: 800; border-radius: 10px;
     }
-    /* Customer phone on cart — same idea as live POS (optional; auto-WA on pay) */
-    /* Customer chip + expand — same pattern as live POS cart-cust-toggle */
+    /* Customer phone on cart â€” same idea as live POS (optional; auto-WA on pay) */
+    /* Customer chip + expand â€” same pattern as live POS cart-cust-toggle */
     .rs-pos-sandbox .cart-meta-row {
       flex-wrap: wrap;
     }
@@ -908,7 +892,7 @@
       font-size: 10.5px; font-weight: 600; color: var(--rs-pos-mute); line-height: 1.35;
     }
     .rs-pos-sandbox .cart-cust-direct .ph-hint.has-num { color: #0F9F6E; }
-    /* Ask-for-number modal (Print & Pay when no mobile) — same idea as live POS */
+    /* Ask-for-number modal (Print & Pay when no mobile) â€” same idea as live POS */
     .sim-ask-phone-overlay {
       position: fixed; inset: 0; z-index: 3100;
       background: rgba(0,0,0,.55); display: none;
@@ -1052,7 +1036,7 @@
     .sandbox-toast.error { background:#c0392b; }
     .terminal-body { position:relative; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6);  display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-    /* Sandbox bill closed — same receipt paper as live POS Bill settled preview */
+    /* Sandbox bill closed â€” same receipt paper as live POS Bill settled preview */
     .sim-settle-card {
       max-width: 380px !important;
       width: 100%;
@@ -1157,7 +1141,7 @@
     @media (max-width: 980px) {
       .hero-grid { grid-template-columns: 1fr; gap: 40px; }
       .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; min-height: 0; }
-      .flow-stage { height: 520px; min-height: 520px; }
+      .flow-stage { height: 480px; min-height: 480px; }
       .features-grid { grid-template-columns: repeat(2, 1fr); }
       .empathy-grid, .demo-grid, .pricing-grid { grid-template-columns: 1fr; }
       .pricing-card.featured { order: -1; }
@@ -1180,7 +1164,10 @@
       .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
       .hero-trust { gap: 12px; flex-wrap: wrap; }
       .hero-visual { min-height: 0; }
-      .flow-stage { height: auto; min-height: 0; padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .flow-stage {
+        height: auto; min-height: 0; padding: 4px 0;
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      }
       .flow-svg, .flow-label { display: none; }
       .flow-live-pill, .flow-status {
         position: static; grid-column: 1 / -1; max-width: none; justify-self: start;
@@ -1191,7 +1178,6 @@
         transform: none !important; left: auto !important; right: auto !important;
         top: auto !important; bottom: auto !important;
       }
-      .flow-card.wa { grid-column: 1 / -1; }
       .float-chip.sync { display: none; }
       .float-chip.wa { right: 4%; top: -14px; }
 
@@ -1207,7 +1193,7 @@
       .empathy-list { gap: 12px; }
       .empathy-list li { font-size: 14px; }
 
-      /* Demo — POS clone */
+      /* Demo â€” POS clone */
       .demo-grid { gap: 14px; grid-template-columns: 1fr; }
       .rs-pos-sandbox .pos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
       .rs-pos-sandbox .pos-cart { min-height: 420px; max-height: none; }
@@ -1215,7 +1201,7 @@
       .rs-pos-sandbox .pos-item .pname { font-size: 13px; }
       .rs-pos-sandbox .cart-actions-final { grid-template-columns: 1fr 1.2fr; }
 
-      /* Compare — all columns fit on mobile, no horizontal scroll */
+      /* Compare â€” all columns fit on mobile, no horizontal scroll */
       .compare-wrap { padding: 0; border-radius: 14px; overflow-x: hidden; }
       .compare-table { table-layout: fixed !important; min-width: 0 !important; width: 100%; }
       .compare-table colgroup col:first-child { width: 28% !important; }
@@ -1225,7 +1211,7 @@
       .compare-table thead th { font-size: 10px; }
       .compare-table tbody td:first-child { font-size: 11px; font-weight: 600; }
       .compare-table td.us-col { font-size: 10.5px; }
-      /* Chips — 2x2 grid + RestroSuite full-width highlight */
+      /* Chips â€” 2x2 grid + RestroSuite full-width highlight */
       .comp-chips-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; margin-bottom: 28px !important; }
       .comp-chips-row .comp-price-chip.highlight { grid-column: 1 / -1; }
       .comp-price-chip { padding: 12px 10px; min-width: 0; }
@@ -1233,7 +1219,7 @@
       .comp-price-chip .comp-cost { font-size: 13px; }
       .comp-price-chip .free-tag { font-size: 20px; }
 
-      /* Competitor price chips — compact 2-col grid */
+      /* Competitor price chips â€” compact 2-col grid */
       .comp-price-chip { padding: 11px 14px; min-width: 0; }
       .comp-price-chip .comp-name { font-size: 11px; }
       .comp-price-chip .comp-cost { font-size: 13px; }
@@ -1316,10 +1302,10 @@
         <div class="hero-content">
           <div class="hero-flag">
             <span class="pill">CodeArc</span>
-            <span>Built for Indian restaurants — works offline, syncs when you reconnect</span>
+            <span>Built for Indian restaurants â€” works offline, syncs when you reconnect</span>
           </div>
           <h1>Run the floor, kitchen, and bills from one <span class="grad">clear console</span>.</h1>
-          <p class="hero-sub">RestroSuite is an offline-first POS with kitchen display, WhatsApp receipts, and QR table ordering. Start free on the phone or laptop you already use — no hardware purchase required.</p>
+          <p class="hero-sub">RestroSuite is an offline-first POS with kitchen display, WhatsApp receipts, and QR table ordering. Start free on the phone or laptop you already use â€” no hardware purchase required.</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="login.html?tab=register" id="hero-cta-buy">
               Create free outlet
@@ -1335,71 +1321,65 @@
           </div>
         </div>
 
-        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite modules connected live — same UI as dashboard">
+        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite modules connected â€” POS, Kitchen, Floor, Bills">
           <div class="flow-stage" id="sync-stage">
-            <span class="flow-live-pill"><span class="pulse" aria-hidden="true"></span> Live · one console</span>
+            <span class="flow-live-pill"><span class="pulse" aria-hidden="true"></span> Live Â· one console</span>
             <span class="flow-status" id="sync-msg">Order data flows between modules</span>
 
-            <svg class="flow-svg" viewBox="0 0 600 560" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <path id="path-pos-kds" class="flow-path" d="M 250 175 C 330 110, 400 115, 470 145" />
-              <path id="path-pos-floor" class="flow-path dim" d="M 140 310 C 120 360, 125 400, 145 455" />
-              <path id="path-kds-bills" class="flow-path dim" d="M 520 210 C 545 280, 540 360, 505 430" />
-              <path id="path-floor-bills" class="flow-path dim" d="M 230 480 C 310 510, 390 505, 460 460" />
-              <path id="path-bills-wa" class="flow-path dim" d="M 460 400 C 420 360, 400 320, 405 285" />
-              <path id="path-kds-wa" class="flow-path dim" d="M 480 200 C 450 230, 430 255, 420 275" />
-              <circle class="flow-node" cx="250" cy="175" r="4.5" />
-              <circle class="flow-node" cx="470" cy="145" r="4.5" />
-              <circle class="flow-node" cx="145" cy="455" r="4.5" />
-              <circle class="flow-node" cx="505" cy="430" r="4.5" />
-              <circle class="flow-node" cx="410" cy="280" r="4" />
-              <circle id="flow-packet" class="flow-packet" r="5.5" cx="0" cy="0" />
+            <!-- Solid green connectors â€” routed in open space (CodeArc style) -->
+            <svg class="flow-svg" viewBox="0 0 560 540" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <!-- POS â†’ Kitchen -->
+              <path id="path-pos-kds" class="flow-path" d="M 230 160 C 300 95, 370 95, 430 130" />
+              <!-- Kitchen â†’ Bills -->
+              <path id="path-kds-bills" class="flow-path dim" d="M 470 200 C 500 270, 495 340, 460 400" />
+              <!-- POS â†’ Floor -->
+              <path id="path-pos-floor" class="flow-path dim" d="M 140 290 C 120 350, 125 400, 160 455" />
+              <!-- Floor â†’ Bills -->
+              <path id="path-floor-bills" class="flow-path dim" d="M 250 480 C 320 505, 380 500, 430 450" />
+              <circle class="flow-node" cx="230" cy="160" r="5" />
+              <circle class="flow-node" cx="430" cy="130" r="5" />
+              <circle class="flow-node" cx="160" cy="455" r="5" />
+              <circle class="flow-node" cx="460" cy="400" r="5" />
+              <circle id="flow-packet" class="flow-packet" r="6" cx="0" cy="0" />
             </svg>
 
-            <span class="flow-label" style="left:42%;top:9%">one clear experience</span>
-            <span class="flow-label" style="right:8%;top:52%">works everywhere</span>
-            <span class="flow-label" style="left:36%;bottom:5%">built around your floor</span>
+            <span class="flow-label" style="left:38%;top:7%">one clear experience</span>
+            <span class="flow-label" style="right:2%;top:48%">works everywhere</span>
+            <span class="flow-label" style="left:34%;bottom:0">built around your floor</span>
 
+            <!-- POS -->
             <article class="flow-card pos active" data-seg="pos" id="seg-pos">
-              <div class="win-bar">
-                <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="win-tab"><i class="fa-solid fa-cash-register"></i> POS · Order</span>
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-cash-register"></i></span>
+                <span class="fc-name">Point of Sale</span>
                 <span class="fc-badge on" id="pos-badge">Ready</span>
               </div>
               <div class="fc-body" id="pos-body">
-                <div class="cart-head-mini">
-                  <span class="otype on" title="Dine-in"><i class="fa-solid fa-utensils"></i></span>
-                  <span class="otype" title="Takeaway"><i class="fa-solid fa-bag-shopping"></i></span>
-                  <span class="otype" title="Delivery"><i class="fa-solid fa-motorcycle"></i></span>
-                  <span class="pill">2</span>
-                </div>
-                <div class="cline"><span class="cdot" style="--cc:#FF4F00"></span><span class="cn">Butter Chicken</span><span class="qty-mini">×<em>1</em></span><span class="amt">₹320</span></div>
-                <div class="cline"><span class="cdot" style="--cc:#C47B16"></span><span class="cn">Paneer Tikka</span><span class="qty-mini">×<em>2</em></span><span class="amt">₹498</span></div>
-                <div class="tot-mini">
-                  <div class="row"><span>Sub</span><span>₹818</span></div>
-                  <div class="row"><span>GST</span><span>₹41</span></div>
-                  <div class="grand"><span>Total</span><b id="pos-total">₹859</b></div>
-                </div>
-                <div class="pay-strip"><span class="on">Cash</span><span>UPI</span><span>Card</span><span>Due</span></div>
-                <div class="pay-cta"><i class="fa-solid fa-print"></i> Print &amp; Pay</div>
+                <div class="meta-line"><i class="fa-solid fa-chair" style="color:#FF4F00"></i> Table 12 Â· 4 pax Â· Dine-in</div>
+                <div class="cline"><span class="cdot" style="--cc:#FF4F00"></span><span class="cn">Butter Chicken</span><span class="amt">â‚¹320</span></div>
+                <div class="cline"><span class="cdot" style="--cc:#C47B16"></span><span class="cn">Paneer Tikka Ã—2</span><span class="amt">â‚¹498</span></div>
+                <div class="tot-row"><span>Total</span><b id="pos-total">â‚¹859</b></div>
               </div>
             </article>
 
+            <!-- Kitchen -->
             <article class="flow-card kds" data-seg="kds" id="seg-kds">
-              <div class="win-bar">
-                <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="win-tab"><i class="fa-solid fa-fire-burner"></i> Kitchen</span>
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-fire-burner"></i></span>
+                <span class="fc-name">Kitchen</span>
                 <span class="fc-badge warn" id="kds-badge">Waiting</span>
               </div>
               <div class="fc-body" id="kds-body">
-                <div style="font-size:11px;font-weight:600;color:#6b6960;padding:10px 4px;text-align:center">Queue empty — standing by</div>
+                <div class="empty-soft">Queue empty â€” standing by</div>
               </div>
               <div class="fc-foot"><span>Open tickets</span><b id="kds-count">0</b></div>
             </article>
 
+            <!-- Floor -->
             <article class="flow-card floor" data-seg="qr" id="seg-qr">
-              <div class="win-bar">
-                <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="win-tab"><i class="fa-solid fa-border-all"></i> Floor</span>
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-border-all"></i></span>
+                <span class="fc-name">Floor</span>
                 <span class="fc-badge" id="qr-badge">Tables</span>
               </div>
               <div class="fc-body" id="qr-body">
@@ -1413,32 +1393,22 @@
               <div class="fc-foot"><span>Occupied</span><b id="qr-count">0 / 12</b></div>
             </article>
 
+            <!-- Bills -->
             <article class="flow-card bills" data-seg="bills" id="seg-bills">
-              <div class="win-bar">
-                <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="win-tab"><i class="fa-solid fa-file-invoice"></i> Bills</span>
+              <div class="fc-top">
+                <span class="fc-ico"><i class="fa-solid fa-file-invoice"></i></span>
+                <span class="fc-name">Bills</span>
                 <span class="fc-badge" id="bills-badge">Ready</span>
               </div>
               <div class="fc-body" id="bills-body">
-                <div style="font-size:11px;font-weight:600;color:#6b6960;padding:8px 2px">No bill for Table 12 yet</div>
+                <div class="empty-soft">No bill for Table 12 yet</div>
               </div>
-              <div class="fc-foot"><span>Today</span><b id="bills-total">₹0</b></div>
-            </article>
-
-            <article class="flow-card wa" data-seg="wa" id="seg-wa">
-              <div class="win-bar">
-                <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="win-tab"><i class="fa-brands fa-whatsapp"></i> WhatsApp</span>
-                <span class="fc-badge" id="wa-badge">Idle</span>
-              </div>
-              <div class="wa-preview" id="wa-body">
-                <div class="wa-bubble">Waiting for paid bill…</div>
-              </div>
+              <div class="fc-foot"><span>Today</span><b id="bills-total">â‚¹0</b></div>
             </article>
           </div>
           <div class="flow-caption">
-            <div><b>Real dashboard tabs</b> · connected like one product experience</div>
-            <span class="hc-badge">POS → Kitchen → Floor → Bills → WhatsApp</span>
+            <div><b>One console</b> Â· POS â†’ Kitchen â†’ Floor â†’ Bills</div>
+            <span class="hc-badge">Live sync Â· same order data</span>
           </div>
         </div>
       </div>
@@ -1472,7 +1442,7 @@
           <div class="feature-card glass t2">
             <div class="feature-ic"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
             <h3>WhatsApp Receipts</h3>
-            <p>Send branded GST invoices to customers in 0.8 seconds — no paper, no third-party fees.</p>
+            <p>Send branded GST invoices to customers in 0.8 seconds â€” no paper, no third-party fees.</p>
             <a href="#demo" class="learn">Learn more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </div>
           <div class="feature-card glass">
@@ -1504,7 +1474,7 @@
             <span class="empathy-tag"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> The old way</span>
             <h3>Expensive, fragile, complex</h3>
             <ul class="empathy-list">
-              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> ₹3,000–₹7,000/month locked annual contracts</li>
+              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> â‚¹3,000â€“â‚¹7,000/month locked annual contracts</li>
               <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Sales drop the moment the Wi-Fi flickers</li>
               <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Days of onboarding and sales calls to set up</li>
               <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Paper receipts &amp; manual WhatsApp forwarding</li>
@@ -1515,11 +1485,11 @@
             <span class="empathy-tag"><i class="fa-solid fa-bolt" aria-hidden="true"></i> The RestroSuite way</span>
             <h3>Lightweight, resilient, zero-cost setup</h3>
             <ul class="empathy-list">
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>100% free</b> to use — no credit card</li>
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>100% offline billing</b> — never miss a sale</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>100% free</b> to use â€” no credit card</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>100% offline billing</b> â€” never miss a sale</li>
               <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>5-minute setup</b>, no installation needed</li>
               <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>Instant WhatsApp invoices</b>, built in &amp; free</li>
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>You own your data</b> — self-host option available</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>You own your data</b> â€” self-host option available</li>
             </ul>
           </div>
         </div>
@@ -1532,16 +1502,16 @@
         <div class="section-head">
           <span class="eyebrow">Interactive sandbox</span>
           <h2>Try a 30-second bill</h2>
-          <p>Tap items → tax adds automatically → <b>Print &amp; close</b> or send a demo WhatsApp invoice. Same flow as the real POS — no signup.</p>
+          <p>Tap items â†’ tax adds automatically â†’ <b>Print &amp; close</b> or send a demo WhatsApp invoice. Same flow as the real POS â€” no signup.</p>
         </div>
         <div class="demo-grid rs-pos-sandbox">
           <div class="pos-menu-pane">
             <div class="pos-menu-toolbar">
               <h3><i class="fa-solid fa-utensils" aria-hidden="true"></i> Menu</h3>
-              <span class="pos-menu-hint" id="sandbox-status-text">Tap to add · same as live POS</span>
+              <span class="pos-menu-hint" id="sandbox-status-text">Tap to add Â· same as live POS</span>
             </div>
             <div class="pos-grid" id="sim-menu-grid" role="group" aria-label="Menu items">
-              <!-- populated by JS — exact POS item tiles -->
+              <!-- populated by JS â€” exact POS item tiles -->
             </div>
             <p class="demo-foot-note">
               <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
@@ -1583,7 +1553,7 @@
                       aria-label="Customer WhatsApp number">
                   </div>
                 </div>
-                <div class="ph-hint" id="sandbox-phone-hint">Mobile for WhatsApp bill — auto-sends on Print &amp; Pay</div>
+                <div class="ph-hint" id="sandbox-phone-hint">Mobile for WhatsApp bill â€” auto-sends on Print &amp; Pay</div>
               </div>
             </div>
             <div class="cart-items" id="sim-cart-content" aria-live="polite" aria-label="Shopping cart">
@@ -1595,12 +1565,12 @@
             <div class="cart-foot" id="sandbox-cart-foot" style="display:none">
               <div class="totals-compact totals-readable">
                 <div class="totals-meta">
-                  <span>Sub <b id="sim-t-sub">₹0</b></span>
-                  <span>Tax <b id="sim-t-gst">₹0</b></span>
+                  <span>Sub <b id="sim-t-sub">â‚¹0</b></span>
+                  <span>Tax <b id="sim-t-gst">â‚¹0</b></span>
                 </div>
                 <div class="totals-grand">
                   <span class="totals-grand-lbl">Total</span>
-                  <span class="amt" id="sim-t-grand">₹0</span>
+                  <span class="amt" id="sim-t-grand">â‚¹0</span>
                 </div>
               </div>
               <div class="cart-payment cart-payment-labeled">
@@ -1628,26 +1598,26 @@
         <div class="section-head">
           <span class="eyebrow">Head-to-head comparison</span>
           <h2>RestroSuite vs the competition</h2>
-          <p>Every major Indian restaurant POS charges thousands per month. RestroSuite gives you more — for free.</p>
+          <p>Every major Indian restaurant POS charges thousands per month. RestroSuite gives you more â€” for free.</p>
         </div>
 
         <!-- Competitor pricing reality strip -->
         <div class="comp-chips-row" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:44px;">
           <div class="comp-price-chip glass-2">
             <span class="comp-name">Petpooja</span>
-            <span class="comp-cost">₹2,000 – ₹4,500<small>/mo</small></span>
+            <span class="comp-cost">â‚¹2,000 â€“ â‚¹4,500<small>/mo</small></span>
           </div>
           <div class="comp-price-chip glass-2">
             <span class="comp-name">UrbanPiper</span>
-            <span class="comp-cost">₹3,000 – ₹6,000<small>/mo</small></span>
+            <span class="comp-cost">â‚¹3,000 â€“ â‚¹6,000<small>/mo</small></span>
           </div>
           <div class="comp-price-chip glass-2">
             <span class="comp-name">Posist</span>
-            <span class="comp-cost">₹5,000 – ₹10,000<small>/mo</small></span>
+            <span class="comp-cost">â‚¹5,000 â€“ â‚¹10,000<small>/mo</small></span>
           </div>
           <div class="comp-price-chip glass-2">
             <span class="comp-name">Marg ERP</span>
-            <span class="comp-cost">₹3,500 – ₹7,000<small>/mo</small></span>
+            <span class="comp-cost">â‚¹3,500 â€“ â‚¹7,000<small>/mo</small></span>
           </div>
           <div class="comp-price-chip highlight">
             <span class="comp-name">RestroSuite</span>
@@ -1678,11 +1648,11 @@
             <tbody>
               <tr>
                 <td>Monthly cost</td>
-                <td class="us-col" style="font-size:15px;font-weight:800;color:var(--accent);">₹0 Free</td>
-                <td class="other">₹2k–₹4.5k</td>
-                <td class="other">₹3k–₹6k</td>
-                <td class="other">₹5k–₹10k</td>
-                <td class="other">₹3.5k–₹7k</td>
+                <td class="us-col" style="font-size:15px;font-weight:800;color:var(--accent);">â‚¹0 Free</td>
+                <td class="other">â‚¹2kâ€“â‚¹4.5k</td>
+                <td class="other">â‚¹3kâ€“â‚¹6k</td>
+                <td class="other">â‚¹5kâ€“â‚¹10k</td>
+                <td class="other">â‚¹3.5kâ€“â‚¹7k</td>
               </tr>
               <tr>
                 <td>Contract type</td>
@@ -1696,8 +1666,8 @@
                 <td>Offline billing</td>
                 <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> 100% offline</td>
                 <td class="other">Partial</td>
-                <td class="other" style="color:var(--danger);">✗ No</td>
-                <td class="other" style="color:var(--danger);">✗ No</td>
+                <td class="other" style="color:var(--danger);">âœ— No</td>
+                <td class="other" style="color:var(--danger);">âœ— No</td>
                 <td class="other">Partial</td>
               </tr>
               <tr>
@@ -1705,8 +1675,8 @@
                 <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> Built-in, free</td>
                 <td class="other">Paid add-on</td>
                 <td class="other">Paid add-on</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
+                <td class="other" style="color:var(--danger);">âœ— None</td>
+                <td class="other" style="color:var(--danger);">âœ— None</td>
               </tr>
               <tr>
                 <td>QR table ordering</td>
@@ -1714,7 +1684,7 @@
                 <td class="other">Paid add-on</td>
                 <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
                 <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
+                <td class="other" style="color:var(--danger);">âœ— None</td>
               </tr>
               <tr>
                 <td>Kitchen display (KDS)</td>
@@ -1730,15 +1700,15 @@
                 <td class="other">Paid add-on</td>
                 <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
                 <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
+                <td class="other" style="color:var(--danger);">âœ— None</td>
               </tr>
               <tr>
                 <td>Setup time</td>
                 <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> 5 minutes</td>
-                <td class="other">1–2 days</td>
-                <td class="other">2–3 days</td>
+                <td class="other">1â€“2 days</td>
+                <td class="other">2â€“3 days</td>
                 <td class="other">1+ week</td>
-                <td class="other">1–2 days</td>
+                <td class="other">1â€“2 days</td>
               </tr>
               <tr>
                 <td>Data ownership</td>
@@ -1763,7 +1733,7 @@
         <div class="section-head">
           <span class="eyebrow">Simple pricing</span>
           <h2>Completely free. No hidden cost.</h2>
-          <p>RestroSuite is free to use during our launch period. Get every feature — offline billing, WhatsApp receipts, QR ordering, CRM — at zero cost.</p>
+          <p>RestroSuite is free to use during our launch period. Get every feature â€” offline billing, WhatsApp receipts, QR ordering, CRM â€” at zero cost.</p>
         </div>
 
         <div class="free-banner glass" style="
@@ -1819,7 +1789,7 @@
             <div class="testi-card" role="group" aria-label="Testimonial 2 of 3">
               <div class="testi-inner">
                 <div class="testi-stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-                <p class="testi-quote">"I was paying &#8377;4,500 a month for old software that crashed whenever Wi-Fi dropped. RestroSuite works offline and it's free — I still can't believe it."</p>
+                <p class="testi-quote">"I was paying &#8377;4,500 a month for old software that crashed whenever Wi-Fi dropped. RestroSuite works offline and it's free â€” I still can't believe it."</p>
                 <div class="testi-author">
                   <div class="testi-avatar" aria-hidden="true">PS</div>
                   <div class="testi-meta" style="text-align:left"><div class="n">Priya Sharma</div><div class="r">Founder &middot; Cafe Boho</div></div>
@@ -1851,7 +1821,7 @@
       <div class="container">
         <div class="cta-band glass">
           <h2>Run your restaurant from your phone &mdash; for free</h2>
-          <p>Start free on the devices you already use. Set up in minutes — no credit card required.</p>
+          <p>Start free on the devices you already use. Set up in minutes â€” no credit card required.</p>
           <div class="cta-actions">
             <a class="btn btn-primary btn-lg" href="login.html?tab=register">
               <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free
@@ -1967,7 +1937,7 @@
         </div>
       </div>
       <div class="sim-settle-foot">
-        <p class="sim-settle-note">Same as live POS: settle bill → if mobile is on the cart, WhatsApp PDF goes out automatically.</p>
+        <p class="sim-settle-note">Same as live POS: settle bill â†’ if mobile is on the cart, WhatsApp PDF goes out automatically.</p>
         <a class="btn btn-primary" href="login.html?tab=register">Create free outlet</a>
         <button type="button" class="btn btn-ghost" onclick="closeSimModal()">Done</button>
       </div>
@@ -1979,7 +1949,7 @@
     <div class="wa-send-card glass">
       <div class="wa-send-icon" id="wa-send-icon"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
       <h3 id="wa-send-title" style="margin:0 0 6px;font-size:20px">Sending WhatsApp Invoice</h3>
-      <p id="wa-send-sub" style="margin:0;color:var(--text-dim);font-size:14px">Building your receipt…</p>
+      <p id="wa-send-sub" style="margin:0;color:var(--text-dim);font-size:14px">Building your receiptâ€¦</p>
       <ul class="wa-steps">
         <li class="wa-step" id="wa-step-0">
           <span class="wa-step-dot"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
@@ -2053,7 +2023,7 @@
         closeMobileNav();
     });
 
-    // ===== HERO: CodeArc-style constellation + live packet on solid paths =====
+    // ===== HERO constellation v202 â€” open canvas + solid green flow =====
     (function initHeroSync() {
       var stage = document.getElementById('sync-stage');
       if (!stage) return;
@@ -2063,23 +2033,19 @@
         pos: document.getElementById('seg-pos'),
         kds: document.getElementById('seg-kds'),
         qr: document.getElementById('seg-qr'),
-        bills: document.getElementById('seg-bills'),
-        wa: document.getElementById('seg-wa')
+        bills: document.getElementById('seg-bills')
       };
       var badges = {
         pos: document.getElementById('pos-badge'),
         kds: document.getElementById('kds-badge'),
         qr: document.getElementById('qr-badge'),
-        bills: document.getElementById('bills-badge'),
-        wa: document.getElementById('wa-badge')
+        bills: document.getElementById('bills-badge')
       };
       var pathMap = {
         'pos-kds': document.getElementById('path-pos-kds'),
         'pos-floor': document.getElementById('path-pos-floor'),
         'kds-bills': document.getElementById('path-kds-bills'),
-        'floor-bills': document.getElementById('path-floor-bills'),
-        'bills-wa': document.getElementById('path-bills-wa'),
-        'kds-wa': document.getElementById('path-kds-wa')
+        'floor-bills': document.getElementById('path-floor-bills')
       };
       var step = 0;
       var timer = null;
@@ -2109,7 +2075,7 @@
         var len = pathEl.getTotalLength();
         if (!len) return;
         var start = null;
-        duration = duration || 1000;
+        duration = duration || 1100;
         packet.setAttribute('opacity', '1');
         function frame(ts) {
           if (!start) start = ts;
@@ -2118,17 +2084,16 @@
           var pt = pathEl.getPointAtLength(ease * len);
           packet.setAttribute('cx', pt.x);
           packet.setAttribute('cy', pt.y);
-          packet.setAttribute('opacity', String(t < 0.88 ? 1 : 1 - (t - 0.88) / 0.12));
+          packet.setAttribute('opacity', String(t < 0.9 ? 1 : 1 - (t - 0.9) / 0.1));
           if (t < 1) packetAnim = requestAnimationFrame(frame);
           else packet.setAttribute('opacity', '0');
         }
         packetAnim = requestAnimationFrame(frame);
       }
       function flow(pathKey) {
-        var p = pathMap[pathKey];
         clearPaths();
         lightPath(pathKey, true);
-        animatePacketAlong(p, 1050);
+        animatePacketAlong(pathMap[pathKey], 1100);
       }
       function recv(card) {
         if (!card) return;
@@ -2136,37 +2101,24 @@
         void card.offsetWidth;
         card.classList.add('recv');
       }
-      function posCartHtml(state) {
-        if (state === 'empty') {
-          return '<div class="cart-head-mini">' +
-            '<span class="otype on"><i class="fa-solid fa-utensils"></i></span>' +
-            '<span class="otype"><i class="fa-solid fa-bag-shopping"></i></span>' +
-            '<span class="otype"><i class="fa-solid fa-motorcycle"></i></span>' +
-            '<span class="pill">0</span></div>' +
-            '<div style="font-size:11px;font-weight:600;color:#6b6960;text-align:center;padding:16px 4px">Cart cleared · next guest</div>' +
-            '<div class="pay-strip"><span>Cash</span><span class="on">UPI</span><span>Card</span><span>Due</span></div>';
+      function posHtml(mode) {
+        if (mode === 'empty') {
+          return '<div class="empty-soft">Cart cleared Â· ready for next guest</div>';
         }
-        return '<div class="cart-head-mini">' +
-          '<span class="otype on"><i class="fa-solid fa-utensils"></i></span>' +
-          '<span class="otype"><i class="fa-solid fa-bag-shopping"></i></span>' +
-          '<span class="otype"><i class="fa-solid fa-motorcycle"></i></span>' +
-          '<span class="pill">2</span></div>' +
-          '<div class="cline' + (state === 'new' ? ' new-in' : '') + '"><span class="cdot" style="--cc:#FF4F00"></span><span class="cn">Butter Chicken</span><span class="qty-mini">×<em>1</em></span><span class="amt">₹320</span></div>' +
-          '<div class="cline' + (state === 'new' ? ' new-in' : '') + '"><span class="cdot" style="--cc:#C47B16"></span><span class="cn">Paneer Tikka</span><span class="qty-mini">×<em>2</em></span><span class="amt">₹498</span></div>' +
-          '<div class="tot-mini"><div class="row"><span>Sub</span><span>₹818</span></div><div class="row"><span>GST</span><span>₹41</span></div>' +
-          '<div class="grand"><span>Total</span><b id="pos-total">₹859</b></div></div>' +
-          '<div class="pay-strip"><span class="on">Cash</span><span>UPI</span><span>Card</span><span>Due</span></div>' +
-          '<div class="pay-cta"><i class="fa-solid fa-print"></i> Print &amp; Pay</div>';
+        return '<div class="meta-line"><i class="fa-solid fa-chair" style="color:#FF4F00"></i> Table 12 Â· 4 pax Â· Dine-in</div>' +
+          '<div class="cline' + (mode === 'new' ? ' new-in' : '') + '"><span class="cdot" style="--cc:#FF4F00"></span><span class="cn">Butter Chicken</span><span class="amt">â‚¹320</span></div>' +
+          '<div class="cline' + (mode === 'new' ? ' new-in' : '') + '"><span class="cdot" style="--cc:#C47B16"></span><span class="cn">Paneer Tikka Ã—2</span><span class="amt">â‚¹498</span></div>' +
+          '<div class="tot-row"><span>Total</span><b id="pos-total">â‚¹859</b></div>';
       }
 
       var scenes = [
         function () {
           setActive('pos');
-          if (badges.pos) { badges.pos.textContent = 'Sending KOT'; badges.pos.className = 'fc-badge live'; }
+          if (badges.pos) { badges.pos.textContent = 'Sending'; badges.pos.className = 'fc-badge live'; }
           if (badges.kds) { badges.kds.textContent = 'Waiting'; badges.kds.className = 'fc-badge warn'; }
           var pb = document.getElementById('pos-body');
-          if (pb) pb.innerHTML = posCartHtml('open');
-          flashMsg('POS · Table 12 order leaves for kitchen');
+          if (pb) pb.innerHTML = posHtml('open');
+          flashMsg('POS Â· Table 12 order â†’ kitchen');
           flow('pos-kds');
         },
         function () {
@@ -2177,11 +2129,11 @@
           if (kds) {
             kds.innerHTML =
               '<div class="kds-ticket new-in"><span><span class="tok">T12</span>Butter Chicken</span><span class="st">Prep</span></div>' +
-              '<div class="kds-ticket new-in"><span><span class="tok">T12</span>Paneer Tikka ×2</span><span class="st">Prep</span></div>';
+              '<div class="kds-ticket new-in"><span><span class="tok">T12</span>Paneer Tikka Ã—2</span><span class="st">Prep</span></div>';
           }
           var kc = document.getElementById('kds-count');
           if (kc) kc.textContent = '1';
-          flashMsg('Kitchen · same lines · no re-type');
+          flashMsg('Kitchen Â· same lines Â· no re-type');
           recv(cards.kds);
           flow('pos-floor');
         },
@@ -2192,7 +2144,7 @@
           if (qr) {
             qr.innerHTML =
               '<div class="tbl-grid">' +
-              '<div class="tbl-pill occ"><b>T12</b><span class="st">Dining · ₹859</span></div>' +
+              '<div class="tbl-pill occ"><b>T12</b><span class="st">Dining Â· â‚¹859</span></div>' +
               '<div class="tbl-pill free"><b>T04</b><span class="st">Free</span></div>' +
               '<div class="tbl-pill free"><b>T08</b><span class="st">Free</span></div>' +
               '<div class="tbl-pill free"><b>T02</b><span class="st">QR on</span></div>' +
@@ -2200,7 +2152,7 @@
           }
           var qc = document.getElementById('qr-count');
           if (qc) qc.textContent = '1 / 12';
-          flashMsg('Floor · Table 12 occupied · live map');
+          flashMsg('Floor Â· Table 12 occupied');
           recv(cards.qr);
         },
         function () {
@@ -2211,7 +2163,7 @@
             kds2.innerHTML =
               '<div class="kds-ticket ready"><span><span class="tok">T12</span>All items ready</span><span class="st">Serve</span></div>';
           }
-          flashMsg('Kitchen ready → bills & floor update');
+          flashMsg('Kitchen ready â†’ bills update');
           flow('kds-bills');
         },
         function () {
@@ -2221,15 +2173,14 @@
           var bb = document.getElementById('bills-body');
           if (bb) {
             bb.innerHTML =
-              '<div class="bill-row new-in"><span>RS-23041 · T12 <span class="paid">PAID</span></span><span class="amt">₹859</span></div>' +
-              '<div class="bill-row"><span style="color:#6b6960;font-weight:600">Cash · GST incl.</span><span style="font-size:10px;color:#6b6960">Just now</span></div>';
+              '<div class="bill-row new-in"><span>RS-23041 Â· T12 <span class="paid">PAID</span></span><span class="amt">â‚¹859</span></div>';
           }
           var bt = document.getElementById('bills-total');
-          if (bt) bt.textContent = '₹859';
+          if (bt) bt.textContent = 'â‚¹859';
           var pb = document.getElementById('pos-body');
-          if (pb) pb.innerHTML = posCartHtml('empty');
+          if (pb) pb.innerHTML = posHtml('empty');
           var kds = document.getElementById('kds-body');
-          if (kds) kds.innerHTML = '<div style="font-size:11px;font-weight:600;color:#6b6960;padding:10px 4px;text-align:center">Queue empty — standing by</div>';
+          if (kds) kds.innerHTML = '<div class="empty-soft">Queue empty â€” standing by</div>';
           var kc = document.getElementById('kds-count');
           if (kc) kc.textContent = '0';
           if (badges.kds) { badges.kds.textContent = 'Waiting'; badges.kds.className = 'fc-badge warn'; }
@@ -2246,36 +2197,20 @@
           var qc = document.getElementById('qr-count');
           if (qc) qc.textContent = '0 / 12';
           if (badges.qr) { badges.qr.textContent = 'Tables'; badges.qr.className = 'fc-badge'; }
-          flashMsg('Bill paid · receipt → WhatsApp');
+          flashMsg('Bill paid Â· table free Â· same total');
           recv(cards.bills);
-          flow('bills-wa');
-        },
-        function () {
-          setActive('wa');
-          if (badges.wa) { badges.wa.textContent = 'Sent'; badges.wa.className = 'fc-badge on'; }
-          var wa = document.getElementById('wa-body');
-          if (wa) {
-            wa.innerHTML =
-              '<div class="wa-bubble"><b>RestroSuite Demo</b><br>Bill RS-23041 · T12<br>Total <b>₹859</b> · Cash<br>Thank you!</div>';
-          }
-          flashMsg('WhatsApp invoice · same total as Bills');
-          recv(cards.wa);
           flow('floor-bills');
         },
         function () {
           if (badges.pos) { badges.pos.textContent = 'Ready'; badges.pos.className = 'fc-badge on'; }
-          if (badges.kds) { badges.kds.textContent = 'Waiting'; badges.kds.className = 'fc-badge warn'; }
           if (badges.bills) { badges.bills.textContent = 'Ready'; badges.bills.className = 'fc-badge'; }
-          if (badges.wa) { badges.wa.textContent = 'Idle'; badges.wa.className = 'fc-badge'; }
           var pb = document.getElementById('pos-body');
-          if (pb) pb.innerHTML = posCartHtml('open');
+          if (pb) pb.innerHTML = posHtml('open');
           var bb = document.getElementById('bills-body');
-          if (bb) bb.innerHTML = '<div class="bill-row"><span>Last bill <span class="paid">PAID</span></span><span class="amt">₹859</span></div>';
-          var wa = document.getElementById('wa-body');
-          if (wa) wa.innerHTML = '<div class="wa-bubble">Waiting for paid bill…</div>';
+          if (bb) bb.innerHTML = '<div class="bill-row"><span>Last bill <span class="paid">PAID</span></span><span class="amt">â‚¹859</span></div>';
           setActive('pos');
           clearPaths();
-          flashMsg('Loop resets · every tab shares one truth');
+          flashMsg('Loop resets Â· every tab shares one truth');
         }
       ];
 
@@ -2285,7 +2220,7 @@
       }
       function start() {
         stop();
-        timer = setInterval(run, 2900);
+        timer = setInterval(run, 3000);
       }
       function stop() {
         if (timer) clearInterval(timer);
@@ -2296,8 +2231,8 @@
         cards[k].style.cursor = 'pointer';
         cards[k].addEventListener('click', function () {
           setActive(k);
-          var t = cards[k].querySelector('.win-tab');
-          flashMsg((t ? t.textContent.trim() : k) + ' · same live order data');
+          var n = cards[k].querySelector('.fc-name');
+          flashMsg((n ? n.textContent.trim() : k) + ' Â· same live order data');
         });
       });
       stage.addEventListener('mouseenter', stop);
@@ -2333,7 +2268,7 @@
     var simPayMethod = 'Cash';
     function setSandboxStatus(text) {
       var el = document.getElementById('sandbox-status-text');
-      if (el) el.textContent = text || 'Tap to add · same as live POS';
+      if (el) el.textContent = text || 'Tap to add Â· same as live POS';
     }
     function toggleSandboxCustomer(forceOpen) {
       var panel = document.getElementById('sandbox-cust-direct');
@@ -2372,13 +2307,13 @@
       var need = (simCfg().dialDigits) || 10;
       var digits = phone.value.replace(/\D/g, '');
       if (digits.length === need) {
-        hint.textContent = '✓ WhatsApp bill will send automatically on Print & Pay';
+        hint.textContent = 'âœ“ WhatsApp bill will send automatically on Print & Pay';
         hint.classList.add('has-num');
       } else if (digits.length > 0) {
         hint.textContent = 'Enter full ' + need + '-digit mobile';
         hint.classList.remove('has-num');
       } else {
-        hint.textContent = 'Mobile for WhatsApp bill — auto-sends on Print & Pay';
+        hint.textContent = 'Mobile for WhatsApp bill â€” auto-sends on Print & Pay';
         hint.classList.remove('has-num');
       }
       refreshSandboxCustChip();
@@ -2471,7 +2406,7 @@
           veg: !!veg,
         };
       }
-      setSandboxStatus('Open bill · ' + Object.keys(simCart).length + ' item(s)');
+      setSandboxStatus('Open bill Â· ' + Object.keys(simCart).length + ' item(s)');
       renderSimCart();
       renderSimMenu();
     }
@@ -2487,10 +2422,10 @@
       var phone = document.getElementById('sandbox-phone');
       if (phone) phone.value = '';
       onSandboxPhoneInput();
-      setSandboxStatus('Tap to add · same as live POS');
+      setSandboxStatus('Tap to add Â· same as live POS');
       renderSimCart();
       renderSimMenu();
-      showSandboxToast('Cart cleared — tap menu items to start again', false);
+      showSandboxToast('Cart cleared â€” tap menu items to start again', false);
     }
     function renderSimCart() {
       const container = document.getElementById('sim-cart-content');
@@ -2526,7 +2461,7 @@
           '<div class="cart-empty"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>' +
           '<div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>';
         if (foot) foot.style.display = 'none';
-        setSandboxStatus('Tap to add · same as live POS');
+        setSandboxStatus('Tap to add Â· same as live POS');
         return;
       }
       container.innerHTML = itemsHtml;
@@ -2580,7 +2515,7 @@
         '<div class="receipt-paper">' +
           '<div class="rcp-center">' +
             '<div class="rcp-logo">RestroSuite Demo</div>' +
-            '<div class="rcp-sub">Table 4 · Walk-in / Takeaway</div>' +
+            '<div class="rcp-sub">Table 4 Â· Walk-in / Takeaway</div>' +
             '<div class="rcp-sub">Phone +919983721179</div>' +
           '</div>' +
           '<hr class="rcp-hr">' +
@@ -2603,7 +2538,7 @@
         '</div>'
       );
     }
-    /** Print & Pay — like live POS: ask for WhatsApp number if missing, then send. */
+    /** Print & Pay â€” like live POS: ask for WhatsApp number if missing, then send. */
     async function triggerSimulatedReceipt() {
       var totals = simTaxFromCart();
       if (!totals.subtotal) {
@@ -2614,12 +2549,12 @@
       var pay = simPayMethod || 'Cash';
       var fullPhone = getSandboxFullPhone();
 
-      // No number on cart → ask (same as live POS WhatsApp flow)
+      // No number on cart â†’ ask (same as live POS WhatsApp flow)
       if (!fullPhone) {
         toggleSandboxCustomer(true);
         var asked = await askSandboxWhatsAppPhone();
         if (asked === null) {
-          // User cancelled ask dialog — abort settle
+          // User cancelled ask dialog â€” abort settle
           return;
         }
         // '' = Print only; non-empty = full phone from confirm
@@ -2636,21 +2571,21 @@
       hideSimWaBanner();
 
       if (fullPhone) {
-        setSimWaBanner('pending', 'Sending WhatsApp bill…', 'To ' + fullPhone + ' · same preview as receipt');
-        showSandboxToast('Bill settled · sending WhatsApp…', false);
+        setSimWaBanner('pending', 'Sending WhatsApp billâ€¦', 'To ' + fullPhone + ' Â· same preview as receipt');
+        showSandboxToast('Bill settled Â· sending WhatsAppâ€¦', false);
         try {
           var ok = await autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone);
           if (ok) {
             setSimWaBanner('ok', 'WhatsApp bill sent', 'Receipt delivered to ' + fullPhone);
-            showSandboxToast('✓ WhatsApp bill sent to ' + fullPhone, false);
+            showSandboxToast('âœ“ WhatsApp bill sent to ' + fullPhone, false);
           } else {
             setSimWaBanner('err', 'WhatsApp could not send', 'Bill is saved on screen. You can still share it from a free outlet.');
           }
         } catch (e) {
-          setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled — try again when messaging is available.');
+          setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled â€” try again when messaging is available.');
         }
       } else {
-        showSandboxToast('✓ Bill ' + billNo + ' closed · total ' + simMoney(totals.total), false);
+        showSandboxToast('âœ“ Bill ' + billNo + ' closed Â· total ' + simMoney(totals.total), false);
       }
 
       simCart = {};
@@ -2702,7 +2637,7 @@
     var SIM_COUNTRY = 'IN';
     var COUNTRY_CFG = {
       IN: {
-        name:'India', sym:'₹', dial:'+91', dialDigits:10,
+        name:'India', sym:'â‚¹', dial:'+91', dialDigits:10,
         taxLabel:'GST', taxMode:'cgst_sgst', taxRate:5,
         sacCode:'9963',
         locale:'en-IN', tz:'Asia/Kolkata',
@@ -2718,7 +2653,7 @@
         ]
       },
       IE: {
-        name:'Ireland', sym:'€', dial:'+353', dialDigits:9,
+        name:'Ireland', sym:'â‚¬', dial:'+353', dialDigits:9,
         taxLabel:'VAT', taxMode:'vat_breakout', taxRate:9,
         locale:'en-IE', tz:'Europe/Dublin',
         items:[
@@ -2733,7 +2668,7 @@
         ]
       },
       GB: {
-        name:'United Kingdom', sym:'£', dial:'+44', dialDigits:10,
+        name:'United Kingdom', sym:'Â£', dial:'+44', dialDigits:10,
         taxLabel:'VAT', taxMode:'vat_breakout', taxRate:20,
         locale:'en-GB', tz:'Europe/London',
         items:[
@@ -2880,13 +2815,13 @@
       var dateStr = fmtDate(now, cfg.locale);
       var subtotal = total - tax;
 
-      // ── Build items HTML ────────────────────────────────────────
+      // â”€â”€ Build items HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       var itemsHtml = items.map(function(item) {
         var taxR = item.taxRate || cfg.taxRate;
-        return '<div class="rr"><span>' + item.qty + '× ' + item.name + ' (' + taxR + '%)</span><span>' + rs(item.price * item.qty) + '</span></div>';
+        return '<div class="rr"><span>' + item.qty + 'Ã— ' + item.name + ' (' + taxR + '%)</span><span>' + rs(item.price * item.qty) + '</span></div>';
       }).join('');
 
-      // ── Build tax section HTML ──────────────────────────────────
+      // â”€â”€ Build tax section HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       var taxHtml = '';
       if (cfg.taxMode === 'cgst_sgst') {
         var halfGst = Math.round(tax / 2);
@@ -2900,7 +2835,7 @@
         taxHtml = '<div class="rr"><span>' + cfg.taxLabel + ' (' + cfg.taxRate + '%)</span><span>' + rs(tax) + '</span></div>';
       }
 
-      // ── Receipt HTML (rendered off-screen) ─────────────────────
+      // â”€â”€ Receipt HTML (rendered off-screen) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       var rcpHtml = '<style>' +
         '*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}body{background:#fff}' +
         '#rcp{width:302px;font-family:Arial,Helvetica,sans-serif;font-size:13px;background:#fff;color:#111;padding:18px 16px}' +
@@ -2970,8 +2905,8 @@
     }
 
     /**
-     * Auto WhatsApp after Print & Pay when cart has a valid mobile —
-     * mirrors live POS: settle → send bill PDF if customerPhone present.
+     * Auto WhatsApp after Print & Pay when cart has a valid mobile â€”
+     * mirrors live POS: settle â†’ send bill PDF if customerPhone present.
      */
     async function autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone) {
       var cfg = totals.cfg || simCfg();
@@ -3036,7 +2971,7 @@
                 reviews = data.reviews;
                 if (data.avg != null) {
                   var lab = document.getElementById('hero-stars-label');
-                  if (lab) lab.textContent = data.avg + '★ from approved guests';
+                  if (lab) lab.textContent = data.avg + 'â˜… from approved guests';
                 }
               }
             }
@@ -3047,11 +2982,11 @@
         if (!track) return;
         var avg = reviews.reduce(function (s, r) { return s + (Number(r.rating) || 5); }, 0) / reviews.length;
         var lab2 = document.getElementById('hero-stars-label');
-        if (lab2 && !/★/.test(lab2.textContent || '')) lab2.textContent = avg.toFixed(1) + '★ approved reviews';
+        if (lab2 && !/â˜…/.test(lab2.textContent || '')) lab2.textContent = avg.toFixed(1) + 'â˜… approved reviews';
         track.innerHTML = reviews.slice(0, 6).map(function (r, i) {
           var name = String(r.guestName || r.guest_name || 'Guest');
-          var initials = name.split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase() || '★';
-          var stars = '★'.repeat(Math.min(5, Number(r.rating) || 5));
+          var initials = name.split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase() || 'â˜…';
+          var stars = 'â˜…'.repeat(Math.min(5, Number(r.rating) || 5));
           var quote = String(r.comment || 'Great experience with RestroSuite.').slice(0, 220);
           return '<div class="testi-card" role="group" aria-label="Review ' + (i + 1) + '">' +
             '<div class="testi-inner">' +

@@ -417,7 +417,7 @@
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
     // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v201-20260715-ask-phone-privacy';
+    return 'v202-20260715-hero-codearc-clean';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

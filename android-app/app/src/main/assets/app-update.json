@@ -1,11 +1,12 @@
 ﻿{
-  "version": "v201-20260715-ask-phone-privacy",
+  "version": "v202-20260715-hero-codearc-clean",
   "date": "2026-07-15",
-  "title": "Ask WhatsApp number + stack privacy",
-  "summary": "Sandbox Print and Pay asks for WhatsApp number like live POS when missing. Public API/errors no longer name hosting, database, or messaging vendors.",
+  "title": "Hero CodeArc clean constellation",
+  "summary": "Homepage hero rebuilt as open CodeArc-style canvas: solid green connectors, four airy module cards (POS, Kitchen, Floor, Bills), no stacked clutter.",
   "highlights": [
-    "Walk-in customer chip expands to name + mobile like POS cart",
-    "Print and Pay prompts for WhatsApp number if not on cart",
-    "Sanitized messaging API errors; removed vendor fingerprints from user copy"
+    "Open canvas without heavy frame box",
+    "Solid teal/green curved connectors with nodes",
+    "Four clear cards with breathing room — no WhatsApp pile-up",
+    "Soft product chrome matching CodeArc reference composition"
   ]
 }
