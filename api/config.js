@@ -1,17 +1,17 @@
-/**
+﻿/**
  * GET /api/config
- * Serves public Supabase credentials from Vercel environment variables.
+ * Serves public runtime config from server environment variables.
  * The anon key is intentionally public (it's safe to expose in the browser),
  * but keeping it out of source code prevents it being scraped from GitHub
  * and means rotation only requires an env-var update, not a code deploy.
  *
- * Required Vercel environment variables:
- *   SUPABASE_URL          -- e.g. https://<ref>.supabase.co
- *   SUPABASE_ANON_KEY     -- the public anon/service key from Supabase -> Settings -> API
+ * Required environment variables (host secrets only):
+ *   SUPABASE_URL          -- cloud project URL
+ *   SUPABASE_ANON_KEY     -- public client key
  *
- * Optional Vercel environment variables (default to false/off):
+ * Optional (default false/off):
  *   ENABLE_DEMO_TOOLS     -- set to "true" to show demo/seed tools in the dashboard (dev only)
- *   ZERO_COST_LAUNCH_MODE -- set to "true" to disable the cloud WhatsApp gateway
+ *   ZERO_COST_LAUNCH_MODE -- set to "true" to disable cloud WhatsApp messaging
  */
 export default function handler(req, res) {
   if (req.method !== 'GET') {

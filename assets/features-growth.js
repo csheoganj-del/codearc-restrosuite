@@ -3411,7 +3411,7 @@
         (window.RS_API && RS_API.functionsBase) ||
         (window.__SUPABASE_URL__
           ? String(window.__SUPABASE_URL__).replace(/\/+$/, '') + '/functions/v1'
-          : 'https://YOUR_PROJECT.supabase.co/functions/v1');
+          : '');
       const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid || 'YOUR_TENANT_ID')}`;
       const sample = `{
   "platform": "swiggy",
@@ -4445,7 +4445,7 @@
               if(!records.length) throw new Error('No valid customer rows found');
               const res = await (RS.importPreview ? RS.importPreview({ 
                 title: 'Import customers CSV', 
-                summary: 'Customer rows will update loyalty profiles for this outlet and sync to Supabase when cloud is available.', 
+                summary: 'Customer rows will update loyalty profiles for this outlet and sync to the cloud when available.', 
                 rows: records.length, 
                 skipped, 
                 duplicatesCount 

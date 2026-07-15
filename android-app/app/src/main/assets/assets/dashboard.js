@@ -417,7 +417,7 @@
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
     // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v200-20260715-sandbox-auto-wa';
+    return 'v201-20260715-ask-phone-privacy';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
