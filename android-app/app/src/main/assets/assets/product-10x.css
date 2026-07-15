@@ -391,33 +391,82 @@
   border-radius: 12px;
 }
 
-/* ---- Mobile bottom nav: ensure icons always visible ---- */
+/* ---- Mobile bottom nav: FA solid icons require weight 900 ---- */
 .mobile-nav .mnav-link,
 .mobile-bottom-nav .mobile-nav-link {
   display: flex !important;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
+  justify-content: flex-start;
+  gap: 5px;
   min-width: 0;
+  overflow: visible !important;
+  color: var(--text-mute, #6b7280);
 }
+.mobile-nav .mnav-link > i,
 .mobile-nav .mnav-link i,
+.mobile-bottom-nav .mobile-nav-link > i,
 .mobile-bottom-nav .mobile-nav-link i {
   display: inline-block !important;
-  font-size: 18px !important;
-  line-height: 1;
+  font-family: "Font Awesome 6 Free" !important;
+  font-weight: 900 !important;
+  font-style: normal !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 1.35em;
+  min-height: 1.2em;
+  padding: 6px 12px !important;
   opacity: 1 !important;
   visibility: visible !important;
+  color: inherit !important;
+  -webkit-font-smoothing: antialiased;
+}
+.mobile-nav .mnav-link > i::before,
+.mobile-nav .mnav-link i::before {
+  font-family: "Font Awesome 6 Free" !important;
+  font-weight: 900 !important;
+  display: inline-block !important;
 }
 .mobile-nav .mnav-link span,
 .mobile-bottom-nav .mobile-nav-link span {
   display: block !important;
-  font-size: 10px !important;
-  font-weight: 700;
+  font-size: 11px !important;
+  font-weight: 700 !important;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: inherit;
+}
+.mobile-nav .mnav-link.active,
+.mobile-bottom-nav .mobile-nav-link.active {
+  color: var(--orange, #FF4F00) !important;
+}
+.mobile-nav .mnav-link.active > i,
+.mobile-nav .mnav-link.active i {
+  background: var(--orange-tint, rgba(255, 79, 0, 0.16));
+  color: var(--orange, #FF4F00) !important;
+  border-radius: 999px;
+}
+
+/* POS ⋯ menus: open fully inside viewport */
+@media (max-width: 760px) {
+  .rs-pos-more,
+  .pos-display-opts,
+  .pos-toolbar-secondary {
+    overflow: visible !important;
+    position: relative;
+    z-index: 80;
+  }
+  .rs-pos-more-menu,
+  .pos-display-panel {
+    right: 0 !important;
+    left: auto !important;
+    z-index: 300 !important;
+    max-width: min(260px, calc(100vw - 16px)) !important;
+  }
 }
 
 /* ---- Hindi font stack ---- */
