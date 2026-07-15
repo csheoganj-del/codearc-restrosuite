@@ -229,10 +229,25 @@ async function pollSuperAdminGateway() {
               qrImg.style.display = 'block';
             }
           } else {
-            if (qrSpinner) qrSpinner.style.display = 'block';
+            if (qrSpinner) {
+              qrSpinner.style.display = 'block';
+              qrSpinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-bottom:6px;font-size:16px;color:#FF4F00"></i><br>Preparing QR…';
+            }
             if (qrImg) qrImg.style.display = 'none';
           }
+        } else if (st === 'connecting' || st === 'starting' || st === 'syncing' || st === 'authenticated') {
+          statusBadge.className = 'pill pill-amber';
+          statusBadge.style.background = '';
+          statusBadge.style.color = '';
+          if (connectedView) connectedView.style.display = 'none';
+          if (qrContainer) qrContainer.style.display = 'flex';
+          if (qrSpinner) {
+            qrSpinner.style.display = 'block';
+            qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>${escHtml(pretty)}…`;
+          }
+          if (qrImg) qrImg.style.display = 'none';
         } else {
+          // disconnected / offline / closed / unknown — not "connecting"
           statusBadge.className = 'pill pill-red';
           statusBadge.style.background = '';
           statusBadge.style.color = '';
@@ -240,7 +255,12 @@ async function pollSuperAdminGateway() {
           if (qrContainer) qrContainer.style.display = 'flex';
           if (qrSpinner) {
             qrSpinner.style.display = 'block';
-            qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>Connecting (${escHtml(pretty)})`;
+            qrSpinner.innerHTML =
+              '<i class="fa-solid fa-link-slash" style="margin-bottom:8px;font-size:18px;color:#ef4444;display:block"></i>' +
+              '<strong style="color:var(--text);font-size:13px">WhatsApp not linked</strong>' +
+              '<span style="display:block;margin-top:8px;font-size:11.5px;color:var(--text-soft);line-height:1.45;max-width:260px">' +
+              'Click <b>Reset Gateway Connection</b> above, then scan the QR from WhatsApp → Linked devices.' +
+              '</span>';
           }
           if (qrImg) qrImg.style.display = 'none';
         }

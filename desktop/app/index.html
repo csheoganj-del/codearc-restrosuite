@@ -2496,15 +2496,16 @@
       setSimWaBanner('pending', 'Sending WhatsApp bill…', 'To ' + guestName + ' · ' + fullPhone);
       showSandboxToast('Bill settled · sending WhatsApp…', false);
       try {
-        var ok = await autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone);
-        if (ok) {
+        var sendResult = await autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone);
+        if (sendResult && sendResult.ok) {
           setSimWaBanner('ok', 'WhatsApp bill sent', guestName + ' · ' + fullPhone);
           showSandboxToast('✓ WhatsApp bill sent to ' + fullPhone, false);
         } else {
-          setSimWaBanner('err', 'WhatsApp could not send', 'Bill is saved on screen. Try again later.');
+          var why = (sendResult && sendResult.error) || 'Messaging is offline right now.';
+          setSimWaBanner('err', 'WhatsApp could not send', why + ' Bill is saved on screen.');
         }
       } catch (e) {
-        setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled on this screen.');
+        setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled on this screen. Messaging may be offline.');
       }
 
       simCart = {};
@@ -2828,13 +2829,13 @@
       var dialDigits = String(cfg.dial || '').replace(/\D/g, '');
       var num = String(fullPhone || '').replace(/\D/g, '');
       if (dialDigits && num.startsWith(dialDigits)) num = num.slice(dialDigits.length);
-      if (num.length < 7) return false;
+      if (num.length < 7) return { ok: false, error: 'Invalid phone number' };
 
       var items = Object.keys(cartSnap || {}).map(function (name) {
         var v = cartSnap[name];
         return { name: name, price: v.price, qty: v.qty, taxRate: v.taxRate || cfg.taxRate };
       });
-      if (!items.length) return false;
+      if (!items.length) return { ok: false, error: 'Cart is empty' };
 
       var pdfBase64 = null;
       try {
@@ -2854,7 +2855,14 @@
         })
       });
       var json = await r.json().catch(function () { return {}; });
-      return !!(r.ok && json && json.ok);
+      if (r.ok && json && json.ok) return { ok: true };
+      var errMsg = String((json && json.error) || '').trim();
+      if (!errMsg || /gateway|stack|token|host|supabase|vercel|hf\.|huggingface/i.test(errMsg)) {
+        errMsg = r.status === 503 || r.status === 502
+          ? 'Messaging is offline right now. Try again after WhatsApp is linked.'
+          : 'Could not send the bill. Try again later.';
+      }
+      return { ok: false, error: errMsg };
     }
 
     // ===== APPROVED HOMEPAGE REVIEWS (optional public feed) =====

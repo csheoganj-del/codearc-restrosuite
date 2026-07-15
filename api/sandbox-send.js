@@ -6,6 +6,7 @@ function publicErr(code, fallback) {
     not_configured: 'Messaging is not available right now. Please try again later.',
     unauthorized: 'Messaging is not available right now. Please try again later.',
     status_failed: 'Could not reach messaging service. Please try again.',
+    not_linked: 'Messaging is offline — WhatsApp is not linked. Link it in the dashboard, then try again.',
     missing_body: 'Missing phone number or cart items',
     invalid_phone: 'Invalid phone number',
     send_failed: 'Could not send the bill. Please try again.',
@@ -117,6 +118,20 @@ export default async function handler(req, res) {
   message += `\n*TOTAL    ${rs(total)}*\n\nThank you for dining with us.\nPowered by RestroSuite`;
 
   try {
+    // Prefer a clear offline/not-linked message before attempting send
+    try {
+      const statusResp = await fetch(`${gatewayUrl}/status`, { method: 'GET', headers, cache: 'no-store' });
+      if (statusResp.ok) {
+        const st = await statusResp.json().catch(() => ({}));
+        const status = String((st && st.status) || '').toLowerCase();
+        if (status && status !== 'ready') {
+          return res.status(503).json({ error: publicErr('not_linked'), code: 'not_linked' });
+        }
+      }
+    } catch {
+      /* fall through to send attempt */
+    }
+
     if (pdfData) {
       const cleanPdfData = String(pdfData).includes(',') ? String(pdfData).split(',').pop() : String(pdfData);
       const pdfResp = await fetch(`${gatewayUrl}/send`, {
@@ -130,6 +145,14 @@ export default async function handler(req, res) {
         }),
       });
       if (!pdfResp.ok) {
+        const body = await readGatewayResponse(pdfResp);
+        const raw = String((body && (body.error || body.message || body.reason)) || '').toLowerCase();
+        if (pdfResp.status === 401) {
+          return res.status(503).json({ error: publicErr('unauthorized') });
+        }
+        if (/disconnect|not.?ready|offline|not.?link|session|logged.?out|qr/i.test(raw) || pdfResp.status === 409 || pdfResp.status === 503) {
+          return res.status(503).json({ error: publicErr('not_linked'), code: 'not_linked' });
+        }
         return res.status(502).json({ error: publicErr('send_failed') });
       }
       return res.status(200).json({ ok: true, phone: cleanPhone, billNo, textSent: false, pdfSent: true });
@@ -143,6 +166,11 @@ export default async function handler(req, res) {
     if (!textResp.ok) {
       if (textResp.status === 401) {
         return res.status(503).json({ error: publicErr('unauthorized') });
+      }
+      const body = await readGatewayResponse(textResp);
+      const raw = String((body && (body.error || body.message || body.reason)) || '').toLowerCase();
+      if (/disconnect|not.?ready|offline|not.?link|session|logged.?out|qr/i.test(raw) || textResp.status === 409 || textResp.status === 503) {
+        return res.status(503).json({ error: publicErr('not_linked'), code: 'not_linked' });
       }
       return res.status(502).json({ error: publicErr('send_failed') });
     }

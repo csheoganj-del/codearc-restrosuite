@@ -142,7 +142,8 @@
   /* ---------- TAB SWITCHING ---------- */
   const isSuperAdmin = () => {
     const sess = window.RS_API ? RS_API.session() : null;
-    return !!(sess && sess.role === 'superadmin');
+    const role = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase().trim();
+    return role === 'superadmin' || role === 'super_admin';
   };
 
   function renderImpersonationBanner() {
@@ -234,11 +235,16 @@
 
   async function activateTab(id){
     const sess = window.RS_API ? RS_API.session() : null;
-    const isSuper = sess && sess.role === 'superadmin';
-    const isBrandAdmin = sess && sess.role === 'brand_admin';
+    const roleRaw = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase().trim();
+    const isSuper = roleRaw === 'superadmin' || roleRaw === 'super_admin';
+    const isBrandAdmin = roleRaw === 'brand_admin';
 
+    // Super-admin shell only exposes Super Admin + Gateway Monitor
+    // (settings-tab is blocked — WhatsApp link lives on gateway-monitor-tab)
     if (isSuper) {
-      if (id !== 'super-admin-tab' && id !== 'gateway-monitor-tab') {
+      if (id === 'settings-tab' || id === 'open-settings') {
+        id = 'gateway-monitor-tab';
+      } else if (id !== 'super-admin-tab' && id !== 'gateway-monitor-tab') {
         id = 'super-admin-tab';
       }
     } else if (isBrandAdmin) {
@@ -417,7 +423,7 @@
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
     // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v204-20260715-10of10-hero';
+    return 'v205-20260715-wa-gateway-open';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -2070,8 +2076,9 @@
   }).catch(()=>{});
 
   const sess = window.RS_API ? RS_API.session() : null;
-  const isSuper = sess && sess.role === 'superadmin';
-  const isBrandAdmin = sess && sess.role === 'brand_admin';
+  const shellRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase().trim();
+  const isSuper = shellRole === 'superadmin' || shellRole === 'super_admin';
+  const isBrandAdmin = shellRole === 'brand_admin';
   // Keep html + body in sync (html is stamped early in dashboard.html <head>)
   document.documentElement.classList.toggle('rs-role-superadmin', !!isSuper);
   document.documentElement.classList.toggle('rs-role-brandadmin', !!isBrandAdmin);

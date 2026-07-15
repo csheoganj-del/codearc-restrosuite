@@ -1339,7 +1339,7 @@
       // outlet owner/admin gets the full screen; managers get an operational
       // subset; every other staff role is blocked entirely.
       const role = settingsRole();
-      const isOwnerAdmin = ['owner','admin','superadmin'].includes(role);
+      const isOwnerAdmin = ['owner','admin','superadmin','super_admin'].includes(role);
       const isManager = role === 'manager';
       if (!isOwnerAdmin && !isManager) {
         sec.innerHTML = `<div class="panel panel-pad" style="text-align:center;padding:48px 24px">
@@ -1927,7 +1927,7 @@
           btnReset.onclick = async () => {
             // Defense in depth: even if this pane is somehow rendered for a
             // non-admin role, refuse to run the destructive reset.
-            if (!['owner','admin','superadmin'].includes(settingsRole())) {
+            if (!['owner','admin','superadmin','super_admin'].includes(settingsRole())) {
               RS.toast('Only the outlet owner can reset outlet data.', 'fa-lock');
               return;
             }
@@ -1987,7 +1987,12 @@
         }
       };
       $('#set-cancel').onclick=()=>show('profile');
-      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
+      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{
+        if(saved) SET_STORE=saved;
+        const deep = String(window.__rsOpenSettingsSection || '').trim();
+        window.__rsOpenSettingsSection = '';
+        show(deep && NAV.some(s => s[0] === deep) ? deep : 'profile');
+      });
     }
     RS.titles['settings-tab']=['Settings','Outlet · operations · access · account'];
     RS.addRenderer('settings-tab', renderSettings);
@@ -2224,11 +2229,66 @@
       window.__rsWaBadge = { state, label, tooltip };
     }
 
+    function isSuperAdminSession() {
+      const meta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const role = String(meta.role || sessionStorage.getItem('logged_in_role') || '')
+        .toLowerCase()
+        .trim();
+      return role === 'superadmin' || role === 'super_admin';
+    }
+
+    /**
+     * Open the right place to link / manage WhatsApp.
+     * Super-admin shell only allows super-admin-tab + gateway-monitor-tab
+     * (settings-tab is CSS-hidden and activateTab remaps it away).
+     * Outlet roles go to Settings → WhatsApp.
+     */
+    function openWhatsAppSettings() {
+      window.__rsOpenSettingsSection = 'gateway';
+      if (isSuperAdminSession()) {
+        if (window.RS && typeof RS.activateTab === 'function') {
+          return Promise.resolve(RS.activateTab('gateway-monitor-tab')).then(() => {
+            try {
+              const panel = document.getElementById('gateway-monitor-tab');
+              if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              const resetBtn = document.getElementById('btn-saas-gateway-reset');
+              if (resetBtn) {
+                resetBtn.classList.add('rs-pulse-hint');
+                setTimeout(() => resetBtn.classList.remove('rs-pulse-hint'), 2400);
+              }
+            } catch (_) {}
+            if (window.RS && RS.toast) {
+              RS.toast('Gateway Monitor — link WhatsApp with Reset / scan QR', 'fa-whatsapp');
+            }
+          });
+        }
+        return Promise.resolve();
+      }
+      if (window.RS && typeof RS.activateTab === 'function') {
+        return Promise.resolve(RS.activateTab('settings-tab')).then(() => {
+          let tries = 0;
+          const goGateway = () => {
+            const b = document.querySelector('.set-nav button[data-s="gateway"]');
+            if (b) {
+              b.click();
+              return;
+            }
+            if (++tries < 20) setTimeout(goGateway, 80);
+          };
+          setTimeout(goGateway, 60);
+        });
+      }
+      return Promise.resolve();
+    }
+    window.openWhatsAppSettings = openWhatsAppSettings;
+    if (window.RS) window.RS.openWhatsAppSettings = openWhatsAppSettings;
+
     function openWhatsAppStatusPanel() {
       const st = window.__rsGatewayLastStatus || 'unknown';
       const ready = window.__rsGatewayReady === true;
       const num = window.__rsGatewayNumber || '';
       const tip = (window.__rsWaBadge && window.__rsWaBadge.tooltip) || '';
+      const superAdmin = isSuperAdminSession();
       const stHuman =
         ready ? 'Connected'
           : st === 'qr' ? 'Scan QR to connect'
@@ -2242,6 +2302,12 @@
         : st === 'qr'
           ? `<span style="color:var(--amber);font-weight:800">Scan QR to connect</span>`
           : `<span style="color:var(--red);font-weight:800">${safe(stHuman)}</span>`;
+      const linkHint = superAdmin
+        ? 'Open Gateway Monitor to reset the connection and scan a new QR'
+        : 'Open Settings → WhatsApp and scan the QR';
+      const settingsBtnLabel = superAdmin
+        ? '<i class="fa-solid fa-server"></i> Open Gateway Monitor'
+        : '<i class="fa-solid fa-gear"></i> Open settings';
       const body = `
         <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px;line-height:1.5;color:var(--text-soft)">
           <div style="padding:12px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke-2)">
@@ -2253,7 +2319,7 @@
           <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft)">
             <li>Best for bills and “order ready” messages</li>
             <li>Phone online · WhatsApp → Linked devices</li>
-            <li>If not connected: open Settings → WhatsApp and scan the QR</li>
+            <li>If not connected: ${safe(linkHint)}</li>
           </ul>
           ${
             window.RSWaSendQueue && RSWaSendQueue.count && RSWaSendQueue.count() > 0
@@ -2264,18 +2330,14 @@
           }
         </div>`;
       if (!window.RSModal) {
-        if (confirm((tip || 'WhatsApp: ' + stHuman) + '\n\nOpen WhatsApp settings?')) {
-          if (RS.activateTab) RS.activateTab('settings-tab');
-          setTimeout(() => {
-            const b = document.querySelector('.set-nav button[data-s="gateway"]');
-            if (b) b.click();
-          }, 200);
+        if (confirm((tip || 'WhatsApp: ' + stHuman) + '\n\n' + (superAdmin ? 'Open Gateway Monitor?' : 'Open WhatsApp settings?'))) {
+          openWhatsAppSettings();
         }
         return;
       }
       RSModal.open({
         title: 'WhatsApp',
-        sub: 'Bill delivery for this outlet',
+        sub: superAdmin ? 'Platform messaging gateway' : 'Bill delivery for this outlet',
         icon: 'fa-brands fa-whatsapp',
         size: 'sm',
         body,
@@ -2285,7 +2347,7 @@
                    ? '<button type="button" class="btn btn-ghost" id="wa-panel-queue"><i class="fa-solid fa-clock"></i> Waiting bills</button>'
                    : ''
                }
-               <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1"><i class="fa-solid fa-gear"></i> Open settings</button>`,
+               <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1">${settingsBtnLabel}</button>`,
         onMount(modal, close) {
           modal.querySelector('#wa-panel-refresh').onclick = async () => {
             if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
@@ -2303,11 +2365,7 @@
             };
           modal.querySelector('#wa-panel-settings').onclick = () => {
             close();
-            if (RS.activateTab) RS.activateTab('settings-tab');
-            setTimeout(() => {
-              const b = document.querySelector('.set-nav button[data-s="gateway"]');
-              if (b) b.click();
-            }, 180);
+            openWhatsAppSettings();
           };
         },
       });

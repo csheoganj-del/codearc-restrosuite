@@ -753,15 +753,21 @@
     // Double-send guard: prevents auto-send + manual click from both firing for the same bill
     const _waSendingBills = new Set();
 
+    function goWhatsAppSettings() {
+      if (typeof window.openWhatsAppSettings === 'function') return window.openWhatsAppSettings();
+      if (window.RS && typeof RS.openWhatsAppSettings === 'function') return RS.openWhatsAppSettings();
+      if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
+      setTimeout(() => {
+        const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
+        if (gatewayBtn) gatewayBtn.click();
+      }, 200);
+    }
+
     function openGatewayConnectCTA(reason) {
       const msg = reason || 'WhatsApp is not connected on this outlet.';
       if (!window.RSModal) {
-        if (confirm(msg + '\n\nOpen Settings → Gateway to connect?')) {
-          if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
-          setTimeout(() => {
-            const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-            if (gatewayBtn) gatewayBtn.click();
-          }, 200);
+        if (confirm(msg + '\n\nOpen Settings → WhatsApp to connect?')) {
+          goWhatsAppSettings();
         }
         return;
       }
@@ -772,7 +778,7 @@
         size: 'sm',
         body: `<div style="padding:4px 2px 8px;line-height:1.55;font-size:13.5px;color:var(--text-soft)">
           <p style="margin:0 0 12px;color:var(--text)">${esc(msg)}</p>
-          <p style="margin:0 0 10px">Link <b>this outlet’s</b> WhatsApp in <b>Settings → Gateway</b> (Linked devices → scan QR). Bills still save if WhatsApp is offline.</p>
+          <p style="margin:0 0 10px">Link <b>this outlet’s</b> WhatsApp in <b>Settings → WhatsApp</b> (Linked devices → scan QR). Bills still save if WhatsApp is offline.</p>
           <p style="margin:0;font-size:12.5px">Meanwhile: share PDF from Bill settled, or open WhatsApp Web with the text bill.</p>
         </div>`,
         foot: `<button class="btn btn-ghost" id="wa-cta-later">Later</button>
@@ -781,11 +787,7 @@
           modal.querySelector('#wa-cta-later').onclick = close;
           modal.querySelector('#wa-cta-connect').onclick = () => {
             close();
-            if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
-            setTimeout(() => {
-              const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-              if (gatewayBtn) gatewayBtn.click();
-            }, 180);
+            goWhatsAppSettings();
           };
         }
       });
@@ -799,13 +801,7 @@
         !rawWhy || /gateway|disconnected|offline|econn|timeout|not ready|unavailable/i.test(rawWhy)
           ? 'WhatsApp is not connected right now.'
           : rawWhy;
-      const goSettings = () => {
-        if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
-        setTimeout(() => {
-          const gatewayBtn = document.querySelector('.set-nav button[data-s="gateway"]');
-          if (gatewayBtn) gatewayBtn.click();
-        }, 180);
-      };
+      const goSettings = () => goWhatsAppSettings();
       // Ensure queued for auto-send when Ready
       let queued = !!alreadyQueued;
       if (!queued && window.RSWaSendQueue && RSWaSendQueue.enqueue) {
@@ -1058,8 +1054,14 @@
           resolve(null);
           return;
         }
-        const tenantSlug = sessionStorage.getItem('tenant_slug') || 'outlet';
-        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${tenantSlug}/${bill.no}`;
+        // Query form works on production; path form /bill/slug/no returns 404
+        const digitalUrl =
+          (window.RSReceiptEngine && typeof RSReceiptEngine.digitalBillUrl === 'function')
+            ? RSReceiptEngine.digitalBillUrl(bill.no)
+            : (() => {
+                const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+                return `https://restrosuite.codearc.co.in/bill?slug=${encodeURIComponent(slug)}&no=${encodeURIComponent(bill.no)}`;
+              })();
         QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
           if (err) {
             console.error('[QR Generation Error]', err);
