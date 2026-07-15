@@ -417,7 +417,7 @@
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
     // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v197-20260715-hero-flow';
+    return 'v198-20260715-receipt-preview';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

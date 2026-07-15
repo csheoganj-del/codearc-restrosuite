@@ -1,11 +1,11 @@
 ﻿{
-  "version": "v197-20260715-hero-flow",
+  "version": "v198-20260715-receipt-preview",
   "date": "2026-07-15",
-  "title": "Hero constellation live flow",
-  "summary": "Homepage hero: exact dashboard module UIs (POS cart, Kitchen, Floor, Bills, WhatsApp) connected with animated flow lines and live data packets like CodeArc.",
+  "title": "Sandbox bill receipt preview",
+  "summary": "Homepage Print and Pay modal shows the same thermal receipt paper as live POS Bill settled, with Create free outlet CTA.",
   "highlights": [
-    "Hero cards match real POS cart lines, KDS tickets, floor map, bills",
-    "SVG flow lines + moving packet between modules",
-    "Live status captions as order data moves POS to Kitchen to Floor to Bills to WhatsApp"
+    "Bill settled modal uses real receipt-paper chrome (logo, dashed lines, TOTAL, tender)",
+    "Create free outlet CTA kept under the receipt",
+    "Matches live POS cart bill preview UX"
   ]
 }
