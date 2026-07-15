@@ -1,11 +1,11 @@
 ﻿{
-  "version": "v198-20260715-receipt-preview",
+  "version": "v199-20260715-hero-codearc",
   "date": "2026-07-15",
-  "title": "Sandbox bill receipt preview",
-  "summary": "Homepage Print and Pay modal shows the same thermal receipt paper as live POS Bill settled, with Create free outlet CTA.",
+  "title": "Hero CodeArc constellation",
+  "summary": "Homepage hero rebuilt: solid teal flow lines with nodes, window-chrome dashboard modules (POS cart, Kitchen KDS, Floor map, Bills, WhatsApp), live packet along paths.",
   "highlights": [
-    "Bill settled modal uses real receipt-paper chrome (logo, dashed lines, TOTAL, tender)",
-    "Create free outlet CTA kept under the receipt",
-    "Matches live POS cart bill preview UX"
+    "Solid CodeArc-style curved connectors (not dashed marketing lines)",
+    "POS window shows real cart chrome: order types, lines, totals, pay strip, Print and Pay",
+    "Kitchen tickets, floor table pills, bills list, WhatsApp bubble match dashboard tabs"
   ]
 }
