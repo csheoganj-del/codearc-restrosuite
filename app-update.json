@@ -1,13 +1,12 @@
-﻿{
-  "version": "v206-20260716-staff-guest-qr-dual",
+{
+  "version": "v207-20260716-reports-chart-clip",
   "date": "2026-07-16",
-  "title": "Staff/guest dual table QR 10/10",
-  "summary": "Same printed table QR: guests use phone camera; staff scan in-app (Floor → Scan table). Shared live tickets so guests track, add more, and amend after waiter takes the order.",
+  "title": "Reports chart layout fix",
+  "summary": "Daily revenue bars no longer overflow under the Payment mix donut on Last 30 / 90 day views. Dense bars, sparse labels, and hard panel clipping.",
   "highlights": [
-    "Floor → Scan table staff in-app QR scanner",
-    "Guest hub shows waiter-taken and guest tickets",
-    "Guest can add more and amend pending items",
-    "POS KOTs tagged as staff for shared table view",
-    "Builds on v205 + mobile menu/inventory cards"
+    "Clip daily revenue chart inside its own panel",
+    "Dense 30/90-day bar mode with shorter date labels",
+    "Payment mix donut no longer covered by overflowing bars",
+    "Service worker cache bump so browsers pick up the fix"
   ]
 }

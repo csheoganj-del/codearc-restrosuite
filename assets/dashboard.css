@@ -2066,65 +2066,98 @@ body.rs-role-brandadmin #klc-mobile-setup {
 }
 
 /* ===================== REPORTS / charts ===================== */
-.report-grid { display: grid; grid-template-columns: var(--cols, 1.6fr 1fr); gap: 16px; align-items: stretch; }
-/* Keep panels from letting chart bars spill into the neighbour (Payment mix) */
-.report-grid > .panel { min-width: 0; overflow: hidden; }
+.report-grid {
+  display: grid;
+  grid-template-columns: var(--cols, 1.6fr 1fr);
+  gap: 16px;
+  align-items: stretch;
+  /* Independent stacking so a long bar series cannot paint across columns */
+  isolation: isolate;
+}
+/* Solid clip + opaque paint — bars must never show under Payment mix */
+.report-grid > .panel {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+  z-index: 0;
+  background: var(--panel-solid, var(--panel));
+  contain: layout paint;
+}
+.report-grid > .panel:nth-child(2) { z-index: 1; }
 .chart-bars {
   display: flex;
   align-items: stretch;
-  gap: 6px;
+  gap: 4px;
   height: 210px;
-  padding-top: 6px;
+  padding-top: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
-  overflow: hidden; /* clip long 30/90-day series — never paint under Payment mix */
+  overflow: hidden;
+  position: relative;
 }
 .chart-bars.dense { gap: 2px; }
 .chart-bars .cbar {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: 0 !important; /* override flex min-content so date labels don't force overflow */
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   height: 100%;
   justify-content: flex-end;
+  overflow: hidden;
 }
 /* Track holds the bar; labels sit below — bars never use 100% of total height */
 .chart-bars .cbar .bar-track {
   flex: 1 1 auto;
   width: 100%;
+  min-width: 0;
   min-height: 0;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  overflow: hidden;
 }
 .chart-bars .cbar .bar {
-  width: 100%;
-  max-width: 38px;
+  width: 70%;
+  max-width: 28px;
+  min-width: 3px;
   min-height: 2px;
   border-radius: 4px 4px 2px 2px;
   background: var(--orange);
   transition: height .4s var(--ease);
   position: relative;
+  box-sizing: border-box;
 }
-.chart-bars.dense .cbar .bar { max-width: 14px; border-radius: 3px 3px 1px 1px; }
+.chart-bars.dense .cbar .bar {
+  width: 55%;
+  max-width: 12px;
+  min-width: 2px;
+  border-radius: 2px 2px 1px 1px;
+}
 .chart-bars .cbar .bar.v { background: var(--violet); }
 .chart-bars .cbar .bl {
   flex: none;
-  height: 28px;
+  height: 26px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 6px;
-  font-size: 10.5px;
+  font-size: 10px;
   line-height: 1.1;
   color: var(--text-mute);
   white-space: nowrap;
   overflow: hidden;
+  width: 100%;
   max-width: 100%;
   text-overflow: clip;
+  box-sizing: border-box;
 }
-.chart-bars.dense .cbar .bl { font-size: 9px; height: 24px; }
-.chart-bars .cbar .bl.is-muted { opacity: 0; pointer-events: none; } /* keep layout, hide every Nth label */
+.chart-bars.dense .cbar .bl { font-size: 8.5px; height: 22px; letter-spacing: -0.02em; }
+.chart-bars .cbar .bl.is-muted { opacity: 0; pointer-events: none; user-select: none; }
 .chart-bars .cbar .bv {
   position: absolute;
   top: -18px;
@@ -2146,8 +2179,9 @@ body.rs-role-brandadmin #klc-mobile-setup {
   gap: 20px;
   min-height: 170px;
   position: relative;
-  z-index: 1; /* sit above any accidental neighbour overflow */
+  z-index: 2;
   background: var(--panel-solid, var(--panel));
+  isolation: isolate;
 }
 .donut {
   width: 150px;
@@ -2155,14 +2189,15 @@ body.rs-role-brandadmin #klc-mobile-setup {
   border-radius: 50%;
   flex: none;
   position: relative;
-  overflow: hidden; /* keep ring clean */
+  overflow: hidden;
+  z-index: 1;
 }
 .donut::after {
   content: "";
   position: absolute;
   inset: 26px;
   border-radius: 50%;
-  background: var(--panel-solid);
+  background: var(--panel-solid, var(--panel));
 }
 .donut-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; z-index: 1; }
 .donut-center .dc-v { font-family: var(--font-display); font-weight: 700; font-size: 22px; }
