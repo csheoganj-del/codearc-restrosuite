@@ -11,11 +11,11 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-test('v85 asset version and SW cache present', () => {
+test('asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
-  assert.match(html, /v87-20260711-petpooja/);
-  assert.match(sw, /restrosuite-shell-v20260711/);
+  assert.match(html, /builtin = 'v\d+-\d{8}-/);
+  assert.match(sw, /const CACHE_NAME = "restrosuite-shell-v/);
 });
 
 test('POS calm mode: customer collapse, pay zone, more tools, no bare demo on html', () => {

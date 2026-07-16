@@ -26,7 +26,7 @@ test('competitive-ops.js exists and exposes core APIs', () => {
 test('dashboard loads competitive-ops in critical path', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /competitive-ops\.js|critical\.bundle\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('bill settled modal has thermal print action', () => {

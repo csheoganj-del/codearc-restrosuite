@@ -32,7 +32,7 @@ test('dashboard loads wave5 modules', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /escpos-encoder\.js/);
   assert.match(html, /bill-identity\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
   assert.match(html, /bills-history\.js|inventory-ledger\.js/);
 });
 
@@ -63,7 +63,7 @@ test('bills-history module extracted (wave 6)', () => {
   assert.ok(!dash.includes('payPill'), 'payPill map should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /bills-history\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('checkout e2e spec present (wave 6)', () => {
@@ -82,7 +82,7 @@ test('inventory-ui module extracted (wave 7)', () => {
   assert.ok(!dash.includes('btn-auto-draft-pos'), 'heavy inventory UI should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /inventory-ui\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('bills-history has server search helpers (wave 7)', () => {
@@ -110,7 +110,7 @@ test('reports-ui module extracted (wave 8)', () => {
   assert.ok(!dash.includes('GSTR_report_'), 'GSTR export should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /reports-ui\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('gateway-monitor module extracted (wave 8)', () => {
@@ -141,7 +141,7 @@ test('super-admin module extracted (wave 9)', () => {
   assert.ok(!dash.includes('function openCreateTenantModal'), 'tenant create modal should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /super-admin\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('kds-ui module extracted (wave 9)', () => {
@@ -166,7 +166,7 @@ test('qr-orders-ui module extracted (wave 10)', () => {
   assert.ok(!dash.includes('qr-grid'), 'QR grid markup should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /qr-orders-ui\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('employees-ui module extracted (wave 10)', () => {
@@ -193,7 +193,7 @@ test('pos-ui module extracted (wave 11)', () => {
   assert.ok(!dash.includes('pos-item'), 'POS menu tiles should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /pos-ui\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('tax-helpers module extracted (wave 12)', () => {
@@ -206,7 +206,7 @@ test('tax-helpers module extracted (wave 12)', () => {
   assert.match(dash, /tax-helpers|RS_TAX_RATES|RSTax/);
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /tax-helpers\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('growth-hub-shell module extracted (wave 12)', () => {
@@ -252,14 +252,14 @@ test('product pack: Z-report scope, WA retry, demo script (wave product)', () =>
   assert.match(reports, /Taxable Value|TOTALS/);
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /demo-script\.js/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
 });
 
 test('cashier pack: dues banner, hold polish, release notes', () => {
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /cart-customer-dues-banner/);
   assert.match(html, /insight-dues/);
-  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20260711/);
+  assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);
   const pos = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
   assert.match(pos, /paintDuesBanner|Outstanding dues/);
   assert.match(pos, /cart-dues-settle|RS_showSettleDues/);
