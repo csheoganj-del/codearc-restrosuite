@@ -1505,11 +1505,11 @@
               };
             }
           } else if (res.canAutomate || res.platformReady || res.sendMode === 'platform') {
-            // Platform automation — unlimited clients, no per-outlet QR required
+            // Platform automation — blue (not green): central line, own number not linked
             const pn = res.platformNumber ? ('+' + res.platformNumber) : 'platform line';
-            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#22c55e 35%,var(--stroke));border-radius:14px;padding:16px 18px;background:color-mix(in srgb,#22c55e 6%,var(--panel))">
-              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Automation</div><div class="sd">Bills can use platform line until you link your number</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Auto on</span></div>
-              <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-soft);line-height:1.45">For bills from <b>your</b> restaurant WhatsApp: scan QR once (Linked devices). Lazy mode keeps server RAM low.</p>
+            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#0ea5e9 40%,var(--stroke));border-radius:14px;padding:16px 18px;background:color-mix(in srgb,#0ea5e9 8%,var(--panel))">
+              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Automation</div><div class="sd">Bills send from <b>central</b> WhatsApp (${pn}) until you link yours</div></div><span class="pill" style="padding:5px 12px;background:rgba(14,165,233,.14);color:#0284c7;border:1px solid rgba(14,165,233,.35)"><span class="dot" style="background:#0ea5e9"></span> Platform</span></div>
+              <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-soft);line-height:1.45"><b>Green</b> top-bar icon = your restaurant number linked. <b>Blue</b> = central line only. Scan QR once to use your own WhatsApp.</p>
               <button type="button" class="btn btn-primary btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Link my WhatsApp</button>
             </div>`;
             wireFreshQrButtons(container, tenantId);
@@ -2240,7 +2240,9 @@
       });
     }
     
-    const WA_BADGE_STATES = ['wa-linked', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
+    // wa-linked = green (own restaurant number)
+    // wa-platform = blue (central/platform line only — outlet not linked)
+    const WA_BADGE_STATES = ['wa-linked', 'wa-platform', 'wa-syncing', 'wa-qr', 'wa-offline', 'wa-auth-failure', 'wa-starting'];
     function setTopbarWhatsAppBadge(state, label, tooltip, pulse) {
       const pills = document.querySelectorAll('.js-wa-status-pill, #tb-wa-status-btn');
       if (!pills.length) return;
@@ -2259,6 +2261,7 @@
       if (lab) {
         const short =
           state === 'wa-linked' ? (label && String(label).indexOf('+') === 0 ? label : 'On')
+          : state === 'wa-platform' ? (label && String(label).indexOf('+') === 0 ? label : 'Hub')
           : state === 'wa-offline' || state === 'wa-auth-failure' ? 'Off'
           : state === 'wa-qr' ? 'Scan'
           : '…';
@@ -2272,6 +2275,7 @@
         pillEl.setAttribute('data-tooltip', tooltip || '');
         pillEl.title = tooltip || label || 'Bill WhatsApp';
         pillEl.setAttribute('aria-label', 'Bill WhatsApp: ' + (label || state));
+        pillEl.setAttribute('data-wa-mode', state === 'wa-linked' ? 'own' : state === 'wa-platform' ? 'platform' : state);
       });
       window.__rsWaBadge = { state, label, tooltip };
     }
@@ -2475,9 +2479,18 @@
         window.__rsGatewayStatusRaw = res || null;
         window.__rsWaSendMode = (res && res.sendMode) || 'none';
         window.__rsPlatformReady = !!(res && res.platformReady);
-        const canAuto = !!(res && (res.canAutomate || res.status === 'ready' || res.platformReady));
-        if (res && res.status === 'ready') {
-          // Own linked number
+        // Platform central number can deliver bills even when this outlet has not linked WhatsApp
+        // (or is stuck on Scan QR). Prefer canAutomate / platformReady so the bill modal allows PDF auto-send.
+        const canAuto = !!(res && (
+          res.canAutomate === true
+          || res.status === 'ready'
+          || res.status === 'linked'
+          || res.platformReady === true
+          || res.sendMode === 'platform'
+          || res.sendMode === 'own'
+        ));
+        if (res && res.status === 'ready' && res.sendMode !== 'platform') {
+          // Own linked number (live)
           window.__rsGatewayReady = true;
           const n = window.__rsGatewayNumber;
           const short = n ? ('+' + String(n).slice(-4)) : 'On';
@@ -2497,14 +2510,19 @@
             'Your WhatsApp is linked · connects automatically when sending a bill',
             false
           );
-        } else if (canAuto && res && res.sendMode === 'platform') {
+        } else if (canAuto && (res.sendMode === 'platform' || res.platformReady === true || res.canAutomate === true)) {
+          // Central / platform line only — NOT own number (blue badge, not green)
           window.__rsGatewayReady = true;
           window.__rsGatewayLastStatus = 'ready';
-          const pn = res.platformNumber ? ('+' + String(res.platformNumber).slice(-4)) : 'On';
+          window.__rsWaSendMode = res.sendMode || 'platform';
+          const pn = res.platformNumber || res.number;
+          const short = pn ? ('+' + String(pn).slice(-4)) : 'Hub';
           setTopbarWhatsAppBadge(
-            'wa-linked',
-            pn,
-            'Platform WhatsApp available · link your number in Settings for bills from your phone',
+            'wa-platform',
+            short,
+            pn
+              ? 'Using central WhatsApp +' + pn + ' (not your number). Link your WhatsApp in Settings for green status and bills from your phone.'
+              : 'Using central platform WhatsApp. Link your restaurant number in Settings for green status.',
             false
           );
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {

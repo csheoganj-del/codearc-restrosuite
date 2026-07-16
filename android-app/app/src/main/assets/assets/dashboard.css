@@ -389,6 +389,7 @@
   background: var(--glass); color: var(--text-soft); font-size: 15px;
 }
 .tb-more-status.wa-linked > i { background: rgba(37, 211, 102, 0.14); color: #128C7E; }
+.tb-more-status.wa-platform > i { background: rgba(14, 165, 233, 0.14); color: #0284c7; }
 .tb-more-status.wa-offline > i,
 .tb-more-status.wa-auth-failure > i { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 .tb-more-status.wa-qr > i,
@@ -5095,7 +5096,7 @@ textarea:focus-visible,
   margin-left: 0 !important;
 }
 
-/* Connected — WhatsApp green */
+/* Own restaurant WhatsApp linked — classic green */
 #tb-wa-status-btn.wa-linked,
 .topbar #tb-wa-status-btn.wa-linked {
   color: #25d366 !important;
@@ -5110,6 +5111,27 @@ textarea:focus-visible,
 #tb-wa-status-btn.wa-linked:hover {
   background: rgba(37, 211, 102, 0.2) !important;
   border-color: rgba(37, 211, 102, 0.5) !important;
+}
+
+/* Platform / central line only (outlet not linked) — blue, not green */
+#tb-wa-status-btn.wa-platform,
+.topbar #tb-wa-status-btn.wa-platform,
+#topbar-whatsapp-status-pill.wa-platform {
+  color: #0284c7 !important;
+  background: rgba(14, 165, 233, 0.14) !important;
+  border-color: rgba(14, 165, 233, 0.42) !important;
+}
+#tb-wa-status-btn.wa-platform .tb-wa-icon,
+#tb-wa-status-btn.wa-platform:hover,
+#tb-wa-status-btn.wa-platform:hover .tb-wa-icon,
+#topbar-whatsapp-status-pill.wa-platform i,
+#topbar-whatsapp-status-pill.wa-platform span {
+  color: #0284c7 !important;
+}
+#tb-wa-status-btn.wa-platform:hover,
+#topbar-whatsapp-status-pill.wa-platform:hover {
+  background: rgba(14, 165, 233, 0.22) !important;
+  border-color: rgba(14, 165, 233, 0.55) !important;
 }
 
 /* Offline / failed — red */

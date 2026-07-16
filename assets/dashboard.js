@@ -1255,7 +1255,7 @@
     if (tbLabel) tbLabel.textContent = 'Off';
     const tbBtn = document.getElementById('tb-wa-status-btn');
     if (tbBtn) {
-      tbBtn.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
+      tbBtn.classList.remove('wa-linked', 'wa-platform', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
       tbBtn.classList.add('wa-offline');
       tbBtn.title = friendly;
       tbBtn.setAttribute('data-tooltip', friendly);

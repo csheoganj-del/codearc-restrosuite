@@ -294,6 +294,9 @@
     try{ history.replaceState(null,'','#'+id); }catch(e){}
     // Save active tab to localStorage
     try { localStorage.setItem('rs_active_tab', id); } catch(e){}
+    try {
+      document.dispatchEvent(new CustomEvent('rs:tab-change', { detail: { tab: id } }));
+    } catch (e) {}
   }
 
   // Early role-home map (must exist before hydrate may call loadSavedTab)
@@ -1252,7 +1255,7 @@
     if (tbLabel) tbLabel.textContent = 'Off';
     const tbBtn = document.getElementById('tb-wa-status-btn');
     if (tbBtn) {
-      tbBtn.classList.remove('wa-linked', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
+      tbBtn.classList.remove('wa-linked', 'wa-platform', 'wa-syncing', 'wa-qr', 'wa-starting', 'wa-auth-failure');
       tbBtn.classList.add('wa-offline');
       tbBtn.title = friendly;
       tbBtn.setAttribute('data-tooltip', friendly);
@@ -1275,11 +1278,41 @@
   // and shows a live count while it's happening.
   function getSyncQueueLength() {
     try {
+      if (typeof window.RS_DB_SYNC_DEPTH === 'function') {
+        const n = Number(window.RS_DB_SYNC_DEPTH());
+        if (Number.isFinite(n)) return n;
+      }
+      if (window.RS_DB && typeof RS_DB.getSyncQueueDepth === 'function') {
+        const n = Number(RS_DB.getSyncQueueDepth());
+        if (Number.isFinite(n)) return n;
+      }
       const raw = localStorage.getItem('rs:sync_queue');
       if (!raw) return 0;
       const q = JSON.parse(raw);
-      return Array.isArray(q) ? q.length : 0;
-    } catch(e) { return 0; }
+      if (!Array.isArray(q)) return 0;
+      return q.filter((e) => e && e.status !== 'acked').length;
+    } catch (e) {
+      return 0;
+    }
+  }
+  function getSyncLastError() {
+    try {
+      const q =
+        (typeof window.RS_DB_GET_SYNC_QUEUE === 'function' && window.RS_DB_GET_SYNC_QUEUE()) ||
+        JSON.parse(localStorage.getItem('rs:sync_queue') || '[]');
+      if (!Array.isArray(q) || !q.length) return '';
+      const withErr = q.find((e) => e && e.lastError);
+      return withErr ? String(withErr.lastError).slice(0, 120) : '';
+    } catch (_) {
+      return '';
+    }
+  }
+  async function runSyncQueueFlush(opts) {
+    if (window.RS_DB && typeof RS_DB.flushSyncQueue === 'function') return RS_DB.flushSyncQueue(opts);
+    if (typeof window.RS_DB_DRAIN === 'function') return window.RS_DB_DRAIN(opts);
+    if (typeof window.RS_DB_FLUSH_SYNC === 'function') return window.RS_DB_FLUSH_SYNC(opts);
+    if (window.RS_DB && typeof RS_DB.sync === 'function') return RS_DB.sync();
+    return null;
   }
   function updateOfflineSyncIndicator() {
     const count = getSyncQueueLength();
@@ -1318,16 +1351,25 @@
             window.__rsOfflineBannerDismissedAt = Date.now();
             pill.style.display = 'none';
             document.body.classList.remove('rs-offline-banner-on');
-            toast('Got it  -  POS keeps working offline', 'fa-wifi');
+            toast('Got it - POS keeps working offline', 'fa-wifi');
             return;
           }
           act.disabled = true;
           act.textContent = '...';
           try {
-            if (window.RS_DB && typeof RS_DB.flushSyncQueue === 'function') await RS_DB.flushSyncQueue();
-            else if (window.RS_DB && typeof RS_DB.sync === 'function') await RS_DB.sync();
-            window.dispatchEvent(new CustomEvent('rs:sync-queue-drained'));
-            toast('Sync retry started', 'fa-cloud-arrow-up');
+            // Second click while still stuck drops poison pills so the banner can clear
+            const force = !!window.__rsSyncForceDrop;
+            const result = await runSyncQueueFlush(force ? { forceDropStuck: true } : undefined);
+            window.__rsSyncForceDrop = true; // next Retry can force-drop if still stuck
+            setTimeout(() => { window.__rsSyncForceDrop = false; }, 15000);
+            const left = (result && result.remaining != null) ? result.remaining : getSyncQueueLength();
+            if (left === 0) {
+              toast('Cloud sync complete', 'fa-cloud');
+            } else if (force) {
+              toast('Cleared stuck sync item(s). Local data is safe.', 'fa-cloud');
+            } else {
+              toast('Sync retry finished - still ' + left + ' pending. Tap Retry again to clear stuck items.', 'fa-cloud-arrow-up');
+            }
           } catch (e) {
             toast('Sync will retry automatically', 'fa-cloud');
           }
@@ -1353,6 +1395,7 @@
     const subEl = document.getElementById('rs-offline-sync-sub');
     const icon = document.getElementById('rs-offline-sync-icon');
     const act = document.getElementById('rs-offline-sync-action');
+    const lastErr = getSyncLastError();
     if (isOffline) {
       pill.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
       pill.style.color = '#1a1205';
@@ -1360,10 +1403,10 @@
       if (textEl) {
         textEl.textContent =
           count > 0
-            ? `Offline | ${count} change${count === 1 ? '' : 's'} saved on this device`
-            : 'You are offline  -  billing still works';
+            ? `Offline - ${count} change${count === 1 ? '' : 's'} saved on this device`
+            : 'You are offline - billing still works';
       }
-      if (subEl) subEl.textContent = 'Bills & KOTs save locally and upload when Wi"‘Fi returns.';
+      if (subEl) subEl.textContent = 'Bills & KOTs save locally and upload when Wi-Fi returns.';
       if (act) {
         act.textContent = 'Got it';
         act.style.display = '';
@@ -1373,17 +1416,26 @@
       pill.style.color = '#fff';
       if (icon) icon.className = 'fa-solid fa-cloud-arrow-up fa-fade';
       if (textEl) textEl.textContent = `Syncing ${count} change${count === 1 ? '' : 's'} to cloud...`;
-      if (subEl) subEl.textContent = 'Keep this tab open a moment  -  no action needed.';
+      if (subEl) {
+        subEl.textContent = lastErr
+          ? ('Issue: ' + lastErr + ' - tap Retry (again to clear if stuck)')
+          : 'Keep this tab open a moment - no action needed. Tap Retry if it stays.';
+      }
       if (act) {
         act.textContent = 'Retry';
         act.style.display = '';
         act.style.background = 'rgba(255,255,255,.2)';
       }
+      // Auto-drain so a stuck queue does not sit forever without user action
+      if (!window.__rsSyncAutoDrainAt || Date.now() - window.__rsSyncAutoDrainAt > 12000) {
+        window.__rsSyncAutoDrainAt = Date.now();
+        runSyncQueueFlush().catch(() => {}).finally(() => updateOfflineSyncIndicator());
+      }
     } else if (cloudErr) {
       pill.style.background = 'linear-gradient(135deg,#ef4444,#b91c1c)';
       pill.style.color = '#fff';
       if (icon) icon.className = 'fa-solid fa-cloud-bolt';
-      if (textEl) textEl.textContent = 'Cloud sync hiccup  -  data is safe on this device';
+      if (textEl) textEl.textContent = 'Cloud sync hiccup - data is safe on this device';
       if (subEl) {
         subEl.textContent = String((window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.message) || 'Will retry automatically.');
       }
@@ -1400,6 +1452,7 @@
   window.addEventListener('offline', updateOfflineSyncIndicator);
   window.addEventListener('rs:cloud-fallback', updateOfflineSyncIndicator);
   window.addEventListener('rs:sync-queue-drained', updateOfflineSyncIndicator);
+  window.addEventListener('rs:sync-queue-changed', updateOfflineSyncIndicator);
   window.addEventListener('rs:sync-done', updateOfflineSyncIndicator);
   setInterval(updateOfflineSyncIndicator, 5000);
   if (document.readyState !== 'loading') updateOfflineSyncIndicator();
