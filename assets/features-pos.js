@@ -890,14 +890,15 @@
       });
     }
 
-    async function shareReceiptViaWhatsApp(bill) {
+    async function shareReceiptViaWhatsApp(bill, sendOpts) {
       const key = bill && (bill.no || bill.orderId || bill.id);
       if (key && _waSendingBills.has(key)) return;
       if (key) _waSendingBills.add(key);
-      try { await _doShareReceiptViaWhatsApp(bill); } finally { if (key) _waSendingBills.delete(key); }
+      try { await _doShareReceiptViaWhatsApp(bill, sendOpts || {}); } finally { if (key) _waSendingBills.delete(key); }
     }
 
-    async function _doShareReceiptViaWhatsApp(bill) {
+    async function _doShareReceiptViaWhatsApp(bill, sendOpts) {
+      sendOpts = sendOpts || {};
       let phone = bill.customerPhone;
       if (!phone || phone.trim() === '' || phone === 'null') {
         phone = await new Promise(resolve => {
@@ -982,7 +983,11 @@
 
       if (window.RSReceiptEngine && typeof RSReceiptEngine.sendWhatsApp === 'function') {
         try {
-          const result = await RSReceiptEngine.sendWhatsApp(normalized, cleanPhone, { timeoutMs: 30000 });
+          const result = await RSReceiptEngine.sendWhatsApp(normalized, cleanPhone, {
+            timeoutMs: sendOpts.timeoutMs || 45000,
+            skipWaMe: !!sendOpts.auto,
+            preferPdf: true,
+          });
           if (result.mode === 'pdf') {
             RS.toast('WhatsApp bill PDF sent (same as preview)!', 'fa-file-pdf');
             return;
@@ -993,6 +998,10 @@
             return;
           }
           if (result.mode === 'wa.me') {
+            if (sendOpts.auto) {
+              RS.toast('PDF send failed — tap green WhatsApp to retry', 'fa-circle-exclamation');
+              return;
+            }
             // Gateway path failed — queue + structured fallback
             openWaOfflineFallback(
               normalized,
@@ -1009,6 +1018,10 @@
           }
         } catch (err) {
           console.warn('[Receipt] engine send failed:', err && err.message);
+          if (sendOpts.auto) {
+            RS.toast('WhatsApp PDF auto-send failed — tap green icon to retry', 'fa-circle-exclamation');
+            return;
+          }
           openWaOfflineFallback(normalized, cleanPhone, err && err.message);
           return;
         }
@@ -2469,10 +2482,16 @@
 
           try {
             const autoSendSettings = window.RS_SETTINGS || {};
-            const autoSendEnabled = autoSendSettings.set_auto_send_receipts === true
-              || autoSendSettings.set_auto_send_receipts === 'true';
+            // Match gateway: default ON unless explicitly false
+            const autoSendEnabled = autoSendSettings.set_auto_send_receipts !== false
+              && autoSendSettings.set_auto_send_receipts !== 'false';
             if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
-              setTimeout(() => { shareReceiptViaWhatsApp(bill); }, 600);
+              // Give bill settle UI a moment, then send thermal PDF via gateway (not plaintext)
+              setTimeout(() => {
+                shareReceiptViaWhatsApp(bill, { auto: true, timeoutMs: 45000 }).catch((e) => {
+                  console.warn('Auto-send WhatsApp failed:', e && e.message);
+                });
+              }, 900);
             }
           } catch (autoSendErr) {
             console.warn('Auto-send WhatsApp failed:', autoSendErr.message);

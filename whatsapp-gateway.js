@@ -3492,12 +3492,12 @@ if (dbClientForRealtime) {
 
                 console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
 
-                // Wait briefly so POS /send (PDF) can win; then we act as backup text send
-                await new Promise(r => setTimeout(r, 8000));
+                // Wait for POS to generate + gateway_send the thermal PDF (can take 10–25s)
+                await new Promise(r => setTimeout(r, 22000));
 
-                // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
+                // Skip if the POS frontend already handled this order via /send (PDF preferred)
                 if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
-                    console.log(`[Realtime Skipped] Order ${orderId} already handled by frontend via /send.`);
+                    console.log(`[Realtime Skipped] Order ${orderId} already handled by frontend via /send (PDF).`);
                     return;
                 }
 
@@ -3540,39 +3540,38 @@ if (dbClientForRealtime) {
                                 return;
                             }
 
-                            // Check bill format preference -- if PDF mode, skip auto-send from realtime listener.
-                            // The POS frontend will handle PDF generation and delivery via the /send endpoint.
                             let flags = {};
                             try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
                             uiSettings = flags.ui_settings || {};
 
-                            // Empty ui_settings: still allow platform text backup (do not hard-skip)
-
-                            // Check if auto-send is disabled (default ON when unset)
                             const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
                             if (!autoSendEnabled) {
                                 console.log(`[Realtime Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
                                 return;
                             }
 
-                            // Prefer POS PDF path when explicitly configured; otherwise send text backup via platform
-                            const billFormat = uiSettings.set_whatsapp_bill_format || '';
-                            if (billFormat && billFormat !== 'Text receipt' && billFormat !== 'text' && Object.keys(uiSettings).length > 0) {
-                                // Give POS more time already waited; still send text backup so customer gets something
-                                console.log(`[Realtime] Tenant ${tenantId} prefers PDF (${billFormat}) — sending text backup via platform if POS did not send.`);
+                            // Default = PDF. Realtime cannot build thermal PDF — POS must gateway_send pdfData.
+                            // Do NOT spam plain-text "```" bills when PDF is preferred.
+                            const billFormat = String(uiSettings.set_whatsapp_bill_format || 'Thermal PDF receipt').toLowerCase();
+                            const wantsText = billFormat === 'text receipt' || billFormat === 'text' || billFormat === 'plain text';
+                            if (!wantsText) {
+                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF bills — waiting on POS /send for order ${orderId}. No text fallback (avoids ugly plaintext bills).`);
+                                return;
                             }
+                        } else {
+                            // No profile: still prefer PDF-only; POS owns PDF path
+                            console.log(`[Realtime Skipped] No profile for ${tenantId}; PDF path is POS-only for order ${orderId}.`);
+                            return;
                         }
                     }
 
-                    // Extract tenant currency symbol (WhatsApp-safe ASCII version)
+                    // Explicit TEXT receipt mode only from here
                     let currSymbol = 'Rs.';
                     try {
                         const rawCurr = uiSettings.set_currency || '';
                         if (rawCurr) {
-                            // Handle "EUR (€)" -> extract €
                             const m = rawCurr.match(/\(([^)]+)\)/);
                             const sym = m ? m[1].trim() : rawCurr.trim().split(/\s+/).pop();
-                            // Convert multi-byte symbols to ASCII-safe equivalents for WhatsApp
                             currSymbol = sym
                                 .replace(/₹/g, 'Rs.')
                                 .replace(/€/g, 'EUR')
@@ -3586,7 +3585,6 @@ if (dbClientForRealtime) {
                         console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
                     }
 
-                    // Normalize record for text formatter (snake_case → camel fields)
                     const billForText = {
                         ...record,
                         orderId: orderId,
@@ -3596,13 +3594,13 @@ if (dbClientForRealtime) {
                         paymentMethod: record.payment_method || record.paymentMethod,
                         total: record.total,
                         subtotal: record.subtotal,
+                        gst: record.gst,
                         items: record.items,
+                        dateTime: record.date_time || record.dateTime,
                     };
 
-                    // Format clean text receipt (matching POS frontend format)
                     const message = formatReceiptText(billForText, tenantProfile, currSymbol);
                     
-                    // Prefer own tenant WA if live; else platform central number (lazy fallback)
                     let route = null;
                     try {
                         route = await resolveSendRouteLazy(tenantId || 'system');
@@ -3613,9 +3611,8 @@ if (dbClientForRealtime) {
                         console.warn(`[Realtime Delay] No WhatsApp route for tenant ${tenantId} (platform offline?). Cannot dispatch.`);
                     } else {
                         await humanSend(route.client, chatId, message, {}, route.sendAsTenantId || tenantId);
-                        console.log(`[Realtime Auto-Sent] via=${route.via} to +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
+                        console.log(`[Realtime Auto-Sent TEXT] via=${route.via} to +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
                         
-                        // Broadcast success back to POS Web Clients
                         if (supabase) {
                             const broadcastChannel = supabase.channel('whatsapp-billing-status');
                             broadcastChannel.subscribe(async (status) => {
@@ -3623,7 +3620,7 @@ if (dbClientForRealtime) {
                                     await broadcastChannel.send({
                                         type: 'broadcast',
                                         event: 'status',
-                                        payload: { orderId, status: 'success', via: route.via }
+                                        payload: { orderId, status: 'success', via: route.via, format: 'text' }
                                     });
                                     supabase.removeChannel(broadcastChannel);
                                 }
@@ -3819,32 +3816,46 @@ function formatDouble24(label, value) {
     return label + valStr.padStart(padSize, ' ');
 }
 
+function moneyRs(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '0';
+    // Avoid 21.990000000000002 — max 2 dp, drop trailing .00 when whole
+    const r = Math.round((v + Number.EPSILON) * 100) / 100;
+    return Number.isInteger(r) ? String(r) : r.toFixed(2);
+}
+
 function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.') {
     const borderDouble = '='.repeat(24);
     const borderSingle = '-'.repeat(24);
+    const money = (n) => `${currSymbol}${moneyRs(n)}`;
     
-    let msg = "```\n";
+    let msg = '';
     msg += borderDouble + '\n';
-    msg += centerText24(profile.name) + '\n';
-    msg += centerText24(profile.address) + '\n';
-    msg += centerText24(profile.phone) + '\n';
+    msg += centerText24(profile.name || 'Outlet') + '\n';
+    if (profile.address) msg += centerText24(String(profile.address).slice(0, 24)) + '\n';
+    if (profile.phone) msg += centerText24(String(profile.phone).slice(0, 24)) + '\n';
     msg += borderDouble + '\n\n';
     
-    const billLine = `Bill: ${record.orderId}`;
-    const payLine = record.paymentMethod || 'Cash';
-    const padSize = 24 - billLine.length;
-    if (padSize >= payLine.length) {
-        // Bill number short enough -- payment fits on same line
-        msg += billLine + payLine.padStart(padSize, ' ') + '\n';
-    } else {
-        // Bill number too long -- put each on its own line, no truncation
-        msg += billLine + '\n';
-        msg += `Paid: ${payLine}` + '\n';
-    }
+    const orderId = record.orderId || record.order_id || record.no || '';
+    msg += `Bill: ${orderId}\n`;
+    msg += `Paid: ${record.paymentMethod || record.payment_method || 'Cash'}\n`;
     
-    const dateOnly = record.dateTime ? record.dateTime.split(',')[0] : new Date().toLocaleDateString('en-IN');
+    let dateOnly = '';
+    try {
+        const raw = record.dateTime || record.date_time || record.created_at;
+        if (raw) {
+            const d = new Date(raw);
+            dateOnly = Number.isNaN(d.getTime())
+                ? String(raw).split(',')[0]
+                : d.toLocaleDateString('en-IN');
+        } else {
+            dateOnly = new Date().toLocaleDateString('en-IN');
+        }
+    } catch (_) {
+        dateOnly = new Date().toLocaleDateString('en-IN');
+    }
     msg += `Date: ${dateOnly}\n`;
-    msg += `Guest: ${(record.customerName || 'Walk-in Guest').slice(0, 17)}\n\n`;
+    msg += `Guest: ${String(record.customerName || record.customer_name || 'Walk-in Guest').slice(0, 20)}\n\n`;
     
     msg += borderSingle + '\n';
     msg += formatRow24('Item', 'Qty', 'Amt') + '\n';
@@ -3859,45 +3870,34 @@ function formatReceiptText(record, profile = businessProfile, currSymbol = 'Rs.'
 
     if (Array.isArray(items)) {
         items.forEach(item => {
-            const itemIcon = item.icon || getFallbackCategoryIcon(item.category || item.name);
-            let displayName = `${itemIcon} ${item.name}`;
-            if (item.size && item.size !== 'Small') {
-                displayName += ` (${item.size.charAt(0)})`;
-            }
-            msg += formatRow24(displayName, item.qty, (item.price * item.qty).toString()) + '\n';
-            msg += `  (${currSymbol}${item.price} each)\n`;
-            if (item.toppings && item.toppings.length > 0) {
-                msg += `  + ${item.toppings.join(', ')}\n`;
-            }
-            if (item.notes) {
-                msg += `  * Note: ${item.notes}\n`;
+            const name = String(item.name || item.item || 'Item').slice(0, 14);
+            const qty = Number(item.qty != null ? item.qty : item.quantity) || 1;
+            const price = Number(item.price != null ? item.price : item.unit_price) || 0;
+            const line = price * qty;
+            msg += formatRow24(name, qty, moneyRs(line)) + '\n';
+            msg += `  (${money(price)} each)\n`;
+            if (item.notes || item.note) {
+                msg += `  * ${String(item.notes || item.note).slice(0, 40)}\n`;
             }
         });
     }
     
     msg += borderSingle + '\n';
-    msg += formatDouble24('Subtotal', `${currSymbol}${record.subtotal}`) + '\n';
+    msg += formatDouble24('Subtotal', money(record.subtotal)) + '\n';
     
-    if (profile.gstEnabled !== false) {
-        msg += formatDouble24('GST', `${currSymbol}${record.gst}`) + '\n';
+    if (profile.gstEnabled !== false && Number(record.gst) > 0) {
+        msg += formatDouble24('GST', money(record.gst)) + '\n';
     }
     
-    if (record.discount && record.discount > 0) {
-        msg += formatDouble24('Discount', `-${currSymbol}${record.discount}`) + '\n';
+    if (record.discount && Number(record.discount) > 0) {
+        msg += formatDouble24('Discount', `-${money(record.discount)}`) + '\n';
     }
     
     msg += borderDouble + '\n';
-    msg += formatDouble24('GRAND TOTAL', `${currSymbol}${record.total}`) + '\n';
+    msg += formatDouble24('GRAND TOTAL', money(record.total)) + '\n';
     msg += borderDouble + '\n\n';
-
-    const vibeQuote = getRandomGoodVibeQuote(record);
-    msg += borderSingle + '\n';
-    msg += centerText24(vibeQuote) + '\n';
-    msg += borderSingle + '\n\n';
-    
-    msg += centerText24('Thank you for visiting!') + '\n';
-    msg += centerText24('Visit Again ☕') + '\n';
-    msg += "```";
+    msg += centerText24('Thank you!') + '\n';
+    msg += centerText24('Visit again') + '\n';
     return msg;
 }
 
