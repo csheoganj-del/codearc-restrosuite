@@ -1330,11 +1330,12 @@
       pill.className = 'rs-offline-sync-banner attention-blink';
       pill.setAttribute('role', 'status');
       pill.setAttribute('aria-live', 'polite');
+      // Sit above cart Print & Pay (not covering the checkout button)
       pill.style.cssText =
-        'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:99997;' +
+        'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:9000;' +
         'background:linear-gradient(135deg,#f59e0b,#d97706);color:#1a1205;padding:10px 16px;border-radius:14px;' +
         'font-size:12.5px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:10px;' +
-        'max-width:min(520px,calc(100vw - 24px));line-height:1.35;cursor:default;';
+        'max-width:min(520px,calc(100vw - 24px));line-height:1.35;cursor:default;pointer-events:auto;';
       pill.innerHTML =
         '<i class="fa-solid fa-cloud-arrow-up" id="rs-offline-sync-icon" aria-hidden="true"></i>' +
         '<span style="flex:1;min-width:0">' +

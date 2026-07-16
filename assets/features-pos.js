@@ -3336,20 +3336,84 @@
       } catch (_) {}
     });
 
+    let _posCustCache = null;
+    let _posCustCacheAt = 0;
+    function phoneDigits(p) {
+      return String(p == null ? '' : p).replace(/\D/g, '');
+    }
+    function phonesLooseMatch(a, b) {
+      const da = phoneDigits(a);
+      const db = phoneDigits(b);
+      if (!da || !db) return false;
+      if (da === db) return true;
+      // Match last 10 digits (IN mobile) regardless of +91 / leading 0
+      if (da.length >= 7 && db.length >= 7) {
+        const ta = da.length >= 10 ? da.slice(-10) : da;
+        const tb = db.length >= 10 ? db.slice(-10) : db;
+        if (ta === tb) return true;
+        return ta.includes(tb) || tb.includes(ta);
+      }
+      return da.includes(db) || db.includes(da);
+    }
+    async function getCustomersForPosSearch(force) {
+      if (!force && _posCustCache && Date.now() - _posCustCacheAt < 20000) {
+        return _posCustCache;
+      }
+      let list = [];
+      try {
+        if (window.RS_DB && typeof RS_DB.list === 'function') {
+          list = await RS_DB.list('customers').catch(() => []);
+          if ((!list || !list.length) && typeof RS_DB.listLocal === 'function') {
+            list = await RS_DB.listLocal('customers').catch(() => []);
+          }
+        }
+      } catch (_) {
+        list = [];
+      }
+      if ((!list || !list.length) && window.RS && Array.isArray(RS.CUSTOMERS)) {
+        list = RS.CUSTOMERS.slice();
+      }
+      // Also mine recent bills for names/phones not yet in CRM
+      try {
+        const bills = (window.RS && Array.isArray(RS.BILLS) ? RS.BILLS : []) || [];
+        const seen = new Set((list || []).map((c) => phoneDigits(c.phone)).filter(Boolean));
+        bills.slice(0, 200).forEach((b) => {
+          const ph = b.customerPhone || b.phone || '';
+          const dig = phoneDigits(ph);
+          if (dig.length < 7 || seen.has(dig.slice(-10))) return;
+          seen.add(dig.slice(-10));
+          list.push({
+            id: 'bill-cust-' + dig,
+            name: b.customerName || b.customer || 'Guest',
+            phone: dig.length === 10 ? dig : dig,
+            visits: 1,
+            spend: Number(b.amount != null ? b.amount : b.total) || 0,
+            dues: 0,
+            fromBill: true,
+          });
+        });
+      } catch (_) {}
+      _posCustCache = Array.isArray(list) ? list : [];
+      _posCustCacheAt = Date.now();
+      return _posCustCache;
+    }
     async function loadCustomersForPos() {
       const sel = document.getElementById('cart-customer-sel');
       if (!sel) return;
       const currentVal = sel.value;
       try {
-        const customers = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+        const customers = await getCustomersForPosSearch(true);
         sel.innerHTML = '<option value="">Walk-in Customer</option>' + 
-          customers.map(c => `<option value="${esc(c.phone)}" data-name="${esc(c.name)}" data-gst="${esc(c.email||'')}" ${c.phone === currentVal ? 'selected' : ''}>${esc(c.name)} (${esc(c.phone)})</option>`).join('');
+          customers.map(c => `<option value="${esc(c.phone)}" data-name="${esc(c.name)}" data-gst="${esc(c.email||'')}" ${c.phone === currentVal || phonesLooseMatch(c.phone, currentVal) ? 'selected' : ''}>${esc(c.name)} (${esc(c.phone)})</option>`).join('');
       } catch(e) {
         console.warn("Failed to load customers for POS", e);
       }
     }
     loadCustomersForPos();
-    document.addEventListener('rs:hydrated', loadCustomersForPos);
+    document.addEventListener('rs:hydrated', () => {
+      _posCustCache = null;
+      loadCustomersForPos();
+    });
     
     // Also reload when selector gets focus to pick up any new customers added in CRM
     const csel = document.getElementById('cart-customer-sel');
@@ -3640,8 +3704,15 @@
         }
       });
       
-      // Live search → inline popover inside cart (not over the menu grid)
-      const handleInput = async () => {
+      // Live search → inline popover (CRM + recent bills; loose phone match)
+      let _custSearchTimer = null;
+      let _custSearchSeq = 0;
+      const handleInput = () => {
+        if (_custSearchTimer) clearTimeout(_custSearchTimer);
+        _custSearchTimer = setTimeout(() => runCustomerLiveSearch(), 120);
+      };
+      const runCustomerLiveSearch = async () => {
+        const seq = ++_custSearchSeq;
         const nameVal = nameInput.value.trim();
         const phoneVal = phoneInput.value.trim();
         
@@ -3663,27 +3734,40 @@
         
         if (triggerText) triggerText.innerText = nameVal || phoneVal;
         
-        const allCustomers = window.RS_DB ? await window.RS_DB.list('customers').catch(() => []) : [];
-        const cleanPhoneVal = phoneVal.replace(/\D/g, '');
-        const matches = allCustomers.filter(c => {
-          const matchName = nameVal ? (c.name || '').toLowerCase().includes(nameVal.toLowerCase()) : true;
-          const matchPhone = cleanPhoneVal ? (c.phone || '').replace(/\D/g, '').includes(cleanPhoneVal) : true;
-          // When only name typed, still match; when only phone, match phone
-          if (nameVal && !phoneVal) return matchName;
-          if (!nameVal && phoneVal) return matchPhone;
-          return matchName && matchPhone;
-        }).slice(0, 8);
+        // Ensure customer form is open so suggestions are visible
+        try {
+          if (window.RSPosUI && typeof RSPosUI.setCartCustomerPanelOpen === 'function') {
+            RSPosUI.setCartCustomerPanelOpen(true);
+          } else {
+            const panel = document.getElementById('cart-cust-direct-inputs');
+            if (panel) {
+              panel.hidden = false;
+              panel.classList.add('is-open');
+            }
+          }
+        } catch (_) {}
 
-        // Live dues banner when phone uniquely matches CRM (or first exact phone hit)
+        const allCustomers = await getCustomersForPosSearch(false);
+        if (seq !== _custSearchSeq) return;
+        const cleanPhoneVal = phoneDigits(phoneVal);
+        const nameQ = nameVal.toLowerCase();
+        const matches = allCustomers.filter((c) => {
+          const cName = String(c.name || '').toLowerCase();
+          const matchName = nameQ ? cName.includes(nameQ) : true;
+          const matchPhone = cleanPhoneVal
+            ? phonesLooseMatch(c.phone, cleanPhoneVal) || phoneDigits(c.phone).includes(cleanPhoneVal)
+            : true;
+          if (nameQ && !cleanPhoneVal) return matchName;
+          if (!nameQ && cleanPhoneVal) return matchPhone;
+          // Either field can match when both typed (OR) so guessing feels live
+          return matchName || matchPhone;
+        }).slice(0, 10);
+
+        // Live dues banner when phone uniquely matches CRM
         if (duesBannerLive) {
           const exact =
-            matches.find((c) => String(c.phone || '').replace(/\D/g, '') === cleanPhoneVal) ||
-            (cleanPhoneVal.length >= 10 &&
-              matches.find((c) =>
-                String(c.phone || '')
-                  .replace(/\D/g, '')
-                  .endsWith(cleanPhoneVal.slice(-10))
-              ));
+            matches.find((c) => phonesLooseMatch(c.phone, cleanPhoneVal) && cleanPhoneVal.length >= 7) ||
+            matches.find((c) => phoneDigits(c.phone) === cleanPhoneVal);
           const due = exact ? Number(exact.dues) || 0 : 0;
           if (exact && due > 0) {
             duesBannerLive.style.display = 'block';
@@ -3693,32 +3777,40 @@
               rs(due) +
               '</b> · ' +
               esc(exact.name || 'Customer');
-          } else if (!exact) {
-            duesBannerLive.style.display = 'none';
-            duesBannerLive.innerHTML = '';
+          } else if (!exact || due <= 0) {
+            // keep banner if syncWidget set it for selected customer
+            if (!exact) {
+              duesBannerLive.style.display = 'none';
+              duesBannerLive.innerHTML = '';
+            }
           }
         }
 
         const target = searchPopover || searchResults;
         if (matches.length > 0 && target) {
           target.innerHTML = matches.map(c => `
-            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}" role="option">
-              <span class="res-name">${esc(c.name)}${Number(c.dues) > 0 ? ' · Due ₹' + Number(c.dues) : ''}</span>
+            <div class="search-result-item" data-phone="${esc(c.phone)}" data-name="${esc(c.name)}" role="option" tabindex="0">
+              <span class="res-name">${esc(c.name)}${Number(c.dues) > 0 ? ' · Due ₹' + Number(c.dues) : ''}${c.fromBill ? ' · recent' : ''}</span>
               <span class="res-phone">${esc(c.phone)}</span>
             </div>
           `).join('');
           target.style.display = 'flex';
           
           target.querySelectorAll('.search-result-item').forEach(item => {
-            item.onclick = async () => {
+            const pick = async () => {
               const selectedPhone = item.dataset.phone;
               const selectedName = item.dataset.name;
               
-              let opt = sel.querySelector(`option[value="${selectedPhone}"]`);
+              let opt = sel.querySelector(`option[value="${CSS.escape ? CSS.escape(selectedPhone) : selectedPhone}"]`);
+              if (!opt) {
+                // value attr may contain special chars — scan
+                opt = Array.from(sel.options).find((o) => o.value === selectedPhone);
+              }
               if (!opt) {
                 opt = document.createElement('option');
                 opt.value = selectedPhone;
                 opt.setAttribute('data-name', selectedName);
+                opt.textContent = `${selectedName} (${selectedPhone})`;
                 sel.appendChild(opt);
               }
               
@@ -3726,13 +3818,19 @@
               if (tempOpt) tempOpt.remove();
               
               sel.value = selectedPhone;
+              nameInput.value = selectedName || '';
+              phoneInput.value = selectedPhone || '';
               sel.dispatchEvent(new Event('change'));
               
               hideCustomerSearchPopover();
               await syncWidgetWithHiddenSelect();
-              // Chip mode: collapse form after pick
               collapseCustomerPanel();
               paintCustomerChrome();
+              RS.toast('Customer: ' + (selectedName || selectedPhone), 'fa-user-check');
+            };
+            item.onclick = (e) => { e.preventDefault(); e.stopPropagation(); pick(); };
+            item.onkeydown = (e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
             };
           });
         } else {
@@ -3740,7 +3838,7 @@
           if (insightsPanel) insightsPanel.style.display = 'none';
         }
         
-        const exactMatch = allCustomers.find(c => (c.phone || '').replace(/\D/g, '') === cleanPhoneVal);
+        const exactMatch = allCustomers.find((c) => phonesLooseMatch(c.phone, cleanPhoneVal) && cleanPhoneVal.length >= 10);
         if (!exactMatch && nameVal && cleanPhoneVal && cleanPhoneVal.length >= 10) {
           if (actionRow) actionRow.style.display = 'block';
         } else {
@@ -3750,6 +3848,14 @@
       
       nameInput.addEventListener('input', handleInput);
       phoneInput.addEventListener('input', handleInput);
+      nameInput.addEventListener('focus', () => {
+        getCustomersForPosSearch(false);
+        if (nameInput.value.trim() || phoneInput.value.trim()) handleInput();
+      });
+      phoneInput.addEventListener('focus', () => {
+        getCustomersForPosSearch(false);
+        if (nameInput.value.trim() || phoneInput.value.trim()) handleInput();
+      });
       
       // Save new customer action
       if (btnSaveNew) {
