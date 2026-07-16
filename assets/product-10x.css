@@ -91,6 +91,24 @@
 
 .tb-qr-scan {
   color: var(--orange, #FF4F00) !important;
+  display: inline-grid !important;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 17px;
+  border: 1px solid var(--stroke-2, #e5e7eb);
+  background: var(--glass, rgba(255, 255, 255, 0.7));
+  cursor: pointer;
+  flex-shrink: 0 !important;
+}
+.tb-qr-scan:hover {
+  background: rgba(255, 79, 0, 0.1);
+  border-color: rgba(255, 79, 0, 0.35);
+}
+.tb-qr-scan i {
+  font-size: 15px;
+  line-height: 1;
 }
 
 /* ---- Mobile topbar compaction ---- */
