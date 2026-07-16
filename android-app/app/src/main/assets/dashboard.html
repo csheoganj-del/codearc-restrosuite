@@ -80,7 +80,7 @@
   }
 
   // Canonical build tag. The SERVER builtin always wins for the version chip.
-  // ?appv= is only a cache-bust token â€” sticky old values like ?appv=v151 used
+  // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
     var builtin = 'v206-20260716-staff-guest-qr-dual';
@@ -97,7 +97,7 @@
     var shortBuiltin = builtin.split('-')[0]; // e.g. v159
     var q = '';
     try { q = String(new URLSearchParams(location.search).get('appv') || '').trim(); } catch (_) {}
-    // Always display/load this deploy's builtin â€” never stay stuck on an older appv.
+    // Always display/load this deploy's builtin  -  never stay stuck on an older appv.
     var resolved = builtin;
     try {
       var url = new URL(location.href);
@@ -246,7 +246,7 @@
     .support-dropdown .dropdown-trigger i:last-child { display: none; }
   }
 
-  /* Hold Buttons Styling â€” single primary Hold + Send KOT */
+  /* Hold Buttons Styling  -  single primary Hold + Send KOT */
   .hold-buttons-group,
   .hold-kot-row {
     display: grid;
@@ -408,7 +408,7 @@
       <div class="avatar" aria-hidden="true">RS</div>
       <div class="uinfo hide-collapsed">
         <div class="un">Outlet User</div>
-        <div class="ur">Outlet Â· Admin</div>
+        <div class="ur">Outlet | Admin</div>
       </div>
     </div>
 
@@ -423,7 +423,7 @@
       <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
-      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup Â· Menu Â· Recipe Â· Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
+      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup | Menu | Recipe | Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
       <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
       <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
@@ -466,11 +466,11 @@
       </div>
       <div class="tb-spacer"></div>
       <!-- Center: shift host injected by competitive-ops (#rs-topbar-shift) -->
-      <!-- Right: search Â· call Â· bill WhatsApp Â· clock Â· bell Â· theme Â· version (no â‹¯ dump) -->
+      <!-- Right: search | call | bill WhatsApp | clock | bell | theme | version (no â‹¯ dump) -->
       <div class="tb-right" id="tb-right">
         <div class="tb-search tb-search-compact" title="Global search">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="search" placeholder="Searchâ€¦" aria-label="Search anything" autocomplete="off">
+          <input type="search" placeholder="Search..." aria-label="Search anything" autocomplete="off">
         </div>
         <div class="tb-support-wrap" id="tb-support-wrap">
           <button type="button" class="tb-icon-btn tb-call-btn" id="tb-call-support" aria-label="Contact support" aria-expanded="false" aria-haspopup="true" title="Contact support" data-tooltip="Contact support">
@@ -494,12 +494,12 @@
             </a>
           </div>
         </div>
-        <!-- Bill WhatsApp only (not support chat) â€” green / red / spin -->
+        <!-- Bill WhatsApp only (not support chat)  -  green / red / spin -->
         <button type="button" class="tb-pill tb-wa-pill js-wa-status-pill wa-starting" id="tb-wa-status-btn" role="status" aria-label="Bill WhatsApp status" title="Bill WhatsApp" data-tooltip="Bill WhatsApp">
           <i class="fa-brands fa-whatsapp tb-wa-icon" id="tb-wa-icon" aria-hidden="true"></i>
-          <span class="tb-badge-label" id="tb-wa-label">â€¦</span>
+          <span class="tb-badge-label" id="tb-wa-label">...</span>
         </button>
-        <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock">â€”</span></span>
+        <span class="tb-pill txt clock-pill" title="Local time"><i class="fa-regular fa-clock"></i> <span id="clock"> - </span></span>
         <button type="button" class="tb-icon-btn" id="tb-notif-btn" aria-label="Notifications" title="Notifications" data-tooltip="Notifications"><i class="fa-regular fa-bell" aria-hidden="true"></i><span class="dot-notif" style="display:none"></span></button>
         <button type="button" class="tb-icon-btn theme-toggle" id="theme-toggle" aria-label="Theme" title="Light / dark"><i id="theme-toggle-i" class="fa-solid fa-sun"></i></button>
         <span class="tb-version" id="app-version-pill" role="status" title="App version" aria-label="App version"></span>
@@ -518,7 +518,7 @@
             <div class="pos-toolbar pos-toolbar-menu">
               <div class="pos-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="pos-search-input" placeholder="Search menu or item codeâ€¦" autocomplete="off" enterkeyhint="search">
+                <input id="pos-search-input" placeholder="Search menu or item code..." autocomplete="off" enterkeyhint="search">
                 <div class="mobile-only-inline pos-m-hold-buttons" id="pos-m-hold-buttons" style="display:none; align-items:center; gap:4px;">
                   <button type="button" class="hold-btn hold-btn-current" id="btn-m-hold-current" style="padding: 4px 10px; font-size: 11px;" title="Held orders">
                     <i class="fa-solid fa-pause"></i> Holds <span id="held-count-current-m"></span>
@@ -536,8 +536,8 @@
                       <select id="pos-sort-select" class="pos-sort-select" aria-label="Sort menu">
                         <option value="popular">Most Ordered</option>
                         <option value="default">Default</option>
-                        <option value="name-asc">Aâ€“Z</option>
-                        <option value="name-desc">Zâ€“A</option>
+                        <option value="name-asc">A - Z</option>
+                        <option value="name-desc">Z - A</option>
                         <option value="price-asc">Price â†‘</option>
                         <option value="price-desc">Price â†“</option>
                         <option value="veg-first">Veg first</option>
@@ -585,7 +585,7 @@
           </div>
 
           <aside class="pos-cart pos-cart-workbench pos-cart-symbols">
-            <!-- Symbol chrome: title Â· order type icons Â· count Â· clear (one row) -->
+            <!-- Symbol chrome: title | order type icons | count | clear (one row) -->
             <div class="cart-head cart-head-symbols">
               <button class="btn btn-ghost btn-sm mobile-only-inline" id="btn-pos-back-menu" title="Back to menu" aria-label="Back to menu"><i class="fa-solid fa-chevron-left"></i></button>
               <h3 title="Current order"><i class="fa-solid fa-receipt cart-head-ico" aria-hidden="true"></i><span class="cart-head-title">Order</span></h3>
@@ -599,7 +599,7 @@
                 <button class="btn btn-ghost cart-clear-btn" id="btn-clear-cart" title="Clear cart" aria-label="Clear cart"><i class="fa-solid fa-trash-can"></i></button>
               </div>
             </div>
-            <!-- Customer only (shift tools live in top bar â€” Petpooja order cart) -->
+            <!-- Customer only (shift tools live in top bar  -  Petpooja order cart) -->
             <div class="cart-meta-row cart-meta-customer-only" id="cart-meta-row">
               <div id="pos-shift-slot" class="pos-shift-slot" hidden aria-hidden="true"></div>
               <div class="cart-table-sel" id="cart-table-sel">
@@ -659,7 +659,7 @@
             </div>
             <div class="cart-items" id="cart-items"></div>
               <div class="cart-foot">
-              <!-- Plain Sub / Tax / Total â€” readable at a glance -->
+              <!-- Plain Sub / Tax / Total  -  readable at a glance -->
               <div class="totals-compact totals-readable">
                 <div class="totals-meta">
                   <span title="Subtotal">Sub <b id="t-sub">â‚¹0</b></span>
@@ -674,7 +674,7 @@
               <details class="cart-more-opts" id="cart-more-opts">
                 <summary title="Discount, tip, promo">
                   <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                  <span class="cart-more-summary-txt">Discount Â· Tip Â· Promo</span>
+                  <span class="cart-more-summary-txt">Discount | Tip | Promo</span>
                 </summary>
                 <div class="cart-tip-row" id="cart-tip-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 8px">
                   <input type="number" id="disc-input" min="0" max="100" step="1" placeholder="Disc %" title="Discount percent" class="form-input" style="width:68px;height:36px;font-size:12px;padding:4px 6px">
@@ -768,8 +768,8 @@
                         <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear">Ã—</button>
                       </div>
                       <div class="csd-split-status cart-split-status">
-                        <span id="split-status-text" class="csd-split-remaining">â€”</span>
-                        <strong id="split-total-text" class="csd-split-paid">â€”</strong>
+                        <span id="split-status-text" class="csd-split-remaining"> - </span>
+                        <strong id="split-total-text" class="csd-split-paid"> - </strong>
                       </div>
                     </div>
                   </div>
@@ -777,7 +777,7 @@
 
                 <div class="cart-actions cart-actions-final">
                   <div class="hold-kot-row">
-                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order Â· right-click for held list" aria-label="Hold order">
+                    <button type="button" class="hold-btn hold-btn-current" id="btn-hold-current" title="Hold order | right-click for held list" aria-label="Hold order">
                       <i class="fa-solid fa-pause"></i>
                       <span class="act-lbl">Hold</span>
                       <span id="held-count-current" class="hold-count"></span>
@@ -814,7 +814,7 @@
       <section class="tab-content" id="kds-tab" data-screen-label="KDS">
         <div class="toolbar-row">
           <div class="grow"><span class="pill pill-green"><span class="dot dot-live"></span> Live kitchen queue</span> <span class="pill" style="margin-left:6px" id="kds-avg-prep">Avg prep --:--</span></div>
-          <input id="kds-search" type="search" placeholder="Search order #, table or itemâ€¦" autocomplete="off" aria-label="Search kitchen orders" style="flex:0 1 260px;min-width:150px;padding:8px 12px;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);color:var(--text);font-size:13px;margin:0 10px 0 0" />
+          <input id="kds-search" type="search" placeholder="Search order #, table or item..." autocomplete="off" aria-label="Search kitchen orders" style="flex:0 1 260px;min-width:150px;padding:8px 12px;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);color:var(--text);font-size:13px;margin:0 10px 0 0" />
           <div class="seg"><button class="active">All stations</button><button>Tandoor</button><button>Curry</button><button>Beverages</button></div>
         </div>
         <div class="kds-grid" id="kds-grid"></div>
@@ -839,11 +839,11 @@
             </div>
             <div class="bills-custom-range" id="bills-custom-range" hidden>
               <input type="date" id="bills-date-from" aria-label="From date">
-              <span class="bills-custom-sep">â€“</span>
+              <span class="bills-custom-sep"> - </span>
               <input type="date" id="bills-date-to" aria-label="To date">
               <button type="button" class="btn btn-ghost btn-sm" id="bills-date-apply">Apply</button>
             </div>
-            <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phoneâ€¦" autocomplete="off" aria-label="Search bills"></div>
+            <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone..." autocomplete="off" aria-label="Search bills"></div>
             <span id="bills-result-meta" class="bills-result-meta" hidden></span>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
             <div class="bills-export-group" role="group" aria-label="Export bills">
@@ -910,7 +910,7 @@
           <div class="grow"></div>
           <div class="pos-search inv-search-wrap" style="max-width:220px;padding:8px 12px">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="inv-stock-search" placeholder="Search food, boxes, bagsâ€¦" autocomplete="off" aria-label="Search inventory">
+            <input id="inv-stock-search" placeholder="Search food, boxes, bags..." autocomplete="off" aria-label="Search inventory">
           </div>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-variance" title="Theoretical usage from sales vs stock"><i class="fa-solid fa-chart-column"></i> Variance</button>
           <button type="button" class="btn btn-ghost btn-sm" id="btn-inv-prep" title="Run prep batch: use stock to make stock"><i class="fa-solid fa-blender"></i> Prep</button>
@@ -935,7 +935,7 @@
               </th>
               <th>In stock</th>
               <th>Min level</th>
-              <th title="Click a cell to set/edit â€” links to plate cost">Unit cost Â· value</th>
+              <th title="Click a cell to set/edit  -  links to plate cost">Unit cost | value</th>
               <th>
                 Status
                 <select id="inv-status-filter" style="background:none; border:1px solid var(--stroke-2); color:var(--text-soft); font-size:11px; padding:2px 4px; border-radius:4px; outline:none; cursor:pointer; margin-left:6px; font-weight:600; font-family:inherit;">
@@ -1039,7 +1039,7 @@
         </div>
         <div class="report-grid">
           <div class="panel panel-pad">
-            <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">Last 7 days Â· hover for value</span></div>
+            <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">Last 7 days | hover for value</span></div>
             <div class="chart-bars" id="chart-revenue"></div>
           </div>
           <div class="panel panel-pad">
@@ -1197,13 +1197,13 @@
             <div class="sa-controls">
               <div class="sa-search-wrapper">
                 <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-mute);font-size:12px;pointer-events:none"></i>
-                <input id="tenant-search-input" placeholder="Search tenantsâ€¦" style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none">
+                <input id="tenant-search-input" placeholder="Search tenants..." style="padding:6px 10px 6px 28px;border:1px solid var(--stroke);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;outline:none">
               </div>
               <button class="btn btn-ghost btn-sm" id="btn-export-tenants"><i class="fa-solid fa-download"></i> Export</button>
               <button class="btn btn-sm" id="btn-create-tenant" style="background:var(--orange);color:#fff;border:none;gap:6px"><i class="fa-solid fa-plus"></i> New Workspace</button>
             </div>
           </div>
-          <!-- Bulk actions bar â€” shown for selected tenants or pending approvals -->
+          <!-- Bulk actions bar  -  shown for selected tenants or pending approvals -->
           <div id="sa-bulk-bar" style="display:none;align-items:center;gap:12px;padding:10px 16px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:10px;margin-bottom:12px">
             <i id="sa-bulk-icon" class="fa-solid fa-user-clock" style="color:#b45309"></i>
             <span id="sa-bulk-label" style="font-size:13px;font-weight:500;color:#b45309;flex:1"></span>
@@ -1243,8 +1243,8 @@
             <div class="gw-status" style="margin-bottom: 0;">
               <div class="gw-ic"><i class="fa-brands fa-whatsapp"></i></div>
               <div style="flex:1">
-                <div class="gw-t">WhatsApp Gateway Â· <span id="saas-gateway-status-label">Online</span></div>
-                <div class="gw-s">Connected as <strong id="saas-gateway-phone">-</strong> Â· Session Saved: <span id="saas-gateway-session-saved">-</span></div>
+                <div class="gw-t">WhatsApp Gateway | <span id="saas-gateway-status-label">Online</span></div>
+                <div class="gw-s">Connected as <strong id="saas-gateway-phone">-</strong> | Session Saved: <span id="saas-gateway-session-saved">-</span></div>
               </div>
               <span id="saas-gateway-status" class="pill pill-green"><span class="dot dot-live"></span> Ready</span>
             </div>
@@ -1265,7 +1265,7 @@
             </div>
 
             <div class="stat-row" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
-              <div class="stat-card" style="padding: 12px;" title="Messages / alerts dispatched today"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;">â€”</div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
+              <div class="stat-card" style="padding: 12px;" title="Messages / alerts dispatched today"><div class="stat-ic bg-g" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-paper-plane"></i></div><div><div class="sv" id="gw-sent-count" style="font-size: 15px;"> - </div><div class="sl" style="font-size: 10px;">Sent today</div></div></div>
               <div class="stat-card" style="padding: 12px;" title="Successful deliveries vs attempts"><div class="stat-ic bg-o" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-check-double"></i></div><div><div class="sv" id="gw-delivery-rate" style="font-size: 15px;">n/a</div><div class="sl" style="font-size: 10px;">Delivery rate</div></div></div>
               <div class="stat-card" style="padding: 12px;" title="Average send latency"><div class="stat-ic bg-v" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-gauge-high"></i></div><div><div class="sv" id="gw-latency" style="font-size: 15px;">n/a</div><div class="sl" style="font-size: 10px;">Avg latency</div></div></div>
               <div class="stat-card" style="padding: 12px;" title="Messages waiting in queue"><div class="stat-ic bg-a" style="width: 36px; height: 36px; font-size: 14px;"><i class="fa-solid fa-layer-group"></i></div><div><div class="sv" id="gw-queued" style="font-size: 15px;">0</div><div class="sl" style="font-size: 10px;">Queued</div></div></div>
@@ -1286,7 +1286,7 @@
                 </div>
               </div>
               <p style="font-size:11.5px;color:var(--text-mute);margin:0 0 12px;line-height:1.45">
-                Client crashes and unhandled errors from restaurant dashboards (and related apps). <b>Resolve</b> only marks them reviewed â€” it does not fix the bug. Safe to clear old noise after youâ€™ve checked.
+                Client crashes and unhandled errors from restaurant dashboards (and related apps). <b>Resolve</b> only marks them reviewed  -  it does not fix the bug. Safe to clear old noise after you've checked.
               </p>
               <div id="app-incidents-list" style="display: flex; flex-direction: column; gap: 8px; flex: 1; max-height: 250px; overflow-y: auto;">
                 <div style="text-align: center; padding: 20px; color: var(--text-mute); font-size: 12px;"><i class="fa-solid fa-spinner fa-spin"></i> Checking incidents...</div>
@@ -1523,13 +1523,13 @@
       <!-- Licensing & devices -->
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-key" style="font-size:9px"></i> Licensing &amp; Devices</div>
-        <div id="manage-devices-box" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;background:var(--panel);font-size:12.5px;color:var(--text-soft);min-height:44px">Loading devicesâ€¦</div>
+        <div id="manage-devices-box" style="border:1px solid var(--stroke);border-radius:10px;padding:12px;background:var(--panel);font-size:12.5px;color:var(--text-soft);min-height:44px">Loading devices...</div>
       </div>
 
       <!-- Notes -->
       <div>
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-mute);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-note-sticky" style="font-size:9px"></i> Internal Notes</div>
-        <textarea id="manage-notes" placeholder="Account notes, support history, onboarding statusâ€¦" rows="2" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+        <textarea id="manage-notes" placeholder="Account notes, support history, onboarding status..." rows="2" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
       </div>
 
       <div style="display:flex;justify-content:flex-end;padding-top:6px;border-top:1px solid var(--stroke)">
@@ -1760,7 +1760,7 @@
 
     function hasRecentCloudFailure() {
       var last = window.RS_LAST_CLOUD_ERROR;
-      // Only treat as soft warning (not hard lock) â€” 60s window
+      // Only treat as soft warning (not hard lock)  -  60s window
       return !!(last && last.time && (Date.now() - last.time < 60000));
     }
 
@@ -1797,7 +1797,7 @@
         }
         return;
       }
-      // Force logout path â€” clear soft lock and re-click after releasing guard
+      // Force logout path  -  clear soft lock and re-click after releasing guard
       window.__RS_FORCE_LOGOUT__ = true;
       try {
         if (window.RS_API && typeof RS_API.signOut === 'function') {
@@ -1858,7 +1858,7 @@
       }, Promise.resolve());
     }
 
-    // Wave 4: load order matters â€” dashboard/pos first, then receipt+ops bundle, then shell.
+    // Wave 4: load order matters  -  dashboard/pos first, then receipt+ops bundle, then shell.
     var pre = [
       'assets/country-currency-data.js',
       'assets/dashboard.js',
@@ -1872,7 +1872,7 @@
       'assets/competitive-ops.js'
     ];
 
-    // Secondary modules â€” loaded on first tab that needs them (or idle preload)
+    // Secondary modules  -  loaded on first tab that needs them (or idle preload)
     var TAB_MODULES = {
       'editor-tab': ['assets/features-editor.js'],
       'inventory-tab': ['assets/features-manage.js'],
@@ -1905,7 +1905,7 @@
       });
     }
 
-    // Help must work on first click â€” never require waiting for idle preload.
+    // Help must work on first click  -  never require waiting for idle preload.
     // Stub opens guide after loading onboarding.js (or immediately if already ready).
     window.RS_loadProductGuide = function() {
       return loadScript('src/dashboard/onboarding.js');
@@ -1942,7 +1942,7 @@
             btn.removeAttribute('aria-busy');
           }
           if (window.RS && typeof RS.toast === 'function') {
-            RS.toast('Help is still loading â€” try again in a moment', 'fa-circle-info');
+            RS.toast('Help is still loading  -  try again in a moment', 'fa-circle-info');
           }
         });
     };
@@ -1995,7 +1995,7 @@
 </script>
 
 <script>
-/* Fix 1: Sidebar hamburger toggle â€” mobile/tablet */
+/* Fix 1: Sidebar hamburger toggle  -  mobile/tablet */
 (function () {
   var btn     = document.getElementById("sidebarToggle");
   var sidebar = document.querySelector(".sidebar");

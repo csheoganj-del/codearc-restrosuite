@@ -204,7 +204,7 @@
       }
     }
   }
-  // Super-admin module (separate IIFE) calls this â€” must be global
+  // Super-admin module (separate IIFE) calls this  -  must be global
   window.openTenantDashboard = openTenantDashboard;
 
   const titles = {
@@ -430,11 +430,11 @@
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
-  // Quiet, trustworthy version chip â€” never show Systempatch; click copies build tag
+  // Quiet, trustworthy version chip  -  never show Systempatch; click copies build tag
   (function wireVersionPill() {
     const el = document.getElementById('app-version-pill');
     if (!el) return;
-    const tip = 'RestroSuite ' + appVersionShort + ' Â· full build ' + appVersion + ' Â· click to copy';
+    const tip = 'RestroSuite ' + appVersionShort + ' | full build ' + appVersion + ' | click to copy';
     el.textContent = appVersionShort;
     el.classList.add('tb-version', 'tb-version-live');
     el.setAttribute('role', 'button');
@@ -494,7 +494,7 @@
   function shortDateKey(date = new Date()) { return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`; }
   function fileDate(date = new Date()) { return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`; }
   function sequenceScope() {
-    // Tab-scoped only â€” never fall back to shared localStorage tenant_id.
+    // Tab-scoped only  -  never fall back to shared localStorage tenant_id.
     return sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local';
   }
   function hashCode(value) {
@@ -805,10 +805,10 @@
     const shortVer = String(info.version || appVersionShort || '').split('-')[0] || 'latest';
     modal.innerHTML = `
       <div class="app-update-card" role="dialog" aria-modal="true" aria-labelledby="app-update-title">
-        <div class="app-update-eyebrow">Smooth update Â· no data loss</div>
+        <div class="app-update-eyebrow">Smooth update | no data loss</div>
         <h2 id="app-update-title">RestroSuite ${shortVer} is ready</h2>
-        <div class="app-update-version">${info.version || shortVer}${info.date ? ' Â· ' + info.date : ''}</div>
-        <p>Open cart, bills, and settings stay on this device. We snapshot first, then reload the new build â€” usually under 10 seconds.</p>
+        <div class="app-update-version">${info.version || shortVer}${info.date ? ' | ' + info.date : ''}</div>
+        <p>Open cart, bills, and settings stay on this device. We snapshot first, then reload the new build  -  usually under 10 seconds.</p>
         <div class="app-update-release">
           <div class="app-update-release-title">${info.title || 'Workflow improvements'}</div>
           <p>${info.summary || 'This update improves billing, importing, exports, sync, and dashboard stability.'}</p>
@@ -816,7 +816,7 @@
         </div>
         <div class="app-update-save-row">
           <i class="fa-solid fa-shield-halved"></i>
-          <span id="app-update-save-status">Ready to save cart Â· open tables Â· preferences.</span>
+          <span id="app-update-save-status">Ready to save cart | open tables | preferences.</span>
         </div>
         <div class="app-update-progress-track" style="display:none; width:100%; height:4px; background:var(--stroke-2); border-radius:99px; margin-top:8px; overflow:hidden;">
           <div id="app-update-progress-bar" style="width:0%; height:100%; background:var(--orange); transition:width .2s var(--ease);"></div>
@@ -949,7 +949,7 @@
   const stockCls = {ok:'stock-ok',low:'stock-low',out:'stock-out'};
 
   /* ============================================================
-     TAX â€” Wave 12: assets/modules/tax-helpers.js
+     TAX  -  Wave 12: assets/modules/tax-helpers.js
      Share the same array instance the module owns.
      ============================================================ */
   const TAX_RATES =
@@ -959,7 +959,7 @@
   window.RS_TAX_RATES = TAX_RATES;
 
   /* ============================================================
-     POS UI â€” Wave 11: assets/modules/pos-ui.js
+     POS UI  -  Wave 11: assets/modules/pos-ui.js
      Cart state lives in RSPosUI; tax helpers in tax-helpers.js.
      ============================================================ */
   let activeCat = 'All';
@@ -1108,7 +1108,7 @@
           const mappedKds = activeKds.map(r => ({
             id: r.id,
             tok: formatDisplayOrderId(r),
-            type: `${r.orderType} Â· ${r.tableNumber}`,
+            type: `${r.orderType} | ${r.tableNumber}`,
             start: parseOrderTimestamp(r.dateTime) || Date.now(),
             prepMinutes: r.prepMinutes,
             prepStartedAt: r.prepStartedAt,
@@ -1117,7 +1117,7 @@
           replaceArr(KDS, mappedKds);
         }
 
-        // 2. Update QR_ORDERS â€” keep dateTime so UI can live-refresh relative ages
+        // 2. Update QR_ORDERS  -  keep dateTime so UI can live-refresh relative ages
         const activeQr = rows.filter(r => r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready');
         const mappedQr = activeQr.map(r => {
           const ts = parseOrderTimestamp(r.dateTime);
@@ -1230,10 +1230,10 @@
 
     // Prefer shell badge updater (keeps More menu + compact pill consistent)
     if (typeof window.updateTopbarWhatsAppStatus === 'function') {
-      // fall through â€” shell polling will set offline; also set immediate UI
+      // fall through  -  shell polling will set offline; also set immediate UI
     }
     if (window.setTopbarWhatsAppBadge) {
-      // not exported â€” use DOM detail
+      // not exported  -  use DOM detail
     }
     const tbIcon = document.getElementById('tb-wa-icon');
     const tbLabel = document.getElementById('tb-wa-label');
@@ -1321,11 +1321,11 @@
             window.__rsOfflineBannerDismissedAt = Date.now();
             pill.style.display = 'none';
             document.body.classList.remove('rs-offline-banner-on');
-            toast('Got it â€” POS keeps working offline', 'fa-wifi');
+            toast('Got it  -  POS keeps working offline', 'fa-wifi');
             return;
           }
           act.disabled = true;
-          act.textContent = 'â€¦';
+          act.textContent = '...';
           try {
             if (window.RS_DB && typeof RS_DB.flushSyncQueue === 'function') await RS_DB.flushSyncQueue();
             else if (window.RS_DB && typeof RS_DB.sync === 'function') await RS_DB.sync();
@@ -1363,10 +1363,10 @@
       if (textEl) {
         textEl.textContent =
           count > 0
-            ? `Offline Â· ${count} change${count === 1 ? '' : 's'} saved on this device`
-            : 'You are offline â€” billing still works';
+            ? `Offline | ${count} change${count === 1 ? '' : 's'} saved on this device`
+            : 'You are offline  -  billing still works';
       }
-      if (subEl) subEl.textContent = 'Bills & KOTs save locally and upload when Wiâ€‘Fi returns.';
+      if (subEl) subEl.textContent = 'Bills & KOTs save locally and upload when Wi"‘Fi returns.';
       if (act) {
         act.textContent = 'Got it';
         act.style.display = '';
@@ -1375,8 +1375,8 @@
       pill.style.background = 'linear-gradient(135deg,#0ea5e9,#0369a1)';
       pill.style.color = '#fff';
       if (icon) icon.className = 'fa-solid fa-cloud-arrow-up fa-fade';
-      if (textEl) textEl.textContent = `Syncing ${count} change${count === 1 ? '' : 's'} to cloudâ€¦`;
-      if (subEl) subEl.textContent = 'Keep this tab open a moment â€” no action needed.';
+      if (textEl) textEl.textContent = `Syncing ${count} change${count === 1 ? '' : 's'} to cloud...`;
+      if (subEl) subEl.textContent = 'Keep this tab open a moment  -  no action needed.';
       if (act) {
         act.textContent = 'Retry';
         act.style.display = '';
@@ -1386,7 +1386,7 @@
       pill.style.background = 'linear-gradient(135deg,#ef4444,#b91c1c)';
       pill.style.color = '#fff';
       if (icon) icon.className = 'fa-solid fa-cloud-bolt';
-      if (textEl) textEl.textContent = 'Cloud sync hiccup â€” data is safe on this device';
+      if (textEl) textEl.textContent = 'Cloud sync hiccup  -  data is safe on this device';
       if (subEl) {
         subEl.textContent = String((window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.message) || 'Will retry automatically.');
       }
@@ -1490,7 +1490,7 @@
   window.RS_SYNC = { syncPendingOrders, setupSupabaseRealtime };
 
   /* ============================================================
-     QR ORDERS UI â€” Wave 10: assets/modules/qr-orders-ui.js
+     QR ORDERS UI  -  Wave 10: assets/modules/qr-orders-ui.js
      ============================================================ */
   async function openQrOrderInPos(order) {
     if (window.RSQrOrdersUI && RSQrOrdersUI.openQrOrderInPos) {
@@ -1502,7 +1502,7 @@
   };
 
   /* ============================================================
-     BILLS â€” Wave 6: UI lives in assets/modules/bills-history.js
+     BILLS  -  Wave 6: UI lives in assets/modules/bills-history.js
      Array stays here so RS.BILLS reference remains stable for POS.
      ============================================================ */
   const BILLS = [];
@@ -1529,7 +1529,7 @@
   };
 
   /* ============================================================
-     INVENTORY â€” Wave 7: UI lives in assets/modules/inventory-ui.js
+     INVENTORY  -  Wave 7: UI lives in assets/modules/inventory-ui.js
      Array stays here so RS.INVENTORY reference remains stable.
      ============================================================ */
   const INVENTORY = [];
@@ -1543,7 +1543,7 @@
   const renderEditor = () => {
     $('#editor-list').innerHTML = MENU.map(m=>`
       <tr>
-        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${_e(m.name)}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} Â· ${_e(m.cat)}</div></div></div></td>
+        <td><div style="display:flex;align-items:center;gap:11px"><span class="veg ${m.veg?'':'nonveg'}"></span><div><b>${_e(m.name)}</b><div style="font-size:11px;color:var(--text-mute)">${m.veg?'Veg':'Non-veg'} | ${_e(m.cat)}</div></div></div></td>
         <td>${_e(m.cat)}</td><td class="td-strong">${rs(m.price)}</td>
         <td><span class="stock-dot ${stockCls[m.stock]}">${stockLabel[m.stock]}</span></td>
         <td><label class="switch-mini"><input type="checkbox" ${m.stock!=='out'?'checked':''}><span></span></label></td>
@@ -1564,7 +1564,7 @@
   };
 
   /* ============================================================
-     REPORTS â€” Wave 8: assets/modules/reports-ui.js
+     REPORTS  -  Wave 8: assets/modules/reports-ui.js
      ============================================================ */
   const renderReports = async (period) => {
     if (window.RSReportsUI && RSReportsUI.renderReports) return RSReportsUI.renderReports(period);
@@ -1572,7 +1572,7 @@
   window._renderReports = (p) => renderReports(p);
 
   /* ============================================================
-     KDS â€” Wave 9: assets/modules/kds-ui.js
+     KDS  -  Wave 9: assets/modules/kds-ui.js
      Array stays here so syncPendingOrders can mutate RS.KDS.
      ============================================================ */
   let kdsState = {};
@@ -1584,7 +1584,7 @@
   }
 
   /* ============================================================
-     GROWTH HUB â€” Wave 12: assets/modules/growth-hub-shell.js
+     GROWTH HUB  -  Wave 12: assets/modules/growth-hub-shell.js
      ============================================================ */
   const renderHub = () => {
     if (window.RSGrowthHubShell && RSGrowthHubShell.renderHub) return RSGrowthHubShell.renderHub();
@@ -1595,7 +1595,7 @@
   }
 
   /* ============================================================
-     EMPLOYEES â€” Wave 10: assets/modules/employees-ui.js
+     EMPLOYEES  -  Wave 10: assets/modules/employees-ui.js
      Array stays here so RS.EMPLOYEES reference remains stable.
      ============================================================ */
   const EMPLOYEES = [];
@@ -1604,14 +1604,14 @@
   };
 
   /* ============================================================
-     SUPER-ADMIN â€” Wave 9: assets/modules/super-admin.js
+     SUPER-ADMIN  -  Wave 9: assets/modules/super-admin.js
      ============================================================ */
   const renderSuper = async () => {
     if (window.RSSuperAdmin && RSSuperAdmin.renderSuper) return RSSuperAdmin.renderSuper();
   };
 
   /* ============================================================
-     GATEWAY MONITOR â€” Wave 8: assets/modules/gateway-monitor.js
+     GATEWAY MONITOR  -  Wave 8: assets/modules/gateway-monitor.js
      ============================================================ */
   async function pollSuperAdminGateway() {
     if (window.RSGatewayMonitor && RSGatewayMonitor.pollSuperAdminGateway) {
@@ -2092,9 +2092,9 @@
   document.body.classList.toggle('rs-role-client', !isSuper && !isBrandAdmin);
   if (isSuper) {
     try {
-      document.title = 'RestroSuite Platform Â· Super-Admin';
+      document.title = 'RestroSuite Platform | Super-Admin';
       const brandName = document.querySelector('.brand-name');
-      // Soft brand cue only â€” full lockdown is CSS shell + later block
+      // Soft brand cue only  -  full lockdown is CSS shell + later block
     } catch (_) {}
   }
   renderImpersonationBanner();
@@ -2125,7 +2125,7 @@
     inventory: 'Inventory Manager',
   };
 
-  /** Role-first home tab â€” reduces cognitive load for staff logins */
+  /** Role-first home tab  -  reduces cognitive load for staff logins */
   const ROLE_HOME_TAB = ROLE_HOME_TAB_EARLY;
 
   // Resolve current staff role (session meta -> sessionStorage fallback)
@@ -2209,12 +2209,12 @@
     // 7. Role switch is client-only demo control
     const rsSwitch = $('#role-switch');
     if (rsSwitch) rsSwitch.style.display = 'none';
-    // Wire platform controls ASAP (no 300ms delay â€” that window caused client flash)
+    // Wire platform controls ASAP (no 300ms delay  -  that window caused client flash)
     const openSet = document.getElementById('open-settings');
     if (openSet) openSet.style.display = 'none';
     const tbSearchInput = document.querySelector('.tb-search input');
     if (tbSearchInput) {
-      tbSearchInput.placeholder = 'Search tenantsâ€¦';
+      tbSearchInput.placeholder = 'Search tenants...';
       if (!tbSearchInput.dataset.saWired) {
         tbSearchInput.dataset.saWired = '1';
         tbSearchInput.addEventListener('input', () => {
@@ -2239,7 +2239,7 @@
       cloudPill.addEventListener('click', () => {
         const mode = cloudPill.textContent.trim();
         const detail = window.RS_LAST_CLOUD_ERROR ? `âš ï¸ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : 'âœ… No recent sync errors.';
-        toast(`Cloud status: ${mode} â€” ${detail}`, 'fa-cloud');
+        toast(`Cloud status: ${mode}  -  ${detail}`, 'fa-cloud');
       });
     }
     const userPill = document.querySelector('.user-pill');
@@ -2255,7 +2255,7 @@
           window.RSSuperAdmin && typeof RSSuperAdmin.getTenantCount === 'function'
             ? RSSuperAdmin.getTenantCount()
             : 0;
-        toast(`Logged in as ${uname} Â· Role: ${role} Â· ${tenantCount} tenants loaded`, 'fa-user-shield');
+        toast(`Logged in as ${uname} | Role: ${role} | ${tenantCount} tenants loaded`, 'fa-user-shield');
       });
     }
     const helpBtn = document.getElementById('open-product-guide-btn');
@@ -2487,7 +2487,7 @@
         ]);
         RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `menu-export-${fileDate()}.csv`);
         finishOperationStatus('Menu exported');
-        toast('Menu CSV Â· ' + list.length + ' items', 'fa-file-export');
+        toast('Menu CSV | ' + list.length + ' items', 'fa-file-export');
       };
     }
 
@@ -2634,7 +2634,7 @@
       };
     }
 
-    // 3a. Inventory Export (full stock list â€” re-importable columns)
+    // 3a. Inventory Export (full stock list  -  re-importable columns)
     const btnExportInventory = document.getElementById('btn-export-inventory');
     if (btnExportInventory && !btnExportInventory.dataset.rsExportBound) {
       btnExportInventory.dataset.rsExportBound = '1';
@@ -2672,7 +2672,7 @@
         ]);
         RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `inventory-export-${fileDate()}.csv`);
         finishOperationStatus('Inventory exported');
-        toast('Stock CSV Â· ' + list.length + ' items', 'fa-file-export');
+        toast('Stock CSV | ' + list.length + ' items', 'fa-file-export');
       };
     }
 
@@ -2791,7 +2791,7 @@
                 const parsedStock = cleanNumber(
                   getValue(row, ['instock', 'stock', 'currentstock', 'current', 'quantity'])
                 );
-                // Prefer absolute min level â€” do not treat "reorder %" as min units
+                // Prefer absolute min level  -  do not treat "reorder %" as min units
                 const parsedMin = cleanNumber(
                   getValue(row, ['minlevel', 'min', 'threshold', 'reorderlevel', 'minstock'])
                 );
@@ -2856,7 +2856,7 @@
       };
     }
 
-    // 5. Bills Export Excel (.xlsx) / CSV â€” primary wiring lives in bills-history.js
+    // 5. Bills Export Excel (.xlsx) / CSV  -  primary wiring lives in bills-history.js
     // (dashboard only fills a last-resort fallback if the module is missing).
     const btnExportBills = document.getElementById('btn-export-bills');
     if (btnExportBills && !btnExportBills.dataset.rsExportDashBound) {
@@ -2876,7 +2876,7 @@
     }
 
     // 5b. Print sales report is wired in assets/modules/bills-history.js
-    // (printSalesReport â€” A4/PDF, range-aware). Do not double-bind here.
+    // (printSalesReport  -  A4/PDF, range-aware). Do not double-bind here.
 
     // 6. GSTR Download
     const btnGSTR = document.getElementById('btn-download-gstr');

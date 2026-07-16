@@ -2867,24 +2867,22 @@ app.post('/supabase-webhook', async (req, res) => {
         return res.status(400).json({ status: 'ignored', reason: 'Not an insert on public.doppio_bills' });
     }
     
-    let phone = record.customerPhone;
-    const orderId = record.orderId;
-    const tenantId = record.tenant_id;
+    let phone = record.customer_phone || record.customerPhone || record.phone || '';
+    const orderId = record.order_id || record.orderId || record.no || null;
+    const tenantId = record.tenant_id || record.tenantId || null;
 
-    if (!phone || phone.trim() === '' || phone === 'null') {
+    if (!phone || String(phone).trim() === '' || phone === 'null') {
         console.log(`[Webhook] Ignored: No phone number provided for bill ${orderId}`);
         return res.json({ status: 'ignored', reason: 'No customer phone number' });
     }
 
-    phone = phone.replace(/\D/g, '');
+    phone = String(phone).replace(/\D/g, '');
     if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
         phone = "91" + phone;
     }
 
-    // Wait 15s -- the POS frontend auto-sends after 800ms but the full chain
-    // (jsPDF load + edge function cold start + network) can take 8-12s.
-    // 15s gives enough headroom without meaningfully delaying text-only sends.
-    await new Promise(r => setTimeout(r, 15000));
+    // Wait for POS /send (PDF) first; then act as backup
+    await new Promise(r => setTimeout(r, 8000));
 
     // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
     if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
@@ -2893,7 +2891,7 @@ app.post('/supabase-webhook', async (req, res) => {
     }
 
     try {
-        const chatId = `${phone}@c.us`;
+        const chatId = `${phone}@s.whatsapp.net`;
         let uiSettings = {};
         
         // Fetch dynamic business profile for this tenant
@@ -3486,17 +3484,16 @@ if (dbClientForRealtime) {
                 table: 'doppio_bills'
             },
             async (payload) => {
-                const record = payload.new;
-                const orderId = record.orderId;
-                let phone = record.customerPhone;
-                const tenantId = record.tenant_id;
+                const record = payload.new || {};
+                // Postgres columns are snake_case (order_id, customer_phone) — camelCase is always undefined
+                const orderId = record.order_id || record.orderId || record.no || null;
+                let phone = record.customer_phone || record.customerPhone || record.phone || '';
+                const tenantId = record.tenant_id || record.tenantId || null;
 
                 console.log(`[Realtime Triggered] Detected new bill insert in cloud db: ${orderId} for tenant: ${tenantId}`);
 
-                // Wait 5s -- the POS frontend auto-sends after 800ms; this gives it time
-                // to call /send first so we can skip if it already handled the bill (PDF mode).
-                // 15s gives enough headroom for jsPDF load + edge cold start + network.
-                await new Promise(r => setTimeout(r, 15000));
+                // Wait briefly so POS /send (PDF) can win; then we act as backup text send
+                await new Promise(r => setTimeout(r, 8000));
 
                 // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
                 if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
@@ -3504,18 +3501,18 @@ if (dbClientForRealtime) {
                     return;
                 }
 
-                if (!phone || phone.trim() === '' || phone === 'null') {
+                if (!phone || String(phone).trim() === '' || phone === 'null') {
                     console.log(`[Realtime Triggered] Ignored: No phone number provided for bill ${orderId}`);
                     return;
                 }
 
-                phone = phone.replace(/\D/g, '');
+                phone = String(phone).replace(/\D/g, '');
                 if (phone.length === 10 && !phone.startsWith('65') && !phone.startsWith('45') && !phone.startsWith('47') && !phone.startsWith('96') && !phone.startsWith('91')) {
                     phone = "91" + phone;
                 }
 
                 try {
-                    const chatId = `${phone}@c.us`;
+                    const chatId = `${phone}@s.whatsapp.net`;
                     let uiSettings = {};
                     
                     // Fetch dynamic business profile for this tenant
@@ -3549,25 +3546,20 @@ if (dbClientForRealtime) {
                             try { flags = typeof profiles[0].feature_flags === 'string' ? JSON.parse(profiles[0].feature_flags) : (profiles[0].feature_flags || {}); } catch(e) {}
                             uiSettings = flags.ui_settings || {};
 
-                            // If uiSettings couldn't be loaded, skip rather than risk sending wrong format.
-                            if (!uiSettings || Object.keys(uiSettings).length === 0) {
-                                console.log(`[Realtime Skipped] uiSettings empty for tenant ${tenantId} -- skipping to avoid duplicate/wrong-format send.`);
-                                return;
-                            }
+                            // Empty ui_settings: still allow platform text backup (do not hard-skip)
 
-                            // Check if auto-send is disabled
+                            // Check if auto-send is disabled (default ON when unset)
                             const autoSendEnabled = uiSettings.set_auto_send_receipts !== false && uiSettings.set_auto_send_receipts !== 'false';
                             if (!autoSendEnabled) {
                                 console.log(`[Realtime Skipped] Auto-send receipts is disabled for tenant ${tenantId}.`);
                                 return;
                             }
 
-                            // Default to PDF: POS generates thermal PDF and calls /send.
-                            // Only auto-text when the outlet explicitly chooses text receipts.
-                            const billFormat = uiSettings.set_whatsapp_bill_format || 'Thermal PDF receipt';
-                            if (billFormat !== 'Text receipt' && billFormat !== 'text') {
-                                console.log(`[Realtime Skipped] Tenant ${tenantId} uses PDF receipts (${billFormat}) -- POS will send PDF via /send.`);
-                                return;
+                            // Prefer POS PDF path when explicitly configured; otherwise send text backup via platform
+                            const billFormat = uiSettings.set_whatsapp_bill_format || '';
+                            if (billFormat && billFormat !== 'Text receipt' && billFormat !== 'text' && Object.keys(uiSettings).length > 0) {
+                                // Give POS more time already waited; still send text backup so customer gets something
+                                console.log(`[Realtime] Tenant ${tenantId} prefers PDF (${billFormat}) — sending text backup via platform if POS did not send.`);
                             }
                         }
                     }
@@ -3594,14 +3586,34 @@ if (dbClientForRealtime) {
                         console.warn('[Realtime] Failed to parse currency symbol:', currErr.message);
                     }
 
+                    // Normalize record for text formatter (snake_case → camel fields)
+                    const billForText = {
+                        ...record,
+                        orderId: orderId,
+                        customerPhone: phone,
+                        customerName: record.customer_name || record.customerName,
+                        tableNumber: record.table_number || record.tableNumber,
+                        paymentMethod: record.payment_method || record.paymentMethod,
+                        total: record.total,
+                        subtotal: record.subtotal,
+                        items: record.items,
+                    };
+
                     // Format clean text receipt (matching POS frontend format)
-                    const message = formatReceiptText(record, tenantProfile, currSymbol);
+                    const message = formatReceiptText(billForText, tenantProfile, currSymbol);
                     
-                    // Dispatch message via Whatsapp
-                    const tenantData = getOrCreateClient(tenantId);
-                    if (tenantData.status === 'ready') {
-                        await humanSend(tenantData.client, chatId, message, {}, tenantId);
-                        console.log(`[Realtime Auto-Sent] WhatsApp receipt successfully delivered to: +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
+                    // Prefer own tenant WA if live; else platform central number (lazy fallback)
+                    let route = null;
+                    try {
+                        route = await resolveSendRouteLazy(tenantId || 'system');
+                    } catch (routeErr) {
+                        console.warn('[Realtime] resolveSendRouteLazy failed:', routeErr.message);
+                    }
+                    if (!route || !route.client) {
+                        console.warn(`[Realtime Delay] No WhatsApp route for tenant ${tenantId} (platform offline?). Cannot dispatch.`);
+                    } else {
+                        await humanSend(route.client, chatId, message, {}, route.sendAsTenantId || tenantId);
+                        console.log(`[Realtime Auto-Sent] via=${route.via} to +${maskPhone(phone)} for order ${orderId} (tenant: ${tenantId})`);
                         
                         // Broadcast success back to POS Web Clients
                         if (supabase) {
@@ -3611,14 +3623,12 @@ if (dbClientForRealtime) {
                                     await broadcastChannel.send({
                                         type: 'broadcast',
                                         event: 'status',
-                                        payload: { orderId, status: 'success' }
+                                        payload: { orderId, status: 'success', via: route.via }
                                     });
                                     supabase.removeChannel(broadcastChannel);
                                 }
                             });
                         }
-                    } else {
-                        console.warn(`[Realtime Delay] WhatsApp gateway for tenant ${tenantId} not connected (Status: ${tenantData.status}). Cannot dispatch message.`);
                     }
                 } catch (err) {
                     console.error(`[Realtime Error] Failed to send receipt for order ${orderId} to +${phone}:`, err.message);
