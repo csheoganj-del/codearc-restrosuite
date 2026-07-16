@@ -1,12 +1,12 @@
 {
-  "version": "v207-20260716-reports-chart-clip",
+  "version": "v208-20260716-platform-sync",
   "date": "2026-07-16",
-  "title": "Reports chart layout fix",
-  "summary": "Daily revenue bars no longer overflow under the Payment mix donut on Last 30 / 90 day views. Dense bars, sparse labels, and hard panel clipping.",
+  "title": "Platform sync — Web PWA, Windows, Android",
+  "summary": "Ships the v207 reports chart clip fix and tax/docs baseline across web PWA, Windows desktop, and Android offline assets so every client runs the same build.",
   "highlights": [
-    "Clip daily revenue chart inside its own panel",
-    "Dense 30/90-day bar mode with shorter date labels",
-    "Payment mix donut no longer covered by overflowing bars",
-    "Service worker cache bump so browsers pick up the fix"
+    "Reports daily revenue bars no longer spill into Payment mix",
+    "PWA service-worker cache bump for fresh assets",
+    "Android assets + desktop app/ folder resynced from web",
+    "Version chip v208 across clients"
   ]
 }

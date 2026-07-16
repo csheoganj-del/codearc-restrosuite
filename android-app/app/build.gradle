@@ -16,8 +16,8 @@ android {
         // IMPORTANT: bump versionCode by at least 1 (and versionName to match)
         // on every Play Store release. versionCode is per applicationId, so
         // this fresh package can start at 1 — keep bumping on each upload.
-        versionCode 3
-        versionName "2.0.1"
+        versionCode 4
+        versionName "2.0.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
