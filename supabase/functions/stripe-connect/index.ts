@@ -48,9 +48,62 @@ function json(body: unknown, status = 200, req?: Request) {
   });
 }
 
-// ── Auth helper: validate staff JWT ──────────────────────────────────────────
+// ── Auth: app HMAC session (primary) or legacy Supabase Auth JWT ─────────────
+// Dashboard login issues custom HMAC tokens via tenant-access (session_token).
+// Payments → Stripe Connect must accept the same tokens as tenant-data / plans.
+
+const SUPERADMIN_SESSION_SECRET = Deno.env.get("SUPERADMIN_SESSION_SECRET") || "";
+
+function decodeB64Url(value: string): Uint8Array {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  return new Uint8Array(binary.split("").map((c) => c.charCodeAt(0)));
+}
+function encB64Url(bytes: Uint8Array): string {
+  let binary = "";
+  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+async function hmacB64Url(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return encB64Url(new Uint8Array(sig));
+}
+async function verifyAppSession(req: Request): Promise<{ tenant_id: string } | null> {
+  if (!SUPERADMIN_SESSION_SECRET) return null;
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const [payloadEncoded, signature] = token.split(".");
+  if (!payloadEncoded || !signature) return null;
+  const expected = await hmacB64Url(payloadEncoded, SUPERADMIN_SESSION_SECRET);
+  if (expected !== signature) return null;
+  try {
+    const p = JSON.parse(new TextDecoder().decode(decodeB64Url(payloadEncoded)));
+    if (!p.exp || Date.now() > Number(p.exp)) return null;
+    const tid = String(p.tenant_id || "");
+    if (!tid || tid === "superadmin") return null;
+    return { tenant_id: tid };
+  } catch { return null; }
+}
+
+async function loadTenantRow(tenantId: string) {
+  const { data: tenant } = await supabase
+    .from("saas_tenants")
+    .select("id, slug, name, stripe_account_id, stripe_enabled, stripe_kyc_status")
+    .eq("id", tenantId)
+    .maybeSingle();
+  return tenant || null;
+}
 
 async function getTenantFromAuth(req: Request) {
+  // 1) Primary path — signed app session used by the dashboard
+  const appSession = await verifyAppSession(req);
+  if (appSession?.tenant_id) {
+    return await loadTenantRow(appSession.tenant_id);
+  }
+
+  // 2) Legacy fallback — Supabase Auth JWT mapped via doppio_staff
   const authHeader = req.headers.get("authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
@@ -65,13 +118,7 @@ async function getTenantFromAuth(req: Request) {
     .maybeSingle();
   if (!staff?.tenant_id) return null;
 
-  const { data: tenant } = await supabase
-    .from("saas_tenants")
-    .select("id, slug, name, stripe_account_id, stripe_enabled, stripe_kyc_status")
-    .eq("id", staff.tenant_id)
-    .maybeSingle();
-
-  return tenant || null;
+  return await loadTenantRow(staff.tenant_id);
 }
 
 // ── Main Handler ─────────────────────────────────────────────────────────────

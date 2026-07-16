@@ -1105,6 +1105,13 @@ function openSuperAdminSettingsModal() {
               <span><i class="fa-solid fa-sidebar" style="width:16px;margin-right:6px;color:var(--text-mute)"></i>Collapse sidebar</span>
               <button id="sa-sidebar-toggle" class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-left-to-line"></i> Toggle</button>
             </label>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;font-size:14px;padding:10px 0;border-top:1px dashed var(--stroke)">
+              <div style="min-width:0">
+                <div style="font-weight:600"><i class="fa-solid fa-shield-halved" style="width:16px;margin-right:6px;color:var(--orange)"></i>UI copy shield</div>
+                <div style="font-size:11.5px;color:var(--text-mute);margin-top:4px;line-height:1.45">Blocks right-click, F12, and Inspect shortcuts on staff consoles. Always on for restaurants — only Super-Admin can change this on this browser.</div>
+              </div>
+              <button type="button" id="sa-ui-shield-toggle" class="btn btn-sm" style="min-width:96px;flex-shrink:0">…</button>
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <div style="font-size:12px;font-weight:600;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em">Data</div>
@@ -1133,6 +1140,46 @@ function openSuperAdminSettingsModal() {
       if (sb) sb.click();
       m.remove();
     };
+    // UI copy shield — Super-Admin only (never shown on outlet Settings)
+    const shieldBtn = document.getElementById('sa-ui-shield-toggle');
+    const paintShieldBtn = () => {
+      if (!shieldBtn) return;
+      const on = !(window.RSSecurityShield && RSSecurityShield.getConfig)
+        ? true
+        : !!(RSSecurityShield.getConfig().enabled);
+      shieldBtn.className = on ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+      shieldBtn.innerHTML = on
+        ? '<i class="fa-solid fa-lock"></i> On'
+        : '<i class="fa-solid fa-lock-open"></i> Off';
+      shieldBtn.title = on
+        ? 'Shield is ON — click to disable on this Super-Admin browser only'
+        : 'Shield is OFF on this browser — click to re-enable';
+    };
+    paintShieldBtn();
+    if (shieldBtn) {
+      shieldBtn.onclick = () => {
+        if (!window.RSSecurityShield || typeof RSSecurityShield.setEnabled !== 'function') {
+          toast('Security shield module not loaded. Hard-refresh the page.', 'fa-circle-exclamation');
+          return;
+        }
+        if (typeof RSSecurityShield.canToggle === 'function' && !RSSecurityShield.canToggle()) {
+          toast('Only Super-Admin can change the UI copy shield.', 'fa-shield-halved');
+          return;
+        }
+        const cur = !!(RSSecurityShield.getConfig && RSSecurityShield.getConfig().enabled);
+        const ok = RSSecurityShield.setEnabled(!cur);
+        if (!ok) {
+          toast('Only Super-Admin can change the UI copy shield.', 'fa-shield-halved');
+          return;
+        }
+        if (typeof RSSecurityShield.install === 'function') RSSecurityShield.install();
+        paintShieldBtn();
+        toast(
+          !cur ? 'UI copy shield enabled (this Super-Admin browser).' : 'UI copy shield disabled on this Super-Admin browser only. Restaurant accounts stay protected.',
+          'fa-shield-halved'
+        );
+      };
+    }
     const expBtn = document.getElementById('sa-export-btn');
     if (expBtn) expBtn.onclick = () => {
       m.remove();

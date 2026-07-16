@@ -642,6 +642,7 @@
     <h4>Your Details</h4>
     <div class="field"><i class="fa-solid fa-user"></i><input type="text" id="cust-name" placeholder="Your Name (required)"></div>
     <div class="field"><i class="fa-solid fa-phone"></i><input type="tel" id="cust-phone" placeholder="Phone (optional)" maxlength="10"></div>
+    <div class="field"><i class="fa-solid fa-users"></i><input type="number" id="cust-covers" min="1" max="99" step="1" inputmode="numeric" placeholder="Guests at table (e.g. 2)" title="Number of guests"></div>
   </div>
   <div class="summary">
     <div class="sum-row"><span>Subtotal</span><span id="s-sub">&#8377;0</span></div>
@@ -1964,12 +1965,24 @@
         note: c.note || ''
       };
     });
+    var coversEl = document.getElementById('cust-covers');
+    var covers = Math.max(0, Math.min(99, Number(coversEl && coversEl.value) || 0));
+    try {
+      if (covers) sessionStorage.setItem('rs_table_covers_' + String(tv), String(covers));
+      else {
+        var prev = sessionStorage.getItem('rs_table_covers_' + String(tv));
+        if (prev) covers = Math.max(0, Number(prev) || 0);
+      }
+    } catch (e) {}
     var order = {orderId:rid,displayOrderId:displayId,customerName:name,customerPhone:phone||'Dine-in',dateTime:ts,
       items:JSON.parse(JSON.stringify(cartPayload)),subtotal:sub,discount:0,gst:gst,total:sub,
       paymentMethod:'Pending',orderType:tv==='Takeaway'?'Takeaway':'Dine-in',
       tableNumber:tv,tenant_slug:slug,status:'Pending Review',
+      covers: covers || undefined,
+      pax: covers || undefined,
       source: waiterMode ? 'waiter_kot' : 'customer_qr',
-      waiterMode: !!waiterMode};
+      waiterMode: !!waiterMode,
+      sharedTable: true};
     var orderBtn = document.querySelector('.order-btn');
     var originalText = orderBtn ? orderBtn.innerHTML : 'Place Order';
     if (orderBtn) {

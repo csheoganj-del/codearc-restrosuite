@@ -541,7 +541,7 @@
       payments: { title: 'Payments', sub: 'Card / UPI settlement to your bank account' },
       security: { title: 'Security & PIN', sub: 'Admin PIN and which actions require manager approval' },
       team: { title: 'Team & roles', sub: 'Staff permissions and cashier restrictions' },
-      plan: { title: 'Plan & billing', sub: 'Subscription, renewals, and upgrade options' },
+      plan: { title: 'Plan & billing', sub: 'Your workspace plan, limits, and how to upgrade' },
       danger: { title: 'Danger zone', sub: 'Irreversible actions for this outlet' },
     };
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
@@ -608,9 +608,10 @@
           <div class="form-grid-2" style="margin-top:12px">${field('Phone','','Outlet phone')}${field('Email','','Outlet email')}</div>
           <div class="form-grid-2" style="margin-top:12px">${field('GSTIN','','Tax ID if enabled')}${sel('Cuisine',['North Indian','South Indian','Multi-cuisine','Cafe'],'Multi-cuisine')}</div>
           <div class="form-grid-2" style="margin-top:12px" id="set-country-currency-row"></div>`) +
-        setBlock('Guest QR cards', 'Optional extras printed on table QR cards (Order food + Call waiter are always on)',
+        setBlock('Guest QR cards', 'Printed on each table tent. Dual workflow: guest scans to order OR call waiter — staff can also take/amend the same table order until kitchen starts prep.',
           `<div class="form-grid-2">${field('Wifi name','','e.g. Cafe-Guest')}${field('Wifi password','','Guest network password')}</div>
-          <div style="margin-top:12px">${field('Guest welcome','','Scan to order food or call your waiter')}</div>`),
+          <div style="margin-top:12px">${field('Guest welcome','','This table only · Order food or call waiter')}</div>
+          <p class="set-hint" style="margin-top:10px">Each QR is for <b>that table only</b>. Waiters can scan the same code (or open QR Orders → Amend) to edit the shared bill.</p>`),
       tax:
         setBlock('Tax engine', 'How tax is calculated on cart and invoices',
           `${toggle('Calculate taxes','Enable tax calculations on cart and bills',false)}
@@ -667,7 +668,16 @@
           <div class="form-grid-2" style="margin-top:12px">${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}<div></div></div>
           <p class="set-hint">Exact preview matches the settled bill screen. Fast thermal is lighter on slow devices.</p>`) +
         setBlock('Operating mode', 'Advanced POS behaviour',
-          `${toggle('POS-only mode','Billing only — no KOT to Kitchen Display or waiter app. QR orders still work but stay in POS only.',false)}`),
+          `${toggle('POS-only mode','Billing only — no KOT to Kitchen Display or waiter app. QR orders still work but stay in POS only.',false)}`) +
+        setBlock('Sounds &amp; alerts', 'New QR orders, waiter calls, and kitchen chimes',
+          `<div class="set-row" style="border:0;padding:0 0 8px;align-items:center;gap:12px">
+            <div class="si" style="flex:1"><div class="st">Alert sounds</div><div class="sd" id="set-sound-status">Chimes for new QR orders and “call waiter”</div></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-alert-sound"><i class="fa-solid fa-volume-high"></i> Sound on</button>
+          </div>
+          <div class="set-actions-row" style="margin-top:4px">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-test-alert-sound"><i class="fa-solid fa-bell"></i> Test chime</button>
+          </div>
+          <p class="set-hint">Some browsers mute audio until you tap the page once. Test chime unlocks sound on this device.</p>`),
       gateway:
         setBlock('Connection', 'Send bills and order-ready messages from your restaurant WhatsApp',
           `<div id="outlet-gateway-status-container" class="set-gateway-status">
@@ -697,9 +707,9 @@
           `${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
           ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
           ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`),
-      plan: setBlock('Subscription', 'Current plan, renewals, and upgrades',
+      plan: setBlock('Your workspace plan', 'What you are on today, limits, and upgrade options',
           `<div id="rs-plan-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div></div>`),
-      payments: setBlock('Card &amp; UPI settlement', 'Route guest card/UPI payments to your bank account',
+      payments: setBlock('Card &amp; UPI settlement', 'Optional — auto bank settlement when Razorpay / Stripe is enabled',
           `<div id="rzp-route-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking payment status…</div></div>`),
       security: `<div id="rs-security-panel" class="set-security-host"></div>`,
       danger:
@@ -744,12 +754,6 @@
             <span class="set-sep">·</span>
             <span class="sd">Forgotten PIN resets need a server-verified code from the account owner.</span>
           </div>` : ''}`)}
-        ${setBlock('UI copy shield', 'Blocks casual inspection — real security is auth + server rules',
-          `<p class="set-hint" style="margin-top:0">${(window.RSSecurityShield && RSSecurityShield.disclaimer) || 'Blocks casual right-click and DevTools shortcuts on this console. Real security is auth + server rules — this is not unhackable.'}</p>
-          <label class="set-check-label">
-            <input type="checkbox" id="sec-ui-shield" ${(window.RSSecurityShield && RSSecurityShield.getConfig && RSSecurityShield.getConfig().enabled) ? 'checked' : 'checked'}>
-            <span>Block right-click · F12 · Ctrl+Shift+I on dashboard</span>
-          </label>`)}
         ${setBlock('Always PIN-protected', 'These always require admin PIN when a PIN is set',
           `<div class="set-prot-list">${[
             ['fa-trash-can','Delete Bill','Permanently remove a completed bill from records'],
@@ -808,85 +812,248 @@
         RS.toast('Admin PIN removed','fa-lock-open');
         initSecurityPanel(body);
       });
-
-      container.querySelector('#sec-ui-shield')?.addEventListener('change', (e) => {
-        const on = !!e.target.checked;
-        if (window.RSSecurityShield) {
-          RSSecurityShield.setEnabled(on);
-          if (on) RSSecurityShield.install();
-          RS.toast(on ? 'UI copy shield on' : 'UI copy shield off', 'fa-shield-halved');
-        }
-      });
     }
 
-    // -- Plan & billing panel (tenant self-serve) -----------------------------
+    // -- Plan & billing panel (tenant self-serve + graceful offline catalogue) -
     async function initPlanPanel(body) {
       const container = body.querySelector('#rs-plan-container');
       if (!container) return;
+
       const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-      const fmtDate = (iso) => { if (!iso) return '—'; try { return new Date(iso).toLocaleDateString(undefined, { day:'2-digit', month:'short', year:'numeric' }); } catch(e){ return '—'; } };
-      const money = (amt, cur) => { const sym = cur === 'INR' ? '₹' : (cur === 'EUR' ? '€' : (cur === 'USD' ? '$' : (cur ? cur + ' ' : ''))); return amt > 0 ? `${sym}${Number(amt).toLocaleString()}` : 'Free'; };
-      const STATUS_STYLE = { active:['#22c55e','Active'], trialing:['#3b82f6','Trial'], past_due:['#f59e0b','Payment due'], canceled:['#ef4444','Cancelled'] };
-      let data;
-      try { data = await RS_API.getPlans(); }
-      catch (e) { container.innerHTML = `<div style="padding:14px;border:1px solid rgba(239,68,68,0.25);border-radius:var(--r-sm);background:rgba(239,68,68,0.04);color:#ef4444;font-size:13px;">Could not load your plan. Please check your connection and try again.</div>`; return; }
-      const current = (data && data.current) || {};
-      const plans = (data && data.plans) || [];
-      const curCode = current.plan_code || 'starter';
-      const st = STATUS_STYLE[current.subscription_status] || STATUS_STYLE.active;
+      const fmtDate = (iso) => {
+        if (!iso) return 'Managed by RestroSuite';
+        try {
+          const d = new Date(iso);
+          if (Number.isNaN(d.getTime())) return 'Managed by RestroSuite';
+          return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (e) { return 'Managed by RestroSuite'; }
+      };
+      const money = (amt, cur) => {
+        const n = Number(amt) || 0;
+        if (n <= 0) return 'Included';
+        const sym = cur === 'INR' ? '₹' : (cur === 'EUR' ? '€' : (cur === 'USD' ? '$' : (cur ? cur + ' ' : '')));
+        return `${sym}${n.toLocaleString()}`;
+      };
+      const STATUS_STYLE = {
+        active: ['#22c55e', 'Active'],
+        trialing: ['#3b82f6', 'Trial'],
+        past_due: ['#f59e0b', 'Payment due'],
+        canceled: ['#ef4444', 'Cancelled'],
+        cancelled: ['#ef4444', 'Cancelled'],
+      };
+      const SUPPORT_EMAIL = 'support@codearc.co.in';
+      const FEATURES = {
+        starter: ['POS + bills', 'QR orders', 'Kitchen display', 'Up to 5 staff', '300 orders / month', 'Standard support'],
+        growth: ['Everything in Starter', 'Reports & analytics', 'CRM / customers', 'Up to 15 staff', '8,000 orders / month', 'Priority support'],
+        enterprise: ['Everything in Growth', 'Multi-outlet ready', 'Up to 75 staff', 'High order volume', 'Dedicated support', 'Custom rollout help'],
+      };
+      const FALLBACK_PLANS = [
+        { plan_code: 'starter', name: 'Starter', price_monthly: 0, currency: 'INR', max_staff: 5, monthly_order_limit: 300, support_level: 'standard', checkout_available: false },
+        { plan_code: 'growth', name: 'Growth', price_monthly: 0, currency: 'INR', max_staff: 15, monthly_order_limit: 8000, support_level: 'priority', checkout_available: false },
+        { plan_code: 'enterprise', name: 'Enterprise', price_monthly: 0, currency: 'INR', max_staff: 75, monthly_order_limit: 100000, support_level: 'dedicated', checkout_available: false },
+      ];
+
+      const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const localCurrent = {
+        plan_code: sess.plan_code || '',
+        plan_name: sess.plan_name || '',
+        subscription_status: sess.subscription_status || 'active',
+        subscription_current_period_end: sess.subscription_current_period_end || null,
+        plan_limits: sess.plan_limits || {},
+      };
+
+      let remoteOk = false;
+      let data = null;
+      let loadNote = '';
+      try {
+        if (window.RS_API && typeof RS_API.getPlans === 'function') {
+          data = await RS_API.getPlans();
+          remoteOk = !!(data && (Array.isArray(data.plans) || data.current));
+        }
+      } catch (e) {
+        remoteOk = false;
+        loadNote = 'Live catalogue is temporarily unavailable. Showing your workspace plan from this session.';
+      }
+
+      const current = Object.assign({}, localCurrent, (data && data.current) || {});
+      let plans = (data && Array.isArray(data.plans) && data.plans.length) ? data.plans.slice() : FALLBACK_PLANS.slice();
+      // Ensure current plan always appears in the list
+      const curCode = String(current.plan_code || localCurrent.plan_code || 'starter').toLowerCase() || 'starter';
+      if (!plans.some(p => String(p.plan_code).toLowerCase() === curCode)) {
+        const fb = FALLBACK_PLANS.find(p => p.plan_code === curCode) || {
+          plan_code: curCode,
+          name: current.plan_name || curCode,
+          price_monthly: 0,
+          currency: 'INR',
+          max_staff: (current.plan_limits && current.plan_limits.max_staff) || '—',
+          monthly_order_limit: (current.plan_limits && current.plan_limits.monthly_order_limit) || 0,
+          support_level: 'standard',
+          checkout_available: false,
+        };
+        plans = [fb].concat(plans);
+      }
+
+      const st = STATUS_STYLE[String(current.subscription_status || 'active').toLowerCase()] || STATUS_STYLE.active;
       const sColor = st[0], sLabel = st[1];
-      const curPlan = plans.find(p => p.plan_code === curCode) || { name: curCode, price_monthly: 0, currency: 'INR' };
+      const curPlan = plans.find(p => String(p.plan_code).toLowerCase() === curCode)
+        || { name: current.plan_name || curCode, price_monthly: 0, currency: 'INR', max_staff: localCurrent.plan_limits.max_staff, monthly_order_limit: localCurrent.plan_limits.monthly_order_limit, support_level: 'standard' };
+      const displayName = current.plan_name || curPlan.name || curCode;
       const renews = current.subscription_current_period_end;
+      const maxStaff = curPlan.max_staff != null ? curPlan.max_staff : (localCurrent.plan_limits.max_staff || '—');
+      const orderLim = curPlan.monthly_order_limit != null ? curPlan.monthly_order_limit : (localCurrent.plan_limits.monthly_order_limit || 0);
+      const anyCheckout = plans.some(p => p.checkout_available && Number(p.price_monthly) > 0);
+      const priceLabel = (p) => {
+        if (Number(p.price_monthly) > 0) return `${money(p.price_monthly, p.currency || 'INR')}<span style="font-size:12px;color:var(--text-soft);font-weight:600"> / mo</span>`;
+        if (p.checkout_available) return 'Included';
+        return '<span style="font-size:15px;font-weight:700;color:var(--text-soft)">Talk to us</span>';
+      };
+
+      const banner = loadNote
+        ? `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:16px;border-radius:var(--r-sm);background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.18);font-size:12.5px;line-height:1.55;color:var(--text)">
+            <i class="fa-solid fa-circle-info" style="color:#3b82f6;margin-top:2px"></i>
+            <div style="flex:1">${esc(loadNote)} Your POS keeps working as normal.</div>
+            <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-retry" style="flex-shrink:0"><i class="fa-solid fa-rotate"></i> Retry</button>
+          </div>`
+        : '';
+
       const header = `
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px">
-          <div style="flex:1;min-width:220px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px">
+          <div style="flex:1.2;min-width:220px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)">
             <div style="font-weight:800;font-size:12px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current plan</div>
-            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin:6px 0">${esc(curPlan.name)}</div>
-            <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:${sColor}"><span style="width:7px;height:7px;border-radius:50%;background:${sColor};display:inline-block"></span>${esc(sLabel)}</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin:6px 0">${esc(displayName)}</div>
+            <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:${sColor}">
+              <span style="width:7px;height:7px;border-radius:50%;background:${sColor};display:inline-block"></span>${esc(sLabel)}
+            </div>
           </div>
-          <div style="flex:1;min-width:220px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:18px;background:var(--glass)">
-            <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em">Renews on</div>
-            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin:6px 0">${fmtDate(renews)}</div>
-            <div style="font-size:12px;color:var(--text-soft)">${money(curPlan.price_monthly, curPlan.currency)}${curPlan.price_monthly>0?' / month':''}</div>
+          <div style="flex:1;min-width:180px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:18px;background:var(--glass)">
+            <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em">${renews ? 'Renews on' : 'Billing'}</div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:${renews ? '22px' : '16px'};margin:8px 0;line-height:1.25">${esc(fmtDate(renews))}</div>
+            <div style="font-size:12px;color:var(--text-soft)">${Number(curPlan.price_monthly) > 0 ? `${money(curPlan.price_monthly, curPlan.currency)} / month` : 'Plan assigned by RestroSuite'}</div>
+          </div>
+          <div style="flex:1;min-width:180px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:18px;background:var(--glass)">
+            <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em">Workspace limits</div>
+            <div style="margin-top:10px;font-size:13px;line-height:1.7;color:var(--text)">
+              <div><i class="fa-solid fa-users" style="width:16px;color:var(--text-soft)"></i> <strong>${esc(maxStaff)}</strong> staff seats</div>
+              <div><i class="fa-solid fa-receipt" style="width:16px;color:var(--text-soft)"></i> <strong>${esc((Number(orderLim) || 0).toLocaleString() || '—')}</strong> orders / month</div>
+              <div><i class="fa-solid fa-headset" style="width:16px;color:var(--text-soft)"></i> ${esc(curPlan.support_level || 'standard')} support</div>
+            </div>
           </div>
         </div>`;
+
+      const included = FEATURES[curCode] || FEATURES.starter;
+      const includedBlock = `
+        <div style="margin-bottom:20px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:14px 16px;background:var(--panel)">
+          <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Included with ${esc(displayName)}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 14px">
+            ${included.map(f => `<div style="font-size:12.5px;color:var(--text);display:flex;gap:8px;align-items:flex-start"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-top:2px"></i><span>${esc(f)}</span></div>`).join('')}
+          </div>
+        </div>`;
+
       const cards = plans.map(p => {
-        const isCurrent = p.plan_code === curCode;
-        const canCheckout = p.checkout_available && p.price_monthly > 0 && !isCurrent;
-        const noCheckout = !p.checkout_available && p.price_monthly > 0 && !isCurrent;
+        const code = String(p.plan_code || '').toLowerCase();
+        const isCurrent = code === curCode;
+        const canCheckout = !!p.checkout_available && Number(p.price_monthly) > 0 && !isCurrent;
+        const feats = FEATURES[code] || [
+          `Up to ${p.max_staff != null ? p.max_staff : '—'} staff`,
+          `${(Number(p.monthly_order_limit) || 0).toLocaleString()} orders/mo`,
+          `${p.support_level || 'standard'} support`,
+        ];
         let cta;
-        if (isCurrent) cta = `<button class="btn btn-ghost btn-sm" disabled style="width:100%;opacity:.7">Current plan</button>`;
-        else if (canCheckout) cta = `<button class="btn btn-primary btn-sm rs-upgrade-btn" data-plan="${esc(p.plan_code)}" style="width:100%"><i class="fa-solid fa-arrow-up"></i> Choose ${esc(p.name)}</button>`;
-        else if (noCheckout) cta = `<button class="btn btn-ghost btn-sm rs-contact-btn" data-plan="${esc(p.plan_code)}" style="width:100%">Contact to upgrade</button>`;
-        else cta = `<button class="btn btn-ghost btn-sm" disabled style="width:100%">—</button>`;
+        if (isCurrent) {
+          cta = `<button type="button" class="btn btn-ghost btn-sm" disabled style="width:100%;opacity:.75"><i class="fa-solid fa-check"></i> Your plan</button>`;
+        } else if (canCheckout) {
+          cta = `<button type="button" class="btn btn-primary btn-sm rs-upgrade-btn" data-plan="${esc(p.plan_code)}" style="width:100%"><i class="fa-solid fa-arrow-up"></i> Upgrade to ${esc(p.name)}</button>`;
+        } else {
+          cta = `<button type="button" class="btn btn-ghost btn-sm rs-contact-btn" data-plan="${esc(p.plan_code)}" data-plan-name="${esc(p.name)}" style="width:100%"><i class="fa-solid fa-headset"></i> Request ${esc(p.name)}</button>`;
+        }
         return `
-          <div style="flex:1;min-width:190px;border:1.5px solid ${isCurrent?'var(--orange)':'var(--stroke-2)'};border-radius:var(--r-md);padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:8px">
-            <div style="font-weight:800;font-size:15px">${esc(p.name)}</div>
-            <div style="font-family:var(--font-display);font-weight:800;font-size:22px">${money(p.price_monthly, p.currency)}<span style="font-size:12px;color:var(--text-soft);font-weight:600">${p.price_monthly>0?' /mo':''}</span></div>
-            <div style="font-size:11.5px;color:var(--text-soft);line-height:1.6">Up to ${esc(p.max_staff)} staff · ${esc((p.monthly_order_limit||0).toLocaleString())} orders/mo · ${esc(p.support_level||'standard')} support</div>
-            <div style="margin-top:auto;padding-top:6px">${cta}</div>
+          <div style="flex:1;min-width:200px;max-width:320px;border:1.5px solid ${isCurrent ? 'var(--orange)' : 'var(--stroke-2)'};border-radius:var(--r-md);padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:8px;box-shadow:${isCurrent ? '0 0 0 1px color-mix(in srgb,var(--orange) 25%,transparent)' : 'none'}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="font-weight:800;font-size:15px">${esc(p.name)}</div>
+              ${isCurrent ? '<span class="set-chip set-chip-warn" style="font-size:10px">Current</span>' : ''}
+            </div>
+            <div style="font-family:var(--font-display);font-weight:800;font-size:22px;min-height:32px">${priceLabel(p)}</div>
+            <ul style="margin:0;padding:0;list-style:none;font-size:11.5px;color:var(--text-soft);line-height:1.65;flex:1">
+              ${feats.slice(0, 5).map(f => `<li style="display:flex;gap:6px"><i class="fa-solid fa-check" style="color:var(--orange);margin-top:3px;font-size:10px"></i><span>${esc(f)}</span></li>`).join('')}
+            </ul>
+            <div style="padding-top:6px">${cta}</div>
           </div>`;
       }).join('');
-      container.innerHTML = header +
-        `<div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Available plans</div>
-         <div style="display:flex;gap:12px;flex-wrap:wrap">${cards}</div>
-         <p style="font-size:11.5px;color:var(--text-soft);margin-top:14px;line-height:1.6">Secure checkout by Razorpay. Your subscription renews automatically each month and your workspace stays active as long as billing is current. Cancel anytime from the checkout page.</p>`;
+
+      const footerNote = anyCheckout
+        ? 'Secure online checkout is available when configured for your region. Subscriptions renew automatically while billing is current.'
+        : 'Plan changes are managed by RestroSuite. Online self-serve checkout is not required — email us and we will update your workspace.';
+
+      const helpRow = `
+        <div style="margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--stroke-2);border-radius:var(--r-md);background:var(--glass)">
+          <div style="min-width:200px">
+            <div style="font-weight:700;font-size:13px">Need a plan change or invoice?</div>
+            <div style="font-size:12px;color:var(--text-soft);margin-top:3px;line-height:1.5">We handle upgrades, renewals, and billing questions for your outlet.</div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <a class="btn btn-primary btn-sm" href="mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Plan upgrade — ' + (sess.tenant_name || sess.tenant_slug || 'RestroSuite'))}"><i class="fa-solid fa-envelope"></i> Email support</a>
+            <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-copy-id"><i class="fa-solid fa-copy"></i> Copy outlet ID</button>
+          </div>
+        </div>
+        <p style="font-size:11.5px;color:var(--text-soft);margin-top:12px;line-height:1.6">${esc(footerNote)}</p>`;
+
+      container.innerHTML = banner + header + includedBlock +
+        `<div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Compare plans</div>
+         <div style="display:flex;gap:12px;flex-wrap:wrap">${cards}</div>` + helpRow;
+
+      container.querySelector('#rs-plan-retry')?.addEventListener('click', () => {
+        container.innerHTML = `<div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div>`;
+        initPlanPanel(body);
+      });
+
+      container.querySelector('#rs-plan-copy-id')?.addEventListener('click', async () => {
+        const id = sess.tenant_slug || sess.tenant_id || '';
+        if (!id) { RS.toast('Outlet ID not available on this session.', 'fa-circle-info'); return; }
+        try {
+          await navigator.clipboard.writeText(String(id));
+          RS.toast('Outlet ID copied', 'fa-copy');
+        } catch (_) {
+          RS.toast(String(id), 'fa-circle-info');
+        }
+      });
+
       container.querySelectorAll('.rs-upgrade-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const plan = btn.getAttribute('data-plan');
-          btn.disabled = true; const orig = btn.innerHTML;
+          btn.disabled = true;
+          const orig = btn.innerHTML;
           btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting checkout…';
           try {
             const res = await RS_API.subscribe(plan);
-            if (res && res.short_url) { window.open(res.short_url, '_blank', 'noopener'); RS.toast('Complete payment in the new tab to activate your plan.', 'fa-arrow-up-right-from-square'); }
-            else { throw new Error('No checkout URL'); }
-          } catch (e) { RS.toast((e && e.message) || 'Could not start checkout.', 'fa-circle-exclamation'); }
-          finally { btn.disabled = false; btn.innerHTML = orig; }
+            if (res && res.short_url) {
+              window.open(res.short_url, '_blank', 'noopener');
+              RS.toast('Complete payment in the new tab to activate your plan.', 'fa-arrow-up-right-from-square');
+            } else {
+              throw new Error('Checkout is not available for this plan yet.');
+            }
+          } catch (e) {
+            RS.toast((e && e.message) || 'Could not start checkout. Email support to upgrade.', 'fa-headset');
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+          }
         });
       });
+
       container.querySelectorAll('.rs-contact-btn').forEach(btn => {
-        btn.addEventListener('click', () => { RS.toast('Contact RestroSuite support to move to this plan.', 'fa-headset'); });
+        btn.addEventListener('click', () => {
+          const planName = btn.getAttribute('data-plan-name') || btn.getAttribute('data-plan') || 'a new plan';
+          const subject = encodeURIComponent(`Request ${planName} plan — ${sess.tenant_name || sess.tenant_slug || 'outlet'}`);
+          const bodyTxt = encodeURIComponent(
+            `Hi RestroSuite,\n\nPlease upgrade our workspace.\n\nOutlet: ${sess.tenant_name || ''}\nSlug: ${sess.tenant_slug || ''}\nRequested plan: ${planName}\n\nThank you.`
+          );
+          window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${bodyTxt}`;
+          RS.toast('Opening email to request this plan…', 'fa-envelope');
+        });
       });
+
+      // Quiet success path marker for support / diagnostics
+      try { container.dataset.planSource = remoteOk ? 'live' : 'session-fallback'; } catch (_) {}
     }
 
     // -- Razorpay Route onboarding panel --------------------------------------
@@ -897,12 +1064,58 @@
       const country = (window.RS_SETTINGS && RS_SETTINGS.set_country) || 'India';
       const isStripe = (country.toLowerCase() === 'ireland' || country.toLowerCase() === 'ie' || country.toLowerCase() !== 'india');
 
-      function renderError(msg) {
-        container.innerHTML = `<div style="padding:14px;border:1px solid rgba(239,68,68,0.25);border-radius:var(--r-sm);background:rgba(239,68,68,0.04);color:#ef4444;font-size:13px;">${msg}</div>`;
-      }
-
       function pill(text, color) {
         return `<span class="pill" style="padding:5px 12px;background:rgba(${color},0.12);color:rgb(${color})"><span class="dot" style="background:rgb(${color})"></span>${text}</span>`;
+      }
+
+      /** Calm empty / not-ready state — not a scary red error. */
+      function renderNotEnabled(opts) {
+        const title = opts.title || 'Online settlement';
+        const provider = opts.provider || 'Razorpay';
+        const detail = opts.detail || '';
+        const isAuth = !!opts.needSignIn;
+        container.innerHTML = `
+          <div class="set-row" style="margin-bottom:14px">
+            <div class="si">
+              <div class="st">${title}</div>
+              <div class="sd">Guest card / UPI auto-settlement to your bank (optional)</div>
+            </div>
+            ${pill(isAuth ? 'Sign in required' : 'Not enabled yet', isAuth ? '239, 68, 68' : '107, 114, 128')}
+          </div>
+          <div style="background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.7;color:var(--text);">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <i class="fa-solid ${isAuth ? 'fa-lock' : 'fa-circle-info'}" style="color:var(--orange);margin-top:3px"></i>
+              <div>
+                <div style="font-weight:700;margin-bottom:6px">${isAuth
+                  ? 'Please sign in again to check settlement status.'
+                  : `${provider} settlement is not set up for this outlet yet.`}</div>
+                <div style="color:var(--text-soft);font-size:12.5px">
+                  ${detail || (isAuth
+                    ? 'Log out and sign back in, then return to this page.'
+                    : `You do not need this to run the restaurant. Take payments as usual with <strong>Cash</strong> and <strong>UPI at the counter</strong>. When ${provider} is enabled for your workspace, bank settlement for online card/UPI can be connected here.`)}
+                </div>
+                ${opts.hint ? `<div style="margin-top:10px;font-size:12px;color:var(--text-soft)">${opts.hint}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          ${opts.retry ? `<div style="margin-top:12px"><button type="button" class="btn btn-ghost btn-sm" id="btn-pay-status-retry"><i class="fa-solid fa-rotate"></i> Try again</button></div>` : ''}
+        `;
+        if (opts.retry) {
+          container.querySelector('#btn-pay-status-retry')?.addEventListener('click', () => {
+            container.innerHTML = `<div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking payment status…</div>`;
+            initRazorpayRoutePanel(body);
+          });
+        }
+      }
+
+      function renderSoftError(msg) {
+        renderNotEnabled({
+          title: isStripe ? 'Stripe Connect' : 'Razorpay Route',
+          provider: isStripe ? 'Stripe' : 'Razorpay',
+          detail: msg || 'We could not check settlement status right now. Your POS cash and counter UPI still work normally.',
+          hint: 'If this keeps happening after a refresh, contact RestroSuite support — no action is required to keep selling.',
+          retry: true,
+        });
       }
 
       const supabaseUrl = window.__SUPABASE_URL__ || '';
@@ -910,7 +1123,7 @@
       const session = window.RS_API && RS_API.session && RS_API.session();
       const token   = session && (session.access_token || session.token);
       if (!supabaseUrl || !token) {
-        renderError('Not authenticated');
+        renderNotEnabled({ needSignIn: true, title: isStripe ? 'Stripe Connect' : 'Razorpay Route', provider: isStripe ? 'Stripe' : 'Razorpay' });
         return;
       }
 
@@ -927,9 +1140,20 @@
             },
             body: JSON.stringify({ action: 'get_account' }),
           });
-          status = await res.json();
+          status = await res.json().catch(() => ({}));
+          if (!res.ok || status.error) {
+            // Platform not ready / not applied — calm message, not a hard failure
+            renderNotEnabled({
+              title: 'Stripe Connect',
+              provider: 'Stripe',
+              detail: 'Card settlement via Stripe is not enabled for this workspace yet. Counter payments (cash / card terminal) still work as usual.',
+              hint: 'RestroSuite has not finished Stripe onboarding for this account. You can keep operating without this step.',
+              retry: true,
+            });
+            return;
+          }
         } catch(e) {
-          renderError('Could not load Stripe Connect status. Please refresh and try again.');
+          renderSoftError('Could not reach settlement services. Check your connection and try again when convenient.');
           return;
         }
 
@@ -1024,51 +1248,13 @@
           return;
         }
 
-        // -- Not connected --
-        container.innerHTML = `
-          <div class="set-row" style="margin-bottom:16px">
-            <div class="si">
-              <div class="st">Stripe Connect</div>
-              <div class="sd">Configure card payments for your outlet. Settles directly to your bank account via Stripe.</div>
-            </div>
-            ${pill('Not connected', '107, 114, 128')}
-          </div>
-          <div style="background:rgba(255,107,0,0.04);border:1px solid rgba(255,107,0,0.2);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--text-soft);line-height:1.6;margin-bottom:18px;">
-            <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-right:6px"></i>
-            <strong style="color:var(--text)">Direct Settlements.</strong> QR order card payments go straight to your Stripe Connected account. RestroSuite never touches your funds.
-          </div>
-          <button class="btn btn-primary" id="btn-stripe-connect" style="min-width:180px;">
-            <i class="fa-brands fa-stripe"></i> Connect Stripe Account
-          </button>
-        `;
-        container.querySelector('#btn-stripe-connect').onclick = async function() {
-          const btn = this;
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting Stripe...';
-          try {
-            const res = await fetch(`${supabaseUrl}/functions/v1/stripe-connect`, {
-              method: 'POST',
-              headers: {
-                'Content-Type':  'application/json',
-                'apikey':        supabaseKey,
-                'Authorization': 'Bearer ' + token,
-              },
-              body: JSON.stringify({ action: 'onboard_account', country: 'IE' }),
-            });
-            const data = await res.json();
-            if (data.onboarding_url) {
-              window.location.href = data.onboarding_url;
-            } else {
-              toast('Error: ' + (data.error || 'onboarding failed'), 'fa-circle-exclamation');
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Connect Stripe Account';
-            }
-          } catch(err) {
-            toast('Network error. Please try again.', 'fa-circle-exclamation');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-brands fa-stripe"></i> Connect Stripe Account';
-          }
-        };
+        // -- Not connected / not enabled on this outlet --
+        renderNotEnabled({
+          title: 'Stripe Connect',
+          provider: 'Stripe',
+          detail: 'Card settlement via Stripe is not connected for this outlet yet. You can keep taking payments at the counter as usual.',
+          hint: 'When RestroSuite enables Stripe for your workspace, you will connect your bank account from this page.',
+        });
         return;
       }
 
@@ -1084,9 +1270,20 @@
           },
           body: JSON.stringify({ action: 'get_account' }),
         });
-        status = await res.json();
+        status = await res.json().catch(() => ({}));
+        if (!res.ok || status.error) {
+          // Platform has not applied / keys missing / auth not ready — calm UX
+          renderNotEnabled({
+            title: 'Razorpay Route',
+            provider: 'Razorpay',
+            detail: 'Razorpay settlement is not set up for this workspace yet. You do not need to apply or enter bank details here right now.',
+            hint: 'Keep using Cash and counter UPI in POS. When RestroSuite enables Razorpay Route, online card/UPI can settle straight to your bank from this page.',
+            retry: true,
+          });
+          return;
+        }
       } catch(e) {
-        renderError('Could not load payment status. Please refresh and try again.');
+        renderSoftError('Could not reach settlement services. Check your connection and try again when convenient.');
         return;
       }
 
@@ -1122,132 +1319,13 @@
         return;
       }
 
-      // -- Not set up yet -- show onboarding form --------------------------------
-      container.innerHTML = `
-        <div class="set-row" style="margin-bottom:16px">
-          <div class="si">
-            <div class="st">Razorpay Route</div>
-            <div class="sd">Link your bank account so customer payments settle directly to you -- no UTR codes, no cashier verification.</div>
-          </div>
-          ${pill('Not connected', '107, 114, 128')}
-        </div>
-
-        <div style="background:rgba(255,107,0,0.04);border:1px solid rgba(255,107,0,0.2);border-radius:var(--r-sm);padding:12px 14px;font-size:12.5px;color:var(--text-soft);line-height:1.6;margin-bottom:18px;">
-          <i class="fa-solid fa-circle-info" style="color:var(--orange);margin-right:6px"></i>
-          <strong style="color:var(--text)">One-time setup.</strong> After connecting, all future QR order payments go directly to your bank via Razorpay. RestroSuite never holds your money.
-        </div>
-
-        <div class="form-grid-2" style="gap:12px;" id="rzp-onboard-form">
-          <div><label class="fl">Legal Business Name *</label><input class="form-input" id="rzp-biz-name" placeholder="As on PAN card"></div>
-          <div><label class="fl">Business Type *</label>
-            <select class="form-input" id="rzp-biz-type">
-              <option value="restaurant">Restaurant (Proprietorship)</option>
-              <option value="individual">Individual</option>
-              <option value="partnership">Partnership</option>
-              <option value="private_limited">Private Limited</option>
-              <option value="public_limited">Public Limited</option>
-              <option value="llp">LLP</option>
-            </select>
-          </div>
-          <div><label class="fl">Contact Person Name *</label><input class="form-input" id="rzp-contact-name" placeholder="Owner / Director name"></div>
-          <div><label class="fl">Contact Email *</label><input class="form-input" type="email" id="rzp-contact-email" placeholder="business@email.com"></div>
-          <div><label class="fl">Mobile Number *</label><input class="form-input" type="tel" id="rzp-contact-mobile" placeholder="10-digit mobile"></div>
-          <div><label class="fl">PAN *</label><input class="form-input" id="rzp-pan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase"></div>
-          <div><label class="fl">Bank Account Number *</label><input class="form-input" id="rzp-bank-acc" placeholder="Your business bank account number"></div>
-          <div><label class="fl">IFSC Code *</label><input class="form-input" id="rzp-ifsc" placeholder="e.g. HDFC0001234" maxlength="11" style="text-transform:uppercase"></div>
-          <div style="grid-column:1/-1"><label class="fl">Account Holder Name *</label><input class="form-input" id="rzp-bank-name" placeholder="Name on bank account"></div>
-          <div><label class="fl">City</label><input class="form-input" id="rzp-city" placeholder="City"></div>
-          <div><label class="fl">State</label><input class="form-input" id="rzp-state" placeholder="State"></div>
-          <div><label class="fl">PIN Code</label><input class="form-input" id="rzp-pin" placeholder="6-digit PIN" maxlength="6"></div>
-          <div style="grid-column:1/-1"><label class="fl">Street Address</label><input class="form-input" id="rzp-street" placeholder="Outlet registered address"></div>
-        </div>
-
-        <div style="margin-top:18px;display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--stroke-2);">
-          <button class="btn btn-primary" id="btn-rzp-submit" style="min-width:160px;">
-            <i class="fa-brands fa-razorpay"></i> Connect & Submit KYC
-          </button>
-          <span style="font-size:11.5px;color:var(--text-soft);">Your details are sent directly to Razorpay over HTTPS. RestroSuite does not store your PAN or bank credentials.</span>
-        </div>
-        <div id="rzp-submit-result" style="margin-top:12px"></div>
-      `;
-
-      // Submit handler
-      container.querySelector('#btn-rzp-submit').onclick = async function() {
-        const btn = this;
-        const result = container.querySelector('#rzp-submit-result');
-
-        const getValue = id => (container.querySelector('#' + id)?.value || '').trim();
-        const required = ['rzp-biz-name','rzp-contact-name','rzp-contact-email','rzp-contact-mobile','rzp-pan','rzp-bank-acc','rzp-ifsc','rzp-bank-name'];
-        const missing  = required.filter(id => !getValue(id));
-        if (missing.length) {
-          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Please fill all required (*) fields.</p>`;
-          return;
-        }
-        if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(getValue('rzp-pan').toUpperCase())) {
-          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Invalid PAN format (e.g. ABCDE1234F).</p>`;
-          return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Razorpay...';
-        result.innerHTML = '';
-
-        try {
-          const supabaseUrl = window.__SUPABASE_URL__ || '';
-          const supabaseKey = window.__SUPABASE_ANON_KEY__ || '';
-          const session = window.RS_API && RS_API.session && RS_API.session();
-          const token   = session && (session.access_token || session.token);
-
-          const payload = {
-            action:               'onboard_account',
-            legal_business_name:  getValue('rzp-biz-name'),
-            business_type:        container.querySelector('#rzp-biz-type')?.value || 'restaurant',
-            contact_name:         getValue('rzp-contact-name'),
-            contact_email:        getValue('rzp-contact-email'),
-            contact_mobile:       getValue('rzp-contact-mobile'),
-            pan:                  getValue('rzp-pan').toUpperCase(),
-            bank_account_number:  getValue('rzp-bank-acc'),
-            bank_ifsc:            getValue('rzp-ifsc').toUpperCase(),
-            bank_beneficiary_name: getValue('rzp-bank-name'),
-            address_street:       getValue('rzp-street'),
-            address_city:         getValue('rzp-city'),
-            address_state:        getValue('rzp-state'),
-            address_pin:          getValue('rzp-pin'),
-          };
-
-          const res = await fetch(`${supabaseUrl}/functions/v1/razorpay-route`, {
-            method: 'POST',
-            headers: {
-              'Content-Type':  'application/json',
-              'apikey':        supabaseKey,
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json();
-
-          if (data.success) {
-            container.innerHTML = `
-              <div style="text-align:center;padding:30px 20px;">
-                <div style="width:52px;height:52px;border-radius:50%;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><i class="fa-solid fa-circle-check" style="font-size:24px;color:#10b981"></i></div>
-                <div style="font-weight:800;font-size:15px;margin-bottom:6px;">KYC Submitted Successfully</div>
-                <p style="font-size:13px;color:var(--text-soft);line-height:1.6;max-width:380px;margin:0 auto;">Razorpay is reviewing your account. This usually takes <strong>1-2 business days</strong>. RestroSuite will automatically activate Route payments once approved -- no further action needed.</p>
-                <div style="margin-top:14px;background:var(--glass);border:1px solid var(--stroke-2);border-radius:var(--r-sm);padding:10px 14px;font-size:12px;display:inline-block;">
-                  Account ID: <strong>${data.account_id}</strong>
-                </div>
-              </div>
-            `;
-          } else {
-            result.innerHTML = `<p style="color:#ef4444;font-size:13px;">${data.error || 'Submission failed. Please try again.'}</p>`;
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fa-brands fa-razorpay"></i> Connect & Submit KYC';
-          }
-        } catch(e) {
-          result.innerHTML = `<p style="color:#ef4444;font-size:13px;">Network error. Please try again.</p>`;
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-brands fa-razorpay"></i> Connect & Submit KYC';
-        }
-      };
+      // -- Not set up yet (platform has not enabled Razorpay for this outlet) ---
+      renderNotEnabled({
+        title: 'Razorpay Route',
+        provider: 'Razorpay',
+        detail: 'Razorpay settlement is not connected for this outlet yet. No bank or PAN details are required from you right now.',
+        hint: 'POS Cash and counter UPI work as normal. When RestroSuite enables Razorpay Route, you can link settlement from this page.',
+      });
     }
 
     function settingsRole(){
@@ -1261,7 +1339,7 @@
       // outlet owner/admin gets the full screen; managers get an operational
       // subset; every other staff role is blocked entirely.
       const role = settingsRole();
-      const isOwnerAdmin = ['owner','admin','superadmin'].includes(role);
+      const isOwnerAdmin = ['owner','admin','superadmin','super_admin'].includes(role);
       const isManager = role === 'manager';
       if (!isOwnerAdmin && !isManager) {
         sec.innerHTML = `<div class="panel panel-pad" style="text-align:center;padding:48px 24px">
@@ -1625,7 +1703,7 @@
           const hint = sec.querySelector('#set-save-hint');
           if (hint) {
             if (key === 'danger') hint.textContent = 'Destructive actions below — not saved as settings';
-            else if (key === 'plan') hint.textContent = 'Plan changes are managed by billing';
+            else if (key === 'plan') hint.textContent = 'Plan changes are handled by RestroSuite support';
             else if (key === 'gateway') hint.textContent = 'Connection is live · preferences save with the button';
             else hint.textContent = 'Changes apply after you save';
           }
@@ -1773,12 +1851,83 @@
         }
         $$('.set-nav button',sec).forEach(b=>b.classList.toggle('active', b.dataset.s===key));
         const tg=$('#set-team-go'); if(tg) tg.onclick=()=>RS.activateTab('employees-tab');
+        // Sounds & alerts (Settings → Printers)
+        (function wireAlertSoundControls() {
+          const MUTE_KEY = 'rs_service_alert_mute';
+          const toggleBtn = body.querySelector('#btn-toggle-alert-sound');
+          const testBtn = body.querySelector('#btn-test-alert-sound');
+          const statusEl = body.querySelector('#set-sound-status');
+          if (!toggleBtn && !testBtn) return;
+          function isMuted() {
+            try { return localStorage.getItem(MUTE_KEY) === '1'; } catch (_) { return false; }
+          }
+          function paint() {
+            const muted = isMuted();
+            if (toggleBtn) {
+              toggleBtn.innerHTML = muted
+                ? '<i class="fa-solid fa-volume-xmark"></i> Muted'
+                : '<i class="fa-solid fa-volume-high"></i> Sound on';
+            }
+            if (statusEl) {
+              statusEl.textContent = muted
+                ? 'Muted on this device — waiter call & QR order chimes off'
+                : 'Chimes for new QR orders and “call waiter”';
+            }
+          }
+          paint();
+          if (toggleBtn && !toggleBtn.dataset.rsSoundBound) {
+            toggleBtn.dataset.rsSoundBound = '1';
+            toggleBtn.onclick = () => {
+              try {
+                localStorage.setItem(MUTE_KEY, isMuted() ? '0' : '1');
+              } catch (_) {}
+              paint();
+              RS.toast(isMuted() ? 'Alert sounds muted' : 'Alert sounds on', isMuted() ? 'fa-volume-xmark' : 'fa-volume-high');
+            };
+          }
+          if (testBtn && !testBtn.dataset.rsSoundBound) {
+            testBtn.dataset.rsSoundBound = '1';
+            testBtn.onclick = () => {
+              try {
+                // Unlock + play same family of tones as floor chime
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) {
+                  RS.toast('Audio not supported in this browser', 'fa-circle-exclamation');
+                  return;
+                }
+                if (!window.__rsAlertAudioCtx) window.__rsAlertAudioCtx = new Ctx();
+                const ctx = window.__rsAlertAudioCtx;
+                if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+                if (isMuted()) {
+                  RS.toast('Sounds are muted — turn Sound on first', 'fa-volume-xmark');
+                  return;
+                }
+                [[880, 0], [1174.7, 0.12], [1396.9, 0.24]].forEach(([freq, delay]) => {
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  osc.type = 'sine';
+                  osc.frequency.value = freq;
+                  const t0 = ctx.currentTime + delay;
+                  gain.gain.setValueAtTime(0.0001, t0);
+                  gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+                  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+                  osc.connect(gain).connect(ctx.destination);
+                  osc.start(t0);
+                  osc.stop(t0 + 0.32);
+                });
+                RS.toast('Test chime played', 'fa-bell');
+              } catch (e) {
+                RS.toast('Could not play chime', 'fa-circle-exclamation');
+              }
+            };
+          }
+        })();
         const btnReset = $('#btn-client-reset-data');
         if(btnReset) {
           btnReset.onclick = async () => {
             // Defense in depth: even if this pane is somehow rendered for a
             // non-admin role, refuse to run the destructive reset.
-            if (!['owner','admin','superadmin'].includes(settingsRole())) {
+            if (!['owner','admin','superadmin','super_admin'].includes(settingsRole())) {
               RS.toast('Only the outlet owner can reset outlet data.', 'fa-lock');
               return;
             }
@@ -1838,7 +1987,12 @@
         }
       };
       $('#set-cancel').onclick=()=>show('profile');
-      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{ if(saved) SET_STORE=saved; show('profile'); });
+      Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{
+        if(saved) SET_STORE=saved;
+        const deep = String(window.__rsOpenSettingsSection || '').trim();
+        window.__rsOpenSettingsSection = '';
+        show(deep && NAV.some(s => s[0] === deep) ? deep : 'profile');
+      });
     }
     RS.titles['settings-tab']=['Settings','Outlet · operations · access · account'];
     RS.addRenderer('settings-tab', renderSettings);
@@ -1999,7 +2153,16 @@
         ['settings-tab','Settings','gear'],
         ['logout','Sign Out','right-from-bracket']
       ];
-      moreBtn.addEventListener('click', ()=>{
+      moreBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        // Kill legacy MORE SECTIONS sheet if any other code tried to open it
+        const legacy = document.getElementById('mobile-more-sheet');
+        if (legacy) {
+          legacy.style.display = 'none';
+          legacy.setAttribute('hidden', '');
+          legacy.setAttribute('aria-hidden', 'true');
+        }
         // Filter the sheet by the signed-in staff role's allowed tabs so
         // restricted roles can't even see (let alone open) forbidden screens.
         const roleInfo = window.RS_ROLE || {};
@@ -2013,6 +2176,8 @@
             return `<button class="hub-card" data-go="${m[0]}" style="text-align:left;cursor:pointer;border:1px solid var(--stroke);background:var(--panel)"><div class="hub-ic ${bgClass}" style="width:38px;height:38px;font-size:15px"><i class="fa-solid fa-${m[2]}"></i></div><h4 style="font-size:14px;margin-top:10px">${m[1]}</h4></button>`;
           }).join('')}</div>`,
           onMount(modal, close){
+            // Keep legacy sheet suppressed while this modal is open
+            if (legacy) legacy.style.display = 'none';
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
                 if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
@@ -2030,8 +2195,9 @@
                   location.href='login';
                 }
               } else {
-                RS.activateTab(b.dataset.go);
                 close();
+                if (legacy) legacy.style.display = 'none';
+                RS.activateTab(b.dataset.go);
               }
             });
           }
@@ -2075,11 +2241,66 @@
       window.__rsWaBadge = { state, label, tooltip };
     }
 
+    function isSuperAdminSession() {
+      const meta = (window.RS_API && RS_API.session && RS_API.session()) || {};
+      const role = String(meta.role || sessionStorage.getItem('logged_in_role') || '')
+        .toLowerCase()
+        .trim();
+      return role === 'superadmin' || role === 'super_admin';
+    }
+
+    /**
+     * Open the right place to link / manage WhatsApp.
+     * Super-admin shell only allows super-admin-tab + gateway-monitor-tab
+     * (settings-tab is CSS-hidden and activateTab remaps it away).
+     * Outlet roles go to Settings → WhatsApp.
+     */
+    function openWhatsAppSettings() {
+      window.__rsOpenSettingsSection = 'gateway';
+      if (isSuperAdminSession()) {
+        if (window.RS && typeof RS.activateTab === 'function') {
+          return Promise.resolve(RS.activateTab('gateway-monitor-tab')).then(() => {
+            try {
+              const panel = document.getElementById('gateway-monitor-tab');
+              if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              const resetBtn = document.getElementById('btn-saas-gateway-reset');
+              if (resetBtn) {
+                resetBtn.classList.add('rs-pulse-hint');
+                setTimeout(() => resetBtn.classList.remove('rs-pulse-hint'), 2400);
+              }
+            } catch (_) {}
+            if (window.RS && RS.toast) {
+              RS.toast('Gateway Monitor — link WhatsApp with Reset / scan QR', 'fa-whatsapp');
+            }
+          });
+        }
+        return Promise.resolve();
+      }
+      if (window.RS && typeof RS.activateTab === 'function') {
+        return Promise.resolve(RS.activateTab('settings-tab')).then(() => {
+          let tries = 0;
+          const goGateway = () => {
+            const b = document.querySelector('.set-nav button[data-s="gateway"]');
+            if (b) {
+              b.click();
+              return;
+            }
+            if (++tries < 20) setTimeout(goGateway, 80);
+          };
+          setTimeout(goGateway, 60);
+        });
+      }
+      return Promise.resolve();
+    }
+    window.openWhatsAppSettings = openWhatsAppSettings;
+    if (window.RS) window.RS.openWhatsAppSettings = openWhatsAppSettings;
+
     function openWhatsAppStatusPanel() {
       const st = window.__rsGatewayLastStatus || 'unknown';
       const ready = window.__rsGatewayReady === true;
       const num = window.__rsGatewayNumber || '';
       const tip = (window.__rsWaBadge && window.__rsWaBadge.tooltip) || '';
+      const superAdmin = isSuperAdminSession();
       const stHuman =
         ready ? 'Connected'
           : st === 'qr' ? 'Scan QR to connect'
@@ -2093,6 +2314,12 @@
         : st === 'qr'
           ? `<span style="color:var(--amber);font-weight:800">Scan QR to connect</span>`
           : `<span style="color:var(--red);font-weight:800">${safe(stHuman)}</span>`;
+      const linkHint = superAdmin
+        ? 'Open Gateway Monitor to reset the connection and scan a new QR'
+        : 'Open Settings → WhatsApp and scan the QR';
+      const settingsBtnLabel = superAdmin
+        ? '<i class="fa-solid fa-server"></i> Open Gateway Monitor'
+        : '<i class="fa-solid fa-gear"></i> Open settings';
       const body = `
         <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px;line-height:1.5;color:var(--text-soft)">
           <div style="padding:12px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke-2)">
@@ -2104,7 +2331,7 @@
           <ul style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft)">
             <li>Best for bills and “order ready” messages</li>
             <li>Phone online · WhatsApp → Linked devices</li>
-            <li>If not connected: open Settings → WhatsApp and scan the QR</li>
+            <li>If not connected: ${safe(linkHint)}</li>
           </ul>
           ${
             window.RSWaSendQueue && RSWaSendQueue.count && RSWaSendQueue.count() > 0
@@ -2115,18 +2342,14 @@
           }
         </div>`;
       if (!window.RSModal) {
-        if (confirm((tip || 'WhatsApp: ' + stHuman) + '\n\nOpen WhatsApp settings?')) {
-          if (RS.activateTab) RS.activateTab('settings-tab');
-          setTimeout(() => {
-            const b = document.querySelector('.set-nav button[data-s="gateway"]');
-            if (b) b.click();
-          }, 200);
+        if (confirm((tip || 'WhatsApp: ' + stHuman) + '\n\n' + (superAdmin ? 'Open Gateway Monitor?' : 'Open WhatsApp settings?'))) {
+          openWhatsAppSettings();
         }
         return;
       }
       RSModal.open({
         title: 'WhatsApp',
-        sub: 'Bill delivery for this outlet',
+        sub: superAdmin ? 'Platform messaging gateway' : 'Bill delivery for this outlet',
         icon: 'fa-brands fa-whatsapp',
         size: 'sm',
         body,
@@ -2136,7 +2359,7 @@
                    ? '<button type="button" class="btn btn-ghost" id="wa-panel-queue"><i class="fa-solid fa-clock"></i> Waiting bills</button>'
                    : ''
                }
-               <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1"><i class="fa-solid fa-gear"></i> Open settings</button>`,
+               <button type="button" class="btn btn-primary" id="wa-panel-settings" style="flex:1">${settingsBtnLabel}</button>`,
         onMount(modal, close) {
           modal.querySelector('#wa-panel-refresh').onclick = async () => {
             if (window.updateTopbarWhatsAppStatus) await window.updateTopbarWhatsAppStatus();
@@ -2154,11 +2377,7 @@
             };
           modal.querySelector('#wa-panel-settings').onclick = () => {
             close();
-            if (RS.activateTab) RS.activateTab('settings-tab');
-            setTimeout(() => {
-              const b = document.querySelector('.set-nav button[data-s="gateway"]');
-              if (b) b.click();
-            }, 180);
+            openWhatsAppSettings();
           };
         },
       });

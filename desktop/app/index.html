@@ -20,11 +20,11 @@
   <meta property="og:url" content="https://restrosuite.codearc.co.in/">
   <meta property="og:title" content="RestroSuite — Offline-First Restaurant POS &amp; Billing">
   <meta property="og:description" content="Offline-first POS, kitchen display, WhatsApp receipts, and QR table ordering. Free to start — no credit card required.">
-  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=7">
+  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=10">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="RestroSuite — Restaurant POS &amp; Billing">
   <meta name="twitter:description" content="Offline-first restaurant POS. WhatsApp receipts, KDS, QR orders. Free to start.">
-  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=7">
+  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/screenshot-cart.png?v=10">
   <link rel="canonical" href="https://restrosuite.codearc.co.in/">
   <!-- Favicons — SVG preferred, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=7">
@@ -205,7 +205,7 @@
 
     /* Hero */
     .hero { padding: 150px 0 90px; }
-    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+     .hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
     .hero-flag {
       display: inline-flex; align-items: center; gap: 9px; margin-bottom: 26px;
       padding: 7px 7px 7px 14px; border-radius: 999px;
@@ -226,19 +226,686 @@
     .hero-trust .t-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); }
     .hero-trust .t-item i { color: var(--green); }
 
-    /* Real product preview (no floating chips / fake mock charts) */
-    .hero-visual { position: relative; animation: fadeUp .55s .15s both; }
-    .hero-shot {
-      border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border);
-      box-shadow: var(--shadow-lg); background: var(--panel-solid);
+    /* ============================================================
+       Hero constellation v208 — LIVE same-as-art (CodeArc)
+       Real DOM modules + connectors + changing data (not a static image)
+       ============================================================ */
+    .hero-visual {
+      position: relative;
+      animation: fadeUp .55s .15s both;
+      min-height: 0;
+      padding: 0;
     }
-    .hero-shot img { width: 100%; height: auto; display: block; }
-    .hero-shot-caption {
-      padding: 12px 16px; font-size: 12.5px; color: var(--text-mute);
-      border-top: 1px solid var(--border); background: var(--surface-2);
-      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    .hero-constellation.live {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 5 / 4;
+      min-height: 420px;
+      max-height: 560px;
+      border-radius: 24px;
+      overflow: hidden;
+      background: #E8E4DB;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.7) inset,
+        0 28px 64px -24px rgba(20,18,16,.2);
+      border: 1px solid rgba(20,18,16,.06);
     }
-    .hero-shot-caption b { color: var(--text); font-weight: 600; }
+    .hero-constellation.live .hc-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .hero-constellation.live .hc-path {
+      fill: none;
+      stroke: #2A6B5A;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: .42;
+      transition: opacity .35s, stroke .35s, stroke-width .35s, filter .35s;
+    }
+    .hero-constellation.live .hc-path.active {
+      opacity: 1;
+      stroke: #FF4F00;
+      stroke-width: 2.6;
+      filter: drop-shadow(0 0 6px rgba(255,79,0,.35));
+    }
+    .hero-constellation.live .hc-node {
+      fill: #E8E4DB;
+      stroke: #2A6B5A;
+      stroke-width: 2.5;
+    }
+    .hero-constellation.live .hc-packet {
+      fill: #FF4F00;
+      stroke: #fff;
+      stroke-width: 2.5;
+      filter: drop-shadow(0 2px 8px rgba(255,79,0,.45));
+      opacity: 0;
+    }
+    .hero-constellation.live .hc-live {
+      position: absolute;
+      top: 3.2%;
+      left: 3%;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      background: #1B4D3E;
+      border: none;
+      padding: 7px 13px;
+      border-radius: 999px;
+      box-shadow: 0 4px 14px rgba(20,18,16,.12);
+      pointer-events: none;
+    }
+    .hero-constellation.live .hc-live .pulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #3DDC97;
+      animation: syncPulse 1.6s infinite;
+    }
+    .hero-constellation.live .hc-status {
+      position: absolute;
+      top: 3.2%;
+      right: 3%;
+      z-index: 6;
+      max-width: min(48%, 230px);
+      font-size: 11px;
+      font-weight: 700;
+      color: #C2410C;
+      background: #FFF8F4;
+      border: 1px solid rgba(255,79,0,.28);
+      padding: 6px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 4px 14px rgba(20,18,16,.08);
+      transition: color .25s, border-color .25s, background .25s;
+      pointer-events: none;
+    }
+    .hero-constellation.live .hc-status.flash {
+      color: #FF4F00;
+      background: #FFF1E8;
+    }
+    .hero-constellation.live .hc-label {
+      position: absolute;
+      z-index: 2;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(11px, 1.35vw, 13.5px);
+      font-style: italic;
+      font-weight: 500;
+      color: #3d6b58;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: .92;
+    }
+    .hero-constellation.live .hc-label.l1 { left: 58%; top: 18%; }
+    .hero-constellation.live .hc-label.l2 { right: 2%; top: 48%; }
+    .hero-constellation.live .hc-label.l3 { left: 8%; bottom: 14%; }
+    .hero-constellation.live .hc-brand {
+      position: absolute;
+      left: 50%;
+      bottom: 3.5%;
+      transform: translateX(-50%);
+      z-index: 2;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(15px, 2vw, 20px);
+      font-weight: 700;
+      color: #1B4D3E;
+      letter-spacing: -.02em;
+      pointer-events: none;
+    }
+    .hc-card {
+      position: absolute;
+      z-index: 3;
+      background: #FFFEFB;
+      border: 1px solid rgba(20,18,16,.08);
+      border-radius: 16px;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.95) inset,
+        0 2px 6px rgba(20,18,16,.04),
+        0 16px 36px -14px rgba(20,18,16,.18);
+      overflow: hidden;
+      transition: border-color .3s, box-shadow .3s, transform .4s cubic-bezier(.22,1,.36,1);
+    }
+    .hc-card.active {
+      border-color: rgba(255,79,0,.38);
+      box-shadow:
+        0 0 0 3px rgba(255,79,0,.1),
+        0 20px 44px -14px rgba(255,79,0,.28);
+      transform: translateY(-2px);
+      z-index: 5;
+    }
+    .hc-card.recv { animation: cardRecv .55s ease; }
+    @keyframes cardRecv {
+      0% { box-shadow: 0 0 0 0 rgba(42,107,90,0); }
+      40% { box-shadow: 0 0 0 5px rgba(42,107,90,.16); }
+      100% { box-shadow: 0 0 0 0 rgba(42,107,90,0); }
+    }
+    .hc-card .hc-top {
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 11px 8px;
+      border-bottom: 1px solid rgba(20,18,16,.06);
+      background: linear-gradient(180deg, #FFFEFB, #F9F7F3);
+    }
+    .hc-card .hc-title {
+      font-size: 11.5px; font-weight: 800; color: #1a1917; letter-spacing: -.01em;
+    }
+    .hc-card .hc-meta {
+      margin-left: auto;
+      font-size: 9.5px; font-weight: 700; color: #8a8780;
+    }
+    .hc-card .hc-body { padding: 8px 10px 10px; }
+    .hc-card.pos {
+      width: min(38%, 220px);
+      left: 3%;
+      top: 22%;
+    }
+    .hc-card.pos .hc-line {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 0;
+      font-size: 11.5px; font-weight: 600; color: #1a1917;
+      border-bottom: 1px solid rgba(20,18,16,.05);
+    }
+    .hc-card.pos .hc-line:last-of-type { border-bottom: none; }
+    .hc-card.pos .hc-line .dot {
+      width: 14px; height: 14px; border-radius: 4px;
+      border: 1.5px solid rgba(20,18,16,.18); flex: none;
+    }
+    .hc-card.pos .hc-line .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hc-card.pos .hc-line .am { color: #1a1917; font-weight: 700; flex: none; }
+    .hc-card.pos .hc-total {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 8px; padding: 9px 11px;
+      background: #FF4F00; color: #fff; border-radius: 10px;
+      font-size: 12px; font-weight: 800;
+    }
+    .hc-card.pos .hc-total b { font-size: 14px; }
+    .hc-card.pos .hc-pay {
+      margin-top: 7px;
+      text-align: center;
+      padding: 8px;
+      background: #FF4F00;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+    .hc-card.kds {
+      width: min(34%, 200px);
+      left: 34%;
+      top: 8%;
+    }
+    .hc-card.kds .k-row {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;
+      padding: 7px 8px; border-radius: 9px; margin-bottom: 6px;
+      background: #FFF7ED; border: 1px solid #FED7AA;
+      font-size: 10.5px; font-weight: 700; color: #1a1917;
+    }
+    .hc-card.kds .k-row.ready {
+      background: #E8F8F1; border-color: #BBF7D0;
+    }
+    .hc-card.kds .k-row .st {
+      font-size: 8.5px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
+      background: #FEF3C7; color: #B45309; flex: none;
+    }
+    .hc-card.kds .k-row.ready .st { background: #DCFCE7; color: #15803D; }
+    .hc-card.kds .k-ready-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 9px; border-radius: 9px;
+      background: #F3FBF7; border: 1px solid #BBF7D0;
+      font-size: 11.5px; font-weight: 800; color: #15803D;
+    }
+    .hc-card.floor {
+      width: min(32%, 188px);
+      right: 18%;
+      top: 24%;
+    }
+    .hc-card.floor .hc-body {
+      background:
+        linear-gradient(rgba(42,107,90,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(42,107,90,.04) 1px, transparent 1px);
+      background-size: 14px 14px;
+    }
+    .hc-card.floor .f-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    }
+    .hc-card.floor .f-cell {
+      padding: 7px 5px 6px; border-radius: 10px; text-align: center;
+      font-size: 9px; font-weight: 700;
+      border: 1.5px solid rgba(20,18,16,.08);
+      background: #FAFAF8;
+    }
+    .hc-card.floor .f-cell b { display: block; font-size: 11px; margin-bottom: 1px; color: #1a1917; }
+    .hc-card.floor .f-cell.free {
+      border-color: rgba(15,159,110,.35); background: #F0FBF6; color: #0F9F6E;
+    }
+    .hc-card.floor .f-cell.occ {
+      border-color: rgba(255,79,0,.35); background: #FFF6F1; color: #FF4F00;
+    }
+    .hc-card.bills {
+      width: min(34%, 200px);
+      left: 36%;
+      bottom: 16%;
+    }
+    .hc-card.bills .b-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 0;
+      font-size: 10.5px; font-weight: 600; color: #1a1917;
+      border-bottom: 1px solid rgba(20,18,16,.05);
+    }
+    .hc-card.bills .b-row:last-child { border-bottom: none; }
+    .hc-card.bills .b-row .ck {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #E8F8F1; color: #0F9F6E;
+      display: grid; place-items: center; font-size: 8px; flex: none;
+    }
+    .hc-card.bills .b-row .am { margin-left: auto; font-weight: 800; color: #0F9F6E; }
+    .hc-card.bills .b-head {
+      display: grid; grid-template-columns: 1fr 1.2fr .8fr;
+      gap: 4px; font-size: 8.5px; font-weight: 800; color: #8a8780;
+      text-transform: uppercase; letter-spacing: .04em;
+      padding: 0 0 6px; border-bottom: 1px solid rgba(20,18,16,.06); margin-bottom: 4px;
+    }
+    /* Phone — WhatsApp receipt */
+    .hc-phone {
+      position: absolute;
+      right: 2.5%;
+      bottom: 8%;
+      z-index: 4;
+      width: min(22%, 118px);
+      aspect-ratio: 9 / 18.5;
+      border-radius: 18px;
+      background: #111;
+      padding: 5px;
+      box-shadow: 0 18px 40px -12px rgba(0,0,0,.35);
+      transition: transform .4s, box-shadow .4s;
+    }
+    .hc-phone.active {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 0 0 3px rgba(37,211,102,.25), 0 20px 44px -10px rgba(0,0,0,.4);
+      z-index: 6;
+    }
+    .hc-phone .ph-notch {
+      position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      width: 36%; height: 5px; border-radius: 999px; background: #222; z-index: 2;
+    }
+    .hc-phone .ph-screen {
+      width: 100%; height: 100%; border-radius: 13px;
+      background: #ECE5DD; overflow: hidden;
+      display: flex; flex-direction: column;
+      font-size: 8px;
+    }
+    .hc-phone .ph-bar {
+      background: #075E54; color: #fff;
+      padding: 12px 6px 6px;
+      font-weight: 800; font-size: 8.5px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .hc-phone .ph-bar i { color: #25D366; font-size: 10px; }
+    .hc-phone .ph-chat {
+      flex: 1; padding: 6px; overflow: hidden;
+    }
+    .hc-phone .ph-bubble {
+      background: #fff;
+      border-radius: 8px 8px 8px 2px;
+      padding: 6px 7px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.08);
+      line-height: 1.35; color: #1a1917;
+      font-weight: 600;
+    }
+    .hc-phone .ph-bubble b { color: #075E54; }
+    .hc-phone .ph-bubble .tot {
+      margin-top: 4px; padding-top: 4px;
+      border-top: 1px dashed rgba(0,0,0,.12);
+      font-weight: 800; color: #FF4F00;
+    }
+    .hc-phone .ph-btn {
+      margin: 5px 6px 7px;
+      background: #25D366; color: #fff;
+      text-align: center; border-radius: 6px;
+      padding: 5px 4px; font-weight: 800; font-size: 7.5px;
+    }
+    .hero-constellation-caption {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin-top: 12px; padding: 0 2px;
+      font-size: 12.5px; color: var(--text-mute);
+    }
+    .hero-constellation-caption b { color: var(--text); font-weight: 800; }
+    .hero-constellation-caption .hc-badge {
+      font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-constellation.live .hc-live .pulse,
+      .hc-card.recv,
+      .hc-card.active { animation: none !important; }
+    }
+    @media (max-width: 980px) {
+      .hero-constellation.live { max-height: 480px; }
+    }
+    @media (max-width: 640px) {
+      .hero-constellation.live {
+        aspect-ratio: 4 / 5;
+        max-height: none;
+        min-height: 480px;
+      }
+      .hc-card.pos { width: 46%; left: 2%; top: 16%; }
+      .hc-card.kds { width: 46%; left: auto; right: 2%; top: 8%; }
+      .hc-card.floor { width: 44%; right: 2%; top: 42%; }
+      .hc-card.bills { width: 48%; left: 2%; bottom: 18%; }
+      .hc-phone { width: 26%; right: 2%; bottom: 6%; }
+      .hero-constellation.live .hc-label { display: none; }
+    }
+    /* Legacy flow-stage unused */
+    .flow-stage {
+      --line: #2A6B5A;
+      --accent: #FF4F00;
+      --paper: #FFFEFB;
+      display: none;
+    }
+    .flow-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .flow-svg .flow-path {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 2.25;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.55;
+      stroke-dasharray: 8 10;
+      animation: pathDrift 12s linear infinite;
+      transition: opacity .4s, stroke .4s, stroke-width .4s, filter .4s;
+    }
+    .flow-svg .flow-path.dim { opacity: 0.32; stroke-width: 1.75; }
+    .flow-svg .flow-path.active {
+      opacity: 1;
+      stroke: var(--accent);
+      stroke-width: 2.5;
+      stroke-dasharray: 6 8;
+      animation: pathDrift 4s linear infinite;
+      filter: drop-shadow(0 0 5px rgba(255,79,0,.3));
+    }
+    @keyframes pathDrift {
+      to { stroke-dashoffset: -72; }
+    }
+    .flow-svg .flow-node {
+      fill: #FFFEFB;
+      stroke: var(--line);
+      stroke-width: 2.5;
+    }
+    .flow-packet {
+      fill: var(--accent);
+      stroke: #fff;
+      stroke-width: 2.5;
+      filter: drop-shadow(0 2px 8px rgba(255,79,0,.4));
+      opacity: 0;
+    }
+    .flow-label {
+      position: absolute;
+      z-index: 2;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 13px;
+      font-style: italic;
+      font-weight: 500;
+      color: #3d6b58;
+      letter-spacing: -.01em;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0.9;
+    }
+    .flow-live-pill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #0F9F6E;
+      background: rgba(255,255,255,.95);
+      border: 1px solid rgba(15,159,110,.22);
+      padding: 6px 12px;
+      border-radius: 999px;
+      box-shadow: 0 4px 16px rgba(20,18,16,.06);
+    }
+    .flow-live-pill .pulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #0F9F6E;
+      animation: syncPulse 1.6s infinite;
+    }
+    @keyframes syncPulse {
+      0% { box-shadow: 0 0 0 0 rgba(15,159,110,.45); }
+      70% { box-shadow: 0 0 0 8px rgba(15,159,110,0); }
+      100% { box-shadow: 0 0 0 0 rgba(15,159,110,0); }
+    }
+    .flow-status {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 6;
+      max-width: min(48%, 220px);
+      font-size: 11px;
+      font-weight: 700;
+      color: #4a4842;
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(20,18,16,.08);
+      padding: 6px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 4px 16px rgba(20,18,16,.06);
+      transition: color .25s, border-color .25s, background .25s;
+    }
+    .flow-status.flash {
+      color: var(--accent);
+      border-color: rgba(255,79,0,.28);
+      background: #FFF8F4;
+    }
+
+    /* Soft product cards — CodeArc-like, not busy OS windows */
+    .flow-card {
+      position: absolute;
+      z-index: 3;
+      background: var(--paper);
+      border: 1px solid rgba(20, 18, 16, 0.08);
+      border-radius: 18px;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.95) inset,
+        0 2px 6px rgba(20,18,16,.04),
+        0 18px 40px -18px rgba(20,18,16,.18);
+      overflow: hidden;
+      transition: border-color .3s, box-shadow .3s, transform .4s cubic-bezier(.22,1,.36,1);
+    }
+    .flow-card.active {
+      border-color: rgba(255,79,0,.35);
+      box-shadow:
+        0 0 0 3px rgba(255,79,0,.08),
+        0 22px 48px -16px rgba(255,79,0,.32);
+      transform: translateY(-3px);
+      z-index: 5;
+    }
+    .flow-card.recv { animation: cardRecv .55s ease; }
+    @keyframes cardRecv {
+      0% { box-shadow: 0 0 0 0 rgba(42,107,90,0); }
+      40% { box-shadow: 0 0 0 5px rgba(42,107,90,.16); }
+      100% { box-shadow: 0 0 0 0 rgba(42,107,90,0); }
+    }
+    .flow-card .fc-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 12px 9px;
+      border-bottom: 1px solid rgba(20,18,16,.06);
+      background: linear-gradient(180deg, #FFFEFB, #F9F7F3);
+    }
+    .flow-card .fc-ico {
+      width: 28px; height: 28px; border-radius: 9px;
+      display: grid; place-items: center;
+      font-size: 12px; flex: none;
+      background: rgba(255,79,0,.1); color: #FF4F00;
+    }
+    .flow-card.kds .fc-ico { background: #FFEDD5; color: #C2410C; }
+    .flow-card.floor .fc-ico { background: #E0E7FF; color: #4338CA; }
+    .flow-card.bills .fc-ico { background: #E8F8F1; color: #0F9F6E; }
+    .flow-card .fc-name {
+      font-size: 12.5px; font-weight: 800; color: #1a1917; letter-spacing: -.01em;
+    }
+    .flow-card .fc-badge {
+      margin-left: auto;
+      font-size: 9.5px; font-weight: 800;
+      padding: 3px 8px; border-radius: 999px;
+      background: #F0EEE8; color: #6b6960;
+    }
+    .flow-card .fc-badge.on { background: #E8F8F1; color: #0F9F6E; }
+    .flow-card .fc-badge.warn { background: #FEF3C7; color: #B45309; }
+    .flow-card .fc-badge.live { background: rgba(255,79,0,.12); color: #FF4F00; }
+    .flow-card .fc-body { padding: 10px 12px 12px; }
+    .flow-card .fc-foot {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px;
+      border-top: 1px solid rgba(20,18,16,.06);
+      font-size: 10.5px; font-weight: 700; color: #6b6960;
+      background: #FAFAF8;
+    }
+    .flow-card .fc-foot b { color: #1a1917; font-weight: 800; }
+
+    .flow-card.wa .fc-ico { background: #DCFCE7; color: #16A34A; }
+    .flow-card.wa {
+      width: 168px; right: 30%; top: 36%;
+      border-radius: 16px;
+    }
+    .flow-card.wa .fc-body { padding: 10px 11px 12px; }
+    .flow-card.wa .wa-bubble {
+      background: #fff; border-radius: 12px; padding: 10px 11px;
+      border: 1px solid rgba(22,163,74,.15);
+      font-size: 11px; line-height: 1.45; color: #3d4a42;
+      box-shadow: 0 2px 10px rgba(22,163,74,.08);
+      animation: rowIn .4s ease;
+    }
+    .flow-card.wa .wa-bubble b { color: #15803D; }
+    /* --- POS (anchor, larger) --- */
+    .flow-card.pos { width: 236px; left: 3%; top: 14%; }
+    .flow-card .cline {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 8px; border-radius: 10px; margin-bottom: 5px;
+      background: #F6F4F0; border: 1px solid rgba(20,18,16,.05);
+      font-size: 12px; font-weight: 700; color: #1a1917;
+    }
+    .flow-card .cline .cdot {
+      width: 6px; height: 6px; border-radius: 2px;
+      background: var(--cc, #FF4F00); flex: none;
+    }
+    .flow-card .cline .cn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .flow-card .cline .amt { color: #FF4F00; font-weight: 800; flex: none; }
+    .flow-card .cline.new-in {
+      animation: rowIn .4s ease;
+      background: rgba(255,79,0,.07);
+      border-color: rgba(255,79,0,.18);
+    }
+    .flow-card .tot-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed rgba(20,18,16,.12);
+      font-size: 12px; font-weight: 700; color: #1a1917;
+    }
+    .flow-card .tot-row b {
+      font-family: Georgia, serif; font-size: 18px; color: #FF4F00; font-weight: 800;
+    }
+    .flow-card .meta-line {
+      font-size: 10.5px; font-weight: 600; color: #6b6960; margin-bottom: 8px;
+    }
+
+    /* --- Kitchen --- */
+    .flow-card.kds { width: 200px; right: 4%; top: 9%; }
+    .flow-card .kds-ticket {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      padding: 8px 9px; border-radius: 10px; margin-bottom: 6px;
+      background: #FFF7ED; border: 1px solid #FED7AA;
+      font-size: 11.5px; font-weight: 700; color: #1a1917;
+    }
+    .flow-card .kds-ticket .tok {
+      font-size: 9px; font-weight: 800; color: #C2410C;
+      background: #FFEDD5; padding: 2px 5px; border-radius: 5px; margin-right: 5px;
+    }
+    .flow-card .kds-ticket .st {
+      font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+      background: #FEF3C7; color: #B45309; flex: none;
+    }
+    .flow-card .kds-ticket.ready { background: #E8F8F1; border-color: #BBF7D0; }
+    .flow-card .kds-ticket.ready .tok { background: #DCFCE7; color: #15803D; }
+    .flow-card .kds-ticket.ready .st { background: #DCFCE7; color: #15803D; }
+    .flow-card .kds-ticket.new-in { animation: rowIn .4s ease; }
+    .flow-card .empty-soft {
+      font-size: 11.5px; font-weight: 600; color: #6b6960;
+      text-align: center; padding: 14px 6px;
+    }
+
+    /* --- Floor --- */
+    .flow-card.floor { width: 196px; left: 6%; bottom: 6%; }
+    .flow-card .tbl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .flow-card .tbl-pill {
+      padding: 9px 8px 8px; border-radius: 12px;
+      border: 1.5px solid rgba(20,18,16,.08); background: #FAFAF8;
+      font-size: 10px; font-weight: 700; text-align: center;
+    }
+    .flow-card .tbl-pill b { display: block; font-size: 14px; margin-bottom: 2px; color: #1a1917; }
+    .flow-card .tbl-pill .st { font-size: 10px; font-weight: 700; color: #6b6960; }
+    .flow-card .tbl-pill.free { border-color: rgba(15,159,110,.28); background: #F3FBF7; }
+    .flow-card .tbl-pill.free .st { color: #0F9F6E; }
+    .flow-card .tbl-pill.occ { border-color: rgba(255,79,0,.32); background: #FFF6F1; }
+    .flow-card .tbl-pill.occ b { color: #FF4F00; }
+    .flow-card .tbl-pill.occ .st { color: #FF4F00; }
+
+    /* --- Bills --- */
+    .flow-card.bills { width: 200px; right: 5%; bottom: 7%; }
+    .flow-card .bill-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 6px;
+      padding: 8px 9px; border-radius: 10px; margin-bottom: 6px;
+      background: #F6F4F0; border: 1px solid rgba(20,18,16,.05);
+      font-size: 11.5px; font-weight: 700; color: #1a1917;
+    }
+    .flow-card .bill-row .amt { color: #0F9F6E; font-weight: 800; }
+    .flow-card .bill-row .paid {
+      font-size: 8.5px; font-weight: 800; padding: 2px 6px; border-radius: 999px;
+      background: #E8F8F1; color: #0F9F6E; margin-left: 4px;
+    }
+    .flow-card .bill-row.new-in {
+      animation: rowIn .4s ease;
+      background: rgba(15,159,110,.08);
+      border-color: rgba(15,159,110,.2);
+    }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: none; }
+    }
+    .flow-caption {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; flex-wrap: wrap; margin-top: 14px; padding: 0 2px;
+      font-size: 12.5px; color: var(--text-mute);
+    }
+    .flow-caption b { color: var(--text); font-weight: 800; }
+    .flow-caption .hc-badge {
+      font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
+    }
 
     /* Logo strip */
     .logo-strip { padding: 16px 0 40px; }
@@ -286,52 +953,354 @@
     .empathy-col.new li i { color: var(--success); }
     .empathy-col.new li b { color: var(--text); font-weight: 600; }
 
-    /* Interactive demo */
-    .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: start; }
-    .menu-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 26px; }
-    .menu-item-btn {
-      text-align: left; padding: 16px 17px; border-radius: 15px; background: var(--surface-2);
-      border: 1px solid var(--border-2); color: var(--text); transition: all .2s; position: relative; overflow: hidden;
+    /* Interactive demo — exact POS menu tiles + cart chrome (matches dashboard POS) */
+    .demo-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-top: 8px;
     }
-    .menu-item-btn:hover { border-color: var(--accent-line); transform: translateY(-3px); box-shadow: 0 14px 30px -16px var(--accent-glow); }
-    .menu-item-btn::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--cc, var(--accent)); opacity: .9; }
-    .menu-item-btn .mtop { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
-    .menu-item-btn .mveg    { width: 15px; height: 15px; border-radius: 3px; background: var(--surface-solid); border: 1.5px solid #22a65a; display: grid; place-items: center; flex: none; }
-    .menu-item-btn .mveg::after { content: ""; width: 6.5px; height: 6.5px; border-radius: 50%; background: #22a65a; }
-    .menu-item-btn .mnonveg { width: 15px; height: 15px; border-radius: 3px; background: var(--surface-solid); border: 1.5px solid #c0392b; display: grid; place-items: center; flex: none; }
-    .menu-item-btn .mnonveg::after { content: ""; width: 6.5px; height: 6.5px; border-radius: 50%; background: #c0392b; }
-    .menu-item-btn .mcat { font-size: 9.5px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--cc, var(--accent)); }
-    [data-theme="light"] .menu-item-btn .mcat { color: color-mix(in srgb, var(--cc, var(--accent)) 58%, #000); }
-    .menu-item-name { font-weight: 700; font-size: 15px; font-family: var(--font-display); }
-    .menu-item-price { font-size: 13.5px; color: var(--text-mute); margin-top: 2px; }
-    .menu-item-btn .add { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; opacity: 0; transition: opacity .2s; }
-    .menu-item-btn:hover .add { opacity: 1; }
-
-    .terminal { padding: 0; overflow: hidden; display: flex; flex-direction: column; min-height: 460px; }
-    .terminal-header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .terminal-header .th-title { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
-    .terminal-body { padding: 22px; flex: 1; display: flex; flex-direction: column; }
-    .empty-cart-msg { margin: auto; text-align: center; color: var(--text-mute); font-size: 14.5px; line-height: 1.7; }
-    .empty-cart-msg i { font-size: 30px; display: block; margin-bottom: 14px; opacity: .5; }
-    .receipt-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; max-height: 230px; overflow-y: auto; }
-    .receipt-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); }
-    .receipt-row:last-child { border-bottom: 0; }
-    .receipt-row .ri-name { font-weight: 600; font-size: 14.5px; }
-    .receipt-row .ri-meta { font-size: 12.5px; color: var(--text-mute); display: flex; align-items: center; gap: 8px; margin-top: 3px; }
-    .qty-btn { width: 22px; height: 22px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-dim); display: grid; place-items: center; font-size: 11px; }
-    .qty-btn:hover { color: var(--accent); border-color: var(--accent-line); }
-    .receipt-row .ri-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
-    .receipt-summary { margin-top: auto; padding-top: 14px; }
-    .sum-row { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--text-dim); padding: 4px 0; }
-    .sum-total { display: flex; justify-content: space-between; font-family: var(--font-display); font-weight: 800; font-size: 20px; padding-top: 12px; margin-top: 6px; border-top: 1px dashed var(--border-strong); }
-    /* FIX: sandbox-actions now also targeted by class */
-    .sandbox-actions {
-      margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 10px;
+    .rs-pos-sandbox {
+      --rs-pos-orange: var(--orange, #FF4F00);
+      --rs-pos-panel: var(--panel-solid, var(--panel, #fff));
+      --rs-pos-stroke: var(--stroke, rgba(0,0,0,.08));
+      --rs-pos-stroke-2: var(--stroke-2, rgba(0,0,0,.12));
+      --rs-pos-glass: var(--glass, rgba(0,0,0,.02));
+      --rs-pos-glass-2: var(--glass-2, rgba(0,0,0,.04));
+      --rs-pos-text: var(--text, #1a1a1a);
+      --rs-pos-mute: var(--text-mute, #6b7280);
+      --rs-pos-soft: var(--text-soft, #4b5563);
+      --rs-pos-green: var(--green, #16a34a);
+      --rs-pos-red: var(--red, #dc2626);
+      --rs-pos-r: var(--r-md, 12px);
+      --rs-pos-r-lg: var(--r-lg, 16px);
     }
-    .sandbox-phone-row { display: flex; gap: 8px; }
-    .sandbox-prefix { display: grid; place-items: center; padding: 0 14px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border-2); font-weight: 700; font-size: 14px; }
+    .rs-pos-sandbox .pos-menu-pane {
+      min-width: 0;
+      background: var(--rs-pos-panel);
+      border: 1px solid var(--rs-pos-stroke);
+      border-radius: var(--rs-pos-r-lg);
+      padding: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.04);
+    }
+    .rs-pos-sandbox .pos-menu-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 10px; padding: 0 2px 8px; border-bottom: 1px solid var(--rs-pos-stroke);
+    }
+    .rs-pos-sandbox .pos-menu-toolbar h3 {
+      margin: 0; font-size: 13px; font-weight: 800; letter-spacing: -.01em;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .rs-pos-sandbox .pos-menu-toolbar h3 i { color: var(--rs-pos-orange); }
+    .rs-pos-sandbox .pos-menu-hint {
+      font-size: 11px; color: var(--rs-pos-mute); font-weight: 600;
+    }
+    .rs-pos-sandbox .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+      gap: 11px;
+      padding: 2px;
+      align-content: start;
+    }
+    .rs-pos-sandbox .pos-item {
+      border-radius: var(--rs-pos-r);
+      background: var(--rs-pos-panel);
+      border: 1px solid var(--rs-pos-stroke);
+      padding: 12px 12px 11px;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s, box-shadow .22s, background .18s;
+      position: relative;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 96px;
+      text-align: left;
+      color: var(--rs-pos-text);
+      font: inherit;
+      width: 100%;
+    }
+    .rs-pos-sandbox .pos-item::before {
+      content: "";
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--cc, var(--rs-pos-orange)); opacity: .85;
+      border-radius: 3px 0 0 3px;
+    }
+    .rs-pos-sandbox .pos-item::after {
+      content: "";
+      position: absolute; inset: 0; pointer-events: none;
+      border-radius: inherit;
+      background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--cc, var(--rs-pos-orange)) 8%, transparent), transparent 55%);
+    }
+    .rs-pos-sandbox .pos-item:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in srgb, var(--cc, var(--rs-pos-orange)) 45%, transparent);
+      box-shadow: 0 8px 22px -10px rgba(0,0,0,.18);
+    }
+    .rs-pos-sandbox .pos-item:active { transform: translateY(0) scale(.985); }
+    .rs-pos-sandbox .pos-item > * { position: relative; z-index: 1; }
+    .rs-pos-sandbox .pos-item.in-cart {
+      border-color: color-mix(in srgb, var(--rs-pos-orange) 70%, var(--rs-pos-stroke)) !important;
+      background: color-mix(in srgb, var(--rs-pos-orange) 4%, var(--rs-pos-panel)) !important;
+      box-shadow: 0 2px 10px rgba(255, 79, 0, 0.1);
+    }
+    .rs-pos-sandbox .pos-item-qty-badge {
+      position: absolute; top: -5px; right: -5px;
+      background: var(--rs-pos-orange); color: #fff;
+      font-size: 10px; font-weight: 800;
+      min-width: 20px; height: 20px; padding: 0 5px;
+      border-radius: 99px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--rs-pos-panel);
+      box-shadow: 0 2px 8px rgba(255, 79, 0, 0.35);
+      z-index: 10; line-height: 1;
+    }
+    .rs-pos-sandbox .pos-item .pi-top {
+      display: flex; align-items: center; gap: 6px; min-height: 14px;
+    }
+    .rs-pos-sandbox .pos-item .picat {
+      font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--rs-pos-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rs-pos-sandbox .pos-item .pname {
+      font-weight: 700; font-size: 14px; line-height: 1.25; letter-spacing: -.015em;
+      flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; word-break: break-word;
+    }
+    .rs-pos-sandbox .pos-item .prow {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto;
+    }
+    .rs-pos-sandbox .pos-item .pprice {
+      font-weight: 800; font-size: 15px; letter-spacing: -.02em;
+    }
+    .rs-pos-sandbox .pos-item .veg {
+      position: relative; width: 14px; height: 14px; border-radius: 3px;
+      background: var(--rs-pos-panel); border: 1.5px solid var(--rs-pos-green);
+      display: grid; place-items: center; flex: none;
+    }
+    .rs-pos-sandbox .pos-item .veg::after {
+      content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--rs-pos-green);
+    }
+    .rs-pos-sandbox .pos-item .veg.nonveg { border-color: var(--rs-pos-red); }
+    .rs-pos-sandbox .pos-item .veg.nonveg::after { background: var(--rs-pos-red); }
 
+    /* Cart — same structure as live POS */
+    .rs-pos-sandbox .pos-cart {
+      display: flex; flex-direction: column;
+      border-radius: var(--rs-pos-r-lg);
+      background: var(--rs-pos-panel);
+      border: 1px solid var(--rs-pos-stroke);
+      overflow: hidden;
+      min-height: 480px;
+      max-height: 640px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.04);
+      position: relative;
+    }
+    .rs-pos-sandbox .cart-head {
+      padding: 8px 10px; border-bottom: 1px solid var(--rs-pos-stroke);
+      display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 6px;
+    }
+    .rs-pos-sandbox .cart-head h3 {
+      font-size: 12px; font-weight: 800; letter-spacing: -.01em; margin: 0;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .rs-pos-sandbox .cart-head-ico { color: var(--rs-pos-orange); font-size: 12px; }
+    .rs-pos-sandbox .cart-count-pill {
+      padding: 2px 8px; font-size: 11px; font-weight: 800; min-width: 22px; text-align: center;
+      border-radius: 99px; background: color-mix(in srgb, var(--rs-pos-orange) 12%, transparent);
+      color: var(--rs-pos-orange); border: 1px solid color-mix(in srgb, var(--rs-pos-orange) 28%, transparent);
+    }
+    .rs-pos-sandbox .cart-clear-btn {
+      width: 28px; height: 28px; padding: 0; color: var(--rs-pos-orange);
+      font-size: 12px; display: inline-grid; place-items: center; border-radius: 8px;
+      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-glass);
+      cursor: pointer;
+    }
+    .rs-pos-sandbox .cart-clear-btn:hover { background: color-mix(in srgb, var(--rs-pos-orange) 10%, transparent); }
+    .rs-pos-sandbox .cart-meta-row {
+      padding: 6px 10px; border-bottom: 1px solid var(--rs-pos-stroke);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .rs-pos-sandbox .cart-walkin-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 9px; font-size: 12px; font-weight: 700;
+      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-glass);
+      color: var(--rs-pos-soft);
+    }
+    .rs-pos-sandbox .cart-walkin-chip i { color: var(--rs-pos-orange); font-size: 11px; }
+    .rs-pos-sandbox .cart-items {
+      flex: 1 1 auto; overflow-y: auto; padding: 6px 8px;
+      display: flex; flex-direction: column; gap: 4px;
+      min-height: 180px;
+    }
+    .rs-pos-sandbox .cart-empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; color: var(--rs-pos-mute); text-align: center; padding: 24px 12px;
+    }
+    .rs-pos-sandbox .cart-empty i { font-size: 24px; opacity: .5; }
+    .rs-pos-sandbox .cart-line {
+      display: flex; gap: 6px; align-items: center;
+      padding: 7px 8px; border-radius: 9px;
+      background: var(--rs-pos-glass); border: 1px solid var(--rs-pos-stroke);
+      min-height: 44px;
+    }
+    .rs-pos-sandbox .cart-line:hover {
+      border-color: color-mix(in srgb, var(--rs-pos-orange) 28%, var(--rs-pos-stroke));
+      background: color-mix(in srgb, var(--rs-pos-orange) 3%, var(--rs-pos-glass));
+    }
+    .rs-pos-sandbox .cart-line .cdot {
+      width: 5px; height: 5px; border-radius: 2px; background: var(--cc, var(--rs-pos-orange)); flex: none;
+    }
+    .rs-pos-sandbox .cart-line .cinfo { flex: 1; min-width: 0; }
+    .rs-pos-sandbox .cart-line .cn-row {
+      display: flex; align-items: baseline; gap: 6px; min-width: 0;
+    }
+    .rs-pos-sandbox .cart-line .cn {
+      font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; line-height: 1.2; flex: 1; min-width: 0;
+    }
+    .rs-pos-sandbox .cart-line .cp {
+      font-size: 11px; color: var(--rs-pos-mute); font-weight: 600; flex: none;
+    }
+    .rs-pos-sandbox .cart-line .cline-total {
+      font-weight: 800; font-size: 13px; min-width: 48px; text-align: right; flex: none;
+    }
+    .rs-pos-sandbox .qty { display: flex; align-items: center; gap: 3px; flex: none; }
+    .rs-pos-sandbox .qty button {
+      width: 30px; height: 30px; min-width: 30px; min-height: 30px;
+      border-radius: 8px; border: 1px solid var(--rs-pos-stroke-2);
+      background: var(--rs-pos-glass-2); color: var(--rs-pos-text); cursor: pointer; font-size: 11px;
+      display: grid; place-items: center;
+    }
+    .rs-pos-sandbox .qty button:hover {
+      background: color-mix(in srgb, var(--rs-pos-orange) 12%, transparent);
+      color: var(--rs-pos-orange); border-color: rgba(255,79,0,0.4);
+    }
+    .rs-pos-sandbox .qty .qn { font-weight: 800; font-size: 12.5px; min-width: 16px; text-align: center; }
+    .rs-pos-sandbox .cart-foot {
+      border-top: 1px solid var(--rs-pos-stroke); padding: 8px 10px 10px;
+      flex-shrink: 0;
+      background: color-mix(in srgb, var(--rs-pos-panel) 92%, var(--rs-pos-glass));
+      box-shadow: 0 -6px 16px rgba(0,0,0,.04);
+    }
+    .rs-pos-sandbox .totals-compact { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+    .rs-pos-sandbox .totals-meta {
+      display: flex; justify-content: space-between; flex-wrap: wrap;
+      font-size: 11px; color: var(--rs-pos-soft); gap: 4px 10px;
+    }
+    .rs-pos-sandbox .totals-meta b { color: var(--rs-pos-text); font-weight: 700; }
+    .rs-pos-sandbox .totals-grand {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-top: 5px; border-top: 1px dashed var(--rs-pos-stroke-2);
+    }
+    .rs-pos-sandbox .totals-grand-lbl { font-weight: 700; font-size: 13px; }
+    .rs-pos-sandbox .totals-grand .amt {
+      font-family: var(--font-display, inherit); font-weight: 800; font-size: 22px;
+      color: var(--rs-pos-orange); letter-spacing: -.02em;
+    }
+    .rs-pos-sandbox .cart-payment {
+      margin: 0 0 8px; padding: 5px; border: 1px solid var(--rs-pos-stroke-2);
+      border-radius: 10px; background: var(--rs-pos-glass);
+    }
+    .rs-pos-sandbox .cpay-methods {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+    }
+    .rs-pos-sandbox .cpay-methods button {
+      min-height: 40px; padding: 4px 2px; font-size: 10px; font-weight: 700;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; border-radius: 8px; line-height: 1.1;
+      border: 1px solid var(--rs-pos-stroke-2); background: var(--rs-pos-panel);
+      color: var(--rs-pos-soft); cursor: pointer;
+    }
+    .rs-pos-sandbox .cpay-methods button.active {
+      border-color: rgba(255,79,0,.5) !important;
+      background: color-mix(in srgb, var(--rs-pos-orange) 10%, transparent) !important;
+      color: var(--rs-pos-orange) !important;
+    }
+    .rs-pos-sandbox .cpay-lbl { font-size: 9.5px; font-weight: 700; }
+    .rs-pos-sandbox .cart-actions-final {
+      display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 6px;
+    }
+    .rs-pos-sandbox .cart-actions-final .btn {
+      min-height: 44px; font-size: 13px; font-weight: 800; border-radius: 10px;
+    }
+    /* Customer phone on cart — same idea as live POS (optional; auto-WA on pay) */
+    /* Guest name + WhatsApp — always visible, required for sandbox bill */
+    .rs-pos-sandbox .cart-guest-required {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 10px 10px 10px;
+      border-bottom: 1px solid var(--rs-pos-stroke);
+      background: color-mix(in srgb, var(--rs-pos-panel) 92%, #fff7ed);
+    }
+    .rs-pos-sandbox .sandbox-guest-head {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .rs-pos-sandbox .req-pill {
+      margin-left: auto; font-size: 10px; font-weight: 800;
+      padding: 2px 8px; border-radius: 999px;
+      background: rgba(255,79,0,.12); color: #FF4F00;
+      border: 1px solid rgba(255,79,0,.25);
+    }
+    .rs-pos-sandbox .req-pill.ok {
+      background: #E8F8F1; color: #0F9F6E; border-color: #BBF7D0;
+    }
+    .rs-pos-sandbox .sandbox-guest-fields {
+      display: grid; grid-template-columns: 1fr 1.15fr; gap: 8px;
+    }
+    .rs-pos-sandbox .sg-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .rs-pos-sandbox .sg-label {
+      font-size: 10.5px; font-weight: 800; color: var(--rs-pos-soft);
+    }
+    .rs-pos-sandbox .sg-label span { color: #FF4F00; }
+    .rs-pos-sandbox .sandbox-guest-fields .form-input {
+      height: 40px; font-size: 13px; font-weight: 600; min-width: 0;
+    }
+    .rs-pos-sandbox .sandbox-guest-fields .form-input.is-invalid {
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.12);
+    }
+    .rs-pos-sandbox .sandbox-guest-fields .form-input.is-valid {
+      border-color: rgba(15,159,110,.45) !important;
+    }
+    .rs-pos-sandbox .sandbox-phone-row { display: flex; gap: 6px; align-items: stretch; }
+    .rs-pos-sandbox .sandbox-prefix {
+      display: grid; place-items: center; padding: 0 10px; border-radius: 9px;
+      background: var(--rs-pos-glass-2); border: 1px solid var(--rs-pos-stroke-2);
+      font-weight: 800; font-size: 12.5px; color: var(--rs-pos-text); flex: none;
+    }
+    .rs-pos-sandbox .sandbox-phone-row .form-input {
+      flex: 1; min-width: 0; height: 40px; font-weight: 600;
+      font-variant-numeric: tabular-nums; letter-spacing: .02em;
+    }
+    .rs-pos-sandbox .cart-guest-required .ph-hint {
+      font-size: 10.5px; font-weight: 600; color: var(--rs-pos-mute); line-height: 1.35;
+    }
+    .rs-pos-sandbox .cart-guest-required .ph-hint.has-num { color: #0F9F6E; }
+    .rs-pos-sandbox .cart-guest-required .ph-hint.err { color: #dc2626; }
+    @media (max-width: 520px) {
+      .rs-pos-sandbox .sandbox-guest-fields { grid-template-columns: 1fr; }
+    }
+    /* Keep ask-phone modal CSS for fallback but rarely used when fields always shown */
+    .sim-ask-phone-overlay { display: none !important; }
+    /* Success banner on bill settled (auto WhatsApp) */
+    .sim-wa-banner {
+      display: none; align-items: flex-start; gap: 10px;
+      margin: 0 0 12px; padding: 10px 12px; border-radius: 11px;
+      background: #E8F8F1; border: 1px solid #BBF7D0;
+      color: #0F6B4A; font-size: 12.5px; font-weight: 700; line-height: 1.4;
+    }
+    .sim-wa-banner.show { display: flex; }
+    .sim-wa-banner.err { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; }
+    .sim-wa-banner.pending { background: #FFF7ED; border-color: #FED7AA; color: #C2410C; }
+    .sim-wa-banner i { margin-top: 2px; flex: none; font-size: 15px; }
+    .sim-wa-banner .sim-wa-body { flex: 1; min-width: 0; }
+    .sim-wa-banner .sim-wa-sub { font-size: 11px; font-weight: 600; opacity: .9; margin-top: 2px; }
+    .rs-pos-sandbox .demo-foot-note {
+      margin-top: 12px; font-size: 12.5px; color: var(--rs-pos-mute);
+      display: flex; gap: 8px; align-items: flex-start; line-height: 1.45;
+    }
+    .rs-pos-sandbox .demo-foot-note i { color: var(--teal, #2A9B8F); margin-top: 2px; }
     /* Competitor price chips */
     .comp-price-chip {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -427,7 +1396,87 @@
     .sandbox-toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
     .sandbox-toast.error { background:#c0392b; }
     .terminal-body { position:relative; }
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6);  display: none; align-items: center; justify-content: center; z-index: 2000; padding: 24px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6);  display: none; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+    /* Sandbox bill closed — same receipt paper as live POS Bill settled preview */
+    .sim-settle-card {
+      max-width: 380px !important;
+      width: 100%;
+      padding: 0 !important;
+      text-align: left !important;
+      overflow: hidden;
+      max-height: min(92dvh, 720px);
+      display: flex;
+      flex-direction: column;
+      background: var(--panel-solid, #fff) !important;
+    }
+    .sim-settle-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .sim-settle-head h3 {
+      margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -.01em;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sim-settle-head h3 i { color: var(--success, #16a34a); }
+    .sim-settle-head .sim-close-x {
+      width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-2);
+      background: var(--surface-2); color: var(--text-dim); cursor: pointer;
+      display: grid; place-items: center; font-size: 14px;
+    }
+    .sim-settle-body {
+      flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+      padding: 14px 16px 8px;
+      background: #ebe8e2;
+    }
+    .sim-settle-card .receipt-paper {
+      background: #fbfaf7; color: #16151c; border-radius: 10px;
+      padding: 20px 18px 22px;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      max-width: 300px; margin: 0 auto;
+      box-shadow: 0 12px 36px rgba(0,0,0,.18);
+      position: relative; box-sizing: border-box;
+    }
+    .sim-settle-card .receipt-paper::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 14px;
+      background: radial-gradient(circle at 7px -2px, transparent 0 7px, #fbfaf7 7px) repeat-x;
+      background-size: 14px 14px;
+    }
+    .sim-settle-card .rcp-center { text-align: center; }
+    .sim-settle-card .rcp-logo {
+      font-family: Georgia, 'Times New Roman', Times, serif;
+      font-weight: 800; font-size: 18px; letter-spacing: -.02em; color: #16151c;
+    }
+    .sim-settle-card .rcp-sub { font-size: 11px; color: #6b6960; margin-top: 2px; }
+    .sim-settle-card .rcp-hr { border: 0; border-top: 1px dashed #c9c6bd; margin: 11px 0; }
+    .sim-settle-card .rcp-meta {
+      display: flex; justify-content: space-between; font-size: 11.5px; color: #4a4842; gap: 8px;
+    }
+    .sim-settle-card .rcp-line {
+      display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0; color: #16151c; gap: 8px;
+    }
+    .sim-settle-card .rcp-line .q { color: #6b6960; }
+    .sim-settle-card .rcp-tot {
+      display: flex; justify-content: space-between;
+      font-family: Georgia, 'Times New Roman', Times, serif;
+      font-weight: 800; font-size: 17px; margin-top: 6px; color: #16151c;
+    }
+    .sim-settle-card .rcp-foot {
+      text-align: center; font-size: 11px; color: #6b6960; margin-top: 12px;
+    }
+    .sim-settle-card .rcp-foot b { color: #16151c; }
+    .sim-settle-foot {
+      flex-shrink: 0; padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 8px;
+      background: var(--panel-solid, #fff);
+    }
+    .sim-settle-foot .btn { width: 100%; }
+    .sim-settle-note {
+      font-size: 11.5px; color: var(--text-mute); text-align: center; line-height: 1.4; margin: 0 0 2px;
+    }
+    .sim-settle-card.modal-card h3 { margin-bottom: 0; font-size: 15px; }
+    .sim-settle-card.modal-card p { margin-bottom: 0; font-size: inherit; color: inherit; }
     /* ===== WhatsApp Live Send Overlay ===== */
     .wa-send-overlay { position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.68);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s ease;padding:20px; }
     .wa-send-overlay.show { opacity:1;pointer-events:all; }
@@ -452,6 +1501,8 @@
     /* ===== RESPONSIVE ===== */
     @media (max-width: 980px) {
       .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; min-height: 0; }
+      .hero-constellation.live { border-radius: 18px; }
       .features-grid { grid-template-columns: repeat(2, 1fr); }
       .empathy-grid, .demo-grid, .pricing-grid { grid-template-columns: 1fr; }
       .pricing-card.featured { order: -1; }
@@ -473,6 +1524,9 @@
       .hero-actions { gap: 10px; }
       .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
       .hero-trust { gap: 12px; flex-wrap: wrap; }
+      .hero-visual { min-height: 0; }
+      .hero-constellation.live { border-radius: 16px; }
+      .hero-constellation.live .hc-status { max-width: 46%; font-size: 10px; }
       .float-chip.sync { display: none; }
       .float-chip.wa { right: 4%; top: -14px; }
 
@@ -488,14 +1542,13 @@
       .empathy-list { gap: 12px; }
       .empathy-list li { font-size: 14px; }
 
-      /* Demo */
-      .demo-grid { gap: 20px; }
-      .menu-selector { grid-template-columns: 1fr 1fr; gap: 10px; }
-      .menu-item-btn { padding: 13px 13px; }
-      .menu-item-name { font-size: 13.5px; }
-      .terminal { min-height: 360px; }
-      .terminal-body { padding: 16px; }
-      .sum-total { font-size: 17px; }
+      /* Demo — POS clone */
+      .demo-grid { gap: 14px; grid-template-columns: 1fr; }
+      .rs-pos-sandbox .pos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .rs-pos-sandbox .pos-cart { min-height: 420px; max-height: none; }
+      .rs-pos-sandbox .pos-item { min-height: 88px; padding: 10px; }
+      .rs-pos-sandbox .pos-item .pname { font-size: 13px; }
+      .rs-pos-sandbox .cart-actions-final { grid-template-columns: 1fr 1.2fr; }
 
       /* Compare — all columns fit on mobile, no horizontal scroll */
       .compare-wrap { padding: 0; border-radius: 14px; overflow-x: hidden; }
@@ -611,53 +1664,81 @@
             </a>
           </div>
           <div class="hero-trust">
+            <div class="t-item" id="hero-stars-item"><i class="fa-solid fa-star" aria-hidden="true" style="color:var(--accent)"></i> <span id="hero-stars-label">Owner-approved reviews</span></div>
             <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Free to start</div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Setup in minutes</div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> GST-ready billing</div>
+            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Offline billing</div>
           </div>
         </div>
 
-        <div class="hero-visual">
-          <figure class="hero-shot">
-            <img src="assets/screenshot-pos.png" width="1400" height="900" alt="RestroSuite point of sale — menu grid, cart, and checkout on a warm light dashboard">
-            <figcaption class="hero-shot-caption">
-              <span><b>Point of sale</b> · menu, cart, and pay in one view</span>
-              <span>Actual product UI</span>
-            </figcaption>
-          </figure>
-          <!-- legacy mock retained for structure; hidden when shot is present -->
-          <div class="hero-mockup glass" hidden aria-hidden="true">
-            <div class="mock-top">
-              <div class="mock-dots"><span></span><span></span><span></span></div>
-              <div class="mock-label">RestroSuite · Live Hub</div>
+        <div class="hero-visual" id="hero-visual" aria-label="RestroSuite live console — POS, Kitchen, Floor, Bills and WhatsApp connected">
+          <div class="hero-constellation live" id="sync-stage">
+            <span class="hc-live"><span class="pulse" aria-hidden="true"></span> Live · one console</span>
+            <span class="hc-status" id="sync-msg">Order data flows between modules</span>
+
+            <svg class="hc-svg" viewBox="0 0 640 520" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <path id="path-pos-kds" class="hc-path" d="M 210 200 C 250 120, 300 90, 360 110" />
+              <path id="path-kds-floor" class="hc-path" d="M 420 140 C 480 150, 500 200, 490 250" />
+              <path id="path-pos-bills" class="hc-path" d="M 150 340 C 180 400, 260 420, 340 390" />
+              <path id="path-bills-wa" class="hc-path" d="M 420 400 C 480 410, 520 380, 545 340" />
+              <path id="path-floor-wa" class="hc-path" d="M 520 300 C 545 310, 555 320, 560 340" />
+              <circle class="hc-node" cx="210" cy="200" r="5" />
+              <circle class="hc-node" cx="360" cy="110" r="5" />
+              <circle class="hc-node" cx="490" cy="250" r="5" />
+              <circle class="hc-node" cx="340" cy="390" r="5" />
+              <circle class="hc-node" cx="545" cy="340" r="5" />
+              <circle id="flow-packet" class="hc-packet" r="6" cx="0" cy="0" />
+            </svg>
+
+            <span class="hc-label l1">one clear experience</span>
+            <span class="hc-label l2">works everywhere</span>
+            <span class="hc-label l3">built around your floor</span>
+
+            <article class="hc-card pos active" id="seg-pos">
+              <div class="hc-top">
+                <span class="hc-title" id="pos-title">POS Cart · Table 12</span>
+                <span class="hc-meta">Host View</span>
+              </div>
+              <div class="hc-body" id="pos-body"></div>
+            </article>
+
+            <article class="hc-card kds" id="seg-kds">
+              <div class="hc-top">
+                <span class="hc-title">Kitchen Display</span>
+                <span class="hc-meta" id="kds-order">Order #A-094</span>
+              </div>
+              <div class="hc-body" id="kds-body"></div>
+            </article>
+
+            <article class="hc-card floor" id="seg-qr">
+              <div class="hc-top">
+                <span class="hc-title">Floor Plan · Level 1</span>
+                <span class="hc-meta">Host View</span>
+              </div>
+              <div class="hc-body" id="qr-body"></div>
+            </article>
+
+            <article class="hc-card bills" id="seg-bills">
+              <div class="hc-top">
+                <span class="hc-title">Bills · Today</span>
+                <span class="hc-meta">View all</span>
+              </div>
+              <div class="hc-body" id="bills-body"></div>
+            </article>
+
+            <div class="hc-phone" id="seg-wa" aria-label="WhatsApp bill on guest phone">
+              <div class="ph-notch" aria-hidden="true"></div>
+              <div class="ph-screen">
+                <div class="ph-bar"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> RestroSuite</div>
+                <div class="ph-chat"><div class="ph-bubble" id="wa-body"></div></div>
+                <div class="ph-btn">Download PDF</div>
+              </div>
             </div>
-            <div class="mock-stat-row">
-              <div class="mock-stat">
-                <div class="k">Today's revenue</div>
-                <div class="v">₹48,290 <small>↑ 18%</small></div>
-              </div>
-              <div class="mock-stat">
-                <div class="k">Orders served</div>
-                <div class="v">214 <small>↑ 9%</small></div>
-              </div>
-            </div>
-            <div class="mock-chart">
-              <div class="ch-head">
-                <span class="t">Hourly sales</span>
-                <span class="badge badge-teal"><span class="dot"></span>Live</span>
-              </div>
-              <div class="bars" role="img" aria-label="Bar chart showing hourly sales">
-                <div class="bar" style="height:38%"></div>
-                <div class="bar" style="height:55%"></div>
-                <div class="bar" style="height:42%"></div>
-                <div class="bar teal" style="height:72%"></div>
-                <div class="bar" style="height:60%"></div>
-                <div class="bar" style="height:88%"></div>
-                <div class="bar teal" style="height:68%"></div>
-                <div class="bar" style="height:95%"></div>
-                <div class="bar" style="height:74%"></div>
-              </div>
-            </div>
+
+            <div class="hc-brand">RestroSuite</div>
+          </div>
+          <div class="hero-constellation-caption">
+            <div><b>One console</b> · POS → Kitchen → Floor → Bills → WhatsApp</div>
+            <span class="hc-badge">Live · animated sync</span>
           </div>
         </div>
       </div>
@@ -750,50 +1831,88 @@
       <div class="container">
         <div class="section-head">
           <span class="eyebrow">Interactive sandbox</span>
-          <h2>Try the POS. Feel the speed.</h2>
-          <p>Tap a few items to build a real receipt. No spinners, no cloud lag — sub-millisecond local checkout.</p>
+          <h2>Instant WhatsApp bills</h2>
+          <p>Enter guest <b>name + mobile</b> → add items → <b>Print &amp; Pay</b>. The receipt hits WhatsApp almost instantly — often under half a second. Same flow as live POS — no signup.</p>
         </div>
-        <div class="demo-grid">
-          <div>
-            <div class="menu-selector" id="sim-menu-grid" role="group" aria-label="Menu items">
-              <!-- populated by JS based on detected country -->
+        <div class="demo-grid rs-pos-sandbox">
+          <div class="pos-menu-pane">
+            <div class="pos-menu-toolbar">
+              <h3><i class="fa-solid fa-utensils" aria-hidden="true"></i> Menu</h3>
+              <span class="pos-menu-hint" id="sandbox-status-text">Name + mobile required · then tap items</span>
             </div>
-            <p class="muted" style="font-size:13.5px; margin-top:18px; display:flex; gap:9px; align-items:center;">
-              <i class="fa-solid fa-circle-info" style="color:var(--teal)" aria-hidden="true"></i>
-              Real checkout adds tax automatically and queues the KOT to your kitchen display.
+            <div class="pos-grid" id="sim-menu-grid" role="group" aria-label="Menu items">
+              <!-- populated by JS — exact POS item tiles -->
+            </div>
+            <p class="demo-foot-note">
+              <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+              <span>Guest name and WhatsApp number must be filled before billing — same idea as live POS.</span>
             </p>
           </div>
 
-          <div class="terminal glass">
-            <div class="terminal-header">
-              <span class="th-title">POS Terminal · Table 4</span>
-              <span class="badge badge-success">
-                <!-- FIX: pulseDot animation now defined -->
-                <span class="dot" style="animation:pulseDot 1.6s infinite" aria-hidden="true"></span>Online
-              </span>
-            </div>
-            <div class="terminal-body">
-              <div class="sandbox-toast" id="sandbox-toast"></div>
-              <div id="sim-cart-content" class="empty-cart-msg" aria-live="polite" aria-label="Shopping cart">
-                <i class="fa-solid fa-receipt" aria-hidden="true"></i>
-                Your receipt is empty.<br>Tap menu items to start a bill.
-              </div>
-              <!-- FIX: added class="sandbox-actions" so CSS applies correctly -->
-              <div id="sandbox-actions" class="sandbox-actions" style="display:none;">
-                <div class="field-label">Send a demo WhatsApp invoice</div>
-                <div class="sandbox-phone-row">
-                  <span class="sandbox-prefix" id="sandbox-prefix">+91</span>
-                  <input type="tel" id="sandbox-phone" placeholder="10-digit WhatsApp number"
-                    class="form-input" oninput="validateSandboxPhone()"
-                    inputmode="numeric" maxlength="10" autocomplete="tel-national">
-                </div>
-                <button class="btn btn-teal btn-block" id="btn-send-real"
-                  onclick="sendRealWhatsAppReceipt()" disabled>
-                  <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Send WhatsApp Invoice (Demo)
+          <div class="pos-cart pos-cart-workbench" id="sandbox-pos-cart">
+            <div class="sandbox-toast" id="sandbox-toast"></div>
+            <div class="cart-head">
+              <h3><i class="fa-solid fa-cart-shopping cart-head-ico" aria-hidden="true"></i> Cart</h3>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="cart-count-pill" id="sim-cart-count">0</span>
+                <button type="button" class="cart-clear-btn" id="btn-clear-sim" onclick="clearSimCart()" title="Clear cart" aria-label="Clear cart">
+                  <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
                 </button>
-                <button class="btn btn-ghost btn-block" id="btn-trigger-sim"
-                  onclick="triggerSimulatedReceipt()">
-                  <i class="fa-solid fa-print" aria-hidden="true"></i> Print &amp; close bill
+              </div>
+            </div>
+            <!-- Always-visible guest fields — required for sandbox bill -->
+            <div class="cart-meta-row cart-guest-required" id="sandbox-guest-block">
+              <div class="sandbox-guest-head">
+                <span class="cart-walkin-chip"><i class="fa-solid fa-user" aria-hidden="true"></i> Guest</span>
+                <span class="cart-walkin-chip"><i class="fa-solid fa-chair" aria-hidden="true"></i> Table 4</span>
+                <span class="req-pill" id="sandbox-req-pill">Required</span>
+              </div>
+              <div class="cart-cust-fields sandbox-guest-fields">
+                <div class="sg-field">
+                  <label class="sg-label" for="sandbox-cust-name">Name <span>*</span></label>
+                  <input type="text" id="sandbox-cust-name" class="form-input" placeholder="Guest name"
+                    autocomplete="name" required oninput="onSandboxGuestInput()">
+                </div>
+                <div class="sg-field">
+                  <label class="sg-label" for="sandbox-phone">WhatsApp <span>*</span></label>
+                  <div class="sandbox-phone-row">
+                    <span class="sandbox-prefix" id="sandbox-prefix">+91</span>
+                    <input type="tel" id="sandbox-phone" placeholder="10-digit mobile" class="form-input"
+                      inputmode="numeric" maxlength="10" autocomplete="tel-national" required
+                      aria-label="Customer WhatsApp number" oninput="onSandboxGuestInput()">
+                  </div>
+                </div>
+              </div>
+              <div class="ph-hint" id="sandbox-phone-hint">Name + mobile required — bill and WhatsApp will not run without them</div>
+            </div>
+            <div class="cart-items" id="sim-cart-content" aria-live="polite" aria-label="Shopping cart">
+              <div class="cart-empty">
+                <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <div>Cart is empty<br><span style="font-size:12px">Fill name + mobile, then tap menu items</span></div>
+              </div>
+            </div>
+            <div class="cart-foot" id="sandbox-cart-foot" style="display:none">
+              <div class="totals-compact totals-readable">
+                <div class="totals-meta">
+                  <span>Sub <b id="sim-t-sub">₹0</b></span>
+                  <span>Tax <b id="sim-t-gst">₹0</b></span>
+                </div>
+                <div class="totals-grand">
+                  <span class="totals-grand-lbl">Total</span>
+                  <span class="amt" id="sim-t-grand">₹0</span>
+                </div>
+              </div>
+              <div class="cart-payment cart-payment-labeled">
+                <div class="cpay-methods" id="sim-pay-methods" role="group" aria-label="Payment method">
+                  <button type="button" class="active" data-sim-pay="Cash" title="Cash"><i class="fa-solid fa-money-bill-wave" style="color:#25d366"></i><span class="cpay-lbl">Cash</span></button>
+                  <button type="button" data-sim-pay="UPI" title="UPI"><i class="fa-solid fa-qrcode" style="color:#6366f1"></i><span class="cpay-lbl">UPI</span></button>
+                  <button type="button" data-sim-pay="Card" title="Card"><i class="fa-solid fa-credit-card" style="color:#0ea5e9"></i><span class="cpay-lbl">Card</span></button>
+                  <button type="button" data-sim-pay="Due" title="Due"><i class="fa-solid fa-book" style="color:#f59e0b"></i><span class="cpay-lbl">Due</span></button>
+                </div>
+              </div>
+              <div class="cart-actions-final">
+                <button type="button" class="btn btn-primary" id="btn-trigger-sim" onclick="triggerSimulatedReceipt()">
+                  <i class="fa-solid fa-print" aria-hidden="true"></i> Print &amp; Pay
                 </button>
               </div>
             </div>
@@ -1037,7 +2156,7 @@
               <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free
             </a>
             <a class="btn btn-ghost btn-lg"
-              href="https://api.whatsapp.com/send?text=Check%20out%20RestroSuite%20%E2%80%94%20free%20offline-first%20restaurant%20POS%0A%0Ahttps%3A%2F%2Fcodearc-restrosuite.vercel.app%2F"
+              href="https://api.whatsapp.com/send?text=Check%20out%20RestroSuite%20%E2%80%94%20free%20offline-first%20restaurant%20POS%0A%0Ahttps%3A%2F%2Frestrosuite.codearc.co.in%2F"
               target="_blank" rel="noopener noreferrer" id="share-whatsapp">
               <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Share on WhatsApp
             </a>
@@ -1102,13 +2221,55 @@
     </div>
   </footer>
 
-  <!-- ===== MODAL ===== -->
+  <!-- Ask WhatsApp number when cart has no mobile (same idea as live POS) -->
+  <div class="sim-ask-phone-overlay" id="sim-ask-phone" role="dialog" aria-modal="true" aria-labelledby="sim-ask-phone-title">
+    <div class="sim-ask-phone-card">
+      <div class="aph-head">
+        <span id="sim-ask-phone-title"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i>WhatsApp number</span>
+        <button type="button" class="sim-close-x" onclick="closeSimAskPhone(null)" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="aph-body">
+        <label for="sim-ask-phone-input">Customer WhatsApp (with country code)</label>
+        <div class="sandbox-phone-row">
+          <span class="sandbox-prefix" id="sim-ask-phone-prefix">+91</span>
+          <input id="sim-ask-phone-input" class="form-input" type="tel" inputmode="numeric"
+            placeholder="10-digit mobile" maxlength="10" autocomplete="tel-national">
+        </div>
+        <p>Required to send the bill on WhatsApp. Leave empty and choose <b>Print only</b> if you only want the receipt preview.</p>
+      </div>
+      <div class="aph-foot">
+        <button type="button" class="btn btn-ghost" onclick="closeSimAskPhone('')">Print only</button>
+        <button type="button" class="btn btn-primary" id="sim-ask-phone-send" onclick="confirmSimAskPhone()">
+          <i class="fa-brands fa-whatsapp"></i> Send bill
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== BILL SETTLED MODAL (same receipt paper as live POS) ===== -->
   <div class="modal-overlay" id="sim-modal" role="dialog" aria-modal="true" aria-labelledby="sim-modal-title">
-    <div class="modal-card glass">
-      <div class="modal-icon" id="sim-modal-icon"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
-      <h3 id="sim-modal-title">Demo invoice prepared</h3>
-      <p id="sim-modal-desc"></p>
-      <button class="btn btn-primary btn-block" onclick="closeSimModal()">Done</button>
+    <div class="modal-card glass sim-settle-card">
+      <div class="sim-settle-head">
+        <h3 id="sim-modal-title"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Bill settled</h3>
+        <button type="button" class="sim-close-x" onclick="closeSimModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="sim-settle-body">
+        <div class="sim-wa-banner" id="sim-wa-banner" role="status" aria-live="polite">
+          <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
+          <div class="sim-wa-body">
+            <div id="sim-wa-title">WhatsApp bill</div>
+            <div class="sim-wa-sub" id="sim-wa-sub"></div>
+          </div>
+        </div>
+        <div id="sim-modal-desc">
+          <!-- receipt-paper injected by JS -->
+        </div>
+      </div>
+      <div class="sim-settle-foot">
+        <p class="sim-settle-note">Same as live POS: settle bill → if mobile is on the cart, WhatsApp PDF goes out automatically.</p>
+        <a class="btn btn-primary" href="login.html?tab=register">Create free outlet</a>
+        <button type="button" class="btn btn-ghost" onclick="closeSimModal()">Done</button>
+      </div>
     </div>
   </div>
 
@@ -1117,7 +2278,7 @@
     <div class="wa-send-card glass">
       <div class="wa-send-icon" id="wa-send-icon"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
       <h3 id="wa-send-title" style="margin:0 0 6px;font-size:20px">Sending WhatsApp Invoice</h3>
-      <p id="wa-send-sub" style="margin:0;color:var(--text-dim);font-size:14px">Building your receipt…</p>
+      <p id="wa-send-sub" style="margin:0;color:var(--text-dim);font-size:14px">Building your receipt...</p>
       <ul class="wa-steps">
         <li class="wa-step" id="wa-step-0">
           <span class="wa-step-dot"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
@@ -1129,7 +2290,7 @@
         </li>
         <li class="wa-step" id="wa-step-2">
           <span class="wa-step-dot"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></span>
-          <span>Sending via WhatsApp gateway</span>
+          <span>Sending WhatsApp message</span>
         </li>
       </ul>
       <div class="wa-result-box" id="wa-result-box"></div>
@@ -1191,68 +2352,635 @@
         closeMobileNav();
     });
 
+    // ===== HERO constellation LIVE — same layout as art, animated data =====
+    (function initHeroLive() {
+      var stage = document.getElementById('sync-stage');
+      if (!stage) return;
+      var msg = document.getElementById('sync-msg');
+      var packet = document.getElementById('flow-packet');
+      var cards = {
+        pos: document.getElementById('seg-pos'),
+        kds: document.getElementById('seg-kds'),
+        qr: document.getElementById('seg-qr'),
+        bills: document.getElementById('seg-bills'),
+        wa: document.getElementById('seg-wa')
+      };
+      var pathMap = {
+        'pos-kds': document.getElementById('path-pos-kds'),
+        'kds-floor': document.getElementById('path-kds-floor'),
+        'pos-bills': document.getElementById('path-pos-bills'),
+        'bills-wa': document.getElementById('path-bills-wa'),
+        'floor-wa': document.getElementById('path-floor-wa')
+      };
+      var reduce = false;
+      try {
+        reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      } catch (_) {}
+
+      var ORDERS = [
+        {
+          table: '12', guest: 'Priya', bill: 'B-238', orderId: 'A-094',
+          items: [
+            { name: '2× Butter Chicken', amt: '₹330.00' },
+            { name: '1× Paneer Tikka', amt: '₹340.00' },
+            { name: '1× Sparkling Water', amt: '₹35.00' }
+          ],
+          total: '₹3,847', kdsExtra: 'Table 7 · 2 items · Rush'
+        },
+        {
+          table: '7', guest: 'Arjun', bill: 'B-241', orderId: 'A-101',
+          items: [
+            { name: '1× Masala Dosa', amt: '₹160.00' },
+            { name: '2× Filter Coffee', amt: '₹120.00' },
+            { name: '1× Vada', amt: '₹80.00' }
+          ],
+          total: '₹360', kdsExtra: 'Table 3 · 1 item · Normal'
+        },
+        {
+          table: '5', guest: 'Neha', bill: 'B-245', orderId: 'A-108',
+          items: [
+            { name: '1× Family Thali', amt: '₹899.00' },
+            { name: '4× Soft Drink', amt: '₹200.00' },
+            { name: '2× Gulab Jamun', amt: '₹160.00' }
+          ],
+          total: '₹1,259', kdsExtra: 'Table 9 · 3 items · Rush'
+        }
+      ];
+      var oi = 0;
+      var step = 0;
+      var timer = null;
+      var packetAnim = null;
+      var dayBills = [];
+
+      function o() { return ORDERS[oi % ORDERS.length]; }
+      function setActive(key) {
+        Object.keys(cards).forEach(function (k) {
+          if (cards[k]) cards[k].classList.toggle('active', k === key);
+        });
+      }
+      function flashMsg(t) {
+        if (!msg) return;
+        msg.textContent = t;
+        msg.classList.add('flash');
+        setTimeout(function () { msg.classList.remove('flash'); }, 1200);
+      }
+      function clearPaths() {
+        Object.keys(pathMap).forEach(function (k) {
+          if (pathMap[k]) pathMap[k].classList.remove('active');
+        });
+      }
+      function flow(key) {
+        clearPaths();
+        var p = pathMap[key];
+        if (p) p.classList.add('active');
+        animatePacket(p, 1100);
+      }
+      function animatePacket(pathEl, duration) {
+        if (!packet || !pathEl || typeof pathEl.getTotalLength !== 'function') return;
+        if (reduce) { packet.setAttribute('opacity', '0'); return; }
+        if (packetAnim) cancelAnimationFrame(packetAnim);
+        var len = pathEl.getTotalLength();
+        if (!len) return;
+        var start = null;
+        duration = duration || 1100;
+        packet.setAttribute('opacity', '1');
+        function frame(ts) {
+          if (!start) start = ts;
+          var t = Math.min(1, (ts - start) / duration);
+          var ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          var pt = pathEl.getPointAtLength(ease * len);
+          packet.setAttribute('cx', pt.x);
+          packet.setAttribute('cy', pt.y);
+          packet.setAttribute('opacity', String(t < 0.88 ? 1 : 1 - (t - 0.88) / 0.12));
+          if (t < 1) packetAnim = requestAnimationFrame(frame);
+          else packet.setAttribute('opacity', '0');
+        }
+        packetAnim = requestAnimationFrame(frame);
+      }
+      function recv(el) {
+        if (!el) return;
+        el.classList.remove('recv');
+        void el.offsetWidth;
+        el.classList.add('recv');
+      }
+      function renderPos(ord, mode) {
+        var title = document.getElementById('pos-title');
+        if (title) title.textContent = 'POS Cart · Table ' + ord.table;
+        var body = document.getElementById('pos-body');
+        if (!body) return;
+        if (mode === 'empty') {
+          body.innerHTML = '<div style="font-size:11px;color:#8a8780;text-align:center;padding:14px 4px">Cart cleared · next guest</div>';
+          return;
+        }
+        var lines = ord.items.map(function (it) {
+          return '<div class="hc-line"><span class="dot"></span><span class="nm">' + it.name + '</span><span class="am">' + it.amt + '</span></div>';
+        }).join('');
+        body.innerHTML = lines +
+          '<div class="hc-total"><span>Total</span><b>' + ord.total + '</b></div>' +
+          '<div class="hc-pay">Pay Now</div>';
+      }
+      function renderKds(ord, mode) {
+        var meta = document.getElementById('kds-order');
+        if (meta) meta.textContent = 'Order #' + ord.orderId;
+        var body = document.getElementById('kds-body');
+        if (!body) return;
+        if (mode === 'empty') {
+          body.innerHTML = '<div style="font-size:11px;color:#8a8780;text-align:center;padding:12px 4px">Queue empty</div>';
+          return;
+        }
+        if (mode === 'ready') {
+          body.innerHTML =
+            '<div class="k-row ready"><span>Table ' + ord.table + ' · Fire<br><span style="font-weight:600;opacity:.8">' +
+            ord.items[1].name.replace(/^[\d×xX\s]+/, '') + '</span></span><span class="st">READY</span></div>' +
+            '<div class="k-ready-bar"><span>Ready</span><i class="fa-solid fa-circle-check"></i></div>';
+          return;
+        }
+        var rows = ord.items.slice(0, 2).map(function (it, i) {
+          var short = it.name.replace(/^[\d×xX]+\s*/, '');
+          return '<div class="k-row"><span>Table ' + ord.table + (i === 0 ? ' · 2 items · Rush' : ' · Fire') +
+            '<br><span style="font-weight:600;opacity:.85">' + short + '</span></span><span class="st">' +
+            (i === 0 ? 'PREP' : 'PREP') + '</span></div>';
+        }).join('');
+        body.innerHTML = rows;
+      }
+      function renderFloor(ord, mode) {
+        var body = document.getElementById('qr-body');
+        if (!body) return;
+        var t = ord.table;
+        if (mode === 'free') {
+          body.innerHTML = '<div class="f-grid">' +
+            '<div class="f-cell free"><b>T' + t + '</b>Free</div>' +
+            '<div class="f-cell free"><b>T9</b>Free</div>' +
+            '<div class="f-cell free"><b>T3</b>Free</div>' +
+            '<div class="f-cell free"><b>T14</b>Free</div></div>';
+          return;
+        }
+        body.innerHTML = '<div class="f-grid">' +
+          '<div class="f-cell free"><b>T3</b>Free</div>' +
+          '<div class="f-cell free"><b>T9</b>Free</div>' +
+          '<div class="f-cell free"><b>T14</b>Free</div>' +
+          '<div class="f-cell occ"><b>T' + t + '</b>Occupied · now</div>' +
+          '<div class="f-cell occ"><b>4p</b>18min</div>' +
+          '<div class="f-cell occ"><b>3p</b>now</div></div>';
+      }
+      function renderBills(ord, mode) {
+        var body = document.getElementById('bills-body');
+        if (!body) return;
+        var rows = dayBills.slice(-3).reverse().map(function (b) {
+          return '<div class="b-row"><span class="ck"><i class="fa-solid fa-check"></i></span>' +
+            '<span>#' + b.bill + ' · Table ' + b.table + ' · Paid</span><span class="am">' + b.total + '</span></div>';
+        }).join('');
+        if (!rows) {
+          rows = '<div style="font-size:11px;color:#8a8780;padding:8px 2px">Waiting for paid bill…</div>';
+        }
+        body.innerHTML = '<div class="b-head"><span>Bill</span><span>Table</span><span>Amount</span></div>' + rows;
+      }
+      function renderWa(ord, mode) {
+        var body = document.getElementById('wa-body');
+        if (!body) return;
+        if (mode === 'idle') {
+          body.innerHTML = 'Waiting for paid bill…';
+          return;
+        }
+        var lines = ord.items.map(function (it) { return it.name; }).join('<br>');
+        body.innerHTML = '<b>RestroSuite</b><br>Table ' + ord.table + ' · ' + ord.items.length + ' items<br>' +
+          lines + '<div class="tot">Total ' + ord.total + '</div>Paid via UPI · Thank you!';
+      }
+
+      var scenes = [
+        function () {
+          var ord = o();
+          setActive('pos');
+          renderPos(ord, 'full');
+          renderKds(ord, 'empty');
+          renderFloor(ord, 'free');
+          renderWa(ord, 'idle');
+          flashMsg('POS · Table ' + ord.table + ' · ' + ord.guest);
+          flow('pos-kds');
+        },
+        function () {
+          var ord = o();
+          setActive('kds');
+          renderKds(ord, 'prep');
+          recv(cards.kds);
+          flashMsg('Kitchen · same ticket · no re-type');
+          flow('kds-floor');
+        },
+        function () {
+          var ord = o();
+          setActive('qr');
+          renderFloor(ord, 'occ');
+          recv(cards.qr);
+          flashMsg('Floor · Table ' + ord.table + ' occupied');
+        },
+        function () {
+          var ord = o();
+          setActive('kds');
+          renderKds(ord, 'ready');
+          flashMsg('Kitchen ready · Table ' + ord.table);
+          flow('pos-bills');
+        },
+        function () {
+          var ord = o();
+          dayBills.push({ bill: ord.bill, table: ord.table, total: ord.total });
+          if (dayBills.length > 4) dayBills.shift();
+          setActive('bills');
+          renderBills(ord, 'paid');
+          renderPos(ord, 'empty');
+          renderKds(ord, 'empty');
+          renderFloor(ord, 'free');
+          recv(cards.bills);
+          flashMsg('Bill #' + ord.bill + ' paid · ' + ord.total);
+          flow('bills-wa');
+        },
+        function () {
+          var ord = o();
+          setActive('wa');
+          renderWa(ord, 'sent');
+          recv(cards.wa);
+          flashMsg('WhatsApp · ' + ord.guest + ' · ' + ord.total);
+          flow('floor-wa');
+        },
+        function () {
+          oi++;
+          var next = o();
+          setActive('pos');
+          renderPos(next, 'full');
+          renderWa(next, 'idle');
+          clearPaths();
+          flashMsg('Next guest · Table ' + next.table + ' · ' + next.guest);
+        }
+      ];
+
+      function run() {
+        scenes[step % scenes.length]();
+        step++;
+      }
+      function start() {
+        stop();
+        if (reduce) { run(); return; }
+        timer = setInterval(run, 2800);
+      }
+      function stop() {
+        if (timer) clearInterval(timer);
+        timer = null;
+      }
+      Object.keys(cards).forEach(function (k) {
+        if (!cards[k]) return;
+        cards[k].style.cursor = 'pointer';
+        cards[k].addEventListener('click', function () {
+          setActive(k);
+          flashMsg((o().guest || '') + ' · live · Table ' + o().table);
+        });
+      });
+      stage.addEventListener('mouseenter', stop);
+      stage.addEventListener('mouseleave', start);
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stop(); else start();
+      });
+      // seed first paint
+      renderPos(o(), 'full');
+      renderKds(o(), 'empty');
+      renderFloor(o(), 'free');
+      renderBills(o(), 'empty');
+      renderWa(o(), 'idle');
+      run();
+      start();
+    })();
+
     // ===== POS SIMULATOR =====
     let simCart = {};
 
-    function addToSimCart(name, price, taxRate) {
-      var tr = taxRate || (COUNTRY_CFG[SIM_COUNTRY] ? COUNTRY_CFG[SIM_COUNTRY].taxRate : 5);
-      if (simCart[name]) simCart[name].qty++;
-      else simCart[name] = { price: price, qty: 1, taxRate: tr };
+    function simCfg() {
+      return COUNTRY_CFG[SIM_COUNTRY] || COUNTRY_CFG.IN;
+    }
+    function simMoney(n) {
+      var cfg = simCfg();
+      var v = Math.round(Number(n) || 0);
+      return cfg.sym + v;
+    }
+    function simTaxFromCart() {
+      var cfg = simCfg();
+      var subtotal = 0;
+      var tax = 0;
+      Object.keys(simCart).forEach(function (name) {
+        var it = simCart[name];
+        var line = it.price * it.qty;
+        subtotal += line;
+        var rate = Number(it.taxRate != null ? it.taxRate : cfg.taxRate) || 0;
+        tax += Math.round(line * rate / 100);
+      });
+      return { subtotal: subtotal, tax: tax, total: subtotal + tax, cfg: cfg };
+    }
+    var simPayMethod = 'Cash';
+    function setSandboxStatus(text) {
+      var el = document.getElementById('sandbox-status-text');
+      if (el) el.textContent = text || 'Tap to add · same as live POS';
+    }
+    function getSandboxGuestName() {
+      var el = document.getElementById('sandbox-cust-name');
+      return el ? String(el.value || '').trim() : '';
+    }
+    function getSandboxFullPhone() {
+      var phoneEl = document.getElementById('sandbox-phone');
+      if (!phoneEl) return '';
+      var cfg = simCfg();
+      var raw = phoneEl.value.replace(/\D/g, '');
+      var dialDigits = String(cfg.dial || '').replace(/\D/g, '');
+      if (raw.startsWith(dialDigits) && raw.length > dialDigits.length + 5) {
+        raw = raw.slice(dialDigits.length);
+      }
+      var need = cfg.dialDigits || 10;
+      if (raw.length !== need) return '';
+      return (cfg.dial || '+91') + raw;
+    }
+    /** Name + valid mobile required — without these, sandbox billing is blocked. */
+    function isSandboxGuestReady() {
+      return !!(getSandboxGuestName() && getSandboxFullPhone());
+    }
+    function onSandboxGuestInput() {
+      var nameEl = document.getElementById('sandbox-cust-name');
+      var phoneEl = document.getElementById('sandbox-phone');
+      var hint = document.getElementById('sandbox-phone-hint');
+      var pill = document.getElementById('sandbox-req-pill');
+      var need = (simCfg().dialDigits) || 10;
+      var name = getSandboxGuestName();
+      var digits = phoneEl ? phoneEl.value.replace(/\D/g, '') : '';
+      var phoneOk = digits.length === need;
+      if (nameEl) {
+        nameEl.classList.toggle('is-valid', !!name);
+        nameEl.classList.toggle('is-invalid', !name && nameEl === document.activeElement);
+      }
+      if (phoneEl) {
+        phoneEl.classList.toggle('is-valid', phoneOk);
+        phoneEl.classList.toggle('is-invalid', digits.length > 0 && !phoneOk);
+      }
+      if (hint) {
+        hint.classList.remove('has-num', 'err');
+        if (name && phoneOk) {
+          hint.textContent = '✓ Guest ready — add items, then Print & Pay (WhatsApp auto-sends)';
+          hint.classList.add('has-num');
+        } else if (!name && !digits) {
+          hint.textContent = 'Name + mobile required — bill and WhatsApp will not run without them';
+        } else if (!name) {
+          hint.textContent = 'Enter guest name to continue';
+          hint.classList.add('err');
+        } else if (!phoneOk) {
+          hint.textContent = 'Enter full ' + need + '-digit WhatsApp mobile';
+          hint.classList.add('err');
+        }
+      }
+      if (pill) {
+        if (name && phoneOk) {
+          pill.textContent = 'Ready';
+          pill.classList.add('ok');
+        } else {
+          pill.textContent = 'Required';
+          pill.classList.remove('ok');
+        }
+      }
+      var btn = document.getElementById('btn-trigger-sim');
+      if (btn) {
+        btn.disabled = !isSandboxGuestReady() || Object.keys(simCart).length === 0;
+        btn.title = !isSandboxGuestReady()
+          ? 'Enter guest name and WhatsApp number first'
+          : Object.keys(simCart).length === 0
+            ? 'Add items first'
+            : 'Print & Pay + WhatsApp bill';
+      }
+    }
+    function requireSandboxGuest(focusField) {
+      if (isSandboxGuestReady()) return true;
+      onSandboxGuestInput();
+      var nameEl = document.getElementById('sandbox-cust-name');
+      var phoneEl = document.getElementById('sandbox-phone');
+      if (!getSandboxGuestName()) {
+        if (nameEl) {
+          nameEl.classList.add('is-invalid');
+          nameEl.focus();
+        }
+        showSandboxToast('Enter guest name — required for billing', true);
+        return false;
+      }
+      if (!getSandboxFullPhone()) {
+        if (phoneEl) {
+          phoneEl.classList.add('is-invalid');
+          phoneEl.focus();
+        }
+        showSandboxToast('Enter WhatsApp mobile — required for billing', true);
+        return false;
+      }
+      return true;
+    }
+    // legacy alias used by render paths
+    function onSandboxPhoneInput() { onSandboxGuestInput(); }
+    function setSimWaBanner(state, title, sub) {
+      var ban = document.getElementById('sim-wa-banner');
+      var t = document.getElementById('sim-wa-title');
+      var s = document.getElementById('sim-wa-sub');
+      if (!ban) return;
+      ban.className = 'sim-wa-banner show' + (state === 'err' ? ' err' : state === 'pending' ? ' pending' : '');
+      if (t) t.textContent = title || '';
+      if (s) s.textContent = sub || '';
+    }
+    function hideSimWaBanner() {
+      var ban = document.getElementById('sim-wa-banner');
+      if (ban) ban.className = 'sim-wa-banner';
+    }
+    function addToSimCart(name, price, taxRate, cat, color, veg) {
+      if (!requireSandboxGuest()) return;
+      var tr = taxRate || (simCfg().taxRate || 5);
+      if (simCart[name]) {
+        simCart[name].qty++;
+      } else {
+        simCart[name] = {
+          price: price,
+          qty: 1,
+          taxRate: tr,
+          cat: cat || '',
+          color: color || '#FF4F00',
+          veg: !!veg,
+        };
+      }
+      setSandboxStatus('Open bill · ' + Object.keys(simCart).length + ' item(s)');
       renderSimCart();
+      renderSimMenu();
     }
     function changeQty(name, amount) {
       if (!simCart[name]) return;
       simCart[name].qty += amount;
       if (simCart[name].qty <= 0) delete simCart[name];
       renderSimCart();
+      renderSimMenu();
+    }
+    function clearSimCart() {
+      simCart = {};
+      // Keep name + phone — guest stays for next bill (like live POS session)
+      setSandboxStatus(isSandboxGuestReady() ? 'Guest ready · add items' : 'Name + mobile required');
+      renderSimCart();
+      renderSimMenu();
+      onSandboxGuestInput();
+      showSandboxToast('Cart cleared — guest name/mobile kept', false);
     }
     function renderSimCart() {
       const container = document.getElementById('sim-cart-content');
-      const actions   = document.getElementById('sandbox-actions');
-      let itemsHtml = '', subtotal = 0, totalItems = 0;
+      const foot = document.getElementById('sandbox-cart-foot');
+      const countEl = document.getElementById('sim-cart-count');
+      if (!container) return;
+      let totalItems = 0;
+      let itemsHtml = '';
       for (const name in simCart) {
-        const it = simCart[name], lineTotal = it.price * it.qty;
-        subtotal += lineTotal; totalItems += it.qty;
-        itemsHtml += `<div class="receipt-row">
-          <div>
-            <div class="ri-name">${name}</div>
-            <div class="ri-meta">
-              <button class="qty-btn" onclick="changeQty('${name}',-1)" aria-label="Remove one ${name}"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
-              <span>${it.qty} &times; &#8377;${it.price}</span>
-              <button class="qty-btn" onclick="changeQty('${name}',1)" aria-label="Add one ${name}"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
-            </div>
-          </div>
-          <div class="ri-amt">&#8377;${lineTotal}</div>
-        </div>`;
+        const it = simCart[name];
+        const lineTotal = it.price * it.qty;
+        totalItems += it.qty;
+        var safeName = String(name).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var cc = it.color || '#FF4F00';
+        itemsHtml +=
+          '<div class="cart-line" data-name="' + safeName + '">' +
+          '<div class="cdot" style="--cc:' + cc + '"></div>' +
+          '<div class="cinfo"><div class="cn-row">' +
+          '<span class="cn">' + name + '</span>' +
+          '<span class="cp">' + simMoney(it.price) + '</span>' +
+          '</div></div>' +
+          '<div class="qty">' +
+          '<button type="button" onclick="changeQty(\'' + safeName + '\',-1)" aria-label="Decrease"><i class="fa-solid fa-minus"></i></button>' +
+          '<span class="qn">' + it.qty + '</span>' +
+          '<button type="button" onclick="changeQty(\'' + safeName + '\',1)" aria-label="Increase"><i class="fa-solid fa-plus"></i></button>' +
+          '</div>' +
+          '<div class="cline-total">' + simMoney(lineTotal) + '</div>' +
+          '</div>';
       }
+      if (countEl) countEl.textContent = String(totalItems);
       if (totalItems === 0) {
-        container.className = 'empty-cart-msg';
-        container.innerHTML = '<i class="fa-solid fa-receipt" aria-hidden="true"></i>Your receipt is empty.<br>Tap menu items to start a bill.';
-        if (actions) actions.style.display = 'none';
+        container.innerHTML =
+          '<div class="cart-empty"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>' +
+          '<div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>';
+        if (foot) foot.style.display = 'none';
+        setSandboxStatus('Tap to add · same as live POS');
         return;
       }
-      const tax = Math.round(subtotal * 0.05), finalTotal = subtotal + tax;
-      container.className = '';
-      container.innerHTML = `
-        <div class="receipt-list">${itemsHtml}</div>
-        <div class="receipt-summary">
-          <div class="sum-row"><span>Subtotal</span><span>&#8377;${subtotal}</span></div>
-          <div class="sum-row"><span>GST (5%)</span><span>&#8377;${tax}</span></div>
-          <div class="sum-total"><span>Total</span><span>&#8377;${finalTotal}</span></div>
-        </div>`;
-      if (actions) { actions.style.display = 'flex'; actions.dataset.total = finalTotal; }
-      document.getElementById('btn-trigger-sim').dataset.total = finalTotal;
-      validateSandboxPhone();
+      container.innerHTML = itemsHtml;
+      var totals = simTaxFromCart();
+      if (foot) foot.style.display = 'block';
+      var subEl = document.getElementById('sim-t-sub');
+      var gstEl = document.getElementById('sim-t-gst');
+      var grandEl = document.getElementById('sim-t-grand');
+      if (subEl) subEl.textContent = simMoney(totals.subtotal);
+      if (gstEl) gstEl.textContent = simMoney(totals.tax);
+      if (grandEl) grandEl.textContent = simMoney(totals.total);
+      var printBtn = document.getElementById('btn-trigger-sim');
+      if (printBtn) printBtn.dataset.total = totals.total;
+      onSandboxGuestInput();
     }
-    function validateSandboxPhone() {
-      const phone = document.getElementById('sandbox-phone');
-      const btn   = document.getElementById('btn-send-real');
-      if (!phone || !btn) return;
-      btn.disabled = phone.value.replace(/\D/g,'').length !== 10;
+    /** Build thermal receipt HTML matching live POS Bill settled preview. */
+    function buildSandboxReceiptHtml(billNo, totals, payMethod, guestName, fullPhone) {
+      var cfg = totals.cfg || simCfg();
+      var $ = function (n) { return simMoney(n); };
+      var now = new Date();
+      var timeStr = '';
+      try {
+        timeStr = now.toLocaleString(cfg.locale || 'en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      } catch (_) {
+        timeStr = now.toLocaleString();
+      }
+      var itemsHtml = Object.keys(simCart).map(function (name) {
+        var it = simCart[name];
+        return (
+          '<div class="rcp-line"><span><span class="q">' + it.qty + 'x </span>' + name +
+          '</span><span>' + $(it.price * it.qty) + '</span></div>'
+        );
+      }).join('');
+      var taxHtml = '';
+      if (cfg.taxMode === 'cgst_sgst') {
+        var half = Math.round(totals.tax / 2);
+        taxHtml =
+          '<div class="rcp-line"><span>CGST (2.5%)</span><span>' + $(half) + '</span></div>' +
+          '<div class="rcp-line"><span>SGST (2.5%)</span><span>' + $(totals.tax - half) + '</span></div>' +
+          '<div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>';
+      } else {
+        taxHtml =
+          '<div class="rcp-line"><span>' + (cfg.taxLabel || 'Tax') +
+          ' (' + (cfg.taxRate || 0) + '%)</span><span>' + $(totals.tax) + '</span></div>';
+      }
+      var pay = payMethod || 'Cash';
+      var cust = guestName || getSandboxGuestName() || 'Guest';
+      var wa = fullPhone || getSandboxFullPhone() || '';
+      return (
+        '<div class="receipt-paper">' +
+          '<div class="rcp-center">' +
+            '<div class="rcp-logo">RestroSuite Demo</div>' +
+            '<div class="rcp-sub">Table 4 · Dine-in</div>' +
+          '</div>' +
+          '<hr class="rcp-hr">' +
+          '<div class="rcp-meta"><span>' + billNo + '</span><span>' + timeStr + '</span></div>' +
+          '<div class="rcp-meta"><span>Table:</span><span>Table 4</span></div>' +
+          '<div class="rcp-meta"><span>Customer:</span><span>' + cust.replace(/</g, '&lt;') + '</span></div>' +
+          (wa ? '<div class="rcp-meta"><span>WhatsApp:</span><span>' + wa + '</span></div>' : '') +
+          '<hr class="rcp-hr">' +
+          itemsHtml +
+          '<hr class="rcp-hr">' +
+          '<div class="rcp-line"><span>Subtotal</span><span>' + $(totals.subtotal) + '</span></div>' +
+          taxHtml +
+          '<div class="rcp-tot"><span>TOTAL</span><span>' + $(totals.total) + '</span></div>' +
+          '<hr class="rcp-hr">' +
+          '<div class="rcp-line"><span class="q">' + pay + '</span><span>' + $(totals.total) + '</span></div>' +
+          '<div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>' +
+        '</div>'
+      );
     }
-    function showModal(title, desc) {
-      document.getElementById('sim-modal-title').innerText = title;
-      document.getElementById('sim-modal-desc').innerHTML  = desc;
+    /** Print & Pay — blocked without name + mobile; then auto WhatsApp. */
+    async function triggerSimulatedReceipt() {
+      if (!requireSandboxGuest()) return;
+      var totals = simTaxFromCart();
+      if (!totals.subtotal) {
+        showSandboxToast('Add items first', true);
+        return;
+      }
+      var billNo = buildBillNo();
+      var pay = simPayMethod || 'Cash';
+      var fullPhone = getSandboxFullPhone();
+      var guestName = getSandboxGuestName();
+
+      var cartSnap = {};
+      Object.keys(simCart).forEach(function (k) {
+        cartSnap[k] = Object.assign({}, simCart[k]);
+      });
+      var html = buildSandboxReceiptHtml(billNo, totals, pay, guestName, fullPhone);
+      setSandboxStatus('Bill closed');
+      showModal('Bill settled', html);
+      hideSimWaBanner();
+
+      setSimWaBanner('pending', 'Sending WhatsApp bill…', 'To ' + guestName + ' · ' + fullPhone);
+      showSandboxToast('Bill settled · sending WhatsApp…', false);
+      try {
+        var sendResult = await autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone);
+        if (sendResult && sendResult.ok) {
+          setSimWaBanner('ok', 'WhatsApp bill sent', guestName + ' · ' + fullPhone);
+          showSandboxToast('✓ WhatsApp bill sent to ' + fullPhone, false);
+        } else {
+          var why = (sendResult && sendResult.error) || 'Messaging is offline right now.';
+          setSimWaBanner('err', 'WhatsApp could not send', why + ' Bill is saved on screen.');
+        }
+      } catch (e) {
+        setSimWaBanner('err', 'WhatsApp unreachable', 'Bill still settled on this screen. Messaging may be offline.');
+      }
+
+      simCart = {};
+      // Keep guest name + phone for next demo bill
+      onSandboxGuestInput();
+      renderSimCart();
+      renderSimMenu();
+    }
+    function showModal(title, receiptHtml) {
+      var titleEl = document.getElementById('sim-modal-title');
+      var bodyEl = document.getElementById('sim-modal-desc');
+      if (titleEl) {
+        titleEl.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i> ' + (title || 'Bill settled');
+      }
+      if (bodyEl) bodyEl.innerHTML = receiptHtml || '';
       document.getElementById('sim-modal').classList.add('show');
     }
     function closeSimModal() { document.getElementById('sim-modal').classList.remove('show'); }
@@ -1301,7 +3029,7 @@
         ]
       },
       IE: {
-        name:'Ireland', sym:'€', dial:'+353', dialDigits:9,
+        name:'Ireland', sym:'---‚¬', dial:'+353', dialDigits:9,
         taxLabel:'VAT', taxMode:'vat_breakout', taxRate:9,
         locale:'en-IE', tz:'Europe/Dublin',
         items:[
@@ -1399,25 +3127,47 @@
       if (!grid || !cfg) return;
       var colors = ['#FF4F00','#2A9B8F','#5B6C8F','#C47B16'];
       grid.innerHTML = cfg.items.map(function(item, i) {
-        var sym = cfg.sym;
-        var label = sym + item.price;
         var color = item.color || colors[i % colors.length];
-        var vegDot = item.veg ? '<span class="mveg" aria-label="Vegetarian"></span>' : '<span class="mnonveg" aria-label="Non-vegetarian"></span>';
-        var safeName = item.name.replace(/'/g, "\\'");
-        return '<button class="menu-item-btn" onclick="addToSimCart(\'' + safeName + '\',' + item.price + ',' + (item.taxRate||cfg.taxRate) + ')" style="--cc:' + color + '" aria-label="Add ' + item.name + ' ' + label + '">' +
-          '<span class="add" aria-hidden="true"><i class="fa-solid fa-plus"></i></span>' +
-          '<span class="mtop">' + vegDot + '<span class="mcat">' + item.cat + '</span></span>' +
-          '<div class="menu-item-name">' + item.name + '</div>' +
-          '<div class="menu-item-price">' + label + '</div>' +
-          '</button>';
+        var safeName = item.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var safeCat = String(item.cat || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        var inCart = simCart[item.name];
+        var qtyBadge = inCart
+          ? '<div class="pos-item-qty-badge" aria-label="' + inCart.qty + ' in cart">' + inCart.qty + '</div>'
+          : '';
+        var vegCls = item.veg ? 'veg' : 'veg nonveg';
+        var vegTitle = item.veg ? 'Veg' : 'Non-veg';
+        var rate = item.taxRate || cfg.taxRate;
+        var vegFlag = item.veg ? 'true' : 'false';
+        return (
+          '<button type="button" class="pos-item' + (inCart ? ' in-cart' : '') + '" ' +
+          'style="--cc:' + color + '" ' +
+          'onclick="addToSimCart(\'' + safeName + '\',' + item.price + ',' + rate + ',\'' + safeCat + '\',\'' + color + '\',' + vegFlag + ')" ' +
+          'aria-label="Add ' + item.name + ' ' + cfg.sym + item.price + '">' +
+          qtyBadge +
+          '<div class="pi-top">' +
+          '<span class="' + vegCls + '" title="' + vegTitle + '" aria-hidden="true"></span>' +
+          '<span class="picat">' + (item.cat || '') + '</span>' +
+          '</div>' +
+          '<div class="pname">' + item.name + '</div>' +
+          '<div class="prow"><span class="pprice">' + cfg.sym + item.price + '</span></div>' +
+          '</button>'
+        );
       }).join('');
-      // Update phone prefix
       var pre = document.getElementById('sandbox-prefix');
       if (pre) pre.textContent = cfg.dial;
-      // Update phone input maxlength
       var ph = document.getElementById('sandbox-phone');
       if (ph) { ph.maxLength = cfg.dialDigits; ph.placeholder = cfg.dialDigits + '-digit WhatsApp number'; }
     }
+
+    // Wire payment method pills (demo only)
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('#sim-pay-methods [data-sim-pay]');
+      if (!btn) return;
+      simPayMethod = btn.getAttribute('data-sim-pay') || 'Cash';
+      document.querySelectorAll('#sim-pay-methods [data-sim-pay]').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+    });
 
     function buildBillNo() {
       var now = new Date();
@@ -1441,13 +3191,13 @@
       var dateStr = fmtDate(now, cfg.locale);
       var subtotal = total - tax;
 
-      // ── Build items HTML ────────────────────────────────────────
+      // --- Build items HTML ---
       var itemsHtml = items.map(function(item) {
         var taxR = item.taxRate || cfg.taxRate;
         return '<div class="rr"><span>' + item.qty + '× ' + item.name + ' (' + taxR + '%)</span><span>' + rs(item.price * item.qty) + '</span></div>';
       }).join('');
 
-      // ── Build tax section HTML ──────────────────────────────────
+      // --- Build tax section HTML ---
       var taxHtml = '';
       if (cfg.taxMode === 'cgst_sgst') {
         var halfGst = Math.round(tax / 2);
@@ -1461,7 +3211,7 @@
         taxHtml = '<div class="rr"><span>' + cfg.taxLabel + ' (' + cfg.taxRate + '%)</span><span>' + rs(tax) + '</span></div>';
       }
 
-      // ── Receipt HTML (rendered off-screen) ─────────────────────
+      // --- Receipt HTML (rendered off-screen) ---
       var rcpHtml = '<style>' +
         '*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}body{background:#fff}' +
         '#rcp{width:302px;font-family:Arial,Helvetica,sans-serif;font-size:13px;background:#fff;color:#111;padding:18px 16px}' +
@@ -1530,87 +3280,111 @@
       _toastTimer = setTimeout(function() { t.classList.remove('show'); }, isError ? 9000 : 3800);
     }
 
-    async function sendRealWhatsAppReceipt() {
-      const phoneEl = document.getElementById('sandbox-phone');
-      const btn     = document.getElementById('btn-send-real');
+    /**
+     * Auto WhatsApp after Print & Pay when cart has a valid mobile —
+     * mirrors live POS: settle → send bill PDF if customerPhone present.
+     */
+    async function autoSendSandboxWhatsApp(billNo, totals, cartSnap, fullPhone) {
+      var cfg = totals.cfg || simCfg();
+      var dialDigits = String(cfg.dial || '').replace(/\D/g, '');
+      var num = String(fullPhone || '').replace(/\D/g, '');
+      if (dialDigits && num.startsWith(dialDigits)) num = num.slice(dialDigits.length);
+      if (num.length < 7) return { ok: false, error: 'Invalid phone number' };
 
-      // Normalise number — strip non-digits, strip dial code if already included
-      var rawNum = phoneEl.value.replace(/\D/g, '');
-      const cfg  = COUNTRY_CFG[SIM_COUNTRY];
-      if (rawNum.startsWith(cfg.dial) && rawNum.length > cfg.dial.length + 5) rawNum = rawNum.slice(cfg.dial.length);
-      const num = rawNum;
-      if (num.length < 7) return;
+      var items = Object.keys(cartSnap || {}).map(function (name) {
+        var v = cartSnap[name];
+        return { name: name, price: v.price, qty: v.qty, taxRate: v.taxRate || cfg.taxRate };
+      });
+      if (!items.length) return { ok: false, error: 'Cart is empty' };
 
-      const items    = Object.entries(simCart).map(([name, v]) => ({ name, price: v.price, qty: v.qty, taxRate: v.taxRate || cfg.taxRate }));
-      const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-      const tax      = Math.round(subtotal * cfg.taxRate / 100);
-      const total    = subtotal + tax;
-      const billNo   = buildBillNo();
-      const fullPhone = cfg.dial + num;
-
-      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…'; }
-
-      // 1. Generate PDF for WhatsApp delivery
       var pdfBase64 = null;
       try {
-        const pdfDoc = await buildPdfReceipt(num, items, tax, total, billNo);
-        if (pdfDoc) {
-          pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
-        }
-      } catch(_) {}
+        var pdfDoc = await buildPdfReceipt(num, items, totals.tax, totals.total, billNo);
+        if (pdfDoc) pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
+      } catch (_) {}
 
-      // 2. Build WhatsApp message
-      var sym = cfg.sym, rs = function(n) { return sym + n; };
-      var msg = '*RestroSuite Demo*\n\u260e\ufe0f +919983721179\n\n';
-      msg += '\ud83e\uddfe ' + billNo + '   ' + fmtDate(new Date(), cfg.locale) + '\n';
-      msg += 'Table: Walk-in / Takeaway\nPhone: +' + fullPhone + '\n\n';
-      items.forEach(function(it) {
-        msg += it.qty + '\u00d7 ' + it.name + ' (' + (it.taxRate||cfg.taxRate) + '%)    ' + rs(it.price * it.qty) + '\n';
+      var r = await fetch('/api/sandbox-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: fullPhone,
+          items: items,
+          country: SIM_COUNTRY,
+          pdfData: pdfBase64,
+          filename: 'Receipt_' + billNo + '.pdf'
+        })
       });
-      msg += '\nSubtotal    ' + rs(subtotal) + '\n';
-      if (cfg.taxMode === 'cgst_sgst') {
-        var hg = Math.round(tax/2);
-        msg += 'CGST (2.5%)    ' + rs(hg) + '\nSGST (2.5%)    ' + rs(tax-hg) + '\nSAC: ' + cfg.sacCode + '\n';
-      } else if (cfg.taxMode === 'vat_breakout') {
-        msg += 'VAT Breakout\nRate ' + cfg.taxRate + '%    Net ' + rs(subtotal) + ' | VAT ' + rs(tax) + '\n';
-      } else {
-        msg += cfg.taxLabel + ' (' + cfg.taxRate + '%)    ' + rs(tax) + '\n';
+      var json = await r.json().catch(function () { return {}; });
+      if (r.ok && json && json.ok) return { ok: true };
+      var errMsg = String((json && json.error) || '').trim();
+      if (!errMsg || /gateway|stack|token|host|supabase|vercel|hf\.|huggingface/i.test(errMsg)) {
+        errMsg = r.status === 503 || r.status === 502
+          ? 'Messaging is offline right now. Try again after WhatsApp is linked.'
+          : 'Could not send the bill. Try again later.';
       }
-      msg += '\n*TOTAL    ' + rs(total) + '*\n\nCash    ' + rs(total) + '\n\nThank you for dining with us!\n*Powered by RestroSuite*';
-
-      // 3. Send through our server route so the private gateway token stays server-side.
-      var sendSucceeded = false;
-      try {
-        const r = await fetch('/api/sandbox-send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: fullPhone,
-            items: items,
-            country: SIM_COUNTRY,
-            pdfData: pdfBase64,
-            filename: 'Receipt_' + billNo + '.pdf'
-          })
-        });
-        const json = await r.json().catch(function() { return {}; });
-        if (r.ok && json && json.ok) {
-          sendSucceeded = true;
-          showSandboxToast('\u2713 ' + (json.pdfSent ? 'PDF receipt' : 'Receipt text') + ' sent to +' + fullPhone, false);
-        } else {
-          showSandboxToast(json.error || 'WhatsApp gateway failed. PDF not sent.', true);
-        }
-      } catch(err) {
-        showSandboxToast('WhatsApp gateway unreachable. PDF not sent.', true);
-      }
-
-      // 4. Reset -- only clear the cart/phone once the send actually succeeded.
-      // Clearing on failure used to hide real errors (e.g. gateway 503s) from the user.
-      if (sendSucceeded) {
-        simCart = {}; phoneEl.value = '';
-      }
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-brands fa-whatsapp"></i> Send WhatsApp Invoice'; }
-      renderSimCart(); validateSandboxPhone();
+      return { ok: false, error: errMsg };
     }
+
+    // ===== APPROVED HOMEPAGE REVIEWS (optional public feed) =====
+    (async function loadHomepageReviews() {
+      try {
+        var params = new URLSearchParams(location.search);
+        var slug = params.get('tenant') || params.get('slug') || localStorage.getItem('rs_public_review_tenant') || '';
+        // Default demo: try platform marketing slug if set on window
+        if (!slug && window.__RS_REVIEW_TENANT__) slug = window.__RS_REVIEW_TENANT__;
+        var localApproved = [];
+        try { localApproved = JSON.parse(localStorage.getItem('rs_homepage_reviews') || '[]') || []; } catch (e) {}
+
+        var reviews = localApproved.filter(function (r) { return r && r.homepageApproved !== false && Number(r.rating) >= 4; });
+        if (slug && window.__configReady) {
+          try {
+            await window.__configReady;
+            var su = window.__SUPABASE_URL__;
+            var sk = window.__SUPABASE_ANON_KEY__;
+            var fn = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic)
+              || (su ? su + '/functions/v1/tenant-public' : '');
+            if (fn) {
+              var res = await fetch(fn, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': sk || '', 'Authorization': 'Bearer ' + (sk || '') },
+                body: JSON.stringify({ action: 'list_homepage_reviews', tenant_slug: slug, limit: 6 })
+              });
+              var data = await res.json().catch(function () { return {}; });
+              if (res.ok && data && Array.isArray(data.reviews) && data.reviews.length) {
+                reviews = data.reviews;
+                if (data.avg != null) {
+                  var lab = document.getElementById('hero-stars-label');
+                  if (lab) lab.textContent = data.avg + '★ from approved guests';
+                }
+              }
+            }
+          } catch (e) {}
+        }
+        if (!reviews.length) return;
+        var track = document.getElementById('testi-track');
+        if (!track) return;
+        var avg = reviews.reduce(function (s, r) { return s + (Number(r.rating) || 5); }, 0) / reviews.length;
+        var lab2 = document.getElementById('hero-stars-label');
+        if (lab2 && !/★/.test(lab2.textContent || '')) lab2.textContent = avg.toFixed(1) + '★ approved reviews';
+        track.innerHTML = reviews.slice(0, 6).map(function (r, i) {
+          var name = String(r.guestName || r.guest_name || 'Guest');
+          var initials = name.split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase() || '★';
+          var stars = '★'.repeat(Math.min(5, Number(r.rating) || 5));
+          var quote = String(r.comment || 'Great experience with RestroSuite.').slice(0, 220);
+          return '<div class="testi-card" role="group" aria-label="Review ' + (i + 1) + '">' +
+            '<div class="testi-inner">' +
+            '<div class="testi-stars" aria-label="' + (r.rating || 5) + ' out of 5 stars">' + stars + '</div>' +
+            '<p class="testi-quote">"' + quote.replace(/</g, '&lt;') + '"</p>' +
+            '<div class="testi-author"><div class="testi-avatar" aria-hidden="true">' + initials.replace(/</g, '') + '</div>' +
+            '<div class="testi-meta" style="text-align:left"><div class="n">' + name.replace(/</g, '&lt;') + '</div>' +
+            '<div class="r">Verified guest feedback</div></div></div></div></div>';
+        }).join('');
+        // Reset carousel counters if present
+        try {
+          if (typeof window.__rsRebuildTestiDots === 'function') window.__rsRebuildTestiDots();
+        } catch (e) {}
+      } catch (e) {}
+    })();
 
     // ===== TESTIMONIALS CAROUSEL =====
     let testiIndex = 0;
@@ -1640,6 +3414,7 @@
     // ===== INIT SANDBOX (must run after COUNTRY_CFG is defined) =====
     SIM_COUNTRY = detectCountry();
     renderSimMenu();
+    onSandboxGuestInput();
 
   </script>
   <script src="pwa.js"></script>

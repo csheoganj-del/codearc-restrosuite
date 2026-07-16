@@ -72,8 +72,11 @@
   const LS_SESS = window.localStorage; // ONLY for "remember me" restore blob + non-auth prefs
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
-              persist:'rs_session_persistent' };
-  const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,'superadmin_admin_token'];
+              persist:'rs_session_persistent',
+              planCode:'rs_plan_code', planName:'rs_plan_name', subStatus:'rs_subscription_status',
+              subEnd:'rs_subscription_period_end', planLimits:'rs_plan_limits' };
+  const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,
+    K.planCode,K.planName,K.subStatus,K.subEnd,K.planLimits,'superadmin_admin_token'];
   // Single-blob remember key. Live auth keys must NEVER be flat localStorage entries
   // shared across tabs — that caused multi-outlet session swaps (tab A silently
   // became tab B when a second login wrote the same keys).
@@ -214,6 +217,18 @@
     store(K.role, s.role || 'admin');
     store(K.display, s.display_name || s.username || '');
     store(K.persist, persist ? '1' : '0');
+    // Plan / billing snapshot (from login + validate_session) for Settings fallback
+    if (s.plan_code != null || s.plan_name != null || s.subscription_status != null) {
+      store(K.planCode, s.plan_code || 'starter');
+      store(K.planName, s.plan_name || '');
+      store(K.subStatus, s.subscription_status || 'active');
+      store(K.subEnd, s.subscription_current_period_end || '');
+      try {
+        store(K.planLimits, JSON.stringify(s.plan_limits || {}));
+      } catch (_) {
+        store(K.planLimits, '{}');
+      }
+    }
     if (s.admin_token) {
       SS.setItem('superadmin_admin_token', s.admin_token);
     } else {
@@ -363,9 +378,24 @@
         absorbRuntimeConfig();
         if (!CONFIGURED && !ssGet('superadmin_admin_token')) return null;
       }
-      return { token:t, tenant_id:ssGet(K.tid), tenant_slug:ssGet(K.slug), tenant_name:ssGet(K.name),
-               username:ssGet(K.user), role, display_name:ssGet(K.display),
-               allowed_tabs: JSON.parse(ssGet(K.tabs)||'[]') }; },
+      let planLimits = {};
+      try { planLimits = JSON.parse(ssGet(K.planLimits) || '{}') || {}; } catch (_) { planLimits = {}; }
+      return {
+        token: t,
+        tenant_id: ssGet(K.tid),
+        tenant_slug: ssGet(K.slug),
+        tenant_name: ssGet(K.name),
+        username: ssGet(K.user),
+        role,
+        display_name: ssGet(K.display),
+        allowed_tabs: JSON.parse(ssGet(K.tabs) || '[]'),
+        plan_code: ssGet(K.planCode) || '',
+        plan_name: ssGet(K.planName) || '',
+        subscription_status: ssGet(K.subStatus) || '',
+        subscription_current_period_end: ssGet(K.subEnd) || '',
+        plan_limits: planLimits,
+      };
+    },
 
     logout(){ ssClear(); },
 

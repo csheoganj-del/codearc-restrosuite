@@ -1200,7 +1200,7 @@
           try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
           setTimeout(()=>location.href='dashboard',700);
         } else {
-          showErr('Outlet "'+slug+'" not found. Register it first or configure Supabase to sign in to a live outlet.');
+          showErr('Outlet "'+slug+'" not found. Register it first, or sign in with a live outlet account.');
           loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
         }
       }

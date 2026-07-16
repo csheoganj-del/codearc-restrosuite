@@ -2454,10 +2454,22 @@
           const u = staffUsers[+b.dataset.idx];
           const newStatus = b.dataset.status === 'active' ? 'suspended' : 'active';
           const verb = newStatus === 'suspended' ? 'Suspend' : 'Reactivate';
-          if (!confirm(`${verb} account for ${u.display_name || u.username}?`)) return;
+          if (!confirm(
+            newStatus === 'suspended'
+              ? `Suspend ${u.display_name || u.username}?\n\nThey cannot log in. Active sessions on other devices will be revoked within a minute.`
+              : `Reactivate ${u.display_name || u.username}?`
+          )) return;
           try {
             await RS_API.staffUsers({ action:'update_user', user_id:u.id, status:newStatus });
-            RS.toast(`${u.display_name || u.username} ${newStatus}`, newStatus==='active'?'fa-circle-check':'fa-ban');
+            try {
+              await RS_API.staffUsers({ action:'revoke_user_sessions', user_id:u.id });
+            } catch (_) {}
+            RS.toast(
+              newStatus === 'suspended'
+                ? `${u.display_name || u.username} suspended · sessions revoked`
+                : `${u.display_name || u.username} reactivated`,
+              newStatus==='active'?'fa-circle-check':'fa-ban'
+            );
             loadStaffUsers();
           } catch(e) { RS.toast(e.message,'fa-circle-exclamation'); }
         }));

@@ -1692,7 +1692,7 @@
       const tagline =
         s.set_tagline ||
         s.set_guest_welcome ||
-        'Scan to order food or call your waiter';
+        'This table only · Order food or call waiter';
       return {
         name: formatOutletTitle(name),
         phone: String(phone || '').trim(),
@@ -2104,7 +2104,7 @@
       const phone = esc(phoneRaw);
       const wifi = esc(wifiRaw);
       const wifiPass = esc(wifiPassRaw);
-      const taglineRaw = String((p && p.tagline) || 'Scan to order food or call your waiter').trim();
+      const taglineRaw = String((p && p.tagline) || 'This table only · Order food or call waiter').trim();
       const tagline = esc(taglineRaw);
       const opts = (p && p.printOpts) || getQrPrintOpts();
 
@@ -2130,6 +2130,10 @@
       const isMini = sizeId === 'mini';
       const padX = isMini ? 8 : 14;
       const padY = isMini ? 8 : 12;
+      // Purpose line: guests/staff know what the QR is for (dual workflow)
+      const purposeLine = isMini
+        ? 'Table QR · order or call waiter'
+        : 'What this is for: guest self-order OR call waiter · same bill as staff';
 
       // —— Dual purpose strip (hero message) ——
       let usesHtml = '';
@@ -2257,9 +2261,13 @@
                 <img src="${qrCodeUrl}" alt="Table ${tbl} — order or call waiter" width="${qr}" height="${qr}" style="display:block;width:${qr}px;height:${qr}px;max-width:100%" />
               </div>
             </div>
-            <div style="font-size:${scanPx}px;font-weight:700;color:${B.inkSoft};margin:0 0 ${
+            <div style="font-size:${scanPx}px;font-weight:700;color:${B.inkSoft};margin:0 0 4px">Point camera at the code</div>
+            <div style="font-size:${Math.max(
+              7,
+              metaPx
+            )}px;font-weight:700;color:${B.mute};margin:0 0 ${
               showSteps ? 6 : 2
-            }px">Point camera at the code</div>
+            }px;line-height:1.3;letter-spacing:.01em">${esc(purposeLine)}</div>
             ${stepsHtml}
             ${metaHtml}
           </div>
@@ -3240,6 +3248,53 @@
       }
     }
 
+    async function settleAggregatorBill(order, statusLabel) {
+      if (!order || !window.RS || typeof RS.saveOne !== 'function') return;
+      const cancelled = /cancel|reject/i.test(String(statusLabel || ''));
+      const items = (order.rawItems || order.row?.items || []).map((it) => ({
+        id: it.id,
+        name: it.name || 'Item',
+        qty: Number(it.qty) || 1,
+        price: Number(it.price || it.salePrice || 0),
+      }));
+      const sub = items.reduce((a, i) => a + i.price * i.qty, 0) || Number(order.total) || 0;
+      const fee = Number(order.row?.deliveryFee || order.deliveryFee) || 0;
+      const gst = Math.round(sub * 0.05);
+      const grand = cancelled ? 0 : sub + fee + gst;
+      const plat = order.plat || order.row?.platform || order.row?.source || 'online';
+      const bill = {
+        id: 'BILL-OL-' + (order.id || Date.now()),
+        no: order.oid || order.orderId || 'OL-' + Date.now(),
+        orderId: order.oid || order.orderId,
+        customerName: order.cust || order.row?.customerName || 'Online guest',
+        customerPhone: order.phone || order.row?.customerPhone || '',
+        dateTime: new Date().toISOString(),
+        time: new Date().toLocaleString('en-IN'),
+        table: 'Online · ' + (platName[plat] || plat),
+        subtotal: sub,
+        gst: cancelled ? 0 : gst,
+        amount: grand,
+        total: grand,
+        paymentMethod: cancelled ? '—' : 'Online',
+        pay: cancelled ? '—' : 'Online',
+        channel: 'aggregator',
+        platform: plat,
+        orderType: 'Online Delivery',
+        status: cancelled ? 'Cancelled' : 'Paid',
+        _items: items,
+        deliveryFee: fee,
+      };
+      try {
+        await RS.saveOne('bills', bill);
+        if (Array.isArray(RS.BILLS)) {
+          const exists = RS.BILLS.some((b) => String(b.no) === String(bill.no) || String(b.id) === String(bill.id));
+          if (!exists) RS.BILLS.unshift(bill);
+        }
+      } catch (e) {
+        console.warn('[Online] bill settle failed', e);
+      }
+    }
+
     async function persistOnlineStatus(idx, persistedStatus, message, icon, opts) {
       const order = ONLINE[idx];
       if (!order) return;
@@ -3254,6 +3309,13 @@
         if (window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true });
         RS.toast(message, icon);
         if (opts && opts.printKot) printOnlineKot(order);
+        // Delivered / rider out / cancelled → save into Bills with platform tag
+        if (/picked|deliver|ready|reject|cancel/i.test(String(persistedStatus))) {
+          const shouldBill =
+            /picked|deliver/i.test(String(persistedStatus)) ||
+            /reject|cancel/i.test(String(persistedStatus));
+          if (shouldBill) await settleAggregatorBill(order, persistedStatus);
+        }
         try {
           document.dispatchEvent(new CustomEvent('rs:kot-new', { detail: order.row }));
         } catch (_) {}
@@ -3361,7 +3423,7 @@
         (window.RS_API && RS_API.functionsBase) ||
         (window.__SUPABASE_URL__
           ? String(window.__SUPABASE_URL__).replace(/\/+$/, '') + '/functions/v1'
-          : 'https://YOUR_PROJECT.supabase.co/functions/v1');
+          : '');
       const url = `${base}/aggregator-webhook?tenant_id=${encodeURIComponent(tid || 'YOUR_TENANT_ID')}`;
       const sample = `{
   "platform": "swiggy",
@@ -3521,17 +3583,18 @@
           </div>
           <h3 class="agg-empty-title">Kitchen is clear for delivery</h3>
           <p class="agg-empty-copy">
-            New aggregator orders land here for <b>Accept + KOT</b>, then settle in POS.
-            ${showDemo ? 'Try a demo order to practice the full flow in under a minute.' : 'Connect your webhook when the aggregator integration is ready.'}
+            Enter Swiggy / Zomato / ONDC orders <b>manually</b> (no API needed), or connect a webhook later.
+            Each order keeps its <b>platform</b> label on bills and reports.
           </p>
           <ol class="agg-empty-steps">
-            <li><span>1</span> Connect webhook</li>
+            <li><span>1</span> Manual entry or webhook</li>
             <li><span>2</span> Accept + print KOT</li>
-            <li><span>3</span> Settle in POS</li>
+            <li><span>3</span> Settle → Bills (platform tagged)</li>
           </ol>
           <div class="agg-empty-actions">
+            <button type="button" class="btn btn-primary" id="agg-empty-manual" data-rs10-manual-online="1"><i class="fa-solid fa-plus"></i> Manual order</button>
             <button type="button" class="btn btn-ghost" id="agg-empty-webhook"><i class="fa-solid fa-link"></i> Webhook setup</button>
-            ${showDemo ? '<button type="button" class="btn btn-primary" id="agg-empty-demo"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
+            ${showDemo ? '<button type="button" class="btn btn-ghost" id="agg-empty-demo"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
           </div>
         </div>`;
       } else if (!filtered.length) {
@@ -3723,6 +3786,13 @@
       if (seedBtn) seedBtn.onclick = seedDemo;
       const emptyDemo = sec.querySelector('#agg-empty-demo');
       if (emptyDemo) emptyDemo.onclick = seedDemo;
+      const emptyManual = sec.querySelector('#agg-empty-manual');
+      if (emptyManual) {
+        emptyManual.onclick = () => {
+          if (window.RS10 && typeof RS10.openManualOnlineOrder === 'function') RS10.openManualOnlineOrder();
+          else emptyManual.setAttribute('data-rs10-manual-online', '1');
+        };
+      }
       const emptyWh = sec.querySelector('#agg-empty-webhook');
       if (emptyWh) emptyWh.onclick = openAggWebhookModal;
       const whBtn = sec.querySelector('#agg-webhook-info');
@@ -4387,7 +4457,7 @@
               if(!records.length) throw new Error('No valid customer rows found');
               const res = await (RS.importPreview ? RS.importPreview({ 
                 title: 'Import customers CSV', 
-                summary: 'Customer rows will update loyalty profiles for this outlet and sync to Supabase when cloud is available.', 
+                summary: 'Customer rows will update loyalty profiles for this outlet and sync to the cloud when available.', 
                 rows: records.length, 
                 skipped, 
                 duplicatesCount 
@@ -5111,20 +5181,32 @@
               <button type="button" class="btn btn-ghost btn-sm" data-open-feedback><i class="fa-solid fa-arrow-up-right-from-square"></i> Open</button>
             </div>`
           : '';
+        const approvedN = records.filter(r => r.homepageApproved || r.status === 'approved').length;
         body = linkBar + (records.length
           ? `<div class="crm-stats" style="margin-bottom:12px">
               <div class="cs"><div class="csv">${records.length}</div><div class="csl">Reviews</div></div>
               <div class="cs"><div class="csv">${avg}</div><div class="csl">Avg stars</div></div>
+              <div class="cs"><div class="csv">${approvedN}</div><div class="csl">On homepage</div></div>
               <div class="cs"><div class="csv">${records.filter(r=>String(r.source||'').indexOf('qr')>=0||r.source==='bill').length}</div><div class="csl">From QR/bill</div></div>
-            </div>`
-            + table(['Date','Guest','Stars','Comment','Source'], records.map(r=>`<tr>
+            </div>
+            <p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Approve reviews to show stars &amp; quotes on the public RestroSuite homepage. Guests always submit as <b>pending</b>.</p>`
+            + table(['Date','Guest','Stars','Comment','Status','Homepage'], records.map(r=>{
+              const approved = !!(r.homepageApproved || r.status === 'approved');
+              const st = approved ? 'approved' : (r.status || 'pending');
+              return `<tr data-id="${esc(r.id)}">
               <td style="font-size:12px">${esc(String(r.createdAt||'').slice(0,10))}</td>
               <td><b>${esc(r.guestName||'Guest')}</b>${r.tableNumber ? `<div style="font-size:11px;color:var(--text-soft)">T ${esc(r.tableNumber)}</div>` : ''}</td>
               <td style="color:var(--orange);font-weight:800">${'★'.repeat(Math.min(5,Number(r.rating)||0))}${'☆'.repeat(Math.max(0,5-Math.min(5,Number(r.rating)||0)))}</td>
-              <td style="font-size:12px;max-width:200px">${esc(r.comment||'—')}</td>
-              <td style="font-size:11px;color:var(--text-soft)">${esc(r.source||'staff')}</td>
-            </tr>`).join(''))
-          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Share the guest QR link (also on digital bills) or log walk-out / Google scores here.</div></div>');
+              <td style="font-size:12px;max-width:180px">${esc(r.comment||'—')}</td>
+              <td style="font-size:11px;color:var(--text-soft)">${esc(st)} · ${esc(r.source||'staff')}</td>
+              <td style="white-space:nowrap">
+                ${approved
+                  ? `<button type="button" class="btn btn-ghost btn-sm" data-rs10-review-act="hide" data-id="${esc(r.id)}" title="Hide from homepage"><i class="fa-solid fa-eye-slash"></i></button>`
+                  : `<button type="button" class="btn btn-primary btn-sm" data-rs10-review-act="approve" data-id="${esc(r.id)}" title="Show on homepage"><i class="fa-solid fa-check"></i> Show</button>`}
+              </td>
+            </tr>`;
+            }).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Share the guest QR link (also on digital bills) or log walk-out scores. Approve what goes on the homepage.</div></div>');
       }
       else if(name==='Purchase Orders'){ 
         RS.activateTab('inventory-tab'); 

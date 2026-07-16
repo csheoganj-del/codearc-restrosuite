@@ -1,13 +1,13 @@
 ﻿{
-  "version": "v192-20260716-staff-guest-qr-dual",
+  "version": "v206-20260716-staff-guest-qr-dual",
   "date": "2026-07-16",
   "title": "Staff/guest dual table QR 10/10",
-  "summary": "Same printed table QR: guests use phone camera; staff scan in-app. Shared live tickets so guests can track, add more, and amend after waiter takes the order.",
+  "summary": "Same printed table QR: guests use phone camera; staff scan in-app (Floor → Scan table). Shared live tickets so guests track, add more, and amend after waiter takes the order.",
   "highlights": [
-    "Floor → Scan table (staff in-app QR scanner)",
+    "Floor → Scan table staff in-app QR scanner",
     "Guest hub shows waiter-taken and guest tickets",
     "Guest can add more and amend pending items",
     "POS KOTs tagged as staff for shared table view",
-    "amend_table_order on tenant-public edge function"
+    "Builds on v205 + mobile menu/inventory cards"
   ]
 }
