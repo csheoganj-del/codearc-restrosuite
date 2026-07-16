@@ -63,7 +63,8 @@
         panel.innerHTML = `
           <div class="panel-head"><h3 id="ed-form-title">Add new item</h3><button class="btn btn-ghost btn-sm" id="ed-reset" style="display:none"><i class="fa-solid fa-xmark"></i> Cancel edit</button></div>
           <div style="display:flex;flex-direction:column;gap:14px">
-            <div><label class="fl">Item name</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
+            <div><label class="fl">Item name (English)</label><input class="form-input" id="ed-name" placeholder="e.g. Paneer Tikka"></div>
+            <div><label class="fl">Item name in Hindi <span style="font-weight:500;color:var(--text-mute);font-size:11.5px">QR menu हिन्दी · optional</span></label><input class="form-input" id="ed-name-hi" placeholder="e.g. पनीर टिक्का" lang="hi"></div>
             <div class="form-grid-2">
               <div><label class="fl">Price (${symbol})</label><input class="form-input" id="ed-price" type="number" min="0" placeholder="199"></div>
               <div><label class="fl">Category</label><select class="form-input" id="ed-cat">${getEditorCats().map(c=>`<option>${c}</option>`).join('')}<option value="__new__">+ New category...</option></select></div>
@@ -277,6 +278,7 @@
           isStaple: !!(document.getElementById('ed-staple') && document.getElementById('ed-staple').checked),
           pairWater: !!(document.getElementById('ed-pair-water') && document.getElementById('ed-pair-water').checked),
           addons: parseAddonsText(document.getElementById('ed-addons') && document.getElementById('ed-addons').value),
+          nameHi: (document.getElementById('ed-name-hi') && document.getElementById('ed-name-hi').value || '').trim(),
         };
         
         try {
@@ -309,6 +311,7 @@
       buildForm._load = (m)=>{ editingId=m.id; $('#ed-form-title').textContent='Edit item'; $('#ed-reset').style.display='inline-flex';
         try { window.buildFormLoad = buildForm._load; } catch (_) {}
         $('#ed-name').value=m.name; $('#ed-price').value=m.price; $('#ed-cat').value=m.cat; $('#ed-type').value=m.veg?'veg':'nonveg';
+        if (document.getElementById('ed-name-hi')) document.getElementById('ed-name-hi').value = m.nameHi || m.name_hi || '';
         if ($('#ed-serve-unit')) $('#ed-serve-unit').value = m.serveUnit || 'plate';
         if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = Math.max(1, Number(m.recipeServings) || 1);
         if (document.getElementById('ed-bestseller')) document.getElementById('ed-bestseller').checked = !!m.bestseller;
@@ -355,6 +358,7 @@
         $('#ed-name').value=''; $('#ed-price').value=''; $('#ed-cat').selectedIndex=0; $('#ed-type').selectedIndex=0; $('#ed-gst').selectedIndex=0;
         if ($('#ed-serve-unit')) $('#ed-serve-unit').value = 'plate';
         if ($('#ed-recipe-servings')) $('#ed-recipe-servings').value = 1;
+        if (document.getElementById('ed-name-hi')) document.getElementById('ed-name-hi').value = '';
         if (document.getElementById('ed-bestseller')) document.getElementById('ed-bestseller').checked = false;
         if (document.getElementById('ed-special')) document.getElementById('ed-special').checked = false;
         if (document.getElementById('ed-staple')) document.getElementById('ed-staple').checked = false;

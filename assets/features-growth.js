@@ -1086,7 +1086,7 @@
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        </div><div class="grow"></div><button class="btn btn-primary btn-sm" id="btn-staff-scan-table" style="margin-right:8px;" title="Staff only: scan table QR with the app camera (not guest phone camera)"><i class="fa-solid fa-camera"></i> Scan table</button><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
         <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
           <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">
@@ -1124,6 +1124,18 @@
       });
       const btnPrint = $('#btn-print-floor-qrs', sec);
       if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
+      const btnStaffScan = $('#btn-staff-scan-table', sec);
+      if (btnStaffScan) {
+        btnStaffScan.onclick = () => {
+          if (window.RSStaffTableScanner && typeof RSStaffTableScanner.open === 'function') {
+            RSStaffTableScanner.open();
+          } else if (typeof window.openStaffTableScanner === 'function') {
+            window.openStaffTableScanner();
+          } else {
+            RS.toast('Scanner loading — refresh dashboard', 'fa-circle-exclamation');
+          }
+        };
+      }
       const btnManage = $('#btn-manage-seating', sec) || $('#btn-manage-seating-empty', sec);
       if (btnManage) btnManage.onclick = () => openManageSeatingModal();
       const btnRefresh = $('#btn-refresh-floor', sec);

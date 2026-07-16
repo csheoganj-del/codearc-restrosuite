@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v191-biz-type-locked";
+const CACHE_NAME = "restrosuite-shell-v20260716-v192-dual-qr";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -47,7 +47,7 @@ const APP_SHELL = [
   
   // Missing Feature Scripts Loaded Dynamically by dashboard.html
   "/assets/dashboard.js",
-  // Offline-lease guard — MUST be cached so enforcement survives offline.
+  // Offline-lease guard â€” MUST be cached so enforcement survives offline.
   "/assets/license-config.js",
   "/assets/license-guard.js",
   "/assets/features-pos.js",
@@ -68,6 +68,7 @@ const APP_SHELL = [
   "/assets/modules/super-admin.js",
   "/assets/modules/kds-ui.js",
   "/assets/modules/qr-orders-ui.js",
+  "/assets/modules/staff-table-scanner.js",
   "/assets/modules/view-mode.js",
   "/assets/modules/employees-ui.js",
   "/assets/modules/progress-ops.js",

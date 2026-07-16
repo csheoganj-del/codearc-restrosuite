@@ -1,11 +1,13 @@
-{
-  "version": "v191-20260714-biz-type-locked",
-  "date": "2026-07-14",
-  "title": "Business type locked in Settings",
-  "summary": "Business type is assigned at registration and is no longer a free dropdown in Settings. It shows as a locked read-only field.",
+﻿{
+  "version": "v192-20260716-staff-guest-qr-dual",
+  "date": "2026-07-16",
+  "title": "Staff/guest dual table QR 10/10",
+  "summary": "Same printed table QR: guests use phone camera; staff scan in-app. Shared live tickets so guests can track, add more, and amend after waiter takes the order.",
   "highlights": [
-    "Business type locked to registration value",
-    "Settings dropdown menus fixed (v190)",
-    "Version pill shows v191 after refresh"
+    "Floor → Scan table (staff in-app QR scanner)",
+    "Guest hub shows waiter-taken and guest tickets",
+    "Guest can add more and amend pending items",
+    "POS KOTs tagged as staff for shared table view",
+    "amend_table_order on tenant-public edge function"
   ]
 }

@@ -415,7 +415,7 @@
   const appVersion = (function resolveDisplayedAppVersion() {
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    return 'v191-20260714-biz-type-locked';
+    return 'v192-20260716-staff-guest-qr-dual';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

@@ -199,6 +199,7 @@ async function checkRateLimit(req: Request, action: string, tenantSlug: string) 
     list_menu: { limit: 120, windowSeconds: 60 },
     create_order: { limit: 20, windowSeconds: 5 * 60 },
     get_table_orders: { limit: 90, windowSeconds: 60 },
+    amend_table_order: { limit: 24, windowSeconds: 5 * 60 },
     create_notification: { limit: 12, windowSeconds: 60 },
     submit_review: { limit: 8, windowSeconds: 60 },
   };
@@ -613,7 +614,7 @@ serve(async (req) => {
       const sessionWindowStart = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
       const { data: pendingRows, error: pendingError } = await supabaseAdmin
         .from("doppio_pending_orders")
-        .select('orderId:order_id, status, items, total, subtotal, tableNumber:table_number, orderType:order_type, paymentMethod:payment_method, dateTime:date_time, created_at, prep_minutes, prep_started_at')
+        .select('orderId:order_id, status, items, total, subtotal, tableNumber:table_number, orderType:order_type, paymentMethod:payment_method, dateTime:date_time, created_at, prep_minutes, prep_started_at, customerName:customer_name')
         .eq("tenant_id", tenant.id)
         .gte("created_at", sessionWindowStart)
         .order("created_at", { ascending: false })
@@ -632,26 +633,54 @@ serve(async (req) => {
             name: String(it?.name || "").slice(0, 120),
             qty: Number(it?.qty || 1) || 1,
             price: Number(it?.price || 0) || 0,
+            notes: String(it?.notes || it?.note || "").slice(0, 240),
           }));
         } catch {
           return [];
         }
       };
 
+      const detectSource = (orderId: string, customerName: string) => {
+        if (/^DO-QR-/i.test(orderId)) return "qr";
+        if (/^DO-WTR-/i.test(orderId)) return "staff";
+        if (/staff|waiter|captain|kot/i.test(customerName || "")) return "staff";
+        // POS kitchen tickets without DO-QR prefix → staff
+        return "staff";
+      };
+
+      const isAmendableStatus = (status: string) => {
+        const s = String(status || "").toLowerCase();
+        return (
+          s.includes("pending") ||
+          s.includes("review") ||
+          s === "new" ||
+          s === "queued"
+        );
+      };
+
       const orders = (pendingRows || [])
         .filter((row: Record<string, unknown>) => normalizeTableKey(row.tableNumber) === tableKey)
-        .map((row: Record<string, unknown>) => ({
-          orderId: String(row.orderId || ""),
-          status: String(row.status || "Pending Review"),
-          items: parseItems(row.items),
-          total: Number(row.total || 0),
-          orderType: String(row.orderType || ""),
-          paymentMethod: String(row.paymentMethod || ""),
-          dateTime: String(row.dateTime || row.created_at || ""),
-          prepMinutes: row.prep_minutes != null ? Number(row.prep_minutes) : null,
-          prepStartedAt: row.prep_started_at || null,
-          source: /^DO-QR-/i.test(String(row.orderId || "")) ? "qr" : "staff",
-        }));
+        .map((row: Record<string, unknown>) => {
+          const orderId = String(row.orderId || "");
+          const customerName = String(row.customerName || "");
+          const status = String(row.status || "Pending Review");
+          const source = detectSource(orderId, customerName);
+          return {
+            orderId,
+            status,
+            items: parseItems(row.items),
+            total: Number(row.total || 0),
+            orderType: String(row.orderType || ""),
+            paymentMethod: String(row.paymentMethod || ""),
+            dateTime: String(row.dateTime || row.created_at || ""),
+            prepMinutes: row.prep_minutes != null ? Number(row.prep_minutes) : null,
+            prepStartedAt: row.prep_started_at || null,
+            source,
+            customerName: customerName.slice(0, 80),
+            amendable: isAmendableStatus(status),
+            placedBy: source === "qr" ? "guest" : "staff",
+          };
+        });
 
       // Recently settled bills for this table -> show as Paid
       const billWindowStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -686,6 +715,192 @@ serve(async (req) => {
         table: tableRaw,
         orders: [...orders, ...paidOrders].slice(0, 40),
         serverTime: new Date().toISOString(),
+        // Hint for guest UX: they may add more / amend pending even if staff started the ticket
+        dualWorkflow: true,
+      }, 200, req);
+    }
+
+    // ── Guest amend of shared table ticket (pending only) ───────────────────
+    // Guests can reduce qty / remove items / replace item list while status is
+    // still Pending Review — whether the ticket was started by guest QR or waiter.
+    // Once kitchen starts cooking, guest can only request a change (notification).
+    if (action === "amend_table_order") {
+      const orderId = String(payload.order_id || payload.orderId || "").trim();
+      if (!orderId || orderId.length > 96) {
+        return jsonResponse({ error: "Invalid order identifier." }, 400, req);
+      }
+      const tableRaw = String(payload.table || "").trim().slice(0, 40);
+      const sessionToken = String(payload.session_token || payload.token || "").trim();
+      const sessionCheck = await validateActiveSession(tenant.id, tenantSlug, tableRaw, sessionToken, false);
+      if (!sessionCheck.allowed) {
+        return jsonResponse({ error: sessionCheck.error }, 403, req);
+      }
+      const tableKey = sessionCheck.tableKey;
+      const mode = String(payload.mode || "replace_items").trim().toLowerCase(); // replace_items | request_change
+      const reason = String(payload.reason || "").trim().slice(0, 200);
+
+      const { data: row, error: fetchErr } = await supabaseAdmin
+        .from("doppio_pending_orders")
+        .select("id, order_id, status, items, table_number, total, customer_name")
+        .eq("tenant_id", tenant.id)
+        .eq("order_id", orderId)
+        .maybeSingle();
+
+      if (fetchErr) {
+        console.error("tenant-public amend fetch failed:", fetchErr);
+        return jsonResponse({ error: "Failed to load order." }, 500, req);
+      }
+      if (!row) {
+        return jsonResponse({ error: "Order not found or already settled." }, 404, req);
+      }
+      if (normalizeTableKey(row.table_number) !== tableKey) {
+        return jsonResponse({ error: "Order is not for this table." }, 403, req);
+      }
+
+      const status = String(row.status || "");
+      const statusL = status.toLowerCase();
+      const pending =
+        statusL.includes("pending") ||
+        statusL.includes("review") ||
+        statusL === "new" ||
+        statusL === "queued";
+
+      // Soft path: already cooking — notify staff only
+      if (!pending || mode === "request_change") {
+        const notifId = "amd_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+        await supabaseAdmin.from("doppio_notifications").insert({
+          id: notifId,
+          tenant_id: tenant.id,
+          title: `Table ${tableRaw || tableKey} · change request`,
+          message: `Guest asks to change order ${orderId.slice(0, 28)}${reason ? ": " + reason : ""}`.slice(0, 240),
+          type: "order_amend_request",
+          role: "staff",
+          is_read: false,
+          timestamp: new Date().toISOString(),
+        }).then(() => {}).catch((e: unknown) => console.warn("amend notif:", e));
+        return jsonResponse({
+          success: true,
+          mode: "request_change",
+          message: "Staff notified. Changes after kitchen starts need waiter confirmation.",
+        }, 200, req);
+      }
+
+      let nextItemsRaw = payload.items;
+      if (typeof nextItemsRaw === "string") {
+        try {
+          nextItemsRaw = JSON.parse(nextItemsRaw);
+        } catch {
+          return jsonResponse({ error: "Invalid items payload." }, 400, req);
+        }
+      }
+      if (!Array.isArray(nextItemsRaw)) {
+        return jsonResponse({ error: "Items array required to amend." }, 400, req);
+      }
+
+      // Empty items = cancel entire pending ticket
+      if (nextItemsRaw.length === 0) {
+        const { error: delErr } = await supabaseAdmin
+          .from("doppio_pending_orders")
+          .delete()
+          .eq("tenant_id", tenant.id)
+          .eq("id", row.id);
+        if (delErr) {
+          console.error("tenant-public amend cancel failed:", delErr);
+          return jsonResponse({ error: "Failed to cancel order." }, 500, req);
+        }
+        const notifId = "amd_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+        await supabaseAdmin.from("doppio_notifications").insert({
+          id: notifId,
+          tenant_id: tenant.id,
+          title: `Table ${tableRaw || tableKey} · order cancelled`,
+          message: `Guest cancelled pending order ${orderId.slice(0, 32)}`,
+          type: "order_amend",
+          role: "staff",
+          is_read: false,
+          timestamp: new Date().toISOString(),
+        }).then(() => {}).catch(() => {});
+        return jsonResponse({ success: true, mode: "cancelled", orderId }, 200, req);
+      }
+
+      if (nextItemsRaw.length > 100) {
+        return jsonResponse({ error: "Too many items." }, 400, req);
+      }
+
+      const { data: menuData, error: menuError } = await supabaseAdmin
+        .from("doppio_menu")
+        .select("name, price")
+        .eq("tenant_id", tenant.id);
+      if (menuError) {
+        console.error("tenant-public amend menu fetch failed:", menuError);
+        return jsonResponse({ error: "Failed to validate items." }, 500, req);
+      }
+      const priceMap = new Map<string, number>(
+        (menuData || []).map((item: { name: string; price: number }) => [
+          item.name.trim().toLowerCase(),
+          Number(item.price),
+        ]),
+      );
+
+      const safeItems: Array<Record<string, unknown>> = [];
+      for (const rawItem of nextItemsRaw as Array<Record<string, unknown>>) {
+        const itemName = String(rawItem.name || "").trim();
+        const key = itemName.toLowerCase();
+        const quantity = Number(rawItem.qty || 1);
+        const serverPrice = priceMap.get(key);
+        if (!itemName || serverPrice === undefined) {
+          return jsonResponse({ error: `Item not on menu: ${itemName.slice(0, 60)}` }, 400, req);
+        }
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+          return jsonResponse({ error: `Invalid quantity for ${itemName.slice(0, 60)}` }, 400, req);
+        }
+        safeItems.push({
+          name: itemName.slice(0, 120),
+          price: serverPrice,
+          qty: quantity,
+          notes: String(rawItem.notes || rawItem.note || "").trim().slice(0, 240),
+        });
+      }
+
+      const expectedSubtotal = safeItems.reduce(
+        (sum, item) => sum + Number(item.price) * Number(item.qty),
+        0,
+      );
+
+      const { error: updErr } = await supabaseAdmin
+        .from("doppio_pending_orders")
+        .update({
+          items: JSON.stringify(safeItems),
+          subtotal: expectedSubtotal,
+          discount: 0,
+          gst: 0,
+          total: expectedSubtotal,
+        })
+        .eq("tenant_id", tenant.id)
+        .eq("id", row.id);
+
+      if (updErr) {
+        console.error("tenant-public amend update failed:", updErr);
+        return jsonResponse({ error: "Failed to update order." }, 500, req);
+      }
+
+      const notifId = "amd_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      await supabaseAdmin.from("doppio_notifications").insert({
+        id: notifId,
+        tenant_id: tenant.id,
+        title: `Table ${tableRaw || tableKey} · order amended`,
+        message: `Guest updated pending order ${orderId.slice(0, 28)} · ${safeItems.length} item(s) · ₹${Math.round(expectedSubtotal)}`,
+        type: "order_amend",
+        role: "staff",
+        is_read: false,
+        timestamp: new Date().toISOString(),
+      }).then(() => {}).catch(() => {});
+
+      return jsonResponse({
+        success: true,
+        mode: "replaced",
+        orderId,
+        total: expectedSubtotal,
+        items: safeItems,
       }, 200, req);
     }
 

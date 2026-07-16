@@ -776,6 +776,19 @@
         kotTitle: 'Waiter KOT',
         kotDesc: 'Send kitchen tickets for this table.',
         fromKitchen: 'Kitchen',
+        byYou: 'You ordered',
+        byStaff: 'Waiter took this',
+        addMore: 'Add more items',
+        amend: 'Edit',
+        amendDone: 'Order updated',
+        amendReq: 'Change requested — waiter will confirm',
+        amendFail: 'Could not update — try again',
+        cancelItem: 'Remove',
+        qtyLess: '−',
+        qtyMore: '+',
+        pendingHint: 'Pending — you can still edit',
+        cookingHint: 'In kitchen — ask waiter to change',
+        sharedTip: 'Same table as staff: you can track, add more, and edit pending items anytime.',
         anyMoment: 'Any moment',
         estimated: 'ETA',
         stepPlaced: 'Placed', stepPlacedD: 'Waiting for kitchen',
@@ -845,6 +858,19 @@
         kotTitle: 'वेटर KOT',
         kotDesc: 'इस टेबल के किचन टिकट भेजें।',
         fromKitchen: 'किचन',
+        byYou: 'आपने ऑर्डर किया',
+        byStaff: 'वेटर ने लिया',
+        addMore: 'और आइटम जोड़ें',
+        amend: 'बदलें',
+        amendDone: 'ऑर्डर अपडेट',
+        amendReq: 'बदलाव भेजा — वेटर पुष्टि करेंगे',
+        amendFail: 'अपडेट नहीं हुआ',
+        cancelItem: 'हटाएँ',
+        qtyLess: '−',
+        qtyMore: '+',
+        pendingHint: 'पेंडिंग — अभी बदल सकते हैं',
+        cookingHint: 'किचन में — वेटर से बदलवाएँ',
+        sharedTip: 'स्टाफ़ के साथ एक ही टेबल: ट्रैक, और जोड़ें, पेंडिंग एडिट।',
         anyMoment: 'जल्दी',
         estimated: 'समय',
         stepPlaced: 'मिला', stepPlacedD: 'किचन प्रतीक्षा',
@@ -896,7 +922,14 @@
       isStaffDevice = !!(sessionStorage.getItem('tenant_session_token') || sessionStorage.getItem('tenant_id') ||
         localStorage.getItem('tenant_session_token'));
     } catch (e) {}
-    var waiterMode = params.get('mode') === 'waiter';
+    // Waiter mode only on staff-authenticated devices (dashboard session present)
+    var waiterMode = params.get('mode') === 'waiter' && isStaffDevice;
+    if (params.get('mode') === 'waiter' && !isStaffDevice) {
+      try {
+        params.delete('mode');
+        history.replaceState({}, '', location.pathname + '?' + params.toString() + (location.hash || ''));
+      } catch (e) {}
+    }
     window.__RS_WAITER_MODE__ = waiterMode;
 
     var sessionToken = '';
@@ -1300,6 +1333,19 @@
       });
     });
 
+    function orderSourceLabel(o) {
+      if (o.source === 'staff' || o.placedBy === 'staff') return t('byStaff');
+      if (o.source === 'qr' || o.placedBy === 'guest') return t('byYou');
+      return t('fromKitchen');
+    }
+
+    function isOrderAmendable(o) {
+      if (o.amendable === true) return true;
+      if (o.amendable === false) return false;
+      var s = String(o.status || '').toLowerCase();
+      return s.indexOf('pending') >= 0 || s.indexOf('review') >= 0 || s === 'new' || s === 'queued';
+    }
+
     function renderOrderCard(o) {
       var status = o.status || 'Pending Review';
       var active = activeStep(status);
@@ -1310,9 +1356,23 @@
         { title: t('stepPaid'), desc: t('stepPaidD') }
       ];
       var items = parseItems(o.items);
-      var itemsHtml = items.length ? '<div class="lines">' + items.map(function (it) {
-        return '<div class="li"><span>' + escHtml((it.qty || 1) + '× ' + (it.name || '')) +
+      var amendable = isOrderAmendable(o) && !/paid|settled|cancel/i.test(status);
+      var itemsHtml = items.length ? '<div class="lines">' + items.map(function (it, idx) {
+        var line =
+          '<div class="li" data-line="' + idx + '"><span>' +
+          escHtml((it.qty || 1) + '× ' + (it.name || '')) +
           '</span><span>' + escHtml(money((it.price || 0) * (it.qty || 1))) + '</span></div>';
+        if (amendable && !waiterMode) {
+          line +=
+            '<div class="amd-row" style="display:flex;gap:6px;margin:-2px 0 8px;align-items:center">' +
+            '<button type="button" class="btn btn-g" style="padding:4px 10px;font-size:12px" data-amd-qty="' +
+            idx + '" data-d="-1">' + escHtml(t('qtyLess')) + '</button>' +
+            '<button type="button" class="btn btn-g" style="padding:4px 10px;font-size:12px" data-amd-qty="' +
+            idx + '" data-d="1">' + escHtml(t('qtyMore')) + '</button>' +
+            '<button type="button" class="btn btn-g" style="padding:4px 10px;font-size:12px;color:#b91c1c" data-amd-rm="' +
+            idx + '">' + escHtml(t('cancelItem')) + '</button></div>';
+        }
+        return line;
       }).join('') + '</div>' : '';
       var eta = '';
       var pm = Number(o.prepMinutes || 0);
@@ -1327,12 +1387,107 @@
         return '<div class="ts ' + cls + '"><div class="td"></div><div class="tt">' + escHtml(st.title) +
           '</div><div class="tdesc">' + escHtml(st.desc) + '</div></div>';
       }).join('');
-      var src = o.source === 'staff' ? ' · ' + t('fromKitchen') : '';
-      return '<div class="ord"><div class="ord-h"><div><div class="oid">' + escHtml(displayOrderId(o.orderId)) +
-        '</div><div class="om">' + escHtml(money(o.total)) +
+      var srcBadge =
+        '<span style="display:inline-block;margin-top:4px;font-size:10.5px;font-weight:800;letter-spacing:.03em;' +
+        'padding:3px 8px;border-radius:999px;background:' +
+        (o.source === 'staff' ? 'rgba(8,145,178,.12);color:#0e7490' : 'rgba(15,159,110,.12);color:#047857') +
+        '">' + escHtml(orderSourceLabel(o)) + '</span>';
+      var hint = amendable
+        ? '<div style="font-size:11.5px;color:#b45309;margin:6px 0 0;font-weight:600">' + escHtml(t('pendingHint')) + '</div>'
+        : (!/paid|settled/i.test(status)
+          ? '<div style="font-size:11.5px;color:var(--muted);margin:6px 0 0">' + escHtml(t('cookingHint')) +
+            (waiterMode ? '' : ' · <button type="button" class="btn btn-g" style="padding:2px 8px;font-size:11px" data-amd-req="1">' +
+              escHtml(t('amend')) + '</button>') + '</div>'
+          : '');
+      var footerActs = '';
+      if (!waiterMode && !/paid|settled/i.test(status)) {
+        footerActs =
+          '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' +
+          '<button type="button" class="btn btn-p" style="flex:1;min-width:120px" data-add-more="1">' +
+          '<i class="fa-solid fa-plus"></i> ' + escHtml(t('addMore')) + '</button></div>';
+      }
+      return '<div class="ord" data-oid="' + escHtml(o.orderId) + '"><div class="ord-h"><div><div class="oid">' +
+        escHtml(displayOrderId(o.orderId)) + '</div><div class="om">' + escHtml(money(o.total)) +
         (o.dateTime ? ' · ' + escHtml(String(o.dateTime).slice(0, 16).replace('T', ' ')) : '') +
-        escHtml(src) + '</div></div><span class="pill ' + statusPillClass(status) + '">' +
-        escHtml(statusLabel(status)) + '</span></div>' + eta + '<div class="tl">' + tl + '</div>' + itemsHtml + '</div>';
+        '</div>' + srcBadge + hint + '</div><span class="pill ' + statusPillClass(status) + '">' +
+        escHtml(statusLabel(status)) + '</span></div>' + eta + '<div class="tl">' + tl + '</div>' + itemsHtml + footerActs + '</div>';
+    }
+
+    function cloneItems(list) {
+      return (list || []).map(function (it) {
+        return {
+          name: it.name,
+          qty: Number(it.qty) || 1,
+          price: Number(it.price) || 0,
+          notes: it.notes || it.note || ''
+        };
+      });
+    }
+
+    function submitAmend(orderId, items, mode) {
+      if (!ensureSessionOrWarn()) return Promise.resolve();
+      return apiCall('amend_table_order', {
+        order_id: orderId,
+        table: table,
+        items: items,
+        mode: mode || 'replace_items'
+      }).then(function (res) {
+        if (res && res.success && !res.error) {
+          if (res.mode === 'request_change') showToast(t('amendReq'));
+          else showToast(t('amendDone'));
+          return refreshLiveOrders().then(function () { pollOrderTrackers(true); });
+        }
+        showToast((res && res.error) || t('amendFail'));
+      }).catch(function () { showToast(t('amendFail')); });
+    }
+
+    function wireTrackerActions(box, list) {
+      if (!box) return;
+      box.querySelectorAll('[data-add-more]').forEach(function (btn) {
+        btn.onclick = function () { goMenu(); };
+      });
+      box.querySelectorAll('[data-amd-req]').forEach(function (btn) {
+        btn.onclick = function () {
+          var card = btn.closest('.ord');
+          var oid = card && card.getAttribute('data-oid');
+          if (!oid) return;
+          var reason = window.prompt('What would you like to change?', '') || 'Please review this order';
+          if (!ensureSessionOrWarn()) return;
+          apiCall('amend_table_order', {
+            order_id: oid, table: table, mode: 'request_change', reason: reason, items: []
+          }).then(function (res) {
+            if (res && res.success && !res.error) showToast(t('amendReq'));
+            else showToast((res && res.error) || t('amendFail'));
+          }).catch(function () { showToast(t('amendFail')); });
+        };
+      });
+      list.forEach(function (o) {
+        if (!isOrderAmendable(o)) return;
+        var card = Array.prototype.find.call(box.querySelectorAll('.ord'), function (el) {
+          return el.getAttribute('data-oid') === o.orderId;
+        });
+        if (!card) return;
+        card.querySelectorAll('[data-amd-qty]').forEach(function (btn) {
+          btn.onclick = function () {
+            var idx = Number(btn.getAttribute('data-amd-qty'));
+            var d = Number(btn.getAttribute('data-d')) || 0;
+            var items = cloneItems(parseItems(o.items));
+            if (!items[idx]) return;
+            items[idx].qty = Math.max(0, (Number(items[idx].qty) || 1) + d);
+            if (items[idx].qty <= 0) items.splice(idx, 1);
+            submitAmend(o.orderId, items, 'replace_items');
+          };
+        });
+        card.querySelectorAll('[data-amd-rm]').forEach(function (btn) {
+          btn.onclick = function () {
+            var idx = Number(btn.getAttribute('data-amd-rm'));
+            var items = cloneItems(parseItems(o.items));
+            if (!items[idx]) return;
+            items.splice(idx, 1);
+            submitAmend(o.orderId, items, 'replace_items');
+          };
+        });
+      });
     }
 
     function pollOrderTrackers(silent) {
@@ -1341,6 +1496,7 @@
       refreshLiveOrders().then(function (list) {
         if (!list.length) {
           box.innerHTML = '<div class="empty"><i class="fa-solid fa-receipt"></i><p>' + escHtml(t('noOrders')) +
+            '</p><p style="font-size:12px;color:var(--muted);margin:8px 0 12px">' + escHtml(t('sharedTip')) +
             '</p><button type="button" class="btn btn-p" id="go-menu-from-track">' + escHtml(t('menuCta')) + '</button></div>';
           var g = document.getElementById('go-menu-from-track');
           if (g) g.onclick = goMenu;
@@ -1350,7 +1506,10 @@
         var paid = list.filter(function (o) { return /paid|settled/i.test(String(o.status || '')); }).slice(0, 2);
         var show = (open.length ? open : list).slice(0, 5);
         if (open.length && paid.length) show = show.concat(paid).slice(0, 6);
-        box.innerHTML = show.map(renderOrderCard).join('');
+        var tip = '<p style="font-size:11.5px;color:var(--muted);margin:0 0 10px;line-height:1.4">' +
+          escHtml(t('sharedTip')) + '</p>';
+        box.innerHTML = tip + show.map(renderOrderCard).join('');
+        wireTrackerActions(box, show);
       });
     }
 

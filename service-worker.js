@@ -1,6 +1,6 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v191-biz-type-locked";
+const CACHE_NAME = "restrosuite-shell-v20260716-v192-dual-qr";
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
@@ -68,6 +68,7 @@ const APP_SHELL = [
   "/assets/modules/super-admin.js",
   "/assets/modules/kds-ui.js",
   "/assets/modules/qr-orders-ui.js",
+  "/assets/modules/staff-table-scanner.js",
   "/assets/modules/view-mode.js",
   "/assets/modules/employees-ui.js",
   "/assets/modules/progress-ops.js",

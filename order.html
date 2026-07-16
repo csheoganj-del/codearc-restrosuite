@@ -578,6 +578,17 @@
   <button type="button" id="sess-banner-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
 </div>
 
+<!-- Shared table ticket strip — guest sees waiter-taken + own orders -->
+<div id="table-live-strip" style="display:none;margin:0 14px 10px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid rgba(255,79,0,.18);font-size:13px;line-height:1.4">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+    <div>
+      <div style="font-weight:800;color:#9A3412;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px">Your table now</div>
+      <div id="table-live-body" style="color:#4A453F;font-weight:600">Loading open orders…</div>
+    </div>
+    <button type="button" id="table-live-track" style="flex-shrink:0;border:0;background:#FF4F00;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit">Track / edit</button>
+  </div>
+</div>
+
 <div id="guest-toast" class="guest-toast" role="status" aria-live="polite"></div>
 
 <!-- Service dock -->
@@ -692,7 +703,23 @@
   const tNum  = params.get('table') || '';
   // Waiter mode: same table QR, staff flow. Orders punch to KOT/KDS as
   // waiter-taken (POS-linked) instead of QR self-orders.
-  const waiterMode = params.get('mode') === 'waiter';
+  // Only honor mode=waiter when a staff session exists on this device —
+  // guests who open the printed QR always stay in guest workflow.
+  var __hasStaffSession = false;
+  try {
+    __hasStaffSession = !!(
+      sessionStorage.getItem('tenant_session_token') ||
+      localStorage.getItem('tenant_session_token')
+    );
+  } catch (e) {}
+  const waiterMode = params.get('mode') === 'waiter' && __hasStaffSession;
+  if (params.get('mode') === 'waiter' && !__hasStaffSession) {
+    // Strip fake waiter mode from URL so guests cannot spoof staff KOT
+    try {
+      params.delete('mode');
+      history.replaceState({}, '', location.pathname + '?' + params.toString() + (location.hash || ''));
+    } catch (e) {}
+  }
   document.body.classList.toggle('waiter-mode', waiterMode);
 
   // Configure back to dining portal (hub) link
@@ -976,6 +1003,9 @@
       if (!wasActive && !options.silent) {
         guestToast("You're connected — order anytime");
       }
+      try {
+        if (typeof refreshTableLiveStrip === 'function') refreshTableLiveStrip();
+      } catch (e) {}
       return;
     }
 
@@ -1247,6 +1277,52 @@
     });
   }
 
+  function refreshTableLiveStrip() {
+    if (waiterMode || !tNum) return;
+    var strip = document.getElementById('table-live-strip');
+    var body = document.getElementById('table-live-body');
+    var track = document.getElementById('table-live-track');
+    if (!strip || !body) return;
+    if (!window.__rsQrSessionActive) {
+      strip.style.display = 'none';
+      return;
+    }
+    apiCall('get_table_orders', { table: tNum })
+      .then(function (res) {
+        var orders = (res && Array.isArray(res.orders) ? res.orders : []).filter(function (o) {
+          return !/paid|settled|cancel/i.test(String(o.status || ''));
+        });
+        if (!orders.length) {
+          strip.style.display = 'none';
+          return;
+        }
+        strip.style.display = 'block';
+        var total = orders.reduce(function (s, o) { return s + (Number(o.total) || 0); }, 0);
+        var staffN = orders.filter(function (o) {
+          return o.source === 'staff' || o.placedBy === 'staff' || /^DO-WTR-/i.test(String(o.orderId || ''));
+        }).length;
+        var guestN = orders.length - staffN;
+        var bits = [];
+        bits.push(orders.length + ' open ticket' + (orders.length > 1 ? 's' : ''));
+        if (staffN) bits.push(staffN + ' from waiter');
+        if (guestN) bits.push(guestN + ' from you');
+        bits.push((window.currencySymbol || '₹') + Math.round(total));
+        body.textContent = bits.join(' · ') + ' — add more below anytime';
+      })
+      .catch(function () {});
+    if (track && !track._bound) {
+      track._bound = true;
+      track.onclick = function () {
+        location.href =
+          'qr-order.html?tenant=' +
+          encodeURIComponent(slug) +
+          '&table=' +
+          encodeURIComponent(tNum) +
+          '&hub=1&track=1';
+      };
+    }
+  }
+
   configPromise.then(function() {
     if (waiterMode) {
       window.__rsQrSessionActive = true;
@@ -1255,7 +1331,13 @@
         showStaffLoginOverlay();
       }
     } else {
-      checkTableSession({ silent: false });
+      checkTableSession({ silent: false }).then(function () {
+        refreshTableLiveStrip();
+      }).catch(function () {});
+      // Keep strip fresh while guest browses / after waiter fires a KOT
+      setInterval(function () {
+        if (window.__rsQrSessionActive) refreshTableLiveStrip();
+      }, 8000);
     }
   });
 

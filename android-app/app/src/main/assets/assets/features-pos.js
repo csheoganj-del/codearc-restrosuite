@@ -1058,8 +1058,14 @@
           resolve(null);
           return;
         }
-        const tenantSlug = sessionStorage.getItem('tenant_slug') || 'outlet';
-        const digitalUrl = `https://restrosuite.codearc.co.in/bill/${tenantSlug}/${bill.no}`;
+        // Query form works on production; path form /bill/slug/no returns 404
+        const digitalUrl =
+          (window.RSReceiptEngine && typeof RSReceiptEngine.digitalBillUrl === 'function')
+            ? RSReceiptEngine.digitalBillUrl(bill.no)
+            : (() => {
+                const slug = sessionStorage.getItem('tenant_slug') || 'outlet';
+                return `https://restrosuite.codearc.co.in/bill?slug=${encodeURIComponent(slug)}&no=${encodeURIComponent(bill.no)}`;
+              })();
         QRCode.toDataURL(digitalUrl, { width: 200, margin: 1 }, (err, url) => {
           if (err) {
             console.error('[QR Generation Error]', err);
@@ -2722,9 +2728,20 @@
       if (window.RS_DB) {
         try {
           const tempId = 'kot-' + Date.now();
+          // Tag staff KOTs so guest QR hub can label "Waiter took this"
+          // while still sharing the same table ticket list for add/amend/track.
+          const guestName = String(cust.name || '').trim();
+          const staffLabel = guestName
+            ? guestName + ' · Staff'
+            : 'Staff order';
+          let staffOrderId = String(tok || '');
+          if (staffOrderId && !/^DO-(QR|WTR)-/i.test(staffOrderId)) {
+            // Keep kitchen token readable; prefix helps guest portal source detection
+            staffOrderId = 'DO-WTR-' + staffOrderId.replace(/^DO-/i, '');
+          }
           const orderData = {
-            orderId: tok,
-            customerName: cust.name || 'Walk-in Guest',
+            orderId: staffOrderId || tok,
+            customerName: staffLabel,
             customerPhone: cust.phone || '',
             covers,
             pax: covers,
@@ -2745,6 +2762,7 @@
             status: 'Pending Review',
             dateTime: new Date().toISOString(),
             priority: 'normal',
+            source: 'waiter_pos',
           };
           await RS_DB.put('pending_orders', tempId, orderData);
           if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();

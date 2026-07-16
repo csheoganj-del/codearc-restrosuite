@@ -1086,7 +1086,7 @@
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        </div><div class="grow"></div><button class="btn btn-primary btn-sm" id="btn-staff-scan-table" style="margin-right:8px;" title="Staff only: scan table QR with the app camera (not guest phone camera)"><i class="fa-solid fa-camera"></i> Scan table</button><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
         <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
           <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">
@@ -1124,6 +1124,18 @@
       });
       const btnPrint = $('#btn-print-floor-qrs', sec);
       if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
+      const btnStaffScan = $('#btn-staff-scan-table', sec);
+      if (btnStaffScan) {
+        btnStaffScan.onclick = () => {
+          if (window.RSStaffTableScanner && typeof RSStaffTableScanner.open === 'function') {
+            RSStaffTableScanner.open();
+          } else if (typeof window.openStaffTableScanner === 'function') {
+            window.openStaffTableScanner();
+          } else {
+            RS.toast('Scanner loading — refresh dashboard', 'fa-circle-exclamation');
+          }
+        };
+      }
       const btnManage = $('#btn-manage-seating', sec) || $('#btn-manage-seating-empty', sec);
       if (btnManage) btnManage.onclick = () => openManageSeatingModal();
       const btnRefresh = $('#btn-refresh-floor', sec);
@@ -3564,13 +3576,50 @@
             ${showDemo ? '<button type="button" class="btn btn-ghost btn-sm" id="agg-seed" title="Seed a demo online order"><i class="fa-solid fa-seedling"></i> Demo order</button>' : ''}
             <button type="button" class="btn btn-ghost btn-sm" id="agg-refresh" title="Refresh now"><i class="fa-solid fa-rotate"></i> Refresh</button>
             <button type="button" class="btn btn-ghost btn-sm" id="agg-webhook-info" title="Webhook setup"><i class="fa-solid fa-link"></i> Webhook</button>
+            ${window.RSViewMode ? RSViewMode.toggleHtml('online-orders', window.RSViewMode.get('online-orders', 'cards')) : ''}
             <span class="pill ${feedLive ? 'pill-green' : 'pill-amber'}" title="${feedLive ? 'Browser online — listening for sync' : 'Browser offline'}">
               <span class="dot ${feedLive ? 'dot-live' : ''}"></span>${feedLive ? 'Listening' : 'Offline'}
             </span>
           </div>
 
-          <div class="agg-grid${ONLINE.length ? '' : ' is-empty'}">${gridBody}</div>
+          ${(() => {
+            const mode = window.RSViewMode ? RSViewMode.get('online-orders', 'cards') : 'cards';
+            if (mode === 'list' && ONLINE.length && filtered.length) {
+              return `<div class="agg-grid is-list"><div class="rs-line-list">
+                <div class="rs-line-head agg-line-head">
+                  <span>Platform</span><span>Order</span><span>Customer</span><span>Status</span><span class="rl-num">Total</span><span class="rl-acts">Actions</span>
+                </div>
+                ${filtered.map((o) => {
+                  const i = ONLINE.indexOf(o);
+                  const actions =
+                    o.status === 'new'
+                      ? `<button type="button" class="btn btn-primary btn-sm" data-acc="${i}">Accept</button>`
+                      : o.status === 'preparing'
+                        ? `<button type="button" class="btn btn-primary btn-sm" data-ready="${i}">Ready</button>`
+                        : `<button type="button" class="btn btn-ghost btn-sm" data-rider="${i}">Rider</button>`;
+                  return `<div class="rs-line-row agg-line-row" data-i="${i}">
+                    <span class="rl-name">${esc(platName[o.plat] || o.plat || 'Online')}</span>
+                    <span class="rl-mute">${esc(o.oid)}</span>
+                    <span><span class="rl-name">${esc(o.cust)}</span><div class="rl-mute">${esc(o.area || '')}</div></span>
+                    <span class="pill ${o.status === 'new' ? 'pill-amber' : o.status === 'preparing' ? 'pill-orange' : 'pill-green'}" style="padding:2px 8px;font-size:10px;text-transform:capitalize;justify-self:start">${esc(statusLabel[o.status] || o.status)}</span>
+                    <span class="rl-num">${rs(o.total)}</span>
+                    <span class="rl-acts">
+                      <button type="button" class="btn btn-ghost btn-sm" data-pos="${i}" title="POS"><i class="fa-solid fa-cash-register"></i></button>
+                      ${actions}
+                    </span>
+                  </div>`;
+                }).join('')}
+              </div></div>`;
+            }
+            return `<div class="agg-grid${ONLINE.length ? '' : ' is-empty'}">${gridBody}</div>`;
+          })()}
         </div>`;
+
+      if (window.RSViewMode) {
+        RSViewMode.wire(sec, 'online-orders', () => {
+          renderAgg();
+        }, 'cards');
+      }
 
       $$('[data-pos]', sec).forEach((b) => {
         b.onclick = () => openOnlineOrderInPos(ONLINE[+b.dataset.pos]);
@@ -3732,45 +3781,176 @@
 
     /* ===================== CUSTOMERS / CRM ===================== */
     const CUSTOMERS = [];
-    const tierCls = {vip:'tier-vip',gold:'tier-gold',silver:'tier-silver'};
-    function renderCustomers(){
-      const sec = $('#customers-tab');
-      if(!sec) return;
-      if(window.RS_DB){
-        sec.innerHTML = '<div class="sr-empty">Loading customers...</div>';
-        RS_DB.list('customers').then(rows => {
-          if (rows && rows.length) {
-            CUSTOMERS.length = 0;
-            rows.forEach(r => CUSTOMERS.push(r));
-          }
-          drawCustomersUI(sec);
-        }).catch(e => {
-          console.warn("Failed loading customers from DB", e);
-          drawCustomersUI(sec);
-        });
-      } else {
-        drawCustomersUI(sec);
-      }
-    }
+    const tierCls = { vip: 'tier-vip', gold: 'tier-gold', silver: 'tier-silver' };
+    let _crmFilter = 'all';
+    let _crmSort = 'recent';
+    let _crmView = (function () {
+      if (window.RSViewMode && RSViewMode.get) return RSViewMode.get('customers', 'list');
+      try { return localStorage.getItem('rs_crm_view') || 'list'; } catch (e) { return 'list'; }
+    })();
 
-    function formatCustBillTime(b) {
-      const raw = b && (b.dateTime || b.time || b.created_at || '');
-      if (!raw) return '—';
+    /** National mobile key for matching (+353 85… and 85… become the same). */
+    function normPhone(p) {
+      let d = String(p == null ? '' : p).replace(/\D/g, '');
+      if (!d) return '';
+      if (d.startsWith('00')) d = d.slice(2);
+      // Country codes
+      if (d.startsWith('353')) d = d.slice(3); // Ireland
+      else if (d.startsWith('91') && d.length >= 12) d = d.slice(2); // India
+      else if (d.startsWith('44') && d.length >= 12) d = d.slice(2); // UK
+      else if (d.startsWith('1') && d.length === 11) d = d.slice(1); // NANP
+      // National trunk prefix
+      if (d.startsWith('0') && d.length >= 9) d = d.slice(1);
+      return d;
+    }
+    function formatPhoneDisplay(p) {
+      const raw = String(p == null ? '' : p).trim();
+      if (!raw || /^walk-?in|dine-?in|n\/a|none$/i.test(raw)) return '—';
+      const d = raw.replace(/\D/g, '');
+      const nat = normPhone(raw);
+      // Incomplete junk like "91" or "+91"
+      if (nat.length > 0 && nat.length < 8) return '—';
+      // Ireland: national 8xxxxxxxx (9 digits)
+      if (d.startsWith('353') || (nat.length === 9 && nat.charAt(0) === '8')) {
+        const n = nat.length === 9 ? nat : d.replace(/^3530?/, '');
+        if (n.length === 9) return '+353 ' + n.slice(0, 2) + ' ' + n.slice(2, 5) + ' ' + n.slice(5);
+      }
+      // India 10-digit national
+      if (nat.length === 10) {
+        return '+91 ' + nat.slice(0, 5) + ' ' + nat.slice(5);
+      }
+      if (raw.startsWith('+') && d.length >= 10) {
+        return '+' + d;
+      }
+      return nat.length >= 8 ? nat : '—';
+    }
+    function phonesMatch(a, b) {
+      const na = normPhone(a);
+      const nb = normPhone(b);
+      if (na && nb && na === nb) return true;
+      // Partial overlap (9 vs 10 digit national)
+      if (na && nb && na.length >= 8 && nb.length >= 8) {
+        if (na.endsWith(nb) || nb.endsWith(na)) return true;
+      }
+      return false;
+    }
+    function formatVisitLabel(raw) {
+      if (raw == null || raw === '' || raw === 'never' || raw === 'Never' || raw === 'Today') {
+        if (raw === 'Today') {
+          try {
+            return new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+          } catch (_) { return 'Today'; }
+        }
+        return 'No orders';
+      }
       const d = new Date(raw);
       if (!Number.isNaN(d.getTime())) {
         try {
           return d.toLocaleString(undefined, {
-            day: '2-digit',
+            day: 'numeric',
             month: 'short',
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
           });
         } catch (_) {
-          return d.toLocaleString();
+          return d.toLocaleDateString();
         }
       }
-      return String(raw);
+      // Already human string
+      if (!/T\d{2}:\d{2}/.test(String(raw))) return String(raw);
+      return '—';
+    }
+    function tierFromSpend(spend) {
+      const s = Number(spend) || 0;
+      if (s >= 10000) return 'vip';
+      if (s >= 5000) return 'gold';
+      return 'silver';
+    }
+    function avColor(name) {
+      const colors = RS.avatarColors || ['#FF4F00', '#0F9F6E', '#6366F1', '#D97706', '#DB2777', '#0891B2'];
+      let h = 0;
+      const s = String(name || '');
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      return colors[h % colors.length];
+    }
+    function waDigits(phone) {
+      let d = String(phone || '').replace(/\D/g, '');
+      if (!d) return '';
+      const nat = normPhone(phone);
+      // Ireland 9-digit mobile starting 8
+      if (nat.length === 9 && nat.startsWith('8')) return '353' + nat;
+      // India 10-digit
+      if (nat.length === 10) return '91' + nat;
+      if (d.startsWith('00')) d = d.slice(2);
+      return d;
+    }
+
+    function renderCustomers() {
+      const sec = $('#customers-tab');
+      if (!sec) return;
+      if (window.RS_DB) {
+        sec.innerHTML = '<div class="sr-empty"><div class="spin" style="margin:0 auto 10px"></div>Loading customers…</div>';
+        RS_DB.list('customers')
+          .then((rows) => {
+            CUSTOMERS.length = 0;
+            (rows || []).forEach((r) => CUSTOMERS.push(r));
+            mergeCustomerDuplicatesInPlace();
+            drawCustomersUI(sec);
+          })
+          .catch((e) => {
+            console.warn('Failed loading customers from DB', e);
+            drawCustomersUI(sec);
+          });
+      } else {
+        drawCustomersUI(sec);
+      }
+    }
+
+    /** Collapse near-duplicate CRM rows (same last-10 phone) for a clean UI. */
+    function mergeCustomerDuplicatesInPlace() {
+      const byKey = new Map();
+      const noPhone = [];
+      CUSTOMERS.forEach((r) => {
+        const key = normPhone(r.phone);
+        if (!key) {
+          noPhone.push(r);
+          return;
+        }
+        const prev = byKey.get(key);
+        if (!prev) {
+          byKey.set(key, { ...r, _dupIds: r.id ? [r.id] : [] });
+          return;
+        }
+        const dups = [...(prev._dupIds || [prev.id]), r.id].filter(Boolean);
+        // Prefer the profile with more activity / higher dues as primary
+        const score = (x) =>
+          (Number(x.spend) || 0) * 10 + (Number(x.visits) || 0) * 5 + (Number(x.dues) || 0);
+        const keep = score(r) > score(prev) ? r : prev;
+        const other = keep === r ? prev : r;
+        byKey.set(key, {
+          ...keep,
+          name: keep.name || other.name,
+          email: keep.email || other.email,
+          notes: keep.notes || other.notes,
+          // max dues — same person double-booked shouldn't sum twice
+          dues: Math.max(Number(keep.dues) || 0, Number(other.dues) || 0),
+          visits: Math.max(Number(keep.visits) || 0, Number(other.visits) || 0),
+          spend: Math.max(Number(keep.spend) || 0, Number(other.spend) || 0),
+          phone: keep.phone || other.phone,
+          _rawPhone: key,
+          _dupIds: [...new Set(dups)],
+          _mergedCount: new Set(dups).size,
+        });
+      });
+      CUSTOMERS.length = 0;
+      byKey.forEach((v) => CUSTOMERS.push(v));
+      noPhone.forEach((v) => CUSTOMERS.push(v));
+    }
+
+    function formatCustBillTime(b) {
+      const raw = b && (b.dateTime || b.time || b.created_at || '');
+      return formatVisitLabel(raw);
     }
     function billTimeMs(b) {
       const raw = b && (b.dateTime || b.time || b.created_at);
@@ -3782,71 +3962,313 @@
       const s = String(t || 'silver').toLowerCase();
       if (s === 'platinum' || s === 'vip') return 'vip';
       if (s === 'gold') return 'gold';
-      if (s === 'bronze') return 'silver'; // map bronze → silver badge
+      if (s === 'bronze') return 'silver';
       return 'silver';
     }
-
-    function drawCustomersUI(sec){
-      // Calculate visits and spend dynamically for each customer from RS.BILLS
+    function billsForCustomer(c) {
       const bills = RS.BILLS || [];
-      CUSTOMERS.forEach(c => {
-        const cBills = bills
-          .filter(
-            (b) =>
-              b.customerPhone === c.phone ||
-              (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name)
-          )
-          .sort((a, b) => billTimeMs(b) - billTimeMs(a));
-        c.visits = cBills.length;
-        c.spend = cBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-        c.last = cBills.length > 0 ? formatCustBillTime(cBills[0]) : 'never';
-        c.tier = normalizeCustTier(c.tier);
+      const name = String(c.name || '').trim().toLowerCase();
+      return bills
+        .filter((b) => {
+          if (phonesMatch(b.customerPhone, c.phone)) return true;
+          const bn = String(b.customerName || '').trim().toLowerCase();
+          if (name && bn && bn === name && bn !== 'walk-in guest' && bn !== 'walk-in') return true;
+          return false;
+        })
+        .sort((a, b) => billTimeMs(b) - billTimeMs(a));
+    }
+    function enrichCustomerStats() {
+      CUSTOMERS.forEach((c) => {
+        const cBills = billsForCustomer(c);
+        const billSpend = cBills.reduce((sum, b) => sum + (Number(b.amount != null ? b.amount : b.total) || 0), 0);
+        const billVisits = cBills.length;
+        // Prefer live bill rollups; fall back to stored CRM fields
+        c.visits = billVisits > 0 ? billVisits : Number(c.visits) || 0;
+        c.spend = billSpend > 0 ? billSpend : Number(c.spend) || 0;
+        if (cBills.length > 0) c.last = formatCustBillTime(cBills[0]);
+        else c.last = formatVisitLabel(c.last);
+        c.tier = normalizeCustTier(c.tier || tierFromSpend(c.spend));
+        c.phoneDisplay = formatPhoneDisplay(c.phone);
+        c.dues = Number(c.dues) || 0;
       });
+    }
+
+    function drawCustomersUI(sec) {
+      enrichCustomerStats();
 
       const total = CUSTOMERS.length || 1;
-      const repeat = Math.round(CUSTOMERS.filter(c=>c.visits>1).length/total*100);
-      const totalSpend = CUSTOMERS.reduce((a,c)=>a+(c.spend||0),0);
-      const totalDues = CUSTOMERS.reduce((a,c)=>a+(c.dues||0),0);
+      const withVisits = CUSTOMERS.filter((c) => (c.visits || 0) > 0).length || 1;
+      const repeat = Math.round((CUSTOMERS.filter((c) => (c.visits || 0) > 1).length / withVisits) * 100);
+      const totalSpend = CUSTOMERS.reduce((a, c) => a + (c.spend || 0), 0);
+      const totalDues = CUSTOMERS.reduce((a, c) => a + (c.dues || 0), 0);
+      const duesCount = CUSTOMERS.filter((c) => (c.dues || 0) > 0).length;
+      const vipCount = CUSTOMERS.filter((c) => normalizeCustTier(c.tier) === 'vip').length;
+
       sec.innerHTML = `
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Total customers</div><div class="sd" style="display:none"></div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(Math.round(totalSpend/total))}</div><div class="sl">Avg lifetime spend</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a" style="background: rgba(255, 79, 0, 0.1); color: var(--orange);"><i class="fa-solid fa-hand-holding-dollar"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Total Outstanding Dues</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">${CUSTOMERS.length}</div><div class="sl">Customers</div><div class="sd">${withVisits} with orders</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-repeat"></i></div><div><div class="sv">${repeat}%</div><div class="sl">Repeat rate</div><div class="sd">Guests with 2+ visits</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-chart-line"></i></div><div><div class="sv">${rs(Math.round(totalSpend / total))}</div><div class="sl">Avg spend</div><div class="sd">${rs(totalSpend)} lifetime</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a" style="background:rgba(255,79,0,.1);color:var(--orange)"><i class="fa-solid fa-hand-holding-dollar"></i></div><div><div class="sv" id="crm-total-dues">${rs(totalDues)}</div><div class="sl">Outstanding dues</div><div class="sd">${duesCount} guest${duesCount === 1 ? '' : 's'}</div></div></div>
         </div>
-        <div class="toolbar-row"><div class="pos-search grow" style="max-width:320px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone..." autocomplete="off"></div><div class="grow"></div><button type="button" class="btn btn-ghost btn-sm" id="btn-crm-broadcast"><i class="fa-brands fa-whatsapp"></i> Broadcast</button><button type="button" class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-user-plus"></i> Add customer</button></div>
-        <div class="crm-grid" id="crm-grid"></div>`;
+        <div class="crm-toolbar">
+          <div class="pos-search grow" style="max-width:min(100%,340px);padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="crm-search" placeholder="Search name or phone" autocomplete="off"></div>
+          <div class="grow"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-crm-broadcast"><i class="fa-brands fa-whatsapp"></i> Broadcast</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-download"></i> Export</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-add-customer"><i class="fa-solid fa-plus"></i> Add customer</button>
+        </div>
+        <div class="crm-filters" id="crm-filters">
+          <button type="button" class="chip-btn ${_crmFilter === 'all' ? 'active' : ''}" data-crm-f="all">All</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'dues' ? 'active' : ''}" data-crm-f="dues">Dues${duesCount ? ' · ' + duesCount : ''}</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'vip' ? 'active' : ''}" data-crm-f="vip">VIP${vipCount ? ' · ' + vipCount : ''}</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'gold' ? 'active' : ''}" data-crm-f="gold">Gold</button>
+          <button type="button" class="chip-btn ${_crmFilter === 'repeat' ? 'active' : ''}" data-crm-f="repeat">Repeat</button>
+          ${window.RSViewMode
+            ? RSViewMode.toggleHtml('customers', _crmView)
+            : `<div class="crm-view-toggle" role="group" aria-label="View mode">
+            <button type="button" class="crm-view-btn ${_crmView === 'list' ? 'active' : ''}" data-crm-view="list" title="Line view"><i class="fa-solid fa-list"></i> List</button>
+            <button type="button" class="crm-view-btn ${_crmView === 'cards' ? 'active' : ''}" data-crm-view="cards" title="Card view"><i class="fa-solid fa-grip"></i> Cards</button>
+          </div>`}
+          <select class="crm-sort" id="crm-sort" aria-label="Sort customers">
+            <option value="recent" ${_crmSort === 'recent' ? 'selected' : ''}>Recent first</option>
+            <option value="spend" ${_crmSort === 'spend' ? 'selected' : ''}>Highest spend</option>
+            <option value="dues" ${_crmSort === 'dues' ? 'selected' : ''}>Highest dues</option>
+            <option value="name" ${_crmSort === 'name' ? 'selected' : ''}>Name A–Z</option>
+            <option value="visits" ${_crmSort === 'visits' ? 'selected' : ''}>Most visits</option>
+          </select>
+        </div>
+        <div class="crm-body ${_crmView === 'list' ? 'is-list' : 'is-cards'}" id="crm-grid"></div>`;
+
       const grid = $('#crm-grid');
-      function draw(q=''){ const t=q.toLowerCase();
-        const list = CUSTOMERS.filter(c=>String(c.name||'').toLowerCase().includes(t)||String(c.phone||'').includes(t));
+
+      function applyFilterSort(list) {
+        let out = list.slice();
+        if (_crmFilter === 'dues') out = out.filter((c) => (c.dues || 0) > 0);
+        else if (_crmFilter === 'vip') out = out.filter((c) => normalizeCustTier(c.tier) === 'vip');
+        else if (_crmFilter === 'gold') out = out.filter((c) => normalizeCustTier(c.tier) === 'gold');
+        else if (_crmFilter === 'repeat') out = out.filter((c) => (c.visits || 0) > 1);
+        out.sort((a, b) => {
+          if (_crmSort === 'spend') return (b.spend || 0) - (a.spend || 0);
+          if (_crmSort === 'dues') return (b.dues || 0) - (a.dues || 0);
+          if (_crmSort === 'visits') return (b.visits || 0) - (a.visits || 0);
+          if (_crmSort === 'name') return String(a.name || '').localeCompare(String(b.name || ''));
+          // recent: last order / last_visit
+          const ta = a.last && a.last !== 'never' ? Date.parse(a.last) || 0 : 0;
+          const tb = b.last && b.last !== 'never' ? Date.parse(b.last) || 0 : 0;
+          if (tb !== ta) return tb - ta;
+          return (b.spend || 0) - (a.spend || 0);
+        });
+        return out;
+      }
+
+      function draw(q = '') {
+        const t = q.toLowerCase().trim();
+        const digits = t.replace(/\D/g, '');
+        let list = CUSTOMERS.filter((c) => {
+          if (!t) return true;
+          const hay = [c.name, c.phone, c.phoneDisplay, c.email, c.notes].join(' ').toLowerCase();
+          if (hay.includes(t)) return true;
+          if (digits && normPhone(c.phone).includes(digits)) return true;
+          return false;
+        });
+        list = applyFilterSort(list);
+
         if (!CUSTOMERS.length) {
           grid.innerHTML = `<div class="sr-empty" style="grid-column:1/-1;padding:40px 20px">
-            <i class="fa-solid fa-address-book" style="font-size:26px;opacity:.4;display:block;margin-bottom:10px"></i>
-            <div style="font-weight:700;margin-bottom:6px">No customers yet</div>
-            <div style="font-size:13px;color:var(--text-soft);max-width:360px;margin:0 auto 14px;line-height:1.45">Guests from POS bills appear here, or add/import a loyalty profile.</div>
+            <i class="fa-solid fa-address-book" style="font-size:28px;opacity:.35;display:block;margin-bottom:10px"></i>
+            <div style="font-weight:800;margin-bottom:6px;font-size:16px">No customers yet</div>
+            <div style="font-size:13px;color:var(--text-soft);max-width:380px;margin:0 auto 14px;line-height:1.45">Guests from POS bills appear here automatically. You can also add loyalty profiles or import a CSV.</div>
             <button type="button" class="btn btn-primary btn-sm" id="crm-empty-add"><i class="fa-solid fa-user-plus"></i> Add customer</button>
           </div>`;
           const ea = grid.querySelector('#crm-empty-add');
           if (ea) ea.onclick = () => document.getElementById('btn-add-customer')?.click();
           return;
         }
-        grid.innerHTML = list.length ? list.map((c)=>`
-          <div class="crm-card" data-i="${CUSTOMERS.indexOf(c)}" role="button" tabindex="0">
-            <div class="crm-top"><div class="crm-av" style="background:${(RS.avatarColors||['#FF4F00'])[String(c.name||'').length%(RS.avatarColors||['#FF4F00']).length]}">${RS.initials ? RS.initials(c.name) : (c.name||'?')[0]}</div><div style="flex:1"><div class="crm-name">${esc(c.name)} <span class="tier-badge ${esc(tierCls[c.tier||'silver']||'tier-silver')}">${esc(c.tier||'silver')}</span>${c.dues > 0 ? `<span class="pill pill-orange" style="margin-left:6px; font-size:10px; padding: 2px 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Due: ${rs(c.dues)}</span>` : ''}</div><div class="crm-phone">${esc(c.phone)}</div></div></div>
-            <div class="crm-stats"><div class="cs"><div class="csv">${c.visits||0}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend||0)}</div><div class="csl">Spent</div></div><div class="cs"><div class="csv" style="font-size:12px">${esc(c.last||'never')}</div><div class="csl">Last order</div></div></div>
-          </div>`).join('') : '<div class="sr-empty" style="grid-column:1/-1">No customers match your search</div>';
-        $$('.crm-card',grid).forEach(el=> {
-          const open = () => customerModal(CUSTOMERS[+el.dataset.i]);
-          el.onclick = open;
-          el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+
+        if (!list.length) {
+          grid.innerHTML = '<div class="sr-empty" style="grid-column:1/-1">No customers match this filter or search</div>';
+          return;
+        }
+
+        function rowMeta(c) {
+          const i = CUSTOMERS.indexOf(c);
+          const tier = normalizeCustTier(c.tier);
+          const lastLabel = formatVisitLabel(c.last);
+          const phoneLabel = c.phoneDisplay || formatPhoneDisplay(c.phone);
+          const phoneOk = phoneLabel && phoneLabel !== '—' && phoneLabel !== '+91' && normPhone(c.phone).length >= 8;
+          const initials = RS.initials
+            ? RS.initials(c.name)
+            : String(c.name || '?')
+                .split(/\s+/)
+                .map((w) => w[0] || '')
+                .join('')
+                .slice(0, 2)
+                .toUpperCase() || '?';
+          return { i, tier, lastLabel, phoneLabel: phoneOk ? phoneLabel : (c.phone ? String(c.phone) : 'No phone'), initials, merged: (c._mergedCount || 0) > 1 };
+        }
+
+        if (_crmView === 'list') {
+          grid.className = 'crm-body is-list';
+          grid.innerHTML = `
+            <div class="crm-list" role="table" aria-label="Customers">
+              <div class="crm-list-head" role="row">
+                <span class="cl-guest">Guest</span>
+                <span class="cl-phone">Phone</span>
+                <span class="cl-tier">Tier</span>
+                <span class="cl-num">Visits</span>
+                <span class="cl-num">Spent</span>
+                <span class="cl-num">Dues</span>
+                <span class="cl-last">Last order</span>
+                <span class="cl-acts">Actions</span>
+              </div>
+              ${list.map((c) => {
+                const m = rowMeta(c);
+                return `
+                <div class="crm-list-row ${c.dues > 0 ? 'has-dues' : ''}" data-i="${m.i}" role="row" tabindex="0">
+                  <span class="cl-guest">
+                    <span class="crm-av sm" style="background:${avColor(c.name)}">${esc(m.initials)}</span>
+                    <span class="cl-name-wrap">
+                      <span class="cl-name">${esc(c.name || 'Guest')}</span>
+                      ${m.merged ? `<span class="crm-dup-hint inline">merged</span>` : ''}
+                    </span>
+                  </span>
+                  <span class="cl-phone">${esc(m.phoneLabel)}</span>
+                  <span class="cl-tier"><span class="tier-badge ${esc(tierCls[m.tier] || 'tier-silver')}">${esc(m.tier)}</span></span>
+                  <span class="cl-num">${c.visits || 0}</span>
+                  <span class="cl-num">${rs(c.spend || 0)}</span>
+                  <span class="cl-num ${c.dues > 0 ? 'due' : ''}">${c.dues > 0 ? rs(c.dues) : '—'}</span>
+                  <span class="cl-last">${esc(m.lastLabel)}</span>
+                  <span class="cl-acts">
+                    <button type="button" class="btn btn-ghost btn-sm icon-only" data-crm-wa data-i="${m.i}" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+                    ${c.dues > 0
+                      ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${m.i}" style="background:var(--orange);border-color:var(--orange)">Settle</button>`
+                      : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${m.i}">Profile</button>`}
+                  </span>
+                </div>`;
+              }).join('')}
+            </div>`;
+        } else {
+          grid.className = 'crm-body is-cards crm-grid';
+          grid.innerHTML = list
+            .map((c) => {
+              const m = rowMeta(c);
+              return `
+          <div class="crm-card ${c.dues > 0 ? 'has-dues' : ''}" data-i="${m.i}" role="button" tabindex="0">
+            <div class="crm-top">
+              <div class="crm-av" style="background:${avColor(c.name)}">${esc(m.initials)}</div>
+              <div class="crm-name-block">
+                <div class="crm-name">
+                  <span>${esc(c.name || 'Guest')}</span>
+                  <span class="tier-badge ${esc(tierCls[m.tier] || 'tier-silver')}">${esc(m.tier)}</span>
+                  ${c.dues > 0 ? `<span class="crm-due-pill">Due ${rs(c.dues)}</span>` : ''}
+                </div>
+                <div class="crm-phone"><i class="fa-solid fa-phone"></i>${esc(m.phoneLabel)}</div>
+                ${m.merged ? `<div class="crm-dup-hint">Merged ${c._mergedCount} saved profiles</div>` : ''}
+              </div>
+            </div>
+            <div class="crm-stats">
+              <div class="cs"><div class="csv">${c.visits || 0}</div><div class="csl">Visits</div></div>
+              <div class="cs"><div class="csv">${rs(c.spend || 0)}</div><div class="csl">Spent</div></div>
+              <div class="cs"><div class="csv" style="font-size:12px;font-weight:600">${esc(m.lastLabel)}</div><div class="csl">Last order</div></div>
+            </div>
+            <div class="crm-card-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-crm-wa data-i="${m.i}"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+              ${
+                c.dues > 0
+                  ? `<button type="button" class="btn btn-primary btn-sm" data-crm-settle data-i="${m.i}" style="background:var(--orange);border-color:var(--orange)"><i class="fa-solid fa-indian-rupee-sign"></i> Settle</button>`
+                  : `<button type="button" class="btn btn-ghost btn-sm" data-crm-open data-i="${m.i}"><i class="fa-solid fa-user"></i> Profile</button>`
+              }
+            </div>
+          </div>`;
+            })
+            .join('');
+        }
+
+        function wireRows() {
+          $$('.crm-card, .crm-list-row', grid).forEach((el) => {
+            const open = () => {
+              const c = CUSTOMERS[+el.dataset.i];
+              if (c) customerModal(c);
+            };
+            el.onclick = (e) => {
+              if (e.target.closest('[data-crm-wa],[data-crm-settle],[data-crm-open]')) return;
+              open();
+            };
+            el.onkeydown = (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                open();
+              }
+            };
+          });
+          $$('[data-crm-wa]', grid).forEach((btn) => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const c = CUSTOMERS[+btn.dataset.i];
+              if (!c) return;
+              const d = waDigits(c.phone);
+              if (!d || d.length < 10) return RS.toast('No valid phone number', 'fa-circle-exclamation');
+              window.open(
+                `https://wa.me/${d}?text=${encodeURIComponent('Hi ' + (c.name || '') + ', thank you for dining with us!')}`,
+                '_blank',
+                'noopener,noreferrer'
+              );
+            };
+          });
+          $$('[data-crm-settle]', grid).forEach((btn) => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const c = CUSTOMERS[+btn.dataset.i];
+              if (c) showSettleDuesModal(c);
+            };
+          });
+          $$('[data-crm-open]', grid).forEach((btn) => {
+            btn.onclick = (e) => {
+              e.stopPropagation();
+              const c = CUSTOMERS[+btn.dataset.i];
+              if (c) customerModal(c);
+            };
+          });
+        }
+        wireRows();
+      }
+
+      draw();
+      const searchEl = $('#crm-search');
+      if (searchEl) searchEl.addEventListener('input', (e) => draw(e.target.value));
+      $$('[data-crm-f]', sec).forEach((btn) => {
+        btn.onclick = () => {
+          _crmFilter = btn.getAttribute('data-crm-f') || 'all';
+          $$('[data-crm-f]', sec).forEach((b) => b.classList.toggle('active', b === btn));
+          draw(searchEl ? searchEl.value : '');
+        };
+      });
+      if (window.RSViewMode) {
+        _crmView = RSViewMode.wire(sec, 'customers', (m) => {
+          _crmView = m;
+          draw(searchEl ? searchEl.value : '');
+        }, 'list');
+      } else {
+        $$('[data-crm-view]', sec).forEach((btn) => {
+          btn.onclick = () => {
+            _crmView = btn.getAttribute('data-crm-view') === 'cards' ? 'cards' : 'list';
+            try { localStorage.setItem('rs_crm_view', _crmView); } catch (e) {}
+            $$('[data-crm-view]', sec).forEach((b) => b.classList.toggle('active', b === btn));
+            draw(searchEl ? searchEl.value : '');
+          };
         });
       }
-      draw(); $('#crm-search').addEventListener('input', e=>draw(e.target.value));
-      const addCustomerBtn = $('#btn-add-customer');
-      if(addCustomerBtn && !$('#btn-import-customers')) {
-        addCustomerBtn.insertAdjacentHTML('beforebegin', '<button type="button" class="btn btn-ghost btn-sm" id="btn-import-customers"><i class="fa-solid fa-file-import"></i> Import CSV</button><button type="button" class="btn btn-ghost btn-sm" id="btn-export-customers"><i class="fa-solid fa-file-csv"></i> Export CSV</button>');
+      const sortEl = $('#crm-sort');
+      if (sortEl) {
+        sortEl.onchange = () => {
+          _crmSort = sortEl.value || 'recent';
+          draw(searchEl ? searchEl.value : '');
+        };
       }
-      const broadcastBtn = $('#btn-crm-broadcast') || $$('.toolbar-row .btn-ghost', sec).find(b => /Broadcast/i.test(b.textContent || ''));
+
+      const broadcastBtn = $('#btn-crm-broadcast');
       if(broadcastBtn) broadcastBtn.onclick = () => {
         if (!window.RSModal) { RS.toast('Modal module is unavailable', 'fa-circle-exclamation'); return; }
         RSModal.open({ title:'Broadcast to customers', sub:'Compose a WhatsApp message for your customer list', icon:'fa-bullhorn', size:'md',
@@ -4026,47 +4448,76 @@
         input.click();
       };
 
-      $('#btn-add-customer').onclick = () => {
-        RSModal.open({
-          title: 'Add customer', sub: 'Create new loyalty profile', icon: 'fa-user-plus', size: 'sm',
-          body: `<div style="display:flex;flex-direction:column;gap:12px">
-            <div class="form-group"><label>Full Name</label><input class="form-input" id="add-cust-name" placeholder="John Doe"></div>
-            <div class="form-group"><label>Phone Number</label><input class="form-input" id="add-cust-phone" placeholder="+91 99999 99999"></div>
-            <div class="form-group"><label>Email Address</label><input class="form-input" id="add-cust-email" placeholder="john@example.com"></div>
-          </div>`,
-          foot: `<button class="btn btn-ghost" data-x>Cancel</button><button class="btn btn-primary" id="btn-save-new-cust"><i class="fa-solid fa-check"></i> Save Customer</button>`,
-          onMount(modal, close) {
-            modal.querySelector('[data-x]').onclick = close;
-            modal.querySelector('#btn-save-new-cust').onclick = async () => {
-              const name = modal.querySelector('#add-cust-name').value.trim();
-              const phone = modal.querySelector('#add-cust-phone').value.trim();
-              const email = modal.querySelector('#add-cust-email').value.trim();
-              if (!name || !phone) {
-                RS.toast('Name and phone are required', 'fa-circle-exclamation');
-                return;
-              }
-              if (window.RS_DB) {
+      const addBtn = $('#btn-add-customer');
+      if (addBtn) {
+        addBtn.onclick = () => {
+          RSModal.open({
+            title: 'Add customer',
+            sub: 'Loyalty profile · unique phone per guest',
+            icon: 'fa-user-plus',
+            size: 'sm',
+            body: `<div style="display:flex;flex-direction:column;gap:12px">
+              <div class="form-group"><label class="fl">Full name</label><input class="form-input" id="add-cust-name" placeholder="e.g. Priya Sharma" autocomplete="name"></div>
+              <div class="form-group"><label class="fl">Phone (WhatsApp)</label><input class="form-input" id="add-cust-phone" placeholder="+91 98765 43210" inputmode="tel" autocomplete="tel"></div>
+              <div class="form-group"><label class="fl">Email (optional)</label><input class="form-input" id="add-cust-email" placeholder="guest@email.com" autocomplete="email"></div>
+              <p style="font-size:11.5px;color:var(--text-soft);margin:0;line-height:1.4">Phone is normalized (last 10 digits). Existing guests with the same number are updated, not duplicated.</p>
+            </div>`,
+            foot: `<button class="btn btn-ghost" data-x>Cancel</button><button class="btn btn-primary" id="btn-save-new-cust"><i class="fa-solid fa-check"></i> Save</button>`,
+            onMount(modal, close) {
+              modal.querySelector('[data-x]').onclick = close;
+              const saveBtn = modal.querySelector('#btn-save-new-cust');
+              saveBtn.onclick = async () => {
+                const name = modal.querySelector('#add-cust-name').value.trim();
+                const phoneRaw = modal.querySelector('#add-cust-phone').value.trim();
+                const email = modal.querySelector('#add-cust-email').value.trim();
+                const phoneKey = normPhone(phoneRaw);
+                if (!name || phoneKey.length < 8) {
+                  RS.toast('Name and a valid phone are required', 'fa-circle-exclamation');
+                  return;
+                }
+                const phone = phoneKey.length === 10 ? phoneKey : phoneRaw.replace(/\s+/g, '');
+                saveBtn.disabled = true;
                 try {
+                  // Upsert by phone if exists
+                  let existing = CUSTOMERS.find((x) => phonesMatch(x.phone, phone));
+                  if (!existing && window.RS_DB) {
+                    try {
+                      const all = await RS_DB.list('customers');
+                      existing = (all || []).find((x) => phonesMatch(x.phone, phone));
+                    } catch (e) {}
+                  }
                   const newCust = {
-                    id: 'cust-' + Date.now(),
-                    name, phone, email,
-                    visits: 1, spend: 0, last: 'Today', tier: 'silver'
+                    id: existing && existing.id ? existing.id : undefined,
+                    name,
+                    phone,
+                    email,
+                    visits: existing ? existing.visits || 0 : 0,
+                    spend: existing ? existing.spend || 0 : 0,
+                    dues: existing ? existing.dues || 0 : 0,
+                    last: existing ? existing.last : null,
+                    tier: existing ? normalizeCustTier(existing.tier) : 'silver',
+                    notes: existing ? existing.notes || '' : '',
                   };
-                  await RS_DB.put('customers', newCust.id, newCust);
-                  RS.toast('Customer saved successfully', 'fa-circle-check');
+                  if (window.RS_DB) {
+                    const saved = await RS_DB.put('customers', newCust.id, newCust);
+                    if (saved && saved.id) newCust.id = saved.id;
+                  } else if (RS.saveOne) {
+                    await RS.saveOne('customers', { ...newCust, id: newCust.id || 'cust-' + phone });
+                  }
+                  RS.toast(existing ? 'Customer updated · ' + name : 'Customer saved · ' + name, 'fa-circle-check');
                   close();
                   renderCustomers();
-                } catch(e) {
-                  console.warn("Failed saving customer", e);
-                  RS.toast('Customer save failed: '+e.message, 'fa-circle-exclamation');
+                } catch (e) {
+                  console.warn('Failed saving customer', e);
+                  RS.toast('Save failed: ' + (e.message || 'try again'), 'fa-circle-exclamation');
+                } finally {
+                  saveBtn.disabled = false;
                 }
-              } else {
-                close();
-              }
-            };
-          }
-        });
-      };
+              };
+            },
+          });
+        };
+      }
     }
     function showSettleDuesModal(c, closeParentModal) {
       if (!c) return;
@@ -4205,17 +4656,11 @@
 
     function customerModal(c){
       if (!c) return;
-      const custBills = (RS.BILLS || [])
-        .filter(
-          (b) =>
-            b.customerPhone === c.phone ||
-            (b.customerName && b.customerName !== 'Walk-in Guest' && b.customerName === c.name)
-        )
-        .sort((a, b) => billTimeMs(b) - billTimeMs(a));
+      const custBills = billsForCustomer(c);
       const history = custBills.slice(0, 12).map((b) => [
         formatCustBillTime(b),
         (b._items || []).map((i) => `${i.name} x${i.qty}`).join(', ') || (b.items != null ? b.items + ' items' : '—'),
-        b.amount,
+        Number(b.amount != null ? b.amount : b.total) || 0,
       ]);
 
       const avgVisit = c.visits > 0 ? Math.round(c.spend/c.visits) : 0;
@@ -4228,17 +4673,20 @@
               ? Math.round(c.spend / 100)
               : 0;
       const tierLabel = String(normalizeCustTier(c.tier) || 'silver').toUpperCase();
+      const phoneShow = formatPhoneDisplay(c.phone);
 
-      RSModal.open({ title:c.name, sub:c.phone+' · '+tierLabel+' member · '+points+' pts', icon:'fa-user', size:'md',
+      RSModal.open({ title:c.name, sub:phoneShow+' · '+tierLabel+' · '+points+' pts', icon:'fa-user', size:'md',
         body:`<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${c.visits||0}</div><div class="csl">Visits</div></div><div class="cs"><div class="csv">${rs(c.spend||0)}</div><div class="csl">Lifetime</div></div><div class="cs"><div class="csv">${rs(avgVisit)}</div><div class="csl">Avg / visit</div></div><div class="cs"><div class="csv" style="color:var(--orange)">${points}</div><div class="csl">Points</div></div></div>
+          ${(c._mergedCount || 0) > 1 ? `<div style="font-size:12px;color:#b45309;margin-bottom:10px;font-weight:700"><i class="fa-solid fa-object-group"></i> ${c._mergedCount} CRM rows shared this phone — shown as one guest</div>` : ''}
           ${c.notes ? `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:12px;padding:8px 10px;background:var(--glass);border-radius:8px"><i class="fa-solid fa-sticky-note"></i> ${esc(c.notes)}</div>` : ''}
+          ${c.email ? `<div style="font-size:12.5px;color:var(--text-soft);margin-bottom:12px"><i class="fa-solid fa-envelope" style="opacity:.5"></i> ${esc(c.email)}</div>` : ''}
           ${c.dues > 0 ? `
-          <div style="background:var(--orange-tint); border:1px solid rgba(255,107,0,0.3); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="background:var(--orange-tint); border:1px solid rgba(255,107,0,0.3); border-radius:12px; padding:10px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
             <div style="font-size:13px; color:var(--text); font-weight:700;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--orange); margin-right:6px;"></i> Outstanding dues: <span style="color:var(--orange); font-size:15px; font-weight:800;">${rs(c.dues)}</span></div>
             <button type="button" class="btn btn-sm btn-primary" style="background:var(--orange); border-color:var(--orange); font-size:11px;" id="modal-settle-dues-btn">Settle now</button>
           </div>` : ''}
-          <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3></div>
-          <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td style="white-space:nowrap">${esc(h[0])}</td><td style="color:var(--text-soft)">${esc(h[1])}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history</td></tr>'}</tbody></table>`,
+          <div class="panel-head" style="margin-bottom:10px"><h3 style="font-size:14px">Recent orders</h3><span class="ph-sub">${custBills.length} total</span></div>
+          <table class="data-table"><tbody>${history.length > 0 ? history.map(h=>`<tr><td style="white-space:nowrap">${esc(h[0])}</td><td style="color:var(--text-soft)">${esc(h[1])}</td><td class="td-strong" style="text-align:right">${rs(h[2])}</td></tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-mute)">No order history yet — visits appear after POS bills with this phone</td></tr>'}</tbody></table>`,
         foot:`<button type="button" class="btn btn-ghost btn-sm" data-edit title="Edit profile"><i class="fa-solid fa-pen"></i></button>
               <button type="button" class="btn btn-ghost btn-sm" data-del title="Delete customer" style="color:var(--red)"><i class="fa-solid fa-trash-can"></i></button>
               <button type="button" class="btn btn-ghost" style="flex:1" data-wa><i class="fa-brands fa-whatsapp"></i> Message</button>
@@ -4246,9 +4694,10 @@
               <button type="button" class="btn btn-ghost" style="flex:1; border:1px solid var(--stroke-2)" data-offer><i class="fa-solid fa-tags"></i> Offer</button>`,
         onMount(modal,close){
           modal.querySelector('[data-wa]').onclick=()=>{
-            window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent('Hi '+c.name+', thank you for dining with us.')}`, '_blank', 'noopener,noreferrer');
-            close();
-            RS.toast('WhatsApp message ready for '+c.name,'fa-whatsapp');
+            const d = waDigits(c.phone);
+            if (!d) return RS.toast('No phone number', 'fa-circle-exclamation');
+            window.open(`https://wa.me/${d}?text=${encodeURIComponent('Hi '+c.name+', thank you for dining with us.')}`, '_blank', 'noopener,noreferrer');
+            RS.toast('WhatsApp ready for '+c.name,'fa-whatsapp');
           };
           const editBtn = modal.querySelector('[data-edit]');
           if (editBtn)
@@ -4293,9 +4742,9 @@
                   const code = 'OFR' + Math.random().toString(36).slice(2,7).toUpperCase();
                   const expiry = new Date(Date.now() + days*24*60*60*1000).toLocaleDateString();
                   const msg = `Hi ${c.name}! ${title} -- use code ${code} for ${pct}% off, valid until ${expiry}.`;
-                  const offerRow = { id: 'offer_'+Date.now(), code, title, pct, discount_pct: pct, customerPhone: c.phone, customerName: c.name, createdAt: new Date().toISOString(), expiresAt: expiry, status: 'sent' };
-                  try { if (window.RS_DB) await RS_DB.put('offers', offerRow.id, offerRow); } catch(e) { console.warn('Failed to save offer record', e); }
-                  window.open(`https://wa.me/${String(c.phone||'').replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+                  const offerRow = { code, title, pct, discount_pct: pct, fixed: 0, customerPhone: c.phone, customerName: c.name, createdAt: new Date().toISOString(), expiresAt: expiry, status: 'sent' };
+                  try { if (window.RS_DB) await RS_DB.put('offers', null, offerRow); } catch(e) { console.warn('Failed to save offer record', e); }
+                  window.open(`https://wa.me/${waDigits(c.phone)}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
                   closeOffer();
                   close();
                   RS.toast('Offer '+code+' sent to '+c.name, 'fa-tags');
@@ -4349,8 +4798,9 @@
               RS.toast('Name and phone required', 'fa-circle-exclamation');
               return;
             }
+            const phoneKey = normPhone(phone);
             c.name = name;
-            c.phone = phone;
+            c.phone = phoneKey.length === 10 ? phoneKey : phone;
             c.email = modal.querySelector('#edit-cust-email').value.trim();
             c.tier = normalizeCustTier(modal.querySelector('#edit-cust-tier').value);
             c.notes = modal.querySelector('#edit-cust-notes').value.trim();
@@ -4389,83 +4839,405 @@
     }
     function renderGrowthHub(){ return renderHub(); }
     function table(head, rows){ return `<div class="table-scroll"><table class="data-table"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`; }
+    function hubLocalKey(kind) {
+      try {
+        const tid = sessionStorage.getItem('tenant_id') || sessionStorage.getItem('tenant_slug') || 'local';
+        return 'rs_hub_' + kind + '_' + tid;
+      } catch (e) { return 'rs_hub_' + kind; }
+    }
+    function hubLocalList(kind) {
+      try {
+        const raw = JSON.parse(localStorage.getItem(hubLocalKey(kind)) || '[]');
+        return Array.isArray(raw) ? raw : [];
+      } catch (e) { return []; }
+    }
+    function hubLocalSave(kind, rows) {
+      try { localStorage.setItem(hubLocalKey(kind), JSON.stringify(rows || [])); } catch (e) {}
+    }
+
+    async function hubSave(coll, row) {
+      const payload = { ...(row || {}) };
+      // Let uuid tables allocate real UUIDs (never send RES-/TKT-/OFF- as PK)
+      if (payload.id != null && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(String(payload.id))) {
+        // keep logical codes in their own fields
+        if (coll === 'support_tickets' && !payload.ticketNumber) payload.ticketNumber = payload.id;
+        if (coll === 'offers' && !payload.code) payload.code = payload.id;
+        delete payload.id;
+      }
+      if (window.RS_DB && RS_DB.put) {
+        return RS_DB.put(coll, payload.id, payload);
+      }
+      if (RS.saveOne) return RS.saveOne(coll, payload);
+      return payload;
+    }
+    async function hubRunAction(btn, fn) {
+      if (!btn) return fn();
+      const prev = btn.innerHTML;
+      btn.disabled = true;
+      try {
+        await fn();
+      } finally {
+        btn.disabled = false;
+        try { btn.innerHTML = prev; } catch (e) {}
+      }
+    }
+
     async function hubScreen(name){
       let body='', size='md', icon='fa-rocket', sub='';
       let records = [];
+      let footExtra = '';
 
       if(name==='Reservations'){ 
-        icon='fa-calendar-check'; sub="Today's bookings"; size='lg';
+        icon='fa-calendar-check'; sub="Bookings · floor plan · WhatsApp confirm"; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('reservations'); } catch(e){}
         }
-        body = records && records.length 
-          ? table(['Time','Guest','Pax','Table','Status'], records.map(r=>`<tr><td class="td-strong">${r.time || '--'}</td><td>${r.guestName || '--'}</td><td>${r.pax || 2}</td><td>${r.tableNumber || '--'}</td><td><span class="pill ${r.status==='confirmed'?'pill-green':r.status==='pending'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${r.status || 'confirmed'}</span></td></tr>`).join('')) 
-          : '<div class="sr-empty">No reservations for today</div>'; 
+        const today = new Date().toISOString().slice(0,10);
+        const sorted = (records || []).slice().sort((a,b) => String(a.date||'').localeCompare(String(b.date||'')) || String(a.time||'').localeCompare(String(b.time||'')));
+        const upcoming = sorted.filter(r => !r.date || r.date >= today);
+        const show = upcoming.length ? upcoming : sorted;
+        body = show.length 
+          ? `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px">${show.length} booking(s) · Seat / cancel updates floor plan status</div>`
+            + table(['Date','Time','Guest','Pax','Table','Status','Actions'], show.map(r=>{
+              const st = String(r.status || 'confirmed').toLowerCase();
+              const open = st === 'confirmed' || st === 'booked' || st === 'pending';
+              return `<tr data-res-id="${esc(r.id)}">
+              <td>${esc(r.date || '—')}</td>
+              <td class="td-strong">${esc(r.time || '—')}</td>
+              <td>${esc(r.guestName || '—')}<div style="font-size:11px;color:var(--text-soft)">${esc(r.guestPhone || '')}</div></td>
+              <td>${esc(r.pax || 2)}</td>
+              <td>${esc(r.tableNumber || '—')}</td>
+              <td><span class="pill ${open?'pill-green':st==='seated'?'pill-violet':st==='cancelled'||st==='no_show'?'pill-amber':'pill-violet'}" style="padding:3px 10px;text-transform:capitalize">${esc(st)}</span></td>
+              <td style="white-space:nowrap">${open ? `
+                <button type="button" class="btn btn-ghost btn-sm" data-hub-act="res-seat" data-id="${esc(r.id)}" title="Seated">Seat</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-hub-act="res-noshow" data-id="${esc(r.id)}" title="No-show">No-show</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-hub-act="res-cancel" data-id="${esc(r.id)}" title="Cancel">Cancel</button>
+              ` : '—'}</td>
+            </tr>`;
+            }).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-calendar-check"></i></div><div style="font-weight:700;margin-bottom:4px">No reservations yet</div><div style="font-size:13px;color:var(--text-soft);max-width:320px;margin:0 auto">Book a table for walk-ins or WhatsApp enquiries. Confirmed bookings show on the floor plan for that day.</div></div>'; 
       }
       else if(name==='Support Tickets'){ 
-        icon='fa-headset'; sub='Open customer issues';
+        icon='fa-headset'; sub='Open → resolve workflow · cloud-synced'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('support_tickets'); } catch(e){}
         }
+        const openN = (records || []).filter(r => String(r.status||'open').toLowerCase() === 'open' || String(r.status).toLowerCase() === 'waiting').length;
         body = records && records.length 
-          ? table(['Ticket','Subject','Customer','Priority','Status'], records.map(r=>`<tr><td><b>${r.ticketNumber}</b></td><td>${r.subject}</td><td>${r.customerName}</td><td><span class="pill ${r.priority==='high'?'pill-red':r.priority==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${r.priority}</span></td><td><span class="pill ${r.status==='open'?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${r.status}</span></td></tr>`).join('')) 
-          : '<div class="sr-empty">No open support tickets</div>'; 
+          ? `<div style="font-size:12px;color:var(--text-soft);margin-bottom:10px"><b>${openN}</b> open · ${records.length} total · resolve when fixed</div>`
+            + table(['Ticket','Subject','Customer','Priority','Status','Actions'], records.map(r=>{
+              const st = String(r.status || 'open').toLowerCase();
+              const isOpen = st === 'open' || st === 'waiting';
+              return `<tr>
+              <td><b>${esc(r.ticketNumber || r.id)}</b></td>
+              <td>${esc(r.subject)}<div style="font-size:11px;color:var(--text-soft);max-width:180px;overflow:hidden;text-overflow:ellipsis">${esc(r.notes || '')}</div></td>
+              <td>${esc(r.customerName)}</td>
+              <td><span class="pill ${r.priority==='high'?'pill-red':r.priority==='medium'?'pill-amber':''}" style="padding:3px 10px;text-transform:capitalize">${esc(r.priority||'medium')}</span></td>
+              <td><span class="pill ${isOpen?'pill-orange':'pill-green'}" style="padding:3px 10px;text-transform:capitalize">${esc(st)}</span></td>
+              <td style="white-space:nowrap">${isOpen
+                ? `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="tkt-resolve" data-id="${esc(r.id)}">Resolve</button>
+                   <button type="button" class="btn btn-ghost btn-sm" data-hub-act="tkt-wait" data-id="${esc(r.id)}">Waiting</button>`
+                : `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="tkt-reopen" data-id="${esc(r.id)}">Reopen</button>`
+              }</td>
+            </tr>`;
+            }).join('')) 
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-headset"></i></div><div style="font-weight:700;margin-bottom:4px">No support tickets</div><div style="font-size:13px;color:var(--text-soft)">Log complaints, double-charge issues, or service feedback. Tickets sync to your outlet cloud DB.</div></div>'; 
       }
       else if(name==='Recipe Costing'){ 
-        icon='fa-flask-vial'; sub='Plate cost & margin across the menu'; size='lg';
-        const rows = RS.MENU.slice(0,10).map(m=>{ 
-          const ing=m.ingredients||[]; 
-          const cost=ing.reduce((a,g)=>{const inv=(RS.INVENTORY||[]).find(x=>x.name===g.name);return a+(inv?g.qty*inv.cost:0);},0); 
-          const c=cost||Math.round(m.price*0.32); 
-          const margin=Math.round((1-c/m.price)*100); 
-          return `<tr><td><b>${m.name}</b></td><td>${m.cat}</td><td class="td-strong">${rs(m.price)}</td><td>${rs(c)}</td><td style="color:var(--green)">${margin}%</td></tr>`; 
-        }).join('');
-        body = rows.length ? table(['Item','Category','Sells at','Plate cost','Margin'], rows) : '<div class="sr-empty">No menu items to calculate costing</div>'; 
+        icon='fa-flask-vial'; sub='Plate cost from Menu Editor recipes × inventory costs'; size='lg';
+        const menu = Array.isArray(RS.MENU) ? RS.MENU : [];
+        const inv = Array.isArray(RS.INVENTORY) ? RS.INVENTORY : [];
+        const findInv = (g) => {
+          const nm = String((g && (g.name || g.ingredient || g.item)) || '').toLowerCase();
+          const key = String((g && g.key) || '').toLowerCase();
+          return inv.find(x =>
+            (key && String(x.key || '').toLowerCase() === key) ||
+            String(x.name || '').toLowerCase() === nm ||
+            String(x.id || '') === String(g && g.id || '')
+          );
+        };
+        const lines = menu.map(m => {
+          const ing = Array.isArray(m.ingredients) ? m.ingredients : [];
+          const servings = Math.max(1, Number(m.recipeServings != null ? m.recipeServings : m.servings) || 1);
+          let batchCost = 0;
+          let linked = 0;
+          let missing = 0;
+          if (ing.length) {
+            ing.forEach((g) => {
+              const row = findInv(g);
+              const unitCost = row ? Number(row.cost != null ? row.cost : row.unit_cost) || 0 : 0;
+              const qty = Number(g.qty != null ? g.qty : g.quantity) || 0;
+              if (row && unitCost > 0) linked += 1;
+              else if (qty > 0) missing += 1;
+              batchCost += unitCost * qty;
+            });
+          }
+          const recipeCost = batchCost / servings;
+          const fromRecipe = linked > 0 && recipeCost > 0;
+          const price = Number(m.price) || 0;
+          const c = fromRecipe ? Math.round(recipeCost * 100) / 100 : (price > 0 ? Math.round(price * 0.32 * 100) / 100 : 0);
+          const margin = price > 0 ? Math.round((1 - c / price) * 100) : 0;
+          return {
+            id: m.id, name: m.name, cat: m.cat || m.category || '—', price, cost: c, margin, fromRecipe,
+            linked, missing, ingCount: ing.length, pending: !!m.recipePending,
+          };
+        }).sort((a,b) => a.margin - b.margin);
+        const avgM = lines.length ? Math.round(lines.reduce((s,l)=>s+l.margin,0)/lines.length) : 0;
+        const low = lines.filter(l => l.margin < 50).length;
+        const withRecipe = lines.filter(l => l.fromRecipe).length;
+        const kpis = `<div class="crm-stats" style="margin-bottom:12px">
+          <div class="cs"><div class="csv">${lines.length}</div><div class="csl">Items</div></div>
+          <div class="cs"><div class="csv">${withRecipe}</div><div class="csl">Recipe-costed</div></div>
+          <div class="cs"><div class="csv">${avgM}%</div><div class="csl">Avg margin</div></div>
+          <div class="cs"><div class="csv" style="color:${low?'var(--orange)':'var(--green)'}">${low}</div><div class="csl">Below 50%</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.4">
+          Plate cost = <b>(recipe qty × inventory unit cost) ÷ servings</b> from Menu Editor. Items without recipes or unit costs show <b>(est.)</b> ~32% of sell price.
+          <button type="button" class="btn btn-ghost btn-sm" data-open-menu style="margin-left:6px"><i class="fa-solid fa-utensils"></i> Menu Editor</button>
+        </p>`;
+        const rows = lines.map(l => `<tr>
+          <td><b>${esc(l.name)}</b>${l.pending ? ' <span class="pill pill-amber" style="padding:2px 6px;font-size:10px">recipe?</span>' : ''}</td>
+          <td style="font-size:12px">${esc(l.cat)}</td>
+          <td class="td-strong">${rs(l.price)}</td>
+          <td>${rs(l.cost)}${l.fromRecipe
+            ? ` <span style="font-size:10px;color:var(--text-mute)">${l.linked}/${l.ingCount} ing</span>`
+            : ' <span style="font-size:10px;color:var(--text-mute)">(est.)</span>'}</td>
+          <td style="color:${l.margin<50?'var(--orange)':'var(--green)'};font-weight:700">${l.margin}%</td>
+        </tr>`).join('');
+        body = lines.length
+          ? kpis + table(['Item','Category','Sells at','Plate cost','Margin'], rows)
+          : '<div class="sr-empty">No menu items — add dishes in Menu Editor first.</div>';
+        footExtra = `<button class="btn btn-ghost" data-open-menu><i class="fa-solid fa-utensils"></i> Edit recipes</button>`;
       }
       else if(name==='Offers & Coupons'){ 
-        icon='fa-tags'; sub='Active promotions';
+        icon='fa-tags'; sub='POS promo codes · pause / resume'; size='lg';
         if (window.RS_DB) {
           try { records = await RS_DB.list('offers'); } catch(e){}
         }
+        if ((!records || !records.length) && Array.isArray(RS.OFFERS) && RS.OFFERS.length) records = RS.OFFERS;
         body = records && records.length 
-          ? table(['Code','Offer','Usage','Status'], records.map(r=>`<tr><td><b>${r.code}</b></td><td>${r.description || 'Discount'}</td><td>${r.usageCount || 0}</td><td><span class="pill ${r.status==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${r.status}</span></td></tr>`).join('')) 
-          : '<div class="sr-empty">No active coupons or offers</div>'; 
+          ? `<p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Staff enter the <b>code</b> on POS cart promo. Only <b>active</b> codes discount the cart.</p>`
+            + table(['Code','Offer','Discount','Usage','Status','Actions'], records.map(r=>{
+              const disc = (Number(r.fixed||r.amount)>0) ? rs(r.fixed||r.amount)+' off' : ((r.pct||r.discount_pct||0)+'% off');
+              const st = String(r.status || 'active').toLowerCase();
+              return `<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.description || r.title || 'Discount')}</td><td>${esc(disc)}</td><td>${esc(r.usageCount || 0)}</td>
+              <td><span class="pill ${st==='active'?'pill-green':'pill-amber'}" style="padding:3px 10px;text-transform:capitalize">${esc(st)}</span></td>
+              <td style="white-space:nowrap">${st==='active'
+                ? `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="off-pause" data-id="${esc(r.id)}">Pause</button>`
+                : `<button type="button" class="btn btn-ghost btn-sm" data-hub-act="off-activate" data-id="${esc(r.id)}">Activate</button>`
+              }</td></tr>`;
+            }).join('')) 
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-tags"></i></div><div style="font-weight:700;margin-bottom:4px">No offers yet</div><div style="font-size:13px;color:var(--text-soft)">Create FESTIVE20-style codes. They work on the POS cart when staff enter the code.</div></div>'; 
       }
       else if(name==='Loyalty Program'){ 
-        icon='fa-gift'; sub='Members & rewards';
-        const crm = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : [];
+        icon='fa-gift'; sub='Points earn on POS · tiers from spend'; size='lg';
+        const crm = window.RS_DB ? await RS_DB.list('customers').catch(() => []) : (Array.isArray(RS.CUSTOMERS) ? RS.CUSTOMERS : []);
         const totalMembers = crm.length;
-        const totalPoints = crm.reduce((sum, c) => sum + (c.points || 0), 0);
-        body = `<div class="crm-stats" style="margin-bottom:16px"><div class="cs"><div class="csv">${totalMembers}</div><div class="csl">Members</div></div><div class="cs"><div class="csv">${totalPoints}</div><div class="csl">Points issued</div></div><div class="cs"><div class="csv">${Math.round(totalPoints * 0.1)}</div><div class="csl">Rewards claimed</div></div></div>`
+        const totalPoints = crm.reduce((sum, c) => sum + (Number(c.points) || 0), 0);
+        const vip = crm.filter(c => Number(c.spend) >= 10000 || String(c.tier||'').toLowerCase()==='vip').length;
+        const gold = crm.filter(c => {
+          const s = Number(c.spend)||0; const t = String(c.tier||'').toLowerCase();
+          return t==='gold' || (s >= 5000 && s < 10000);
+        }).length;
+        const silver = Math.max(0, totalMembers - vip - gold);
+        const top = crm.slice().sort((a,b)=>(Number(b.spend)||0)-(Number(a.spend)||0)).slice(0,8);
+        body = `<div class="crm-stats" style="margin-bottom:14px">
+            <div class="cs"><div class="csv">${totalMembers}</div><div class="csl">Members</div></div>
+            <div class="cs"><div class="csv">${totalPoints}</div><div class="csl">Points balance</div></div>
+            <div class="cs"><div class="csv">${vip}</div><div class="csl">VIP</div></div>
+          </div>
+          <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">
+            Loyalty is <b>live on POS</b>: customers earn points on settle and can redeem from the cart banner (Settings → Loyalty). Tiers use lifetime spend.
+          </p>`
           + table(['Tier','Members','Earn rate','Perk'], [
-              ['VIP', crm.filter(c => c.spend >= 10000).length, '3× points', 'Free dessert monthly'],
-              ['Gold', crm.filter(c => c.spend >= 5000 && c.spend < 10000).length, '2× points', 'Priority seating'],
-              ['Silver', crm.filter(c => c.spend < 5000).length, '1× point', 'Birthday treat']
-            ].map(r=>`<tr><td><span class="tier-badge ${r[0]==='VIP'?'tier-vip':r[0]==='Gold'?'tier-gold':'tier-silver'}">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--text-soft)">${r[3]}</td></tr>`).join('')); 
+              ['VIP', vip, '3× points', 'Free dessert monthly'],
+              ['Gold', gold, '2× points', 'Priority seating'],
+              ['Silver', silver, '1× point', 'Birthday treat']
+            ].map(r=>`<tr><td><span class="tier-badge ${r[0]==='VIP'?'tier-vip':r[0]==='Gold'?'tier-gold':'tier-silver'}">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td style="color:var(--text-soft)">${r[3]}</td></tr>`).join(''))
+          + (top.length
+            ? '<div style="margin-top:16px;font-size:12px;font-weight:800;margin-bottom:8px;color:var(--text-soft);letter-spacing:.04em;text-transform:uppercase">Top members</div>'
+              + table(['Name','Phone','Spend','Points','Tier'], top.map(c=>`<tr>
+                <td><b>${esc(c.name||'—')}</b></td>
+                <td style="font-size:12px">${esc(c.phone||'—')}</td>
+                <td class="td-strong">${rs(c.spend||0)}</td>
+                <td>${esc(c.points||0)}</td>
+                <td style="text-transform:capitalize">${esc(c.tier||'silver')}</td>
+              </tr>`).join(''))
+            : '<div class="sr-empty" style="padding:20px 0">No customers yet — they appear after POS bills or CRM add.</div>');
+        footExtra = `<button class="btn btn-ghost" data-open-crm><i class="fa-solid fa-users"></i> Open CRM</button>`;
       }
       else if(name==='WhatsApp Campaigns'){ 
-        icon='fa-bullhorn'; sub='Broadcast performance';
-        body = '<div class="sr-empty">No campaigns run yet</div>'; 
+        icon='fa-bullhorn'; sub='Broadcast history · sends via WhatsApp'; size='lg';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('broadcasts'); } catch(e){}
+        }
+        if (!records || !records.length) records = hubLocalList('broadcasts');
+        records = (records || []).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+        body = records.length
+          ? `<p style="font-size:12px;color:var(--text-soft);margin:0 0 10px">Campaigns open pre-filled WhatsApp chats (browser blocks silent bulk send). Gateway can auto-send when connected.</p>`
+            + table(['When','Audience','Recipients','Message'], records.map(r=>`<tr>
+              <td style="font-size:12px;white-space:nowrap">${esc(String(r.createdAt||'').slice(0,16).replace('T',' '))}</td>
+              <td style="text-transform:capitalize">${esc(r.audience||'all')}</td>
+              <td class="td-strong">${esc(r.recipientCount||0)}</td>
+              <td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.message||'')}</td>
+            </tr>`).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-bullhorn"></i></div><div style="font-weight:700;margin-bottom:4px">No campaigns yet</div><div style="font-size:13px;color:var(--text-soft);max-width:340px;margin:0 auto">Compose a message for VIP / Gold / all customers with phones. Same engine as CRM → Broadcast.</div></div>'; 
       }
       else if(name==='Feedback & Reviews'){ 
-        icon='fa-star'; sub='Recent ratings';
-        body = '<div class="sr-empty">No reviews collected yet</div>'; 
+        icon='fa-star'; sub='QR guest feedback + staff log'; size='lg';
+        if (window.RS_DB) {
+          try { records = await RS_DB.list('reviews'); } catch(e){}
+        }
+        const local = hubLocalList('reviews');
+        if (!records || !records.length) records = local;
+        else {
+          // merge local-only ids not yet on cloud
+          const ids = new Set(records.map(r => String(r.id)));
+          local.forEach(r => { if (!ids.has(String(r.id))) records.push(r); });
+        }
+        records = (records || []).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+        const avg = records.length
+          ? (records.reduce((s,r)=>s+(Number(r.rating)||0),0)/records.length).toFixed(1)
+          : '—';
+        let feedbackUrl = '';
+        try {
+          const slug = sessionStorage.getItem('tenant_slug') || '';
+          if (slug) feedbackUrl = location.origin + '/feedback?tenant=' + encodeURIComponent(slug);
+        } catch (e) {}
+        const linkBar = feedbackUrl
+          ? `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;padding:10px 12px;background:var(--panel-2,rgba(0,0,0,.03));border:1px solid var(--stroke);border-radius:12px">
+              <div style="flex:1;min-width:160px;font-size:12px;color:var(--text-soft)"><b style="color:var(--text)">Guest QR link</b><br><span style="word-break:break-all">${esc(feedbackUrl)}</span></div>
+              <button type="button" class="btn btn-ghost btn-sm" data-copy-feedback><i class="fa-solid fa-copy"></i> Copy</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-open-feedback><i class="fa-solid fa-arrow-up-right-from-square"></i> Open</button>
+            </div>`
+          : '';
+        body = linkBar + (records.length
+          ? `<div class="crm-stats" style="margin-bottom:12px">
+              <div class="cs"><div class="csv">${records.length}</div><div class="csl">Reviews</div></div>
+              <div class="cs"><div class="csv">${avg}</div><div class="csl">Avg stars</div></div>
+              <div class="cs"><div class="csv">${records.filter(r=>String(r.source||'').indexOf('qr')>=0||r.source==='bill').length}</div><div class="csl">From QR/bill</div></div>
+            </div>`
+            + table(['Date','Guest','Stars','Comment','Source'], records.map(r=>`<tr>
+              <td style="font-size:12px">${esc(String(r.createdAt||'').slice(0,10))}</td>
+              <td><b>${esc(r.guestName||'Guest')}</b>${r.tableNumber ? `<div style="font-size:11px;color:var(--text-soft)">T ${esc(r.tableNumber)}</div>` : ''}</td>
+              <td style="color:var(--orange);font-weight:800">${'★'.repeat(Math.min(5,Number(r.rating)||0))}${'☆'.repeat(Math.max(0,5-Math.min(5,Number(r.rating)||0)))}</td>
+              <td style="font-size:12px;max-width:200px">${esc(r.comment||'—')}</td>
+              <td style="font-size:11px;color:var(--text-soft)">${esc(r.source||'staff')}</td>
+            </tr>`).join(''))
+          : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Share the guest QR link (also on digital bills) or log walk-out / Google scores here.</div></div>');
       }
       else if(name==='Purchase Orders'){ 
         RS.activateTab('inventory-tab'); 
-        setTimeout(()=>{ const b=$$('#inventory-tab .seg button')[2]; b&&b.click(); },80); 
+        setTimeout(()=>{
+          const btns = $$('#inventory-tab .seg button');
+          const po = btns.find(b => /purchase/i.test(b.textContent||'')) || btns[3];
+          po && po.click();
+        },80); 
         RS.toast('Opening purchase orders','fa-truck-ramp-box'); 
         return; 
       }
-      else { body = `<p style="color:var(--text-soft)">${name} module.</p>`; }
+      else { body = `<p style="color:var(--text-soft)">${esc(name)} module.</p>`; }
 
-      const hideNewBtn = ['Recipe Costing', 'Loyalty Program', 'WhatsApp Campaigns', 'Feedback & Reviews'].includes(name);
+      const hideNewBtn = ['Recipe Costing', 'Loyalty Program'].includes(name);
+      const newLabel = name === 'WhatsApp Campaigns' ? 'New campaign'
+        : name === 'Feedback & Reviews' ? 'Log review'
+        : 'New';
 
       RSModal.open({ title:name, sub, icon, size, body,
-        foot: hideNewBtn ? `<div class="grow"></div><button class="btn btn-ghost" data-cancel>Close</button>` : `<div class="grow"></div><button class="btn btn-primary" data-x><i class="fa-solid fa-plus"></i> New</button>`,
+        foot: hideNewBtn
+          ? `${footExtra}<div class="grow"></div><button class="btn btn-ghost" data-cancel>Close</button>`
+          : `${footExtra}<div class="grow"></div><button class="btn btn-primary" data-x><i class="fa-solid fa-plus"></i> ${newLabel}</button><button class="btn btn-ghost" data-cancel>Close</button>`,
         onMount(modal,close){ 
           const cancelBtn = modal.querySelector('[data-cancel]');
           if (cancelBtn) cancelBtn.onclick = close;
+          const crmBtn = modal.querySelector('[data-open-crm]');
+          if (crmBtn) crmBtn.onclick = () => {
+            close();
+            try { RS.activateTab('customers-tab'); } catch (e) {}
+          };
+          modal.querySelectorAll('[data-open-menu]').forEach((b) => {
+            b.onclick = () => {
+              close();
+              try { RS.activateTab('editor-tab'); } catch (e) {}
+            };
+          });
+          const copyFb = modal.querySelector('[data-copy-feedback]');
+          if (copyFb) {
+            copyFb.onclick = async () => {
+              try {
+                const slug = sessionStorage.getItem('tenant_slug') || '';
+                const url = location.origin + '/feedback?tenant=' + encodeURIComponent(slug);
+                await navigator.clipboard.writeText(url);
+                RS.toast('Guest feedback link copied', 'fa-copy');
+              } catch (e) { RS.toast('Could not copy link', 'fa-circle-exclamation'); }
+            };
+          }
+          const openFb = modal.querySelector('[data-open-feedback]');
+          if (openFb) {
+            openFb.onclick = () => {
+              try {
+                const slug = sessionStorage.getItem('tenant_slug') || '';
+                window.open(location.origin + '/feedback?tenant=' + encodeURIComponent(slug), '_blank', 'noopener');
+              } catch (e) {}
+            };
+          }
+
+          // Row actions: tickets / reservations / offers
+          modal.querySelectorAll('[data-hub-act]').forEach((btn) => {
+            btn.onclick = () => hubRunAction(btn, async () => {
+              const act = btn.getAttribute('data-hub-act');
+              const id = btn.getAttribute('data-id');
+              if (!act || !id) return;
+              if (!window.RS_DB) {
+                RS.toast('Database not ready — refresh and sign in again', 'fa-circle-exclamation');
+                return;
+              }
+              if (act.startsWith('tkt-')) {
+                let list = [];
+                try { list = await RS_DB.list('support_tickets'); } catch (e) {}
+                const row = (list || []).find((r) => String(r.id) === String(id) || String(r.ticketNumber) === String(id));
+                if (!row || !row.id) { RS.toast('Ticket not found — reopen module', 'fa-circle-exclamation'); return; }
+                if (act === 'tkt-resolve') row.status = 'resolved';
+                if (act === 'tkt-wait') row.status = 'waiting';
+                if (act === 'tkt-reopen') row.status = 'open';
+                await hubSave('support_tickets', row);
+                RS.toast('Ticket marked ' + row.status, 'fa-headset');
+                close();
+                hubScreen('Support Tickets');
+              } else if (act.startsWith('res-')) {
+                let list = [];
+                try { list = await RS_DB.list('reservations'); } catch (e) {}
+                const row = (list || []).find((r) => String(r.id) === String(id));
+                if (!row || !row.id) { RS.toast('Reservation not found — reopen module', 'fa-circle-exclamation'); return; }
+                if (act === 'res-seat') row.status = 'seated';
+                if (act === 'res-noshow') row.status = 'no_show';
+                if (act === 'res-cancel') row.status = 'cancelled';
+                await hubSave('reservations', row);
+                try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (e) {}
+                RS.toast('Reservation ' + String(row.status).replace('_', ' '), 'fa-calendar-check');
+                close();
+                hubScreen('Reservations');
+              } else if (act.startsWith('off-')) {
+                let list = [];
+                try { list = await RS_DB.list('offers'); } catch (e) {}
+                let row = (list || []).find((r) => String(r.id) === String(id));
+                if (!row && Array.isArray(RS.OFFERS)) row = RS.OFFERS.find((r) => String(r.id) === String(id));
+                if (!row || !row.id) { RS.toast('Offer not found — reopen module', 'fa-circle-exclamation'); return; }
+                row.status = act === 'off-pause' ? 'paused' : 'active';
+                const saved = await hubSave('offers', row);
+                if (Array.isArray(RS.OFFERS)) {
+                  const i = RS.OFFERS.findIndex((r) => String(r.id) === String(id) || String(r.code).toUpperCase() === String(row.code || '').toUpperCase());
+                  if (i >= 0) RS.OFFERS[i] = { ...RS.OFFERS[i], ...row, id: (saved && saved.id) || row.id, status: row.status };
+                }
+                RS.toast(row.status === 'active' ? 'Offer live on POS' : 'Offer paused', 'fa-tags');
+                close();
+                hubScreen('Offers & Coupons');
+              }
+            }).catch((e) => {
+              console.warn(e);
+              RS.toast((e && e.message) ? String(e.message).slice(0, 80) : 'Update failed — try again', 'fa-circle-exclamation');
+            });
+          });
 
           const newBtn = modal.querySelector('[data-x]');
           if (newBtn) {
@@ -4516,26 +5288,43 @@
                   foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Book Table</button>`,
                   onMount(resModal, resClose) {
                     resModal.querySelector('[data-cancel]').onclick = resClose;
-                    resModal.querySelector('[data-confirm]').onclick = async () => {
-                      const guestName = resModal.querySelector('#res-guest').value || '';
-                      if (!guestName) return RS.toast('Guest name is required', 'fa-circle-exclamation');
+                    const confirmBtn = resModal.querySelector('[data-confirm]');
+                    confirmBtn.onclick = () => hubRunAction(confirmBtn, async () => {
+                      const guestName = (resModal.querySelector('#res-guest').value || '').trim();
+                      if (!guestName) { RS.toast('Guest name is required', 'fa-circle-exclamation'); return; }
                       const guestPhone = (resModal.querySelector('#res-phone').value || '').trim();
                       const date = resModal.querySelector('#res-date').value || _todayISO;
-                      const time = resModal.querySelector('#res-time').value || '19:30';
-                      const pax = Number(resModal.querySelector('#res-pax').value) || 2;
-                      const tableNumber = resModal.querySelector('#res-table').value || '';
-
-                      const id = RS.nextLogicalNo('RES');
-                      const resRow = { id, time, date, guestName, guestPhone, pax, tableNumber, status: 'confirmed' };
-                      resClose();
-                      if (RS.saveOne) {
-                        await RS.saveOne('reservations', resRow);
-                        RS.toast('Reservation booked — table marked reserved', 'fa-circle-check');
-                        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch(e){}
-                        try { if (typeof sendReservationWhatsApp === 'function') await sendReservationWhatsApp({ guestName, guestPhone, tableNumber, date, time, pax }); } catch(e){ console.warn('Reservation WhatsApp failed', e); }
+                      let time = resModal.querySelector('#res-time').value || '19:30';
+                      if (/^\d{2}:\d{2}$/.test(time)) time = time + ':00';
+                      const pax = Math.max(1, Number(resModal.querySelector('#res-pax').value) || 2);
+                      const tableNumber = (resModal.querySelector('#res-table').value || '').trim();
+                      const resRow = {
+                        guestName, guestPhone, pax, tableNumber,
+                        date, time: time.slice(0, 5),
+                        status: 'confirmed',
+                        reserved_for: (() => {
+                          try {
+                            const d = new Date(date + 'T' + time);
+                            return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+                          } catch (e) { return new Date().toISOString(); }
+                        })(),
+                      };
+                      try {
+                        await hubSave('reservations', resRow);
+                        resClose();
+                        RS.toast('Reservation booked · shows on floor for that day', 'fa-circle-check');
+                        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (e) {}
+                        try {
+                          if (typeof sendReservationWhatsApp === 'function') {
+                            await sendReservationWhatsApp({ guestName, guestPhone, tableNumber, date, time: time.slice(0, 5), pax });
+                          }
+                        } catch (e) { console.warn('Reservation WhatsApp failed', e); }
                         hubScreen('Reservations');
+                      } catch (e) {
+                        console.warn(e);
+                        RS.toast('Could not save reservation — check connection', 'fa-circle-exclamation');
                       }
-                    };
+                    });
                   }
                 });
               } else if (name === 'Support Tickets') {
@@ -4559,6 +5348,10 @@
                         </select>
                       </div>
                     </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Details / notes</label>
+                      <textarea id="tkt-notes" rows="3" class="form-control" placeholder="What happened? Order #, amount, staff involved…" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
                   </div>
                 `;
                 RSModal.open({
@@ -4570,21 +5363,25 @@
                   foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Open Ticket</button>`,
                   onMount(tktModal, tktClose) {
                     tktModal.querySelector('[data-cancel]').onclick = tktClose;
-                    tktModal.querySelector('[data-confirm]').onclick = async () => {
-                      const customerName = tktModal.querySelector('#tkt-cust').value || 'Guest';
-                      const subject = tktModal.querySelector('#tkt-subject').value || '';
-                      if (!subject) return RS.toast('Subject is required', 'fa-circle-exclamation');
+                    const confirmBtn = tktModal.querySelector('[data-confirm]');
+                    confirmBtn.onclick = () => hubRunAction(confirmBtn, async () => {
+                      const customerName = (tktModal.querySelector('#tkt-cust').value || 'Guest').trim() || 'Guest';
+                      const subject = (tktModal.querySelector('#tkt-subject').value || '').trim();
+                      if (!subject) { RS.toast('Subject is required', 'fa-circle-exclamation'); return; }
                       const priority = tktModal.querySelector('#tkt-priority').value || 'medium';
-
-                      const tktNum = RS.nextLogicalNo('TKT');
-                      const tktRow = { id: tktNum, ticketNumber: tktNum, subject, customerName, priority, status: 'open' };
-                      tktClose();
-                      if (RS.saveOne) {
-                        await RS.saveOne('support_tickets', tktRow);
-                        RS.toast('Support ticket opened successfully', 'fa-circle-check');
+                      const notes = (tktModal.querySelector('#tkt-notes').value || '').trim();
+                      const tktNum = RS.nextLogicalNo ? RS.nextLogicalNo('TKT') : ('TKT-' + Date.now());
+                      const tktRow = { ticketNumber: tktNum, subject, customerName, priority, status: 'open', notes };
+                      try {
+                        await hubSave('support_tickets', tktRow);
+                        tktClose();
+                        RS.toast('Support ticket opened', 'fa-circle-check');
                         hubScreen('Support Tickets');
+                      } catch (e) {
+                        console.warn(e);
+                        RS.toast('Could not save ticket — check connection', 'fa-circle-exclamation');
                       }
-                    };
+                    });
                   }
                 });
               } else if (name === 'Offers & Coupons') {
@@ -4620,44 +5417,226 @@
                   foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Create Offer</button>`,
                   onMount(offModal, offClose) {
                     offModal.querySelector('[data-cancel]').onclick = offClose;
-                    offModal.querySelector('[data-confirm]').onclick = async () => {
+                    const confirmBtn = offModal.querySelector('[data-confirm]');
+                    confirmBtn.onclick = () => hubRunAction(confirmBtn, async () => {
                       const code = String(offModal.querySelector('#off-code').value || '')
                         .trim()
-                        .toUpperCase();
-                      if (!code) return RS.toast('Coupon code is required', 'fa-circle-exclamation');
-                      const description = offModal.querySelector('#off-desc').value || 'Discount Coupon';
+                        .toUpperCase()
+                        .replace(/\s+/g, '');
+                      if (!code) { RS.toast('Coupon code is required', 'fa-circle-exclamation'); return; }
+                      const description = (offModal.querySelector('#off-desc').value || '').trim() || code + ' discount';
                       const pct = Math.max(0, Math.min(100, Number(offModal.querySelector('#off-pct').value) || 0));
                       const fixed = Math.max(0, Number(offModal.querySelector('#off-fixed').value) || 0);
                       if (!(pct > 0 || fixed > 0)) {
-                        return RS.toast('Enter percent off or a fixed amount', 'fa-circle-exclamation');
+                        RS.toast('Enter percent off or a fixed amount', 'fa-circle-exclamation');
+                        return;
                       }
-                      const id = RS.nextLogicalNo ? RS.nextLogicalNo('OFF') : 'OFF-' + Date.now();
                       const offRow = {
-                        id,
                         code,
                         description,
                         title: description,
-                        pct,
-                        discount_pct: pct,
+                        pct: fixed > 0 ? 0 : pct,
+                        discount_pct: fixed > 0 ? 0 : pct,
                         fixed,
                         amount: fixed,
                         usageCount: 0,
                         status: 'active',
                       };
-                      offClose();
                       try {
-                        if (RS.saveOne) await RS.saveOne('offers', offRow);
-                        else if (window.RS_DB) await RS_DB.put('offers', id, offRow);
-                        if (Array.isArray(RS.OFFERS)) RS.OFFERS.push(offRow);
+                        const saved = await hubSave('offers', offRow);
+                        if (!Array.isArray(RS.OFFERS)) RS.OFFERS = [];
+                        const merged = { ...offRow, id: saved && saved.id };
+                        const ix = RS.OFFERS.findIndex((o) => String(o.code || '').toUpperCase() === code);
+                        if (ix >= 0) RS.OFFERS[ix] = { ...RS.OFFERS[ix], ...merged };
+                        else RS.OFFERS.unshift(merged);
+                        offClose();
                         RS.toast(
-                          'Offer ' + code + ' · ' + (fixed > 0 ? rs(fixed) + ' off' : pct + '% off'),
+                          'Offer ' + code + ' live on POS · ' + (fixed > 0 ? rs(fixed) + ' off' : pct + '% off'),
                           'fa-circle-check'
                         );
                         hubScreen('Offers & Coupons');
                       } catch (e) {
                         console.warn(e);
-                        RS.toast('Could not save offer', 'fa-circle-exclamation');
+                        RS.toast('Could not save offer — check connection', 'fa-circle-exclamation');
                       }
+                    });
+                  },
+                });
+              } else if (name === 'WhatsApp Campaigns') {
+                const crm = (Array.isArray(RS.CUSTOMERS) && RS.CUSTOMERS.length)
+                  ? RS.CUSTOMERS
+                  : [];
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Audience</label>
+                      <select id="wa-audience" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <option value="all">All customers with phone</option>
+                        <option value="vip">VIP tier</option>
+                        <option value="gold">Gold tier</option>
+                        <option value="silver">Silver tier</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Message</label>
+                      <textarea id="wa-message" rows="4" class="form-control" placeholder="e.g. This weekend only: 15% off all mains. Show this message at the counter!" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
+                    <p id="wa-count" style="font-size:12px;color:var(--text-soft);margin:0">Loading customers…</p>
+                  </div>`;
+                RSModal.open({
+                  title: 'New WhatsApp campaign',
+                  sub: 'Broadcast to your CRM list',
+                  icon: 'fa-bullhorn',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-brands fa-whatsapp"></i> Review &amp; send</button>`,
+                  onMount(waModal, waClose) {
+                    let list = crm.slice();
+                    const load = async () => {
+                      if (window.RS_DB) {
+                        try {
+                          const rows = await RS_DB.list('customers');
+                          if (rows && rows.length) list = rows;
+                        } catch (e) {}
+                      }
+                      refreshCount();
+                    };
+                    const matching = () => {
+                      const aud = waModal.querySelector('#wa-audience').value;
+                      return list.filter((c) => {
+                        if (!c.phone) return false;
+                        const t = String(c.tier || 'silver').toLowerCase();
+                        if (aud === 'all') return true;
+                        return t === aud;
+                      });
+                    };
+                    const refreshCount = () => {
+                      const el = waModal.querySelector('#wa-count');
+                      if (el) el.textContent = matching().length + ' customer(s) match this audience.';
+                    };
+                    waModal.querySelector('#wa-audience').onchange = refreshCount;
+                    waModal.querySelector('[data-cancel]').onclick = waClose;
+                    waModal.querySelector('[data-confirm]').onclick = async () => {
+                      const message = (waModal.querySelector('#wa-message').value || '').trim();
+                      if (!message) return RS.toast('Enter a message', 'fa-circle-exclamation');
+                      const recipients = matching();
+                      if (!recipients.length) return RS.toast('No customers match — add phones in CRM first', 'fa-circle-exclamation');
+                      const audience = waModal.querySelector('#wa-audience').value;
+                      waClose();
+                      const campaignRow = {
+                        id: 'bcast_' + Date.now(),
+                        message,
+                        audience,
+                        recipientCount: recipients.length,
+                        createdAt: new Date().toISOString(),
+                      };
+                      try {
+                        if (window.RS_DB) await RS_DB.put('broadcasts', campaignRow.id, campaignRow);
+                      } catch (e) {}
+                      const prev = hubLocalList('broadcasts');
+                      prev.unshift(campaignRow);
+                      hubLocalSave('broadcasts', prev.slice(0, 100));
+                      RSModal.open({
+                        title: 'Send to ' + recipients.length + ' customer(s)',
+                        sub: 'Tap Send to open WhatsApp for each guest',
+                        icon: 'fa-bullhorn',
+                        size: 'sm',
+                        body: `<div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto">${recipients.map((c, i) => `
+                          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--stroke);border-radius:10px;gap:8px">
+                            <div style="min-width:0"><b>${esc(c.name || 'Guest')}</b><div style="font-size:11px;color:var(--text-mute)">${esc(c.phone)}</div></div>
+                            <button type="button" class="btn btn-ghost btn-sm" data-send-i="${i}"><i class="fa-brands fa-whatsapp"></i> Send</button>
+                          </div>`).join('')}</div>`,
+                        foot: `<button class="btn btn-primary" style="flex:1" data-done>Done</button>`,
+                        onMount(sendModal, closeSend) {
+                          sendModal.querySelector('[data-done]').onclick = () => {
+                            closeSend();
+                            hubScreen('WhatsApp Campaigns');
+                          };
+                          sendModal.querySelectorAll('[data-send-i]').forEach((btn) => {
+                            btn.onclick = () => {
+                              const cst = recipients[+btn.dataset.sendI];
+                              const digits = String(cst.phone || '').replace(/\D/g, '');
+                              const waPhone = digits.length === 10 ? '91' + digits : digits;
+                              window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+                              btn.innerHTML = '<i class="fa-solid fa-check"></i> Opened';
+                              btn.disabled = true;
+                            };
+                          });
+                        },
+                      });
+                      RS.toast('Campaign saved · send from the list', 'fa-bullhorn');
+                    };
+                    load();
+                  },
+                });
+              } else if (name === 'Feedback & Reviews') {
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Guest name</label>
+                        <input type="text" id="rv-name" class="form-control" placeholder="e.g. Priya" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Rating</label>
+                        <select id="rv-rating" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                          <option value="5">5 ★ Excellent</option>
+                          <option value="4" selected>4 ★ Good</option>
+                          <option value="3">3 ★ OK</option>
+                          <option value="2">2 ★ Poor</option>
+                          <option value="1">1 ★ Bad</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Source</label>
+                      <select id="rv-source" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                        <option value="in-house">In-house / verbal</option>
+                        <option value="google">Google</option>
+                        <option value="zomato">Zomato</option>
+                        <option value="swiggy">Swiggy</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Comment</label>
+                      <textarea id="rv-comment" rows="3" class="form-control" placeholder="What did they say?" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
+                  </div>`;
+                RSModal.open({
+                  title: 'Log review',
+                  sub: 'Record guest feedback',
+                  icon: 'fa-star',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Save review</button>`,
+                  onMount(rvModal, rvClose) {
+                    rvModal.querySelector('[data-cancel]').onclick = rvClose;
+                    rvModal.querySelector('[data-confirm]').onclick = async () => {
+                      const guestName = (rvModal.querySelector('#rv-name').value || '').trim() || 'Guest';
+                      const rating = Number(rvModal.querySelector('#rv-rating').value) || 4;
+                      const source = rvModal.querySelector('#rv-source').value || 'staff';
+                      const comment = (rvModal.querySelector('#rv-comment').value || '').trim();
+                      const row = {
+                        id: crypto.randomUUID ? crypto.randomUUID() : 'rev_' + Date.now(),
+                        guestName,
+                        rating,
+                        source,
+                        comment,
+                        createdAt: new Date().toISOString(),
+                      };
+                      rvClose();
+                      try {
+                        const saved = await hubSave('reviews', row);
+                        if (saved && saved.id) row.id = saved.id;
+                      } catch (e) {
+                        console.warn('review cloud save', e);
+                      }
+                      const prev = hubLocalList('reviews');
+                      prev.unshift(row);
+                      hubLocalSave('reviews', prev.slice(0, 200));
+                      RS.toast('Review saved · ' + rating + '★', 'fa-star');
+                      hubScreen('Feedback & Reviews');
                     };
                   },
                 });
