@@ -1641,19 +1641,10 @@
   </div>
 </div>
 
-  <!-- Mobile More Bottom Sheet -->
-  <div id="mobile-more-sheet" style="display:none;position:fixed;inset:0;z-index:500;">
-    <div id="mobile-more-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);" onclick="document.getElementById('mobile-more-sheet').style.display='none'"></div>
-    <div style="position:absolute;bottom:70px;left:12px;right:12px;background:var(--panel);border:1px solid var(--stroke);border-radius:20px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-      <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-mute);grid-column:1/-1;margin-bottom:4px;">MORE SECTIONS</div>
-      <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
-      <button class="mnav-more-btn" data-tab="inventory-tab"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></button>
-      <button class="mnav-more-btn" data-tab="editor-tab"><i class="fa-solid fa-pen-to-square"></i><span>Menu Editor</span></button>
-      <button class="mnav-more-btn" data-tab="employees-tab"><i class="fa-solid fa-users"></i><span>Employees</span></button>
-      <button class="mnav-more-btn" data-tab="customers-tab"><i class="fa-solid fa-address-book"></i><span>Customers</span></button>
-      <button class="mnav-more-btn" data-tab="growth-hub-tab"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></button>
-      <button class="mnav-more-btn" data-tab="floor-tab"><i class="fa-solid fa-chair"></i><span>Tables</span></button>
-    </div>
+  <!-- Legacy mobile more sheet retired (features-shell RSModal "All sections" is canonical).
+       Kept hidden for any residual ID lookups (kitchen-link-coach). -->
+  <div id="mobile-more-sheet" hidden aria-hidden="true" style="display:none!important;pointer-events:none!important;visibility:hidden!important;">
+    <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup" tabindex="-1" aria-hidden="true" style="display:none"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
   </div>
 
   <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:100000;pointer-events:none;">

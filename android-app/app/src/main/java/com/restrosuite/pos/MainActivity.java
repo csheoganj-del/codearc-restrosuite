@@ -97,19 +97,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applySystemBars() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            getWindow().setStatusBarColor(Color.parseColor("#F3EFE8"));
-            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getWindow().setNavigationBarColor(Color.parseColor("#F3EFE8"));
-            getWindow().getDecorView().setSystemUiVisibility(
-                    getWindow().getDecorView().getSystemUiVisibility()
-                            | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        }
-        // Brand accent on API 23+
+        // Immersive POS chrome — cream bars match RestroSuite shell (no browser look)
+        final int cream = Color.parseColor("#F3EFE8");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(Color.parseColor("#F3EFE8"));
+            getWindow().setStatusBarColor(cream);
+            getWindow().setNavigationBarColor(cream);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int flags = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
+        // Draw edge-to-edge under system bars (API 30+) without looking like a browser
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(true);
         }
     }
 
@@ -146,6 +149,15 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setBuiltInZoomControls(false);
         webSettings.setDisplayZoomControls(false);
         webSettings.setTextZoom(100);
+        // App-like scrolling (no rubber-band browser chrome)
+        myWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        myWebView.setVerticalScrollBarEnabled(false);
+        myWebView.setHorizontalScrollBarEnabled(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            myWebView.setNestedScrollingEnabled(true);
+        }
+        // Geolocation for future table maps / delivery — denied by default unless granted
+        webSettings.setGeolocationEnabled(false);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -353,12 +365,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void injectPlatformFlags() {
+        // Tell the web shell it is inside a native Android package — hide PWA install,
+        // use app safe-area, denser mobile chrome, haptics via AndroidInterface.
         String js = "(function(){try{"
                 + "window.RS_ANDROID=true;"
                 + "window.RS_PLATFORM='android';"
+                + "window.RS_NATIVE_APP=true;"
                 + "window.RS_APP_VERSION='" + BuildConfig.VERSION_NAME + "';"
                 + "window.RS_OFFLINE_SHELL=" + (usingLocalShell ? "true" : "false") + ";"
                 + "document.documentElement.setAttribute('data-rs-android','1');"
+                + "document.documentElement.setAttribute('data-rs-native','1');"
+                + "document.documentElement.classList.add('rs-android-app','rs-native-app');"
+                + "var s=document.getElementById('rs-android-app-css');"
+                + "if(!s){s=document.createElement('style');s.id='rs-android-app-css';"
+                + "s.textContent="
+                + "'html.rs-android-app,html.rs-android-app body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}"
+                + "html.rs-android-app .tb-version,html.rs-android-app .pwa-install,"
+                + "html.rs-android-app #pwa-install-btn,html.rs-android-app .rs-install-prompt{display:none!important;}"
+                + "html.rs-android-app .topbar{padding-top:max(6px,env(safe-area-inset-top));}"
+                + "html.rs-android-app .mobile-bottom-nav,"
+                + "html.rs-android-app .mnav{padding-bottom:max(8px,env(safe-area-inset-bottom));}"
+                + "html.rs-android-app .pos-cart{max-height:calc(100dvh - 88px);}';"
+                + "document.head.appendChild(s);}"
                 + "}catch(e){}})();";
         myWebView.evaluateJavascript(js, null);
     }

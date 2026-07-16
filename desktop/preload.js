@@ -14,6 +14,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('RS_DESKTOP', {
   isDesktop: true,
   platform: process.platform,
+  isNativeApp: true,
   versions: {
     electron: process.versions.electron,
     chrome: process.versions.chrome,
@@ -28,6 +29,24 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
   getPreferredPrinter: () => ipcRenderer.invoke('rs-get-preferred-printer'),
   setPreferredPrinter: (name) => ipcRenderer.invoke('rs-set-preferred-printer', name),
 });
+
+// Mark the DOM as native desktop as early as possible (app-like chrome, hide PWA install)
+try {
+  const mark = () => {
+    try {
+      document.documentElement.classList.add('rs-desktop-app', 'rs-native-app');
+      document.documentElement.setAttribute('data-rs-desktop', '1');
+      document.documentElement.setAttribute('data-rs-native', '1');
+      window.RS_NATIVE_APP = true;
+      window.RS_PLATFORM = 'desktop';
+    } catch (_) {}
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mark);
+  } else {
+    mark();
+  }
+} catch (_) {}
 
 // License bridge: the renderer's license-guard.js calls window.rsDesktop.storeLease
 // whenever it obtains a fresh lease, so the main process can persist it

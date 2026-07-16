@@ -1,7 +1,7 @@
 {
   "name": "restrosuite-desktop",
   "productName": "RestroSuite",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "RestroSuite Windows desktop app -- offline-first restaurant POS wrapper around the RestroSuite web app. Shares the same Supabase backend as the web and Android apps.",
   "author": "RestroSuite",

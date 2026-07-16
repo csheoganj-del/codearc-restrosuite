@@ -47,7 +47,7 @@ const APP_SHELL = [
   
   // Missing Feature Scripts Loaded Dynamically by dashboard.html
   "/assets/dashboard.js",
-  // Offline-lease guard â€” MUST be cached so enforcement survives offline.
+  // Offline-lease guard — MUST be cached so enforcement survives offline.
   "/assets/license-config.js",
   "/assets/license-guard.js",
   "/assets/features-pos.js",

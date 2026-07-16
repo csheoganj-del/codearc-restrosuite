@@ -69,7 +69,7 @@
         + `Time: ${time}\n`
         + `Guests: ${pax}\n\n`
         + `We look forward to serving you! Reply here if you need to change anything.`;
-      if (window.__rsGatewayReady === true && window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof window.RS_API.data === 'function') {
+      if (window.__rsGatewayReady === true && window.RS_API && typeof window.RS_API.data === 'function') {
         try {
           await window.RS_API.data({ operation:'gateway_send', phone: digits, message: msg });
           RS.toast('WhatsApp confirmation sent to guest', 'fa-whatsapp');

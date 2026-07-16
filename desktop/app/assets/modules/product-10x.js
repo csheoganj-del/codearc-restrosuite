@@ -328,20 +328,25 @@
       });
     }
 
-    // Staff QR scanner — mobile/tablet only
+    // Staff QR scanner — always visible in top bar (phone, tablet, desktop webcam)
     let scan = document.getElementById('tb-qr-scan');
     if (!scan) {
       scan = document.createElement('button');
       scan.type = 'button';
       scan.id = 'tb-qr-scan';
       scan.className = 'tb-icon-btn tb-qr-scan';
-      scan.setAttribute('aria-label', t('scan_table'));
-      scan.setAttribute('title', t('scan_table'));
+      scan.setAttribute('aria-label', t('scan_table') || 'Scan table QR');
+      scan.setAttribute(
+        'title',
+        'Scan table QR (camera) · or type table number — same session as guest'
+      );
       scan.setAttribute('data-i18n-title', 'scan_table');
-      scan.innerHTML = '<i class="fa-solid fa-camera" aria-hidden="true"></i>';
-      // Insert near support
+      scan.innerHTML = '<i class="fa-solid fa-qrcode" aria-hidden="true"></i>';
+      // Prefer next to WhatsApp / support cluster so it is not lost in overflow
+      const wa = document.getElementById('tb-wa-status-btn');
       const support = document.getElementById('tb-support-wrap');
-      if (support && support.parentNode) support.parentNode.insertBefore(scan, support);
+      if (wa && wa.parentNode) wa.parentNode.insertBefore(scan, wa);
+      else if (support && support.parentNode) support.parentNode.insertBefore(scan, support);
       else right.insertBefore(scan, right.firstChild);
       scan.onclick = () => openStaffQrScanner();
     }
@@ -352,15 +357,12 @@
   function updateScanVisibility() {
     const scan = document.getElementById('tb-qr-scan');
     if (!scan) return;
-    // Hide on pure desktop with mouse; show on phone/tablet
-    scan.style.display = isDesktopWide() ? 'none' : '';
+    // Always show — staff on counter PC also need table QR scan / table #
+    scan.style.display = '';
+    scan.hidden = false;
   }
 
   function openStaffQrScanner() {
-    if (!isTouchMobile() && isDesktopWide()) {
-      toast('QR scanner is for phones & tablets', 'fa-mobile-screen');
-      return;
-    }
     // Role gate: waiter, admin, manager, owner, captain
     const role = String(session().role || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
     const allowed = /owner|admin|manager|waiter|captain|cashier|superadmin/.test(role) || !role;

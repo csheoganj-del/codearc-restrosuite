@@ -2,6 +2,45 @@
    RestroSuite — Product 10x UI (mobile shell, cards, shift, scan)
    ============================================================ */
 
+/* ---- Native app shells (Android WebView / Desktop Electron) ---- */
+html.rs-android-app,
+html.rs-native-app,
+html[data-rs-android="1"] {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+html.rs-android-app .tb-version,
+html.rs-android-app .pwa-install,
+html.rs-android-app #pwa-install-btn,
+html.rs-android-app .rs-install-prompt,
+html.rs-native-app .pwa-install,
+html.rs-native-app #pwa-install-btn {
+  display: none !important;
+}
+html.rs-android-app .topbar {
+  padding-top: max(6px, env(safe-area-inset-top, 0px));
+}
+html.rs-android-app .mobile-bottom-nav,
+html.rs-android-app .mnav {
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+}
+html.rs-android-app .pos-cart {
+  max-height: calc(100dvh - 88px);
+}
+/* Desktop Electron: denser, no browser chrome cues */
+html.rs-desktop-app body,
+body.rs-desktop-app {
+  user-select: none;
+}
+html.rs-desktop-app input,
+html.rs-desktop-app textarea,
+html.rs-desktop-app [contenteditable],
+body.rs-desktop-app input,
+body.rs-desktop-app textarea {
+  user-select: text;
+}
+
 /* ---- Topbar: prevent cut-off, overflow menu ---- */
 .topbar.topbar-calm {
   min-height: 56px;

@@ -7181,12 +7181,16 @@ body.dark-theme .saas-snapshot-card.active-filter {
 .product-guide-body {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 16px 20px 8px;
+  padding: 16px 20px 28px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-bottom: 28px;
+  scrollbar-gutter: stable;
 }
 
 /* Next step strip */
@@ -7251,7 +7255,7 @@ body.dark-theme .saas-snapshot-card.active-filter {
   border: 1px solid var(--stroke-2, #e5e7eb);
   border-radius: 12px;
   background: color-mix(in srgb, var(--glass, #f8fafc) 40%, var(--panel, #fff));
-  overflow: hidden;
+  overflow: visible;
 }
 .pg-block-head {
   display: flex;
@@ -7274,7 +7278,7 @@ body.dark-theme .saas-snapshot-card.active-filter {
   color: var(--text-mute, #64748b);
   line-height: 1.4;
 }
-.pg-block-body { padding: 12px 14px 14px; }
+.pg-block-body { padding: 12px 14px 16px; overflow: visible; }
 
 .pg-progress-ring {
   font-family: var(--font-display, system-ui);
@@ -7469,17 +7473,23 @@ body.dark-theme .saas-snapshot-card.active-filter {
 .pg-feature-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  align-items: stretch;
+  grid-auto-rows: auto;
+  padding-bottom: 8px;
+  margin-bottom: 0;
 }
 .pg-feature {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 14px;
   border-radius: 12px;
   border: 1px solid var(--stroke-2, #e5e7eb);
   background: var(--panel-solid, var(--panel, #fff));
   min-height: 100%;
+  height: auto;
+  overflow: visible;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 .pg-feature:hover {
@@ -7535,7 +7545,9 @@ body.dark-theme .saas-snapshot-card.active-filter {
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-soft, #64748b);
-  flex: 1;
+  flex: 0 1 auto;
+  overflow: visible;
+  word-break: break-word;
 }
 .pg-feature-try {
   margin: 0;
@@ -7544,8 +7556,9 @@ body.dark-theme .saas-snapshot-card.active-filter {
   background: var(--glass, #f8fafc);
   border: 1px solid var(--stroke, #eef2f7);
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--text-soft, #64748b);
+  flex: none;
 }
 .pg-feature-try span {
   font-weight: 800;
@@ -7555,6 +7568,9 @@ body.dark-theme .saas-snapshot-card.active-filter {
 .pg-feature-open {
   align-self: flex-start;
   margin-top: auto;
+  flex: none;
+  position: relative;
+  z-index: 1;
 }
 
 .pg-pill {
@@ -7609,7 +7625,9 @@ body.dark-theme .saas-snapshot-card.active-filter {
   gap: 12px;
   padding: 12px 20px 14px;
   border-top: 1px solid var(--stroke, #e5e7eb);
-  background: color-mix(in srgb, var(--glass, #f8fafc) 55%, var(--panel-solid, #fff));
+  background: var(--panel-solid, var(--panel, #fff));
+  position: relative;
+  z-index: 2;
 }
 .product-guide-footer-text strong {
   display: block;

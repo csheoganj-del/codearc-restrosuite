@@ -1685,13 +1685,28 @@
       return new Set();
     }
   }
-  async function drainSyncQueue() {
-    if (!signedIn()) return;
-    if (drainInFlight) return;
+  function withTimeout(promise, ms, label) {
+    let timer;
+    return Promise.race([
+      Promise.resolve(promise).finally(() => { if (timer) clearTimeout(timer); }),
+      new Promise((_, rej) => {
+        timer = setTimeout(() => rej(new Error((label || 'sync') + ' timed out after ' + ms + 'ms')), ms);
+      }),
+    ]);
+  }
+
+  async function drainSyncQueue(opts) {
+    if (!signedIn()) return { ok: 0, failed: 0, remaining: getSyncQueue().length };
+    if (drainInFlight) return { ok: 0, failed: 0, remaining: getSyncQueue().length, busy: true };
     drainInFlight = true;
+    const forceDropStuck = !!(opts && opts.forceDropStuck);
     try {
       let q = getSyncQueue().filter(e => e && e.status !== 'acked');
-      if (!q.length) { notifySyncQueue(); return; }
+      if (!q.length) {
+        notifySyncQueue();
+        window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: 0, failed: 0 } }));
+        return { ok: 0, failed: 0, remaining: 0 };
+      }
 
       // Mark all pending as in_progress and persist BEFORE attempting
       // (crash mid-drain must not lose the queue — old code cleared first)
@@ -1703,7 +1718,8 @@
       let failed = 0;
       const remaining = [];
       for (const entry of q) {
-        const working = { ...entry, status: 'in_progress', attempts: (entry.attempts || 0) + 1 };
+        const attempts = (entry.attempts || 0) + 1;
+        const working = { ...entry, status: 'in_progress', attempts };
         // Persist in_progress state for this entry
         const snap = getSyncQueue().map(e =>
           (e.id === working.id || entryKey(e.method, e.collection, e.args) === entryKey(working.method, working.collection, working.args))
@@ -1712,10 +1728,13 @@
         saveSyncQueue(snap);
 
         try {
+          // Hard timeout so one hung network call cannot leave the blue banner forever
           if (entry.method === 'setSettings') {
-            await CLOUD.setSettings(entry.args[0]);
+            await withTimeout(CLOUD.setSettings(entry.args[0]), 20000, 'setSettings');
+          } else if (typeof CLOUD[entry.method] === 'function') {
+            await withTimeout(CLOUD[entry.method](entry.collection, ...entry.args), 20000, entry.method + ':' + entry.collection);
           } else {
-            await CLOUD[entry.method](entry.collection, ...entry.args);
+            throw new Error('Unknown sync method: ' + entry.method);
           }
           ok++;
           // Remove only this entry on success
@@ -1724,12 +1743,24 @@
           );
           saveSyncQueue(after);
         } catch (e) {
-          console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, e.message);
+          const msg = (e && e.message) || String(e);
+          console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, msg);
           failed++;
+          // Drop poison pills: permanent client errors, or too many retries for non-bill rows
+          const permanent = /401|403|404|not signed|unauthorized|invalid|schema|column|duplicate key/i.test(msg);
+          const maxAttempts = entry.critical ? 12 : 6;
+          if (forceDropStuck || permanent || attempts >= maxAttempts) {
+            console.warn(`[RS_DB] Dropping stuck sync entry ${entry.method}/${entry.collection} after ${attempts} attempt(s): ${msg}`);
+            const after = getSyncQueue().filter(x =>
+              !(x.id === working.id || entryKey(x.method, x.collection, x.args) === entryKey(working.method, working.collection, working.args))
+            );
+            saveSyncQueue(after);
+            continue;
+          }
           remaining.push({
             ...working,
             status: 'pending',
-            lastError: e.message || String(e),
+            lastError: msg,
             lastAttemptAt: Date.now(),
           });
           // Write failed entry back as pending
@@ -1743,11 +1774,13 @@
         }
       }
 
+      const left = getSyncQueue().filter(e => e && e.status !== 'acked').length;
       if (ok > 0) {
         for (const entry of q) { delete lastListFetchTime[entry.collection]; }
-        window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: ok, failed } }));
       }
+      window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: ok, failed, remaining: left } }));
       notifySyncQueue();
+      return { ok, failed, remaining: left };
     } finally {
       drainInFlight = false;
     }
@@ -1755,11 +1788,18 @@
   // Retry on reconnect
   window.addEventListener('online', () => {
     console.log('[RS_DB] Back online -- draining sync queue');
-    setTimeout(drainSyncQueue, 1000); // brief delay for connection to stabilise
+    setTimeout(() => { drainSyncQueue().catch(() => {}); }, 1000); // brief delay for connection to stabilise
   });
-  // Also expose for manual call
+  // Also expose for manual call (banner Retry + console)
   window.RS_DB_DRAIN = drainSyncQueue;
+  window.RS_DB_FLUSH_SYNC = drainSyncQueue;
   window.RS_DB_SYNC_DEPTH = () => getSyncQueue().filter(e => e && e.status !== 'acked').length;
+  window.RS_DB_GET_SYNC_QUEUE = () => getSyncQueue().filter(e => e && e.status !== 'acked');
+  window.RS_DB_CLEAR_SYNC_QUEUE = () => {
+    saveSyncQueue([]);
+    notifySyncQueue();
+    window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: 0, failed: 0, remaining: 0, cleared: true } }));
+  };
   window.RS_DB_NOTIFY_SYNC = notifySyncQueue;
   // Drain at boot too, not just on the 'online' event. Without this, anything
   // queued from a previous tab/session (e.g. the browser was closed while
@@ -1827,6 +1867,15 @@
     put:(c,id,obj)=>guard('put',c,id,obj),
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),
+    /** Drain offline write queue (banner Retry calls this). */
+    flushSyncQueue: (opts) => drainSyncQueue(opts),
+    drainSyncQueue: (opts) => drainSyncQueue(opts),
+    getSyncQueueDepth: () => getSyncQueue().filter(e => e && e.status !== 'acked').length,
+    clearSyncQueue: () => {
+      saveSyncQueue([]);
+      notifySyncQueue();
+      window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: 0, failed: 0, remaining: 0, cleared: true } }));
+    },
     getSettings: async ()=>{
       const s = await guard('getSettings','settings');
       cachePinHashFromSettings(s);
@@ -1839,12 +1888,20 @@
       await LS.setSettings(o);
       if (signedIn()) {
         try {
-          const res = await CLOUD.setSettings(o);
+          const res = await withTimeout(CLOUD.setSettings(o), 20000, 'setSettings');
           if (res) {
             cachedSettingsMap[tenantId] = res;
             cachePinHashFromSettings(res);
             await LS.setSettings(res);
           }
+          // Settings reached cloud — drop any prior failed settings queue entries
+          try {
+            const cleaned = getSyncQueue().filter(e => !(e && e.method === 'setSettings'));
+            if (cleaned.length !== getSyncQueue().length) {
+              saveSyncQueue(cleaned);
+              notifySyncQueue();
+            }
+          } catch (_) {}
           return res;
         } catch(e) {
           console.warn('[RS_DB] setSettings cloud failed:', e.message);
