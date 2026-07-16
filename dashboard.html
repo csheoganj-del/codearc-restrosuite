@@ -83,7 +83,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v208-20260716-platform-sync';
+    var builtin = 'v209-20260716-mobile-license';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -1731,6 +1731,11 @@
       }
     }
     (window.__configReady || Promise.resolve()).then(boot, boot);
+    // Mobile: re-run after a beat once session/remember-me has fully hydrated.
+    setTimeout(boot, 1200);
+    setTimeout(boot, 3500);
+    document.addEventListener('rs:ready', function () { setTimeout(boot, 200); });
+    document.addEventListener('rs:hydrated', function () { setTimeout(boot, 200); });
   })();
 </script>
 <script src="src/dashboard/staff-access.js"></script>

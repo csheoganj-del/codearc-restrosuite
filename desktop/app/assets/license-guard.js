@@ -250,12 +250,40 @@
    *  Online refresh — asks the server for a fresh lease. This is the only
    *  way the offline window resets. Runs the kill switch on expired/revoked.
    * ------------------------------------------------------------------ */
+  function hasSessionToken() {
+    try {
+      var api = root.RS_API;
+      if (api && typeof api.session === 'function') {
+        var s = api.session();
+        if (s && s.token) return true;
+      }
+    } catch (e) {}
+    try {
+      return !!(root.sessionStorage && root.sessionStorage.getItem('tenant_session_token'));
+    } catch (e2) {
+      return false;
+    }
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
   async function refresh() {
     var deviceId = getDeviceId();
     var api = root.RS_API;
     if (!api || typeof api.lease !== 'function') {
       return { ok: false, reason: 'api_unavailable' };
     }
+    // Mobile Safari / new tabs often hydrate remember-me into sessionStorage
+    // only when session() is first called — do that before lease.
+    try { if (typeof api.session === 'function') api.session(); } catch (e) {}
+    if (!hasSessionToken()) {
+      return { ok: false, status: 'unauthenticated' };
+    }
+    try {
+      if (typeof api.refreshConfig === 'function') api.refreshConfig();
+    } catch (e2) {}
     try {
       var res = await api.lease(deviceId);
       if (res && res.status === 'active' && res.lease) {
@@ -283,8 +311,30 @@
         return { ok: false, status: 'unauthenticated' };
       }
       // Network error / offline — keep whatever lease we have.
-      return { ok: false, status: 'offline', offline: true };
+      return { ok: false, status: 'offline', offline: true, error: String(err && err.message || err || '') };
     }
+  }
+
+  /** Several lease attempts — mobile networks / cold start often fail once. */
+  async function refreshWithRetries(attempts, gapMs) {
+    attempts = Math.max(1, attempts || 1);
+    gapMs = gapMs == null ? 700 : gapMs;
+    var last = { ok: false, status: 'unknown' };
+    for (var i = 0; i < attempts; i++) {
+      last = await refresh();
+      if (last && last.ok) return last;
+      if (last && last.kill) return last;
+      if (last && last.status === 'unauthenticated' && i < attempts - 1) {
+        await sleep(gapMs);
+        continue;
+      }
+      if (last && last.offline && i < attempts - 1) {
+        await sleep(gapMs);
+        continue;
+      }
+      if (i < attempts - 1) await sleep(gapMs);
+    }
+    return last;
   }
 
   /* ------------------------------------------------------------------ *
@@ -327,9 +377,10 @@
     var messages = {
       clock_rollback: 'Your device clock looks incorrect. Connect to the internet once to re-verify your subscription.',
       lease_expired: 'Your RestroSuite licence needs to reconnect. Please go online briefly to renew.',
-      no_lease: 'RestroSuite needs to verify your subscription. Please connect to the internet.',
-      invalid_lease: 'RestroSuite needs to verify your subscription. Please connect to the internet.',
-      lease_no_expiry: 'RestroSuite needs to verify your subscription. Please connect to the internet.'
+      no_lease: 'RestroSuite needs to verify your subscription on this device. Stay online and tap Retry — mobile browsers often need a second try after login.',
+      invalid_lease: 'RestroSuite needs to verify your subscription. Please stay online and tap Retry now.',
+      lease_no_expiry: 'RestroSuite needs to verify your subscription. Please connect to the internet.',
+      verifying: 'Verifying your outlet licence…'
     };
     var msg = messages[reason] || messages.no_lease;
     var el = document.createElement('div');
@@ -347,20 +398,28 @@
       '<div style="width:64px;height:64px;border-radius:50%;margin:0 auto 18px;background:rgba(252,128,25,.15);' +
       'display:flex;align-items:center;justify-content:center;font-size:28px">🔒</div>' +
       '<div style="font-weight:800;font-size:19px;margin-bottom:10px">Reconnect to continue</div>' +
-      '<div style="font-size:14px;line-height:1.6;color:#c7cede;margin-bottom:22px">' + msg + '</div>' +
+      '<div id="rs-license-lock-msg" style="font-size:14px;line-height:1.6;color:#c7cede;margin-bottom:22px">' + msg + '</div>' +
       '<button id="rs-license-retry" style="background:#FF4F00;color:#fff;border:none;border-radius:10px;' +
-      'padding:12px 22px;font-weight:700;font-size:14px;cursor:pointer">Retry now</button>' +
+      'padding:12px 22px;font-weight:700;font-size:14px;cursor:pointer;min-width:140px;min-height:44px">Retry now</button>' +
       '<div style="margin-top:16px;font-size:12px;color:#8b93a7">Need help? Contact RestroSuite support.</div>' +
       '</div>';
     document.body.appendChild(el);
     var btn = document.getElementById('rs-license-retry');
     if (btn) btn.addEventListener('click', async function () {
       btn.textContent = 'Checking…'; btn.disabled = true;
-      var r = await refresh();
-      var ev = await evaluateNow();
-      if (ev.allow && !ev.locked) { el.remove(); }
-      else { btn.textContent = 'Retry now'; btn.disabled = false; }
+      try {
+        await refreshWithRetries(5, 600);
+        var ev = await evaluateNow();
+        if (ev.allow && !ev.locked) {
+          el.remove();
+          return;
+        }
+      } catch (e) {}
+      btn.textContent = 'Retry now';
+      btn.disabled = false;
     });
+    // Auto-retry on mobile while lock is open (session often becomes ready after first paint).
+    startLockedRetryLoop();
   }
   function hideLockScreen() {
     var el = IS_BROWSER && document.getElementById('rs-license-lock');
@@ -399,6 +458,76 @@
    *  gated UI. Returns true if the app may run, false if it was locked.
    * ------------------------------------------------------------------ */
   var _started = false;
+  var _lockRetryTimer = null;
+  var _lockRetryCount = 0;
+  var _pendingLeaseTimer = null;
+  var _pendingLeaseCount = 0;
+
+  function stopLockedRetryLoop() {
+    if (_lockRetryTimer) {
+      clearInterval(_lockRetryTimer);
+      _lockRetryTimer = null;
+    }
+    _lockRetryCount = 0;
+  }
+
+  function stopPendingLeaseLoop() {
+    if (_pendingLeaseTimer) {
+      clearInterval(_pendingLeaseTimer);
+      _pendingLeaseTimer = null;
+    }
+    _pendingLeaseCount = 0;
+  }
+
+  function startPendingLeaseLoop() {
+    if (!IS_BROWSER || _pendingLeaseTimer) return;
+    _pendingLeaseCount = 0;
+    _pendingLeaseTimer = setInterval(function () {
+      var st = readState();
+      if (st.lease) {
+        stopPendingLeaseLoop();
+        reassess();
+        return;
+      }
+      if (++_pendingLeaseCount > 30) {
+        // ~90s of soft tries — if still no lease, show lock with Retry.
+        stopPendingLeaseLoop();
+        if (hasSessionToken() && lsGet('rs_license_killed_v1') !== '1') {
+          showLockScreen('no_lease');
+          startLockedRetryLoop();
+        }
+        return;
+      }
+      if (navigator.onLine === false) return;
+      if (!hasSessionToken()) return;
+      refreshWithRetries(2, 350).then(function (r) {
+        if (r && r.ok) {
+          stopPendingLeaseLoop();
+          reassess();
+        }
+      }).catch(function () {});
+    }, 3000);
+  }
+
+  function startLockedRetryLoop() {
+    if (!IS_BROWSER || _lockRetryTimer) return;
+    _lockRetryCount = 0;
+    _lockRetryTimer = setInterval(function () {
+      if (!document.getElementById('rs-license-lock')) {
+        stopLockedRetryLoop();
+        return;
+      }
+      if (++_lockRetryCount > 40) {
+        // ~2 minutes of 3s ticks — stop hammering; user can still tap Retry.
+        stopLockedRetryLoop();
+        return;
+      }
+      if (navigator.onLine === false) return;
+      refreshWithRetries(2, 400).then(function () { return reassess(); })
+        .catch(function () { reassess(); });
+    }, 3000);
+  }
+
   async function enforce(opts) {
     opts = opts || {};
     if (!CFG || !CFG.RS_LICENSE_PUBLIC_KEY_SPKI_B64 ||
@@ -408,15 +537,57 @@
       return true;
     }
 
-    // Kick a refresh in the background if we appear to be online.
+    // Super-admin console is not tenant-leased.
+    try {
+      var s0 = root.RS_API && RS_API.session ? RS_API.session() : null;
+      if (s0 && s0.role === 'superadmin') return true;
+    } catch (e0) {}
+
     var online = !IS_BROWSER || (typeof navigator === 'undefined') || navigator.onLine !== false;
-    if (online) { try { await refresh(); } catch (e) {} }
+
+    // Mobile / slow devices: wait briefly for session hydrate (remember-me blob
+    // → sessionStorage) before deciding there is no lease.
+    if (online && !hasSessionToken()) {
+      for (var w = 0; w < 8 && !hasSessionToken(); w++) {
+        await sleep(200);
+        try { if (root.RS_API && typeof RS_API.session === 'function') RS_API.session(); } catch (e1) {}
+      }
+    }
+
+    // Online + signed-in: several lease attempts (first fetch often fails on mobile).
+    if (online) {
+      try {
+        await refreshWithRetries(hasSessionToken() ? 5 : 2, 500);
+      } catch (e2) {}
+    }
 
     var ev = await evaluateNow();
 
+    // Soft path: online, logged in, not kill-switched, but lease not banked yet.
+    // Desktop often already has a lease in localStorage; mobile is a fresh device
+    // and must not hard-lock on first paint while lease is still fetching.
+    if (ev.locked && online && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1' &&
+        (ev.reason === 'no_lease' || ev.reason === 'invalid_lease' || ev.reason === 'bootstrap_start' ||
+         ev.reason === 'bootstrap_grace')) {
+      var stSoft = readState();
+      if (!stSoft.lease) {
+        hideLockScreen();
+        if (!_started) { _started = true; startWatch(); }
+        startPendingLeaseLoop();
+        setTimeout(function () {
+          refreshWithRetries(6, 700).then(function (r) {
+            if (r && r.ok) {
+              stopPendingLeaseLoop();
+              reassess();
+            }
+          }).catch(function () {});
+        }, 400);
+        return true;
+      }
+    }
+
     if (ev.locked) {
       showLockScreen(ev.reason);
-      // Keep trying in the background; unlock automatically once it clears.
       if (!_started) {
         _started = true;
         startWatch();
@@ -424,6 +595,8 @@
       return false;
     }
 
+    stopLockedRetryLoop();
+    stopPendingLeaseLoop();
     hideLockScreen();
     if (ev.warn && ev.msUntilExpiry != null) showExpiryBanner(ev.msUntilExpiry);
     if (!_started) { _started = true; startWatch(); }
@@ -434,17 +607,39 @@
     if (!IS_BROWSER) return;
     // Periodic silent refresh while online.
     setInterval(function () {
-      if (navigator.onLine !== false) refresh().then(reassess);
+      if (navigator.onLine !== false) refreshWithRetries(2, 400).then(reassess);
     }, CFG.REFRESH_INTERVAL_MS || (6 * 60 * 60 * 1000));
 
+    // While no valid local lease, poll often (mobile after login).
+    setInterval(function () {
+      if (navigator.onLine === false) return;
+      var st = readState();
+      if (st.lease) return;
+      if (!hasSessionToken()) return;
+      refreshWithRetries(2, 300).then(reassess).catch(function () {});
+    }, 15 * 1000);
+
     // Re-check on regaining connectivity and on tab focus.
-    root.addEventListener && root.addEventListener('online', function () { refresh().then(reassess); });
+    root.addEventListener && root.addEventListener('online', function () {
+      refreshWithRetries(4, 500).then(reassess);
+    });
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') reassess();
+      if (document.visibilityState === 'visible') {
+        if (navigator.onLine !== false) refreshWithRetries(2, 400).then(reassess);
+        else reassess();
+      }
     });
     // Frequent lightweight local re-evaluation (catches lease expiring while
     // the app sits open offline, and clock tampering mid-session).
     setInterval(reassess, 5 * 60 * 1000);
+
+    // After auth finishes loading on mobile, re-enforce once.
+    document.addEventListener('rs:ready', function () {
+      refreshWithRetries(4, 400).then(reassess).catch(function () { reassess(); });
+    });
+    document.addEventListener('rs:hydrated', function () {
+      refreshWithRetries(3, 400).then(reassess).catch(function () { reassess(); });
+    });
 
     // Live push: react INSTANTLY when the server changes this tenant's licence
     // (billing set to past_due/active, plan change, or a device revoke) — no
@@ -471,7 +666,7 @@
         .on('broadcast', { event: 'license-changed' }, function () {
           // The server says this tenant's licence changed. Re-fetch the lease
           // and re-evaluate right away, so lock/unlock happens live.
-          refresh().then(reassess).catch(function () { reassess(); });
+          refreshWithRetries(3, 400).then(reassess).catch(function () { reassess(); });
         })
         .subscribe();
     } catch (e) { /* not ready yet — the retry interval will try again */ }
@@ -479,8 +674,20 @@
 
   async function reassess() {
     var ev = await evaluateNow();
-    if (ev.locked) showLockScreen(ev.reason);
-    else {
+    if (ev.locked) {
+      if (navigator.onLine !== false && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1') {
+        var st = readState();
+        if (!st.lease && (ev.reason === 'no_lease' || ev.reason === 'invalid_lease')) {
+          // Soft: keep POS usable while pending lease loop works.
+          if (_pendingLeaseTimer) return;
+          startPendingLeaseLoop();
+          return;
+        }
+      }
+      showLockScreen(ev.reason);
+    } else {
+      stopLockedRetryLoop();
+      stopPendingLeaseLoop();
       hideLockScreen();
       if (ev.warn && ev.msUntilExpiry != null) showExpiryBanner(ev.msUntilExpiry);
     }
@@ -493,6 +700,7 @@
     // runtime
     enforce: enforce,
     refresh: refresh,
+    refreshWithRetries: refreshWithRetries,
     evaluateNow: evaluateNow,
     getDeviceId: getDeviceId,
     _internal: { storeLease: storeLease, wipeLease: wipeLease, readState: readState, bumpHighWaterMark: bumpHighWaterMark }

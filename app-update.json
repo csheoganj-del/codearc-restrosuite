@@ -1,12 +1,12 @@
 {
-  "version": "v208-20260716-platform-sync",
+  "version": "v209-20260716-mobile-license",
   "date": "2026-07-16",
-  "title": "Platform sync — Web PWA, Windows, Android",
-  "summary": "Ships the v207 reports chart clip fix and tax/docs baseline across web PWA, Windows desktop, and Android offline assets so every client runs the same build.",
+  "title": "Mobile licence lock fix",
+  "summary": "Stops false \"Reconnect to continue\" on mobile browsers after login by waiting for session hydrate, retrying the licence lease, and only hard-locking when the server truly refuses.",
   "highlights": [
-    "Reports daily revenue bars no longer spill into Payment mix",
-    "PWA service-worker cache bump for fresh assets",
-    "Android assets + desktop app/ folder resynced from web",
-    "Version chip v208 across clients"
+    "Lease refresh retries after login on mobile Safari/Chrome",
+    "Soft path while online + signed in without a stored lease yet",
+    "Retry button multi-attempt + auto-retry loop on lock screen",
+    "Re-enforce on rs:ready / rs:hydrated"
   ]
 }
