@@ -1026,18 +1026,55 @@ serve(async (req) => {
     }
 
     if (action === "get_public_bill") {
-      const billNo = String(payload.bill_no || "").trim();
+      const billNo = String(payload.bill_no || payload.billNo || payload.no || payload.order_id || "").trim();
       if (!billNo) {
         return jsonResponse({ error: "Invalid bill number." }, 400, req);
       }
 
-      // Fetch the bill from the tenant's outlet bills
-      const { data: billData, error: billError } = await supabaseAdmin
-        .from("doppio_bills")
-        .select("id, orderId:order_id, dateTime:date_time, table:table_number, items, subtotal, discount, serviceChargeAmount:service_charge_amount, gst, cgst, sgst, total, paymentMethod:payment_method, tenders, change, customerName:customer_name, customerPhone:customer_phone")
-        .eq("tenant_id", tenant.id)
-        .or(`order_id.eq."${billNo}",id.eq."${billNo}"`)
-        .maybeSingle();
+      // IMPORTANT: do NOT or-filter id.eq."RS-TK-…" — id is bigint and PostgREST
+      // throws 22P02 ("invalid input syntax for type bigint") → "Failed to fetch bill details."
+      // Printed receipt QR always carries order_id (e.g. RS-TK-260716-005).
+      const billSelect =
+        "id, order_id, date_time, table_number, items, subtotal, discount, service_charge_amount, gst, cgst, sgst, total, payment_method, tenders, change, customer_name, customer_phone";
+
+      let billData: Record<string, unknown> | null = null;
+      let billError: { message?: string } | null = null;
+
+      {
+        const q = await supabaseAdmin
+          .from("doppio_bills")
+          .select(billSelect)
+          .eq("tenant_id", tenant.id)
+          .eq("order_id", billNo)
+          .maybeSingle();
+        billData = q.data as Record<string, unknown> | null;
+        billError = q.error;
+      }
+
+      // Optional: numeric internal id only when the QR/query is purely digits
+      if (!billData && !billError && /^\d+$/.test(billNo)) {
+        const q2 = await supabaseAdmin
+          .from("doppio_bills")
+          .select(billSelect)
+          .eq("tenant_id", tenant.id)
+          .eq("id", Number(billNo))
+          .maybeSingle();
+        billData = q2.data as Record<string, unknown> | null;
+        billError = q2.error;
+      }
+
+      // Soft fallback: some older rows may store order id with different casing/spacing
+      if (!billData && !billError) {
+        const q3 = await supabaseAdmin
+          .from("doppio_bills")
+          .select(billSelect)
+          .eq("tenant_id", tenant.id)
+          .ilike("order_id", billNo)
+          .limit(1)
+          .maybeSingle();
+        billData = q3.data as Record<string, unknown> | null;
+        billError = q3.error;
+      }
 
       if (billError) {
         console.error("tenant-public get_public_bill failed:", billError);
@@ -1081,28 +1118,40 @@ serve(async (req) => {
       }
 
       // Format items array if stored as JSON in database
-      let parsedItems = [];
+      let parsedItems: unknown[] = [];
       try {
-        parsedItems = typeof billData.items === "string"
-          ? JSON.parse(billData.items)
-          : (billData.items || []);
+        const rawItems = billData.items;
+        parsedItems = typeof rawItems === "string"
+          ? JSON.parse(rawItems)
+          : (Array.isArray(rawItems) ? rawItems : []);
       } catch {
         parsedItems = [];
       }
 
+      const orderId = String(billData.order_id || billData.orderId || billData.id || "Invoice");
+      const dateTime = billData.date_time || billData.dateTime;
       const formattedBill = {
-        no: billData.orderId || billData.id || "Invoice",
-        time: billData.dateTime ? new Date(billData.dateTime).toLocaleString(locale, { hour: 'numeric', minute: '2-digit', hour12: true, day: '2-digit', month: 'short' }) : "",
-        tableNumber: billData.table || "Walk-in",
+        no: orderId,
+        time: dateTime
+          ? new Date(String(dateTime)).toLocaleString(locale, {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+          : "",
+        tableNumber: String(billData.table_number || billData.table || "Walk-in"),
         items: parsedItems,
         subtotal: Number(billData.subtotal || 0),
         discount: Number(billData.discount || 0),
-        serviceChargeAmount: Number(billData.serviceChargeAmount || 0),
+        serviceChargeAmount: Number(billData.service_charge_amount || billData.serviceChargeAmount || 0),
         gst: Number(billData.gst || 0),
         total: Number(billData.total || 0),
-        paymentMethod: billData.paymentMethod || "Cash",
-        customerName: billData.customerName || "Walk-in",
-        customerPhone: billData.customerPhone || ""
+        paymentMethod: String(billData.payment_method || billData.paymentMethod || "Cash"),
+        customerName: String(billData.customer_name || billData.customerName || "Walk-in"),
+        customerPhone: String(billData.customer_phone || billData.customerPhone || ""),
       };
 
       return jsonResponse({
