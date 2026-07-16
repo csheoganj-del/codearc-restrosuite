@@ -206,9 +206,20 @@
     <div class="report-grid">
       <div class="panel panel-pad">
         <div class="panel-head"><h3>Daily revenue</h3><span class="ph-sub">${period} · hover for value</span></div>
-        <div class="chart-bars" id="chart-revenue">
+        <div class="chart-bars${days > 14 ? ' dense' : ''}" id="chart-revenue">
           ${hasDailyData
-            ? dailySlots.map((v,i)=>`<div class="cbar"><div class="bar" style="height:0" data-h="${Math.round(v/maxSlot*100)}"><span class="bv">${rs(v)}</span></div><span class="bl">${dailyLabels[i]}</span></div>`).join('')
+            ? dailySlots.map((v, i) => {
+                // For 30/90-day ranges show every Nth date so labels don't shove bars into Payment mix
+                const labelStep = days > 60 ? 7 : days > 14 ? 5 : 1;
+                const showLabel = i === 0 || i === dailySlots.length - 1 || i % labelStep === 0;
+                const h = Math.max(v > 0 ? 4 : 0, Math.round((v / maxSlot) * 100));
+                return `<div class="cbar" title="${_e(dailyLabels[i])}: ${rs(v)}">
+                  <div class="bar-track">
+                    <div class="bar" style="height:0" data-h="${h}"><span class="bv">${rs(v)}</span></div>
+                  </div>
+                  <span class="bl${showLabel ? '' : ' is-muted'}">${showLabel ? _e(dailyLabels[i]) : '·'}</span>
+                </div>`;
+              }).join('')
             : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px;width:100%">No sales data for this period</div>`
           }
         </div>

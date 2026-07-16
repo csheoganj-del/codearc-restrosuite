@@ -2066,21 +2066,108 @@ body.rs-role-brandadmin #klc-mobile-setup {
 }
 
 /* ===================== REPORTS / charts ===================== */
-.report-grid { display: grid; grid-template-columns: var(--cols, 1.6fr 1fr); gap: 16px; }
-.chart-bars { display: flex; align-items: flex-end; gap: 10px; height: 200px; padding-top: 10px; }
-.chart-bars .cbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
-.chart-bars .cbar .bar { width: 100%; max-width: 38px; border-radius: 4px 4px 2px 2px; background: var(--orange); transition: height .4s var(--ease); position: relative; }
+.report-grid { display: grid; grid-template-columns: var(--cols, 1.6fr 1fr); gap: 16px; align-items: stretch; }
+/* Keep panels from letting chart bars spill into the neighbour (Payment mix) */
+.report-grid > .panel { min-width: 0; overflow: hidden; }
+.chart-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 210px;
+  padding-top: 6px;
+  min-width: 0;
+  overflow: hidden; /* clip long 30/90-day series — never paint under Payment mix */
+}
+.chart-bars.dense { gap: 2px; }
+.chart-bars .cbar {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+/* Track holds the bar; labels sit below — bars never use 100% of total height */
+.chart-bars .cbar .bar-track {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.chart-bars .cbar .bar {
+  width: 100%;
+  max-width: 38px;
+  min-height: 2px;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--orange);
+  transition: height .4s var(--ease);
+  position: relative;
+}
+.chart-bars.dense .cbar .bar { max-width: 14px; border-radius: 3px 3px 1px 1px; }
 .chart-bars .cbar .bar.v { background: var(--violet); }
-.chart-bars .cbar .bl { font-size: 11px; color: var(--text-mute); }
-.chart-bars .cbar .bv { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; opacity: 0; transition: opacity .2s; }
+.chart-bars .cbar .bl {
+  flex: none;
+  height: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 6px;
+  font-size: 10.5px;
+  line-height: 1.1;
+  color: var(--text-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: clip;
+}
+.chart-bars.dense .cbar .bl { font-size: 9px; height: 24px; }
+.chart-bars .cbar .bl.is-muted { opacity: 0; pointer-events: none; } /* keep layout, hide every Nth label */
+.chart-bars .cbar .bv {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .2s;
+  pointer-events: none;
+  z-index: 2;
+}
 .chart-bars .cbar:hover .bv { opacity: 1; }
-.donut-wrap { display: flex; align-items: center; gap: 20px; }
-.donut { width: 150px; height: 150px; border-radius: 50%; flex: none; position: relative; }
-.donut::after { content: ""; position: absolute; inset: 26px; border-radius: 50%; background: var(--panel-solid); }
+.donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 170px;
+  position: relative;
+  z-index: 1; /* sit above any accidental neighbour overflow */
+  background: var(--panel-solid, var(--panel));
+}
+.donut {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  flex: none;
+  position: relative;
+  overflow: hidden; /* keep ring clean */
+}
+.donut::after {
+  content: "";
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  background: var(--panel-solid);
+}
 .donut-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; z-index: 1; }
 .donut-center .dc-v { font-family: var(--font-display); font-weight: 700; font-size: 22px; }
 .donut-center .dc-l { font-size: 10.5px; color: var(--text-mute); }
-.legend { display: flex; flex-direction: column; gap: 11px; flex: 1; }
+.legend { display: flex; flex-direction: column; gap: 11px; flex: 1; min-width: 0; }
 .legend .lg-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .legend .lg-sw { width: 11px; height: 11px; border-radius: 4px; flex: none; }
 .legend .lg-val { margin-left: auto; font-weight: 700; color: var(--text); }
