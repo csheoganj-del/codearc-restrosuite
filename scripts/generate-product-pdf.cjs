@@ -13,6 +13,7 @@ const ROOT = path.resolve(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'docs', 'product-pdf');
 const SHOTS = path.join(OUT_DIR, 'shots');
 const PDF_PATH = path.join(ROOT, 'docs', 'RestroSuite-Product-Features-Guide.pdf');
+const PDF_PATH_ALT = path.join(ROOT, 'docs', 'RestroSuite-Product-Features-Guide-v2.pdf');
 const HTML_PATH = path.join(OUT_DIR, 'brochure.html');
 
 const BASE = process.env.RS_BASE || 'https://restrosuite.codearc.co.in';
@@ -109,12 +110,36 @@ async function login(page) {
 }
 
 async function openTab(page, tabId) {
-  // Settings may not have sidebar link — try multiple strategies
+  // Settings opens from footer gear (#open-settings), not a normal sidebar data-tab
+  if (tabId === 'settings-tab') {
+    const gear = page.locator('#open-settings, .sb-foot-btn:has-text("Settings"), button:has-text("Settings")').first();
+    if (await gear.count()) {
+      await gear.click({ timeout: 5000 }).catch(() => {});
+    } else {
+      await page.evaluate(() => {
+        try {
+          const btn = document.getElementById('open-settings');
+          if (btn) btn.click();
+          else if (window.RS && typeof RS.switchTab === 'function') RS.switchTab('settings-tab');
+        } catch (e) {}
+      });
+    }
+    await page.waitForTimeout(1800);
+    // Prefer Taxes & pricing sub-panel so the shot is content-rich
+    const taxNav = page.locator('.set-nav button[data-s="tax"], [data-s="tax"], button:has-text("Taxes")').first();
+    if (await taxNav.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await taxNav.click().catch(() => {});
+      await page.waitForTimeout(600);
+    }
+    await dismissOverlays(page);
+    return;
+  }
+
+  // Standard sidebar tabs
   const link = page.locator(`.sidebar-link[data-tab="${tabId}"]`).first();
   if (await link.count() && (await link.isVisible().catch(() => false))) {
     await link.click({ timeout: 5000 }).catch(() => {});
   } else {
-    // Programmatic tab switch used by app
     await page.evaluate((id) => {
       try {
         if (window.RS && typeof RS.switchTab === 'function') {
@@ -255,7 +280,7 @@ function buildHtml(shots) {
       </div>
       <footer class="page-foot">
         <span>CodeArc RestroSuite · Client features</span>
-        <span>restrosuite.codearc.co.in</span>
+        <span>support@codearc.co.in</span>
       </footer>
     </section>`;
   };
@@ -277,10 +302,11 @@ function buildHtml(shots) {
     ['14', 'Customers, CRM & dues'],
     ['15', 'Tax, GST & reports'],
     ['16', 'Analytics'],
-    ['17', 'Growth Hub toolkit'],
-    ['18', 'Settings & printing'],
-    ['19', 'Offline-first & shifts'],
-    ['20', 'Getting started & pilot'],
+    ['17', 'Analytics'],
+    ['18', 'Growth Hub toolkit'],
+    ['19', 'Settings — tax, print & profile'],
+    ['20', 'Settings deep dive + offline shifts'],
+    ['21', 'Getting started & pilot'],
   ];
 
   const html = `<!DOCTYPE html>
@@ -1126,76 +1152,79 @@ ${featurePage({
 ${featurePage({
   num: '19',
   eyebrow: 'Configuration',
-  title: 'Settings, printing & profile',
-  badge: 'Outlet setup',
-  lead: 'Everything that makes the suite feel like *your* restaurant: outlet profile, tax defaults, Wi‑Fi for QR tents, printer routing, language, and device preferences.',
+  title: 'Settings — outlet, tax & printing',
+  badge: 'Taxes & pricing',
+  lead: 'Open Settings from the sidebar gear. Configure how your restaurant looks, how GST is calculated, what prints on bills, and guest QR tent details — all in one place.',
   bullets: [
-    'Outlet profile: name, address, country, currency',
-    'Guest QR card fields: Wi‑Fi, welcome line, phone',
-    'Thermal / ESC-POS print bridge &amp; auto-print options',
-    'Bill identity / series preferences',
-    'Language toggle (English / हिंदी) for floor staff',
-    'Backup export for peace of mind',
-    'Support call / WhatsApp shortcuts in the top bar',
+    '<b>Calculate taxes</b> toggle — master on/off for cart, bills, and print',
+    '<b>Tax label</b> (GST / VAT) and default <b>Tax rate %</b> for the outlet',
+    '<b>Inclusive pricing</b> — menu prices include tax, or tax added on top',
+    'Service charge on dine-in + optional round-off',
+    'Show HSN codes on GST-style invoices when enabled',
+    'Outlet profile: name, address, GSTIN, country, currency',
+    'Guest QR: Wi‑Fi name/password and welcome line for table tents',
+    'Printers &amp; KOT, WhatsApp gateway, payments, security PIN',
   ],
   how: [
-    'Complete outlet profile before printing QR tents.',
-    'Connect thermal printer; test one bill on Print &amp; Pay.',
-    'Save Wi‑Fi credentials for guest cards.',
-    'Export a backup after first full service day.',
+    'Sidebar → Settings (gear) → Taxes &amp; pricing.',
+    'Turn Calculate taxes ON for registered restaurants; set default rate (often 5%).',
+    'Set different GST slabs per dish in Menu Editor (5% / 12% / 18% / 28%).',
+    'Profile + Guest QR fields → print table tents; test one Print &amp; Pay bill.',
   ],
   tips: [
-    'Print scale 100% (not Fit-to-page) for QR tent accuracy.',
+    'Item GST slab overrides the outlet default on that line.',
+    'Support: support@codearc.co.in',
   ],
-  image: shot('15-settings.png') || shot('01-pos.png'),
-  imageAlt: 'Settings / workspace configuration',
+  image: shot('15-settings.png'),
+  imageAlt: 'Settings · Taxes & pricing',
 })}
 
-<!-- Offline + shifts -->
+<!-- Offline + shifts (with settings visual + ops) -->
 <section class="page">
   <header class="page-head">
     <div class="brand-mini">${logo ? `<img src="${logo}" alt="" />` : ''}<span>RestroSuite · Feature Guide</span></div>
     <div class="page-num">20</div>
   </header>
-  <span class="eyebrow">Operations discipline</span>
-  <h2>Offline-first, stations &amp; shifts</h2>
-  <p class="lead">Billing must never depend on perfect Wi‑Fi. RestroSuite keeps working locally and reconciles when the network returns — with multi-station awareness for real counters.</p>
-  <div class="two-col">
-    <div>
-      <h3>Offline-first sync</h3>
+  <span class="eyebrow">Configuration · continued</span>
+  <h2>Settings deep dive + offline shifts</h2>
+  <p class="lead">Settings is also where you connect WhatsApp, printers, and security. Day-to-day cash discipline still runs on stations and Z-reports.</p>
+  <div class="feature-layout" style="margin-top:4mm">
+    <div class="feature-copy">
+      <h3>Settings map</h3>
       <ul class="bullets">
-        <li>Bill, print, and KOT without internet</li>
-        <li>Local cache + background cloud hydrate</li>
-        <li>Saved session resume on the same device</li>
-        <li>Cloud status visible in the workspace chrome</li>
+        <li><b>Outlet profile</b> — brand, address, phone, country, currency, GSTIN</li>
+        <li><b>Taxes &amp; pricing</b> — calculate on/off, rates, inclusive, SC, HSN</li>
+        <li><b>Printers &amp; KOT</b> — thermal / auto-print preferences</li>
+        <li><b>WhatsApp</b> — link number, bill PDF preferences</li>
+        <li><b>Security &amp; PIN</b> — manager PIN for refunds / voids</li>
+        <li><b>Team &amp; plan</b> — access hints and workspace plan</li>
       </ul>
-      <h3>Stations</h3>
+      <h3 style="margin-top:10px">Offline + shifts</h3>
       <ul class="bullets">
-        <li>Each counter has an identity (rename anytime)</li>
-        <li>Z-report scope: this station or all stations</li>
-        <li>Owner strip: today sales &amp; shift total</li>
+        <li>Bill offline; cloud hydrates when back online</li>
+        <li>Open / close shift with cash float and variance</li>
+        <li>Station labels for multi-counter Z-reports</li>
       </ul>
-    </div>
-    <div>
-      <h3>Shift lifecycle</h3>
-      <div class="how-box">
-        <h4>Recommended daily rhythm</h4>
+      <div class="how-box" style="margin-top:8px">
+        <h4>Daily cash rhythm</h4>
         <ol>
-          <li><strong>Open shift</strong> with float (notes &amp; coins breakdown).</li>
-          <li>Bill normally across POS devices.</li>
-          <li><strong>Preview Z</strong> before close if cash feels off.</li>
-          <li><strong>Close shift</strong> — enter actual cash counted.</li>
-          <li>Review variance → Print / CSV the Z-report.</li>
-          <li>Export day pack for accounts if needed.</li>
+          <li>Open shift with float</li>
+          <li>Bill all day on POS</li>
+          <li>Close shift → count cash → Print / CSV Z-report</li>
         </ol>
       </div>
-      <div class="panel" style="margin-top:10px">
-        <h3>Why it matters</h3>
-        <p>Cashier reconciliation in under a minute — multi-station aware, variance highlighted when counted cash ≠ expected.</p>
-      </div>
+    </div>
+    <div class="feature-visual">
+      ${
+        shot('15-settings.png')
+          ? img(shot('15-settings.png'), 'Settings workspace — taxes &amp; pricing', 'shot tall')
+          : shot('12-reports.png')
+            ? img(shot('12-reports.png'), 'Reports when settings shot unavailable', 'shot tall')
+            : '<div class="shot-placeholder">Settings screenshot</div>'
+      }
     </div>
   </div>
-  <footer class="page-foot"><span>CodeArc RestroSuite · Client features</span><span>restrosuite.codearc.co.in</span></footer>
+  <footer class="page-foot"><span>CodeArc RestroSuite · Client features</span><span>support@codearc.co.in</span></footer>
 </section>
 
 <!-- Getting started -->
@@ -1228,10 +1257,10 @@ ${featurePage({
     <h2>Run your restaurant from the devices you already own</h2>
     <p>Every client feature in this guide is available in the free launch period. No credit card. No annual lock-in. Upgrade only after value is proven.</p>
     <p style="font-size:13px;color:rgba(255,255,255,.9);margin:0">
-      <strong>restrosuite.codearc.co.in</strong> · support@restrosuite.in
+      <strong>restrosuite.codearc.co.in</strong> · <strong>support@codearc.co.in</strong>
     </p>
   </div>
-  <footer class="page-foot"><span>CodeArc RestroSuite · Client features</span><span>July 2026 · v2.0.1</span></footer>
+  <footer class="page-foot"><span>CodeArc RestroSuite · Client features</span><span>July 2026 · v2.0.2 · support@codearc.co.in</span></footer>
 </section>
 
 </body>
@@ -1252,15 +1281,33 @@ async function writePdf(html) {
     timeout: 120000,
   });
   await page.waitForTimeout(800);
-  await page.pdf({
-    path: PDF_PATH,
-    format: 'A4',
-    printBackground: true,
-    preferCSSPageSize: true,
-    margin: { top: '0', right: '0', bottom: '0', left: '0' },
-  });
+  let outPdf = PDF_PATH;
+  try {
+    await page.pdf({
+      path: PDF_PATH,
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+    });
+  } catch (err) {
+    if (err && (err.code === 'EBUSY' || /busy|locked/i.test(String(err.message || '')))) {
+      outPdf = PDF_PATH_ALT;
+      await page.pdf({
+        path: PDF_PATH_ALT,
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      });
+      console.warn('Primary PDF locked; wrote alternate:', PDF_PATH_ALT);
+    } else {
+      throw err;
+    }
+  }
   await browser.close();
-  console.log('Wrote PDF', PDF_PATH);
+  console.log('Wrote PDF', outPdf);
+  return outPdf;
 }
 
 async function main() {
@@ -1291,11 +1338,11 @@ async function main() {
   }
 
   const html = buildHtml();
-  await writePdf(html);
+  const outPdf = await writePdf(html);
 
-  const size = fs.existsSync(PDF_PATH) ? (fs.statSync(PDF_PATH).size / 1024 / 1024).toFixed(2) : '?';
+  const size = fs.existsSync(outPdf) ? (fs.statSync(outPdf).size / 1024 / 1024).toFixed(2) : '?';
   console.log(`\nDone. PDF size ~${size} MB`);
-  console.log(PDF_PATH);
+  console.log(outPdf);
 }
 
 main().catch((e) => {
