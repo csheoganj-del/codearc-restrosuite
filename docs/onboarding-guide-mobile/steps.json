@@ -1,0 +1,634 @@
+[
+  {
+    "id": "01-google-search",
+    "phase": "1 · Find RestroSuite",
+    "title": "Find RestroSuite (search or APK / browser)",
+    "goal": "Find the product on phone browser or install the Android app.",
+    "actions": [
+      "Open Google on phone or computer.",
+      "Type: CodeArc RestroSuite (or restrosuite codearc).",
+      "Open the official result restrosuite.codearc.co.in (or CodeArc RestroSuite)."
+    ],
+    "tips": [
+      "Bookmark the site for staff. Prefer the official CodeArc domain."
+    ],
+    "highlight": null,
+    "where": "google",
+    "tab": null,
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "02-homepage",
+    "phase": "1 · Find RestroSuite",
+    "title": "Homepage — what RestroSuite is",
+    "goal": "Understand offline POS, WhatsApp bills, QR ordering, and free launch.",
+    "actions": [
+      "Read the hero: offline-first restaurant POS by CodeArc.",
+      "Scroll Features (POS, WhatsApp, QR, CRM).",
+      "Note: free during launch, no credit card required.",
+      "Click Sign Up Free or Sign in when ready."
+    ],
+    "tips": [
+      "Support email for all help: support@codearc.co.in"
+    ],
+    "highlight": "a.btn-primary, .hero-actions a, a[href*=\"login\"]",
+    "where": "marketing",
+    "tab": null,
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "03-login-page",
+    "phase": "2 · Access",
+    "title": "Open the Access page (Sign in / Register)",
+    "goal": "Know the two tabs: Sign in (existing) vs Register outlet (new).",
+    "actions": [
+      "Go to https://restrosuite.codearc.co.in/login.html",
+      "See Sign in tab (left) and Register outlet tab (right).",
+      "New restaurants: choose Register outlet.",
+      "Existing staff: choose Sign in."
+    ],
+    "tips": [],
+    "highlight": "#tab-login-btn, #tab-register-btn, .tab-btn",
+    "where": "login",
+    "tab": null,
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "04-register-form",
+    "phase": "2 · Access",
+    "title": "Register a new outlet (step-by-step fields)",
+    "goal": "Create a workspace: business name, workspace code, owner contact, password, country & currency.",
+    "actions": [
+      "Click Register outlet.",
+      "Enter restaurant / business display name.",
+      "Choose a short workspace code (Outlet ID) — e.g. royal-dhaba (letters, numbers, hyphens). This is NOT the display name.",
+      "Enter owner WhatsApp / phone and email.",
+      "Pick country and currency (drives tax label and ₹ / € etc.).",
+      "Create a strong password (10+ characters) and confirm it.",
+      "Complete any OTP / verification step if shown.",
+      "Submit Create my outlet — wait for success, then sign in with the new Outlet ID."
+    ],
+    "tips": [
+      "Write down Outlet ID + username + password for the owner.",
+      "Staff later get separate logins under Employees — do not share owner password on the floor."
+    ],
+    "highlight": "#tab-register-btn, #register-form, #reg-slug, #reg-password",
+    "where": "register",
+    "tab": null,
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "05-login-form",
+    "phase": "2 · Access",
+    "title": "Sign in to an existing outlet",
+    "goal": "Log in with Outlet ID, username, and password.",
+    "actions": [
+      "Open Sign in tab.",
+      "Workspace / Outlet ID: e.g. bbb (the code from registration).",
+      "Email or Username: staff or owner username.",
+      "Password: your password.",
+      "Optional: Keep me signed in (for trusted devices only).",
+      "Click Sign in securely → lands on Point of Sale."
+    ],
+    "tips": [
+      "Wrong outlet ID is the most common error — use the code, not the restaurant name.",
+      "Forgot password: use Recover access on this page."
+    ],
+    "highlight": "#login-form, #tenant-id, #username, #password, #login-submit",
+    "where": "login",
+    "tab": null,
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "06-shell-overview",
+    "phase": "3 · Workspace shell",
+    "title": "After login — layout of the console",
+    "goal": "Know where navigation, cart, and status live.",
+    "actions": [
+      "Left sidebar: all modules (POS, Kitchen, Bills, Inventory…).",
+      "Main area: active module screen.",
+      "Top bar: station, shift, search, WhatsApp status, time, version, help.",
+      "Bottom of sidebar: Settings (gear) and Sign out.",
+      "On phone: bottom tabs POS · Orders · Kitchen · Bills · More."
+    ],
+    "tips": [
+      "Orange version chip (e.g. v209) — click to copy full build id for support."
+    ],
+    "highlight": ".sidebar, .sidebar-link, #open-settings",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "07-sidebar-map",
+    "phase": "3 · Workspace shell",
+    "title": "Sidebar map — every client module",
+    "goal": "Memorise where each job lives.",
+    "actions": [
+      "OPERATIONS: Point of Sale, QR Orders, Kitchen, Floor & Tables, Online Orders, Bills.",
+      "MANAGE: Kitchen Setup, Inventory, Menu Editor, Employees, Customers, Tax & GST.",
+      "GROW: Reports, Analytics, Growth Hub.",
+      "FOOT: Settings, Help, Sign out."
+    ],
+    "tips": [
+      "Your role may hide some tabs — that is normal for cashiers vs owners."
+    ],
+    "highlight": ".sidebar",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "08-pos-empty-ready",
+    "phase": "4 · Point of Sale",
+    "title": "POS screen — menu grid + cart",
+    "goal": "Sell takeaway, dine-in, or delivery from one counter screen.",
+    "actions": [
+      "Open Point of Sale from the sidebar (default after login).",
+      "Left/centre: menu categories and item tiles.",
+      "Right (or bottom on mobile): Current Order cart.",
+      "Top of cart: order type Takeaway · Dine-in · Delivery.",
+      "Search box filters menu; sort and size controls adjust the grid."
+    ],
+    "tips": [],
+    "highlight": "#pos-tab, .sidebar-link[data-tab=\"pos-tab\"]",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": "ensureMenu",
+    "fullPage": true
+  },
+  {
+    "id": "09-pos-add-items",
+    "phase": "4 · Point of Sale",
+    "title": "Add items to the cart",
+    "goal": "Build an order quickly during rush.",
+    "actions": [
+      "Tap a category (e.g. Starters) if needed.",
+      "Tap menu items — they appear in the cart with qty.",
+      "Use + / − on a line to change quantity.",
+      "Optional: open line note for “less spicy”, “no onion”.",
+      "Optional: customer name + phone (needed for WhatsApp bill and CRM)."
+    ],
+    "tips": [],
+    "highlight": "#pos-tab .pos-grid, #pos-tab .cart-items, .cart-count-pill",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": "ensureCartItems",
+    "fullPage": true
+  },
+  {
+    "id": "10-pos-pay",
+    "phase": "4 · Point of Sale",
+    "title": "Choose payment and settle (Print & Pay)",
+    "goal": "Collect money and finish the bill.",
+    "actions": [
+      "Check subtotal, tax, and grand total in the cart footer.",
+      "Select payment: Cash, UPI, Card, Split, or Due (credit — needs customer).",
+      "Cash: use quick amounts or enter cash received if shown.",
+      "Tap Print & Pay (or Pay) to settle.",
+      "On Bill settled: Print thermal, WhatsApp PDF, or close."
+    ],
+    "tips": [
+      "Due payment requires a registered customer — use Customers / quick register."
+    ],
+    "highlight": ".cart-payment, .cart-actions-final, #btn-print-pay, button:has-text(\"Print\")",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": "ensureCartItems",
+    "fullPage": true
+  },
+  {
+    "id": "11-pos-shift",
+    "phase": "4 · Point of Sale",
+    "title": "Open / close shift (cash discipline)",
+    "goal": "Start and end the day with a clear cash float and Z-report.",
+    "actions": [
+      "Find Shift control in the top bar (Open shift / Close shift).",
+      "Open shift: enter opening cash (notes & coins).",
+      "Sell all day on this station.",
+      "Close shift: enter counted cash → see variance → Print / CSV Z-report.",
+      "Use station label (e.g. Counter 1) when multiple devices bill."
+    ],
+    "tips": [],
+    "highlight": "button:has-text(\"Shift\"), #btn-shift, .rs-shift, [class*=\"shift\"]",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "12-floor",
+    "phase": "5 · Dining room",
+    "title": "Floor & Tables — seating map",
+    "goal": "See free / dining / held / QR tables at a glance.",
+    "actions": [
+      "Open Floor & Tables.",
+      "Colours show state: free, seated, dining, held, QR pending, billed.",
+      "Tap a free table → Seat & order → sends you to POS for that table.",
+      "Held tables: Resume hold on POS.",
+      "Transfer moves open tickets to another free table.",
+      "Clear / free table when guests leave (confirm carefully)."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"floor-tab\"], #floor-tab",
+    "where": "dashboard",
+    "tab": "floor-tab",
+    "settingsPanel": null,
+    "seed": "ensureTables",
+    "fullPage": true
+  },
+  {
+    "id": "13-floor-qr-print",
+    "phase": "5 · Dining room",
+    "title": "Print Table QR tents",
+    "goal": "Put scannable Order food + Call waiter cards on each table.",
+    "actions": [
+      "On Floor toolbar: Print Table QRs (or View QR on one table).",
+      "Choose card size (Mini → Full) or Custom mm sizes.",
+      "Toggle Wi‑Fi, welcome line, Powered by (set Wi‑Fi under Settings first).",
+      "Live preview updates as you change options.",
+      "Print at 100% scale (not Fit-to-page)."
+    ],
+    "tips": [
+      "Table number is always on the card — required for guest orders."
+    ],
+    "highlight": "button:has-text(\"Print\"), button:has-text(\"QR\")",
+    "where": "dashboard",
+    "tab": "floor-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "14-qr-orders",
+    "phase": "6 · Guest QR",
+    "title": "QR Orders queue (staff)",
+    "goal": "Accept or reject orders guests place from table QR.",
+    "actions": [
+      "Open QR Orders from the sidebar.",
+      "New guest tickets appear with table number and items.",
+      "Accept → kitchen / KDS gets the ticket.",
+      "Reject if needed (wrong table / test).",
+      "Amend shared table orders before kitchen starts prep (when enabled)."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"qr-orders-tab\"], #qr-orders-tab",
+    "where": "dashboard",
+    "tab": "qr-orders-tab",
+    "settingsPanel": null,
+    "seed": "ensureQrContext",
+    "fullPage": true
+  },
+  {
+    "id": "15-kds",
+    "phase": "7 · Kitchen",
+    "title": "Kitchen Display (KDS)",
+    "goal": "Cooks see tickets and mark items ready without paper KOTs.",
+    "actions": [
+      "Open Kitchen from the sidebar (or kds.html on a kitchen tablet).",
+      "Tickets show table / token, items, and status.",
+      "Mark preparing → ready as food is cooked.",
+      "Clear when plated or handed to service."
+    ],
+    "tips": [
+      "Use a bright tablet in landscape, fixed on the pass."
+    ],
+    "highlight": ".sidebar-link[data-tab=\"kds-tab\"], #kds-tab",
+    "where": "dashboard",
+    "tab": "kds-tab",
+    "settingsPanel": null,
+    "seed": "ensureKitchenTicket",
+    "fullPage": true
+  },
+  {
+    "id": "16-online",
+    "phase": "8 · Channels",
+    "title": "Online Orders queue",
+    "goal": "One place for delivery-channel and manual online tickets.",
+    "actions": [
+      "Open Online Orders.",
+      "Review items and customer details.",
+      "Accept (to kitchen) or Reject.",
+      "Phone orders: create manual online order, then process like POS."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"aggregator-tab\"]",
+    "where": "dashboard",
+    "tab": "aggregator-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "17-bills",
+    "phase": "9 · History",
+    "title": "Bills — search, reprint, export",
+    "goal": "Find any settled invoice and hand data to accounts.",
+    "actions": [
+      "Open Bills.",
+      "Search by bill no, phone, or customer name.",
+      "Open a row: totals, tax, payment method, station.",
+      "Reprint receipt / thermal.",
+      "Refund / void only with manager PIN if configured.",
+      "Export CSV for the day or filtered set."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"bills-tab\"], #bills-tab",
+    "where": "dashboard",
+    "tab": "bills-tab",
+    "settingsPanel": null,
+    "seed": "ensureBill",
+    "fullPage": true
+  },
+  {
+    "id": "18-inventory",
+    "phase": "10 · Stock",
+    "title": "Inventory — stock list",
+    "goal": "Track ingredients, low stock, and recipe use.",
+    "actions": [
+      "Open Inventory.",
+      "Add stock items: name, unit, qty, reorder threshold.",
+      "Or import from a simple sheet when available.",
+      "Link recipes on Menu Editor so sales deduct stock.",
+      "Watch low-stock badges before weekend rush."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"inventory-tab\"], #inventory-tab",
+    "where": "dashboard",
+    "tab": "inventory-tab",
+    "settingsPanel": null,
+    "seed": "ensureInventory",
+    "fullPage": true
+  },
+  {
+    "id": "19-menu",
+    "phase": "11 · Catalog",
+    "title": "Menu Editor — items, prices, GST slab",
+    "goal": "Publish what POS and guest QR both sell.",
+    "actions": [
+      "Open Menu Editor.",
+      "Create categories (Starters, Mains, Drinks…).",
+      "Add item: name, price, veg/non-veg, GST slab (5% / 12% / 18%…).",
+      "Optional: recipe link for inventory, addons, Hindi name.",
+      "Save — item appears on POS after refresh/sync.",
+      "Mark sold-out when kitchen is out of stock."
+    ],
+    "tips": [
+      "India: most restaurant food 5%; some packaged drinks higher — ask your CA."
+    ],
+    "highlight": ".sidebar-link[data-tab=\"editor-tab\"], #editor-tab",
+    "where": "dashboard",
+    "tab": "editor-tab",
+    "settingsPanel": null,
+    "seed": "ensureMenu",
+    "fullPage": true
+  },
+  {
+    "id": "20-employees",
+    "phase": "12 · Team",
+    "title": "Employees — roles and logins",
+    "goal": "Give each staff member their own login and limited tabs.",
+    "actions": [
+      "Open Employees.",
+      "Add staff: name, username, password, role (cashier, waiter, kitchen, manager…).",
+      "Limit tabs for cashiers (e.g. POS + Bills only).",
+      "Test login once as that user.",
+      "Deactivate login when someone leaves."
+    ],
+    "tips": [
+      "Never share the owner password on the counter tablet."
+    ],
+    "highlight": ".sidebar-link[data-tab=\"employees-tab\"]",
+    "where": "dashboard",
+    "tab": "employees-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "21-customers",
+    "phase": "13 · CRM",
+    "title": "Customers — CRM, loyalty, dues",
+    "goal": "Know regulars, points, and outstanding credit.",
+    "actions": [
+      "Open Customers.",
+      "Profiles build automatically when you bill with a phone number.",
+      "Open a card: visits, spend, loyalty, notes, dues badge.",
+      "Settle Dues: Cash / UPI / Card → receipt / WhatsApp.",
+      "Use Due payment on POS only with a selected customer."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"customers-tab\"]",
+    "where": "dashboard",
+    "tab": "customers-tab",
+    "settingsPanel": null,
+    "seed": "ensureCustomer",
+    "fullPage": true
+  },
+  {
+    "id": "22-tax",
+    "phase": "14 · Compliance",
+    "title": "Tax & GST workspace",
+    "goal": "See GST collected and export accountant packs.",
+    "actions": [
+      "Open Tax & GST.",
+      "Review period stats (taxable supplies, CGST/SGST style totals).",
+      "Download GSTR / period exports for your CA.",
+      "Manage rate slabs if offered (country tax packs)."
+    ],
+    "tips": [
+      "Per-item GST is set in Menu Editor; outlet toggles are in Settings → Taxes."
+    ],
+    "highlight": ".sidebar-link[data-tab=\"tax-tab\"]",
+    "where": "dashboard",
+    "tab": "tax-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "23-reports",
+    "phase": "15 · Numbers",
+    "title": "Sales Reports",
+    "goal": "See revenue, orders, payment mix, tax for Today / 30 days.",
+    "actions": [
+      "Open Reports.",
+      "Pick period: Today, This week, This month, Last 30 / 90 days.",
+      "Read KPI cards: Revenue, Orders, AOV, Tax collected.",
+      "Daily revenue bars and Payment mix donut.",
+      "Top categories + Tax summary.",
+      "Download GSTR-ready CSV for the accountant."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"reports-tab\"], #reports-tab",
+    "where": "dashboard",
+    "tab": "reports-tab",
+    "settingsPanel": null,
+    "seed": "ensureBill",
+    "fullPage": true
+  },
+  {
+    "id": "24-analytics",
+    "phase": "15 · Numbers",
+    "title": "Analytics — deeper trends",
+    "goal": "Spot busy hours and bestsellers beyond the daily total.",
+    "actions": [
+      "Open Analytics.",
+      "Choose period and refresh if needed.",
+      "Review revenue trend, peak hours, top items.",
+      "Use insights before changing staffing or promos."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"analytics-tab\"]",
+    "where": "dashboard",
+    "tab": "analytics-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "25-growth",
+    "phase": "16 · Growth Hub",
+    "title": "Growth Hub launcher",
+    "goal": "Open ops tools beyond pure billing.",
+    "actions": [
+      "Open Growth Hub.",
+      "Tiles: Reservations, Support tickets, Purchase orders, Recipe costing,",
+      "Offers & coupons, WhatsApp campaigns, Feedback, Loyalty.",
+      "Tap a tile to open that module and complete the form."
+    ],
+    "tips": [],
+    "highlight": ".sidebar-link[data-tab=\"growth-hub-tab\"], #hub-grid, .hub-grid",
+    "where": "dashboard",
+    "tab": "growth-hub-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "26-settings-profile",
+    "phase": "17 · Settings",
+    "title": "Settings → Outlet profile",
+    "goal": "Set name, address, phone, country, currency, GSTIN.",
+    "actions": [
+      "Click Settings (gear) at the bottom of the sidebar.",
+      "Open Outlet profile.",
+      "Fill restaurant name, address, phone, GSTIN.",
+      "Country & currency drive tax labels and ₹ formatting.",
+      "Guest QR: Wi‑Fi name, password, welcome line for table tents.",
+      "Save changes."
+    ],
+    "tips": [],
+    "highlight": "#open-settings, .set-nav button[data-s=\"profile\"]",
+    "where": "dashboard",
+    "tab": "settings-tab",
+    "settingsPanel": "profile",
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "27-settings-tax",
+    "phase": "17 · Settings",
+    "title": "Settings → Taxes & pricing",
+    "goal": "Turn tax on/off, set default rate, inclusive pricing, service charge.",
+    "actions": [
+      "Settings → Taxes & pricing.",
+      "Calculate taxes: ON for registered GST outlets (charges + prints tax).",
+      "Tax label: GST. Tax rate %: default (often 5) when item has no slab.",
+      "Inclusive pricing: ON if menu prices already include GST.",
+      "Service charge: optional dine-in %.",
+      "Show HSN: print HSN on invoice when you use codes.",
+      "Save. Per-item rates still come from Menu Editor GST slab."
+    ],
+    "tips": [
+      "OFF Calculate taxes = no tax on cart/print (special cases only)."
+    ],
+    "highlight": ".set-nav button[data-s=\"tax\"], [data-skey=\"set_calculate_taxes\"]",
+    "where": "dashboard",
+    "tab": "settings-tab",
+    "settingsPanel": "tax",
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "28-settings-print-wa",
+    "phase": "17 · Settings",
+    "title": "Settings → Printers & WhatsApp",
+    "goal": "Connect paper receipts and WhatsApp bills.",
+    "actions": [
+      "Printers & KOT: preferred printer name, auto-print options.",
+      "WhatsApp: scan gateway QR once on the office PC, keep gateway online.",
+      "Test send; top-bar icon green = connected.",
+      "On settle: WhatsApp PDF to customer phone when number is filled."
+    ],
+    "tips": [
+      "Support: support@codearc.co.in"
+    ],
+    "highlight": ".set-nav button[data-s=\"printer\"], .set-nav button[data-s=\"gateway\"]",
+    "where": "dashboard",
+    "tab": "settings-tab",
+    "settingsPanel": "printer",
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "29-day-close",
+    "phase": "18 · End of day",
+    "title": "End-of-day checklist",
+    "goal": "Leave the till clean for tomorrow.",
+    "actions": [
+      "Close open shifts on each station (cash count + Z-report).",
+      "Reports → Today → match totals to cash + UPI.",
+      "Download GSTR-ready CSV / day pack if needed.",
+      "Bills export for accountant if requested.",
+      "Backup export from Settings / Growth tools if available.",
+      "Sign out on shared tablets."
+    ],
+    "tips": [
+      "Keep one owner device signed in for overnight monitoring if desired."
+    ],
+    "highlight": ".sidebar-link[data-tab=\"reports-tab\"]",
+    "where": "dashboard",
+    "tab": "reports-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  },
+  {
+    "id": "30-support",
+    "phase": "19 · Help",
+    "title": "Help & support",
+    "goal": "Know how to get unstuck.",
+    "actions": [
+      "In-app Help / Demo checklist (Help button or right-click Help & Setup).",
+      "Email: support@codearc.co.in",
+      "Tell support: Outlet ID, username role, version chip (top bar), what you clicked.",
+      "Screenshot of the error if possible."
+    ],
+    "tips": [],
+    "highlight": "button:has-text(\"Help\"), #open-help, .sb-foot-btn",
+    "where": "dashboard",
+    "tab": "pos-tab",
+    "settingsPanel": null,
+    "seed": null,
+    "fullPage": true
+  }
+]
