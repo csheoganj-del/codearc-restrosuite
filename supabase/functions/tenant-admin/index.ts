@@ -236,8 +236,9 @@ async function verifySuperadminToken(req: Request) {
 }
 
 function getGatewayUrlAndToken() {
-  let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || "";
+  let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("GATEWAY_URL") || "";
   const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+  const ngrokFallback = (Deno.env.get("NGROK_GATEWAY_URL") || "https://goldsmith-finalist-guise.ngrok-free.dev").trim().replace(/\/+$/, "");
 
   if (!url) {
     const relayUrl = Deno.env.get("EMAIL_RELAY_URL") || "";
@@ -252,10 +253,18 @@ function getGatewayUrlAndToken() {
   }
 
   if (!url) {
-    url = "https://kalpeshdeora1006-restrosuite-gateway.hf.space";
+    url = ngrokFallback;
   }
 
   url = url.trim().replace(/\/+$/, "");
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local")) {
+      url = ngrokFallback;
+    }
+  } catch (_) {
+    url = ngrokFallback;
+  }
   return { url, token: token.trim() };
 }
 
@@ -285,10 +294,15 @@ function priceFrom(map: Record<string, number>, planCode: unknown) {
 
 async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request) {
   const { url, token } = getGatewayUrlAndToken();
+  if (!url) {
+    return jsonResponse({ error: "WhatsApp gateway URL is not configured." }, 503, req);
+  }
   const targetUrl = `${url}${path}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+    "User-Agent": "RestroSuite-Edge-GatewayProxy/1.0",
   };
   if (token) {
     headers["Authorization"] = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
@@ -306,12 +320,21 @@ async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Re
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const text = await response.text();
-      return jsonResponse({ error: `Gateway returned status ${response.status}: ${text}` }, response.status, req);
+    const text = await response.text();
+    let json: Record<string, unknown> = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      const snippet = String(text || "").replace(/\s+/g, " ").slice(0, 180);
+      return jsonResponse({
+        error: `Gateway returned non-JSON (HTTP ${response.status}). Check ngrok tunnel. ${snippet}`,
+      }, 502, req);
     }
 
-    const json = await response.json();
+    if (!response.ok) {
+      return jsonResponse({ error: (json as { error?: string }).error || `Gateway returned status ${response.status}`, gateway: json }, response.status, req);
+    }
+
     return jsonResponse(json, 200, req);
   } catch (err: any) {
     console.error(`Gateway proxy error for ${targetUrl}:`, err);

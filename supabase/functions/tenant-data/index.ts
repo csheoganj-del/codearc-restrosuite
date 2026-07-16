@@ -292,23 +292,45 @@ async function getTenantPinResetHash(tenantId: string) {
 }
 
 function getGatewayUrlAndToken() {
-  let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || "";
+  let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("GATEWAY_URL") || "";
   const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
+  const ngrokFallback = (Deno.env.get("NGROK_GATEWAY_URL") || "https://goldsmith-finalist-guise.ngrok-free.dev").trim().replace(/\/+$/, "");
 
+  // Prefer ngrok / production host from secrets. HF Space is last-resort only
+  // (local PC gateway is often primary — set WHATSAPP_GATEWAY_URL explicitly).
   if (!url) {
-    url = "https://kalpeshdeora1006-restrosuite-gateway.hf.space";
+    url = ngrokFallback;
   }
 
   url = url.trim().replace(/\/+$/, "");
+
+  // Edge runs in the cloud — localhost / 127.0.0.1 can never reach the PC gateway.
+  // Rewrite private URLs to the public ngrok tunnel so production bills still send.
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local")) {
+      console.warn(`[gateway] Rejecting private URL ${url}; using public tunnel ${ngrokFallback}`);
+      url = ngrokFallback;
+    }
+  } catch (_) {
+    url = ngrokFallback;
+  }
+
   return { url, token: token.trim() };
 }
 
 async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request, bodyData?: Record<string, unknown>, tenantId?: string) {
   const { url, token } = getGatewayUrlAndToken();
+  if (!url) {
+    return jsonResponse({ error: "WhatsApp gateway URL is not configured (set WHATSAPP_GATEWAY_URL / NGROK_GATEWAY_URL)." }, 503, req);
+  }
   const targetUrl = `${url}${path}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    // Free ngrok interstitials break JSON fetch from Edge — skip the browser warning page.
+    "ngrok-skip-browser-warning": "true",
+    "User-Agent": "RestroSuite-Edge-GatewayProxy/1.0",
   };
   if (token) {
     headers["Authorization"] = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
@@ -319,7 +341,9 @@ async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Re
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    // PDF sends need headroom; status polls should not hang the UI.
+    const timeoutMs = path.startsWith("/send") ? 45000 : 12000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(targetUrl, {
       method,
@@ -330,12 +354,22 @@ async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Re
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const text = await response.text();
-      return jsonResponse({ error: `Gateway returned status ${response.status}: ${text}` }, response.status, req);
+    const text = await response.text();
+    let json: Record<string, unknown> = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      // ngrok HTML interstitial or non-JSON error body
+      const snippet = String(text || "").replace(/\s+/g, " ").slice(0, 180);
+      return jsonResponse({
+        error: `Gateway returned non-JSON (HTTP ${response.status}). Is ngrok pointing at the PC gateway? ${snippet}`,
+      }, 502, req);
     }
 
-    const json = await response.json();
+    if (!response.ok) {
+      return jsonResponse({ error: (json as { error?: string }).error || `Gateway returned status ${response.status}` , gateway: json }, response.status, req);
+    }
+
     return jsonResponse({ data: json }, 200, req);
   } catch (err: any) {
     console.error(`Gateway proxy error for ${targetUrl}:`, err);

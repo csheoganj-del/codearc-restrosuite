@@ -568,10 +568,13 @@
       } catch (_) {}
     }
 
+    // Zero-cost launch: still use FREE platform Baileys gateway when online.
+    // (zeroCostLaunchMode only blocks paid Meta Cloud API / paid BSPs — not our own PC gateway.)
     const gatewayReady = global.__rsGatewayReady === true
-      || (global.RS_API && !global.RS_API.zeroCostLaunchMode);
+      || global.__rsPlatformReady === true
+      || (global.RS_API && typeof global.RS_API.data === 'function');
 
-    if (global.RS_API && typeof global.RS_API.data === 'function' && !global.RS_API.zeroCostLaunchMode) {
+    if (global.RS_API && typeof global.RS_API.data === 'function') {
       // Prefer PDF = exact preview (retry compile + send once)
       try {
         const dataUri = await withRetry(
@@ -592,6 +595,9 @@
                 pdfData: base64,
                 filename: `receipt-${normalizeBill(bill).no || 'bill'}.pdf`,
                 orderId: String(normalizeBill(bill).no || ''),
+                outletName:
+                  (global.RS_SETTINGS && (RS_SETTINGS.set_outlet_name || RS_SETTINGS.set_restaurant_name)) ||
+                  '',
               }),
               new Promise((_, rej) =>
                 setTimeout(() => rej(new Error('Gateway send timed out')), opts.timeoutMs || 30000)

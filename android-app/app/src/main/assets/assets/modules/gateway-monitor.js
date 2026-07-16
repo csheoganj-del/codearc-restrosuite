@@ -165,8 +165,8 @@
 async function pollSuperAdminGateway() {
   const RS_API = global.RS_API;
   if (!RS_API) return;
+  // Zero-cost launch still uses FREE platform Baileys (your PC + ngrok). No paid API.
   const isZeroCost = !!RS_API.zeroCostLaunchMode;
-  const gatewayUrl = isZeroCost ? '' : 'https://kalpeshdeora1006-restrosuite-gateway.hf.space';
 
   const statusBadge = document.getElementById('saas-gateway-status');
   const phoneEl = document.getElementById('saas-gateway-phone');
@@ -177,28 +177,7 @@ async function pollSuperAdminGateway() {
   const connectedView = document.getElementById('saas-gateway-connected-view');
   const logsContainer = document.getElementById('saas-notification-logs-container');
 
-  if (isZeroCost || !gatewayUrl) {
-    if (statusBadge) {
-      statusBadge.textContent = 'ZERO-COST MODE';
-      statusBadge.className = 'pill';
-      statusBadge.style.background = 'rgba(107, 114, 128, 0.1)';
-      statusBadge.style.color = '#6B7280';
-    }
-    if (phoneEl) phoneEl.textContent = 'Disabled';
-    if (sessionEl) sessionEl.textContent = 'Upgrade add-on';
-    if (connectedView) connectedView.style.display = 'none';
-    if (qrContainer) qrContainer.style.display = 'flex';
-    if (qrSpinner) {
-      qrSpinner.innerHTML = `<i class="fa-solid fa-circle-info" style="margin-bottom: 6px; font-size: 16px; color: #6B7280;"></i><br>Gateway disabled for zero-cost launch<br><span style="font-size: 10px; color: #9CA3AF; margin-top: 4px; display: block;">Manual WhatsApp sharing remains available.</span>`;
-      qrSpinner.style.display = 'block';
-    }
-    if (logsContainer) {
-      logsContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: #6B7280;">Gateway logs are disabled in zero-cost launch mode.</div>';
-    }
-    return;
-  }
-
-  // 1. Fetch Gateway Status
+  // 1. Fetch Gateway Status (platform line — free automation for all clients)
   try {
     const data = await RS_API.admin({ action: 'gateway_status' });
     if (data && !data.error) {
@@ -534,8 +513,8 @@ function renderGateway() {
           resetBtn.disabled = true;
           resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
 
-          if (!RS_API || RS_API.zeroCostLaunchMode) {
-            toast('Gateway automation is disabled in zero-cost launch mode.', 'fa-circle-exclamation');
+          if (!RS_API) {
+            toast('API not ready. Refresh and try again.', 'fa-circle-exclamation');
             return;
           }
 

@@ -290,7 +290,7 @@ serve(async (req) => {
       if (rlErr || !rlData) {
         return jsonResponse({ error: "Too many OTP requests. Please wait before trying again." }, 429, req);
       }
-      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || "https://kalpeshdeora1006-restrosuite-gateway.hf.space").replace(/\/+$/, "");
+      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("NGROK_GATEWAY_URL") || "https://goldsmith-finalist-guise.ngrok-free.dev").replace(/\/+$/, "");
       const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
       if (!gatewayToken) {
         return jsonResponse({ error: "WhatsApp gateway is not configured." }, 503, req);

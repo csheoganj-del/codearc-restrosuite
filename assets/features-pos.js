@@ -1017,7 +1017,8 @@
       // Manual fallback (engine missing or failed hard)
       try {
         const text = receiptText(normalized);
-        if (window.RS_API && !window.RS_API.zeroCostLaunchMode && typeof RS_API.data === 'function' && ready) {
+        // Zero-cost: allow free platform gateway automation (no Meta Cloud API fees)
+        if (window.RS_API && typeof RS_API.data === 'function' && ready) {
           const pdfDataUri = await compilePreviewPDF(normalized);
           const base64 = String(pdfDataUri || '').includes(',') ? String(pdfDataUri).split(',')[1] : String(pdfDataUri || '');
           if (base64 && base64.length > 100) {
@@ -1169,13 +1170,18 @@
 
     async function showReceipt(bill) {
       // Open modal immediately — never await QR/PDF (both freeze main-thread scroll)
-      const gwReady = window.__rsGatewayReady === true || window.__rsGatewayLastStatus === 'ready';
+      const gwReady = window.__rsGatewayReady === true
+        || window.__rsGatewayLastStatus === 'ready'
+        || window.__rsPlatformReady === true
+        || window.__rsWaSendMode === 'platform'
+        || window.__rsWaSendMode === 'own';
       const st0 = bill.syncStatus || 'synced';
       const pending0 = isBillSyncPending(st0);
       let liveQr = null;
       let printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, null)}</div>`;
       window.__rsSettleModalOpen = true;
 
+      // Only nag to link when platform central line is also unavailable
       const connectBanner = !gwReady
         ? `<div id="rc-wa-cta" class="rc-wa-banner">
             <i class="fa-brands fa-whatsapp"></i>
@@ -1184,7 +1190,14 @@
               <span class="rc-wa-banner-link"> Open Gateway -&gt;</span>
             </div>
           </div>`
-        : '';
+        : (window.__rsWaSendMode === 'platform'
+          ? `<div id="rc-wa-cta" class="rc-wa-banner" style="opacity:.92">
+            <i class="fa-brands fa-whatsapp"></i>
+            <div class="rc-wa-banner-text">
+              <b>Bills send from platform WhatsApp</b> (central number). Optional: link your restaurant number in Settings for branded sends.
+            </div>
+          </div>`
+          : '');
 
       const settle = RSModal.open({
         title: 'Bill settled',

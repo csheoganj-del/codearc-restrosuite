@@ -688,7 +688,7 @@
             <button type="button" class="btn btn-ghost btn-sm" id="btn-wa-refresh-status"><i class="fa-solid fa-rotate"></i> Refresh</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btn-gateway-troubleshoot-reset"><i class="fa-solid fa-qrcode"></i> New QR</button>
           </div>
-          <p class="set-hint"><i class="fa-solid fa-circle-info"></i> Prefer a dedicated restaurant number when you can. Personal WhatsApp works too — avoid bulk promos.</p>`) +
+          <p class="set-hint"><i class="fa-solid fa-bolt"></i> <b>Your number (recommended):</b> scan QR once — bills send from <b>your</b> WhatsApp with no Meta API fees. Lazy mode: session wakes only when sending (low server RAM). First send after idle may take a few seconds.</p>`) +
         setBlock('Bill preferences', 'What customers receive after payment and for order status',
           `${toggle('Send bill after payment','WhatsApp the bill when payment is taken',true)}
           <div class="form-grid-2" style="margin-top:12px">${sel('Bill format',['Simple text','PDF receipt (recommended)'],'PDF receipt (recommended)')}<div></div></div>
@@ -1454,7 +1454,7 @@
             wireFreshQrButtons(container, tenantId);
           } else if (res.status === 'ready') {
             container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#22c55e 35%,var(--stroke));border-radius:14px;padding:16px 18px;background:color-mix(in srgb,#22c55e 6%,var(--panel))">
-              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Connection</div><div class="sd">Bills can be sent to customers</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Connected</span></div>
+              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Connection</div><div class="sd">Bills send from <b>your</b> WhatsApp automatically</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Your number</span></div>
               <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
                 <div style="font-size:14px;color:var(--text)">Linked: <strong>+${res.number || '—'}</strong></div>
                 <button type="button" class="btn btn-ghost btn-sm" id="btn-outlet-gateway-logout" style="color:#ef4444"><i class="fa-solid fa-power-off"></i> Unlink</button>
@@ -1478,6 +1478,41 @@
                 }
               };
             }
+          } else if (res.status === 'linked' || (res.linked && !res.live && res.sendMode === 'own')) {
+            // Lazy own-number: linked, cold in RAM — wakes on first bill
+            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#22c55e 35%,var(--stroke));border-radius:14px;padding:16px 18px;background:color-mix(in srgb,#22c55e 6%,var(--panel))">
+              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Your WhatsApp</div><div class="sd">Linked — auto-connects when you send a bill (saves server RAM)</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Linked</span></div>
+              <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-soft);line-height:1.45">Bills send from <b>your</b> number. First send after idle may take a few seconds while we wake the session.</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Re-scan QR</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-outlet-gateway-logout" style="color:#ef4444"><i class="fa-solid fa-power-off"></i> Unlink</button>
+              </div>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
+            const logoutBtn = container.querySelector('#btn-outlet-gateway-logout');
+            if (logoutBtn) {
+              logoutBtn.onclick = async () => {
+                if (!confirm('Unlink WhatsApp from this outlet?')) return;
+                logoutBtn.disabled = true;
+                try {
+                  await RS_API.data({ operation: 'gateway_logout', tenantId: tenantId });
+                  pollOutletGateway();
+                  if (typeof window.updateTopbarWhatsAppStatus === 'function') window.updateTopbarWhatsAppStatus();
+                } catch (err) {
+                  RS.toast('Could not unlink. Try again.', 'fa-circle-exclamation');
+                  logoutBtn.disabled = false;
+                }
+              };
+            }
+          } else if (res.canAutomate || res.platformReady || res.sendMode === 'platform') {
+            // Platform automation — unlimited clients, no per-outlet QR required
+            const pn = res.platformNumber ? ('+' + res.platformNumber) : 'platform line';
+            container.innerHTML = `<div style="border:1px solid color-mix(in srgb,#22c55e 35%,var(--stroke));border-radius:14px;padding:16px 18px;background:color-mix(in srgb,#22c55e 6%,var(--panel))">
+              <div class="set-row" style="margin:0 0 12px"><div class="si"><div class="st">Automation</div><div class="sd">Bills can use platform line until you link your number</div></div><span class="pill pill-green" style="padding:5px 12px"><span class="dot dot-live"></span> Auto on</span></div>
+              <p style="margin:0 0 12px;font-size:12.5px;color:var(--text-soft);line-height:1.45">For bills from <b>your</b> restaurant WhatsApp: scan QR once (Linked devices). Lazy mode keeps server RAM low.</p>
+              <button type="button" class="btn btn-primary btn-sm" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Link my WhatsApp</button>
+            </div>`;
+            wireFreshQrButtons(container, tenantId);
           } else if (res.status === 'qr') {
             if (res.qr) {
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
@@ -2435,11 +2470,23 @@
           ? await RS_API.admin({ action: 'gateway_status' })
           : await RS_API.data({ operation: 'gateway_status' });
         window.__rsGatewayLastStatus = (res && res.status) || 'offline';
-        window.__rsGatewayReady = false; // default -- only the 'ready' branch below flips this on
+        window.__rsGatewayReady = false; // true when bills can auto-send (own OR platform line)
         window.__rsGatewayNumber = (res && (res.number || res.phone || res.wa_number)) || window.__rsGatewayNumber || '';
         window.__rsGatewayStatusRaw = res || null;
-        if (res && res.status === 'ready') {
-          // Cached signal used by checkout/receipt for PDF vs wa.me
+        window.__rsWaSendMode = (res && res.sendMode) || 'none';
+        window.__rsPlatformReady = !!(res && res.platformReady);
+        // Platform central number can deliver bills even when this outlet has not linked WhatsApp
+        // (or is stuck on Scan QR). Prefer canAutomate / platformReady so the bill modal allows PDF auto-send.
+        const canAuto = !!(res && (
+          res.canAutomate === true
+          || res.status === 'ready'
+          || res.status === 'linked'
+          || res.platformReady === true
+          || res.sendMode === 'platform'
+          || res.sendMode === 'own'
+        ));
+        if (res && res.status === 'ready' && res.sendMode !== 'platform') {
+          // Own linked number (live)
           window.__rsGatewayReady = true;
           const n = window.__rsGatewayNumber;
           const short = n ? ('+' + String(n).slice(-4)) : 'On';
@@ -2447,6 +2494,31 @@
             'wa-linked',
             short,
             n ? 'WhatsApp connected · +' + n + ' · bills send from your number' : 'WhatsApp connected · ready to send bills',
+            false
+          );
+        } else if (res && (res.status === 'linked' || (res.linked && res.sendMode === 'own'))) {
+          // Own number linked (lazy cold) — still can auto-send
+          window.__rsGatewayReady = true;
+          window.__rsGatewayLastStatus = 'ready';
+          setTopbarWhatsAppBadge(
+            'wa-linked',
+            'On',
+            'Your WhatsApp is linked · connects automatically when sending a bill',
+            false
+          );
+        } else if (canAuto && (res.sendMode === 'platform' || res.platformReady === true || res.canAutomate === true)) {
+          // Central / platform line available — bills send without linking outlet WhatsApp
+          window.__rsGatewayReady = true;
+          window.__rsGatewayLastStatus = 'ready';
+          window.__rsWaSendMode = res.sendMode || 'platform';
+          const pn = res.platformNumber || res.number;
+          const short = pn ? ('+' + String(pn).slice(-4)) : 'On';
+          setTopbarWhatsAppBadge(
+            'wa-linked',
+            short,
+            pn
+              ? 'Platform WhatsApp +' + pn + ' · bills auto-send (link your number in Settings for bills from your phone)'
+              : 'Platform WhatsApp available · bills auto-send from central number',
             false
           );
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
