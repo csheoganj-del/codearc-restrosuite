@@ -1465,6 +1465,9 @@
             <a class="btn btn-primary btn-lg" href="login.html?tab=register" id="hero-cta-buy">
               Create free outlet
             </a>
+            <a class="btn btn-ghost btn-lg" href="#downloads">
+              <i class="fa-solid fa-download" aria-hidden="true"></i> Downloads
+            </a>
             <a class="btn btn-ghost btn-lg" href="#demo">
               See how it works
             </a>
@@ -1587,21 +1590,108 @@
       </div>
     </div>
 
-    <!-- ===== DOWNLOADS (apps + guides — always current via /downloads/manifest.json) ===== -->
+    <!-- ===== DOWNLOADS (static cards always visible; sizes refresh from manifest when available) ===== -->
     <section class="section dl-section" id="downloads" aria-labelledby="downloads-title">
       <div class="container">
         <div class="section-head">
           <span class="eyebrow">Apps &amp; guides</span>
           <h2 id="downloads-title">Download RestroSuite</h2>
-          <p>Android APK, Windows portable app, and full PDF guides. Files refresh automatically when we publish a new build — this list is loaded live from the server.</p>
+          <p>Get the Android app, Windows portable app, and full PDF guides. Links stay current when we publish a new build.</p>
         </div>
-        <div class="dl-meta" id="dl-meta" aria-live="polite">Loading latest packages…</div>
-        <div class="dl-grid" id="dl-apps" role="list" aria-label="Apps"></div>
+        <div class="dl-meta" id="dl-meta" aria-live="polite">Apps · PDFs · always free during launch</div>
+
+        <div class="dl-grid" id="dl-apps" role="list" aria-label="Apps">
+          <article class="dl-card" role="listitem" data-dl-id="android-apk">
+            <div class="dl-card-top">
+              <div class="dl-ic android"><i class="fa-brands fa-android" aria-hidden="true"></i></div>
+              <div><h3>RestroSuite for Android</h3><div class="platform">Android APK</div></div>
+            </div>
+            <p>Install on kitchen tablets and counter phones. Allow “Install unknown apps” for your browser if asked.</p>
+            <div class="dl-stats" data-dl-stats><span>APK</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Android.apk" download data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download APK
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="windows-exe">
+            <div class="dl-card-top">
+              <div class="dl-ic windows"><i class="fa-brands fa-windows" aria-hidden="true"></i></div>
+              <div><h3>RestroSuite for Windows</h3><div class="platform">Windows portable</div></div>
+            </div>
+            <p>Portable .exe for counter PCs — no install wizard. Run and sign in with your Outlet ID.</p>
+            <div class="dl-stats" data-dl-stats><span>EXE</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Windows-Portable.exe" download data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download EXE
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="web-pwa">
+            <div class="dl-card-top">
+              <div class="dl-ic web"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+              <div><h3>Use in browser (PWA)</h3><div class="platform">Web · any device</div></div>
+            </div>
+            <p>Open the live web app now. On Chrome/Safari you can “Install” / Add to Home Screen for offline use.</p>
+            <div class="dl-stats" data-dl-stats><span>Online</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="login.html" data-dl-href>
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open app
+              </a>
+            </div>
+          </article>
+        </div>
+
         <h3 class="dl-subhead">PDF guides</h3>
-        <div class="dl-grid dl-grid-guides" id="dl-guides" role="list" aria-label="PDF guides"></div>
+        <div class="dl-grid dl-grid-guides" id="dl-guides" role="list" aria-label="PDF guides">
+          <article class="dl-card" role="listitem" data-dl-id="pdf-product">
+            <div class="dl-card-top">
+              <div class="dl-ic pdf"><i class="fa-solid fa-book-open" aria-hidden="true"></i></div>
+              <div><h3>Product features guide</h3><div class="platform">PDF brochure</div></div>
+            </div>
+            <p>Full feature brochure — every client module for owners evaluating the product.</p>
+            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-desktop">
+            <div class="dl-card-top">
+              <div class="dl-ic pdf"><i class="fa-solid fa-desktop" aria-hidden="true"></i></div>
+              <div><h3>Desktop / web onboarding</h3><div class="platform">PDF guide</div></div>
+            </div>
+            <p>Step-by-step with real screenshots: every tab, button, and flow on desktop.</p>
+            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Complete-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-mobile">
+            <div class="dl-card-top">
+              <div class="dl-ic pdf"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></div>
+              <div><h3>Mobile / Android onboarding</h3><div class="platform">PDF guide</div></div>
+            </div>
+            <p>Same depth for phone layout — bottom nav, More menu, checkout bar.</p>
+            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Mobile-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
+              </a>
+            </div>
+          </article>
+        </div>
+
         <p class="dl-foot">
           Support: <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
-          · After installing Android, allow “Install unknown apps” for your browser if prompted.
+          · Direct folder: <a href="downloads/">/downloads/</a>
         </p>
       </div>
     </section>
@@ -3286,94 +3376,43 @@
     renderSimMenu();
     onSandboxGuestInput();
 
-    // ===== DOWNLOADS HUB (live manifest — updates after each publish) =====
+    // ===== DOWNLOADS HUB — cards are static HTML; manifest only refreshes size/date =====
     (function loadDownloadsHub() {
       var meta = document.getElementById('dl-meta');
-      var appsEl = document.getElementById('dl-apps');
-      var guidesEl = document.getElementById('dl-guides');
-      if (!appsEl || !guidesEl) return;
-
-      function esc(s) {
-        return String(s == null ? '' : s)
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-      }
       function fmtDate(iso) {
-        if (!iso) return '—';
+        if (!iso) return '';
         try {
-          var d = new Date(iso);
-          return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-        } catch (e) { return iso.slice(0, 10); }
+          return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (e) { return String(iso).slice(0, 10); }
       }
-      function icClass(item) {
-        if (item.id === 'android-apk') return 'android';
-        if (item.id === 'windows-exe') return 'windows';
-        if (item.id === 'web-pwa') return 'web';
-        if (item.kind === 'guide') return 'pdf';
-        return '';
-      }
-      function iconTag(item) {
-        var prefix = item.brand === 'brands' ? 'fa-brands' : 'fa-solid';
-        return '<i class="' + prefix + ' ' + esc(item.icon) + '" aria-hidden="true"></i>';
-      }
-      function cardHtml(item) {
-        var avail = !!item.available && !!item.url;
-        var ver = item.version ? '<span><i class="fa-solid fa-code-branch" aria-hidden="true"></i> ' + esc(item.version) + '</span>' : '';
-        var size = item.sizeLabel ? '<span><i class="fa-solid fa-weight-hanging" aria-hidden="true"></i> ' + esc(item.sizeLabel) + '</span>' : '';
-        var updated = item.updatedAt ? '<span><i class="fa-regular fa-clock" aria-hidden="true"></i> ' + esc(fmtDate(item.updatedAt)) + '</span>' : '';
-        var btnLabel = item.openInPlace ? 'Open app' : (item.kind === 'guide' ? 'Download PDF' : 'Download');
-        var btn;
-        if (avail) {
-          btn = '<a class="btn btn-primary" href="' + esc(item.url) + '"'
-            + (item.openInPlace ? '' : ' download')
-            + (item.openInPlace ? '' : ' target="_blank" rel="noopener"')
-            + '><i class="fa-solid fa-download" aria-hidden="true"></i> ' + btnLabel + '</a>';
-          if (item.openInPlace) {
-            btn = '<a class="btn btn-primary" href="' + esc(item.url) + '"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open app</a>';
-          }
-        } else {
-          btn = '<span class="btn btn-ghost is-disabled" aria-disabled="true">Not published yet</span>';
-        }
-        return '<article class="dl-card' + (avail ? '' : ' unavailable') + '" role="listitem">'
-          + '<div class="dl-card-top"><div class="dl-ic ' + icClass(item) + '">' + iconTag(item) + '</div>'
-          + '<div><h3>' + esc(item.title) + '</h3><div class="platform">' + esc(item.platform || '') + '</div></div></div>'
-          + '<p>' + esc(item.blurb || '') + '</p>'
-          + '<div class="dl-stats">' + ver + size + updated + '</div>'
-          + '<div class="dl-actions">' + btn + '</div></article>';
-      }
-
-      // cache-bust so updates show soon after deploy
-      var url = 'downloads/manifest.json?t=' + Date.now();
-      fetch(url, { cache: 'no-store' })
-        .then(function (r) {
-          if (!r.ok) throw new Error('manifest ' + r.status);
-          return r.json();
-        })
+      fetch('downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
         .then(function (m) {
           var items = Array.isArray(m.items) ? m.items : [];
-          var apps = items.filter(function (i) { return i.kind === 'app'; });
-          var guides = items.filter(function (i) { return i.kind === 'guide'; });
-          appsEl.innerHTML = apps.map(cardHtml).join('') || '<p class="dim">No apps listed yet.</p>';
-          guidesEl.innerHTML = guides.map(cardHtml).join('') || '<p class="dim">No guides listed yet.</p>';
+          items.forEach(function (item) {
+            if (!item || !item.id) return;
+            var card = document.querySelector('[data-dl-id="' + item.id + '"]');
+            if (!card) return;
+            var stats = card.querySelector('[data-dl-stats]');
+            if (stats) {
+              var bits = [];
+              if (item.version) bits.push('v' + item.version);
+              if (item.sizeLabel) bits.push(item.sizeLabel);
+              if (item.updatedAt) bits.push(fmtDate(item.updatedAt));
+              if (bits.length) stats.innerHTML = bits.map(function (b) {
+                return '<span>' + String(b).replace(/</g, '&lt;') + '</span>';
+              }).join('');
+            }
+            var a = card.querySelector('[data-dl-href]');
+            if (a && item.url && item.available !== false) a.setAttribute('href', item.url);
+          });
           if (meta) {
-            meta.innerHTML = 'Latest package set · <b>' + esc(m.appVersion || '—') + '</b>'
-              + (m.generatedAt ? ' · refreshed ' + esc(fmtDate(m.generatedAt)) : '')
-              + ' · ' + items.filter(function (i) { return i.available; }).length + ' downloads ready';
+            meta.innerHTML = 'Latest package set · <b>' + String(m.appVersion || '—').replace(/</g, '&lt;') + '</b>'
+              + (m.generatedAt ? ' · refreshed ' + fmtDate(m.generatedAt) : '');
           }
         })
         .catch(function () {
-          if (meta) meta.textContent = 'Download list temporarily unavailable — try again in a moment, or email support@codearc.co.in';
-          // Static fallbacks so the page still works if manifest fails
-          var fallback = [
-            { id: 'android-apk', kind: 'app', platform: 'Android', title: 'RestroSuite for Android', blurb: 'APK for phones & tablets.', icon: 'fa-android', brand: 'brands', url: 'downloads/RestroSuite-Android.apk', available: true, sizeLabel: 'APK', openInPlace: false },
-            { id: 'windows-exe', kind: 'app', platform: 'Windows', title: 'RestroSuite for Windows', blurb: 'Portable desktop EXE.', icon: 'fa-windows', brand: 'brands', url: 'downloads/RestroSuite-Windows-Portable.exe', available: true, sizeLabel: 'EXE', openInPlace: false },
-            { id: 'web-pwa', kind: 'app', platform: 'Web / PWA', title: 'Use in browser', blurb: 'Open the live web app.', icon: 'fa-globe', brand: 'solid', url: 'login.html', available: true, sizeLabel: 'Online', openInPlace: true },
-            { id: 'pdf-product', kind: 'guide', platform: 'PDF', title: 'Product features guide', blurb: 'Full feature brochure.', icon: 'fa-book-open', brand: 'solid', url: 'downloads/RestroSuite-Product-Features-Guide.pdf', available: true, sizeLabel: 'PDF' },
-            { id: 'pdf-onboarding-desktop', kind: 'guide', platform: 'PDF', title: 'Desktop onboarding', blurb: 'Step-by-step desktop guide.', icon: 'fa-desktop', brand: 'solid', url: 'downloads/RestroSuite-Complete-Onboarding-Guide.pdf', available: true, sizeLabel: 'PDF' },
-            { id: 'pdf-onboarding-mobile', kind: 'guide', platform: 'PDF', title: 'Mobile onboarding', blurb: 'Step-by-step mobile guide.', icon: 'fa-mobile-screen', brand: 'solid', url: 'downloads/RestroSuite-Mobile-Onboarding-Guide.pdf', available: true, sizeLabel: 'PDF' }
-          ];
-          appsEl.innerHTML = fallback.filter(function (i) { return i.kind === 'app'; }).map(cardHtml).join('');
-          guidesEl.innerHTML = fallback.filter(function (i) { return i.kind === 'guide'; }).map(cardHtml).join('');
+          /* keep static buttons — no blank screen */
         });
     })();
 
