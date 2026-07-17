@@ -472,6 +472,7 @@
 
   // Global API
   global.RSPrintBridge = {
+    __fromOverlay: true, // marks latest print-bridge so stale critical.bundle can defer
     printHtml,
     printEscPosText,
     printBillEscPos,
