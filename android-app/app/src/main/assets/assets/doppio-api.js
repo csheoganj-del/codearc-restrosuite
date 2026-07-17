@@ -119,6 +119,48 @@
     });
   }
   function ssGet(k){ return SS.getItem(k); }
+  function rawLocalGet(key) {
+    try {
+      return Storage.prototype.getItem.call(localStorage, key);
+    } catch (_) {
+      return null;
+    }
+  }
+  function rawLocalSet(key, value) {
+    try {
+      Storage.prototype.setItem.call(localStorage, key, value);
+    } catch (_) {}
+  }
+  function rawLocalRemove(key) {
+    try {
+      Storage.prototype.removeItem.call(localStorage, key);
+    } catch (_) {}
+  }
+  /** Read remember blob even if an older build tenant-scoped the key. */
+  function readRememberBlobRaw() {
+    try {
+      // Patched localStorage (after GLOBAL_UNSCOPED fix) or direct
+      let raw = null;
+      try { raw = LS_SESS.getItem(REMEMBER_BLOB_KEY); } catch (_) {}
+      if (!raw) raw = rawLocalGet(REMEMBER_BLOB_KEY);
+      if (raw) return raw;
+      // Scan physical keys for pre-fix tenant-scoped copies
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k === REMEMBER_BLOB_KEY || k.indexOf(':' + REMEMBER_BLOB_KEY) !== -1 || k.endsWith(REMEMBER_BLOB_KEY)) {
+          const v = rawLocalGet(k);
+          if (v) {
+            // Promote to the global unscoped key for next cold start
+            rawLocalSet(REMEMBER_BLOB_KEY, v);
+            if (k !== REMEMBER_BLOB_KEY) rawLocalRemove(k);
+            return v;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
   function writeRememberBlobFromSession(){
     try {
       const blob = {};
@@ -127,36 +169,51 @@
         if (value !== null) blob[k] = value;
       });
       if (!blob[K.token]) {
-        LS_SESS.removeItem(REMEMBER_BLOB_KEY);
+        try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
+        rawLocalRemove(REMEMBER_BLOB_KEY);
         return;
       }
-      LS_SESS.setItem(REMEMBER_BLOB_KEY, JSON.stringify(blob));
+      const json = JSON.stringify(blob);
+      // Write both ways so monkey-patched + raw storage stay consistent
+      try { LS_SESS.setItem(REMEMBER_BLOB_KEY, json); } catch (_) {}
+      rawLocalSet(REMEMBER_BLOB_KEY, json);
     } catch (_) {}
   }
   function hydrateRememberedSessionOnce(){
-    if (SS.getItem(K.token)) return;
+    if (SS.getItem(K.token)) return true;
     try {
       // Prefer the new blob; fall back once to legacy flat keys then migrate.
       let blob = null;
-      const raw = LS_SESS.getItem(REMEMBER_BLOB_KEY);
+      const raw = readRememberBlobRaw();
       if (raw) {
         blob = JSON.parse(raw);
-      } else if (LS_SESS.getItem(K.token)) {
-        blob = {};
-        SESSION_KEYS.forEach(k => {
-          const value = LS_SESS.getItem(k);
-          if (value !== null) blob[k] = value;
-        });
+      } else {
+        // Legacy flat localStorage keys (pre-blob era)
+        const legacyTok = rawLocalGet(K.token) || (function () {
+          try { return LS_SESS.getItem(K.token); } catch (_) { return null; }
+        })();
+        if (legacyTok) {
+          blob = {};
+          SESSION_KEYS.forEach(k => {
+            let value = null;
+            try { value = LS_SESS.getItem(k); } catch (_) {}
+            if (value == null) value = rawLocalGet(k);
+            if (value !== null) blob[k] = value;
+          });
+        }
       }
-      if (!blob || typeof blob !== 'object' || !blob[K.token]) return;
+      if (!blob || typeof blob !== 'object' || !blob[K.token]) return false;
       SESSION_KEYS.forEach(k => {
         if (blob[k] != null && SS.getItem(k) === null) SS.setItem(k, String(blob[k]));
       });
-      // Re-save as blob and strip shared flat keys so other open tabs cannot
+      // Re-save as global blob and strip shared flat keys so other open tabs cannot
       // accidentally read a swapped identity from localStorage.
       writeRememberBlobFromSession();
       purgeLegacyFlatSessionKeys();
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
   function restorePersistentSessionToTab(){
     hydrateRememberedSessionOnce();
@@ -169,10 +226,22 @@
       try { LS_SESS.removeItem(k); } catch (_) {}
     }
   }
+  function clearAllRememberBlobs(){
+    try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
+    rawLocalRemove(REMEMBER_BLOB_KEY);
+    try {
+      const doomed = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k === REMEMBER_BLOB_KEY || k.indexOf(':' + REMEMBER_BLOB_KEY) !== -1)) doomed.push(k);
+      }
+      doomed.forEach((k) => rawLocalRemove(k));
+    } catch (_) {}
+  }
   function ssClear(){
     SESSION_KEYS.forEach(k => { SS.removeItem(k); });
     purgeLegacyFlatSessionKeys();
-    try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
+    clearAllRememberBlobs();
     SS.removeItem(IMP_ORIGIN_KEY);
     SS.removeItem(IMP_TARGET_KEY);
   }

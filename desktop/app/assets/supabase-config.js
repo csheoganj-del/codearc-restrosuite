@@ -40,8 +40,25 @@
     return 'local-demo';
   }
 
+  // Keys that must NEVER be tenant-prefixed. The remember-me blob is written at
+  // login (when a tenant id exists) and must still be readable on a cold start
+  // before any session is hydrated — otherwise offline resume / keep-me-signed-in
+  // silently fails on web, PWA, and desktop.
+  const GLOBAL_UNSCOPED_KEYS = {
+    'rs:session': true,
+    'rs_last_tenant_id': true,
+    'rs_remembered_session_v1': true,
+    'restrosuite_runtime_config_v1': true,
+    'rs_station_label': true,
+    'rs_station_label_friendly': true,
+  };
+
   function scopeKey(key) {
-    if (typeof key === 'string' && (key.startsWith('rs_') || key.startsWith('rs-')) && key !== 'rs:session' && key !== 'rs_last_tenant_id') {
+    if (typeof key !== 'string') return key;
+    // Already a physical tenant-scoped key — never re-wrap
+    if (key.indexOf('rs_t:') === 0) return key;
+    if (GLOBAL_UNSCOPED_KEYS[key]) return key;
+    if ((key.startsWith('rs_') || key.startsWith('rs-')) && key !== 'rs:session' && key !== 'rs_last_tenant_id') {
       const tenantId = getActiveTenantId();
       return 'rs_t:' + tenantId + ':' + key;
     }
@@ -52,8 +69,8 @@
     const scoped = scopeKey(key);
     const val = originalGetItem.call(this, scoped);
     if (val !== null) return val;
-    
-    // Migration: if the scoped key doesn't exist, check the old un-scoped key
+
+    // Migration: unscoped → scoped for tenant data keys
     if (scoped !== key) {
       const oldVal = originalGetItem.call(this, key);
       if (oldVal !== null) {
@@ -61,6 +78,25 @@
         originalRemoveItem.call(this, key);
         return oldVal;
       }
+    }
+
+    // Migration: remember blob was wrongly tenant-scoped before the global-key fix
+    if (key === 'rs_remembered_session_v1') {
+      try {
+        for (let i = 0; i < this.length; i++) {
+          const k = this.key(i);
+          if (!k) continue;
+          if (k === 'rs_remembered_session_v1' || k.indexOf(':rs_remembered_session_v1') !== -1) {
+            const found = originalGetItem.call(this, k);
+            if (found) {
+              // Promote to the global unscoped key
+              originalSetItem.call(this, 'rs_remembered_session_v1', found);
+              if (k !== 'rs_remembered_session_v1') originalRemoveItem.call(this, k);
+              return found;
+            }
+          }
+        }
+      } catch (e) {}
     }
     return null;
   };

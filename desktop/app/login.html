@@ -1059,10 +1059,14 @@
   const continueOfflineBtn=document.getElementById('continue-offline-btn');
   function savedClientSession(){
     try {
-      const s = window.RS_API && RS_API.session ? RS_API.session() : null;
-      if (!s || !s.token) return null;
-      if (s.role === 'superadmin' || s.role === 'brand_admin') return null;
-      return s;
+      // Force remember-me hydrate (localStorage blob → sessionStorage)
+      if (window.RS_API && typeof RS_API.session === 'function') {
+        const s = RS_API.session();
+        if (!s || !s.token) return null;
+        if (s.role === 'superadmin' || s.role === 'brand_admin') return null;
+        return s;
+      }
+      return null;
     } catch(e) {
       return null;
     }
@@ -1078,9 +1082,9 @@
       return;
     }
     offlineResume.hidden = false;
-    offlineResumeMode.textContent = navigator.onLine ? 'Saved session' : 'Offline access';
-    offlineResumeTitle.textContent = navigator.onLine ? 'Continue to dashboard' : 'Continue offline';
-    offlineResumeSub.textContent = `${sessionLabel(s)}${s.username ? ' - ' + s.username : ''}`;
+    offlineResumeMode.textContent = navigator.onLine ? 'Saved session on this device' : 'Offline access';
+    offlineResumeTitle.textContent = navigator.onLine ? 'Continue without re-typing password' : 'Continue offline';
+    offlineResumeSub.textContent = `${sessionLabel(s)}${s.username ? ' · ' + s.username : ''}`;
     const tenantInput = document.getElementById('tenant-id');
     const userInput = document.getElementById('username');
     if (tenantInput && !tenantInput.value && s.tenant_slug) tenantInput.value = s.tenant_slug;
@@ -1144,7 +1148,16 @@
   }
   window.addEventListener('online', updateOfflineResume);
   window.addEventListener('offline', updateOfflineResume);
+  // Hydrate remember-me as soon as API is ready (and again after config load).
   updateOfflineResume();
+  setTimeout(updateOfflineResume, 200);
+  setTimeout(updateOfflineResume, 800);
+  (window.__configReady || Promise.resolve()).then(function () {
+    updateOfflineResume();
+  }, updateOfflineResume);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') updateOfflineResume();
+  });
 
   async function waitForRuntimeConfig(){
     if (window.__configReady) {
