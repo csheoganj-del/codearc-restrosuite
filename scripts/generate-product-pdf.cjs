@@ -1343,6 +1343,13 @@ async function main() {
   const size = fs.existsSync(outPdf) ? (fs.statSync(outPdf).size / 1024 / 1024).toFixed(2) : '?';
   console.log(`\nDone. PDF size ~${size} MB`);
   console.log(outPdf);
+  try {
+    require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'sync-downloads.cjs')], {
+      stdio: 'inherit',
+    });
+  } catch (e) {
+    console.warn('sync-downloads skipped:', e && e.message);
+  }
 }
 
 main().catch((e) => {

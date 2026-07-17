@@ -13,6 +13,15 @@ app/build/
 !desktop/build/splash-mark.png
 *.apk
 *.aar
+*.exe
+# Public homepage download hub (stable names — must be deployable)
+!downloads/
+!downloads/**
+!downloads/RestroSuite-Android.apk
+!downloads/RestroSuite-Windows-Portable.exe
+!downloads/*.pdf
+!downloads/manifest.json
+!downloads/README.md
 dashboard-phase2-restore.zip
 local.properties
 .DS_Store

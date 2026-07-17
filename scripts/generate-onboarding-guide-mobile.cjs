@@ -8,6 +8,9 @@
  */
 'use strict';
 
+const { buildOnboardingContent } = require('./lib/onboarding-content.cjs');
+const { applyStepUi } = require('./lib/onboarding-prep.cjs');
+
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -30,583 +33,14 @@ const CREDS = {
 const SUPPORT = 'support@codearc.co.in';
 const SITE = 'https://restrosuite.codearc.co.in';
 
-/** Ordered guide steps — id used for screenshot filename */
-const STEPS = [];
-
-function step(def) {
-  STEPS.push({
-    id: def.id,
-    phase: def.phase || 'Guide',
-    title: def.title,
-    goal: def.goal || '',
-    actions: def.actions || [],
-    tips: def.tips || [],
-    highlight: def.highlight || null, // CSS selector to ring
-    where: def.where || 'dashboard', // google | marketing | login | register | dashboard
-    tab: def.tab || null,
-    settingsPanel: def.settingsPanel || null,
-    seed: def.seed || null, // optional seed fn name
-    fullPage: def.fullPage !== false,
-  });
-}
-
-// ─── Discovery ─────────────────────────────────────────────
-step({
-  id: '01-google-search',
-  phase: '1 · Find RestroSuite',
-  title: 'Find RestroSuite (search or APK / browser)',
-  where: 'google',
-  goal: 'Find the product on phone browser or install the Android app.',
-  actions: [
-    'Open Google on phone or computer.',
-    'Type: CodeArc RestroSuite (or restrosuite codearc).',
-    'Open the official result restrosuite.codearc.co.in (or CodeArc RestroSuite).',
-  ],
-  tips: ['Bookmark the site for staff. Prefer the official CodeArc domain.'],
+/** Ordered guide steps — exhaustive client coverage from shared module */
+const __OB = buildOnboardingContent({
+  SUPPORT: SUPPORT,
+  SITE: SITE,
+  mobile: true,
 });
-
-step({
-  id: '02-homepage',
-  phase: '1 · Find RestroSuite',
-  title: 'Homepage — what RestroSuite is',
-  where: 'marketing',
-  goal: 'Understand offline POS, WhatsApp bills, QR ordering, and free launch.',
-  actions: [
-    'Read the hero: offline-first restaurant POS by CodeArc.',
-    'Scroll Features (POS, WhatsApp, QR, CRM).',
-    'Note: free during launch, no credit card required.',
-    'Click Sign Up Free or Sign in when ready.',
-  ],
-  tips: ['Support email for all help: ' + SUPPORT],
-  highlight: 'a.btn-primary, .hero-actions a, a[href*="login"]',
-});
-
-// ─── Register & Login ──────────────────────────────────────
-step({
-  id: '03-login-page',
-  phase: '2 · Access',
-  title: 'Open the Access page (Sign in / Register)',
-  where: 'login',
-  goal: 'Know the two tabs: Sign in (existing) vs Register outlet (new).',
-  actions: [
-    'Go to ' + SITE + '/login.html',
-    'See Sign in tab (left) and Register outlet tab (right).',
-    'New restaurants: choose Register outlet.',
-    'Existing staff: choose Sign in.',
-  ],
-  highlight: '#tab-login-btn, #tab-register-btn, .tab-btn',
-});
-
-step({
-  id: '04-register-form',
-  phase: '2 · Access',
-  title: 'Register a new outlet (step-by-step fields)',
-  where: 'register',
-  goal: 'Create a workspace: business name, workspace code, owner contact, password, country & currency.',
-  actions: [
-    'Click Register outlet.',
-    'Enter restaurant / business display name.',
-    'Choose a short workspace code (Outlet ID) — e.g. royal-dhaba (letters, numbers, hyphens). This is NOT the display name.',
-    'Enter owner WhatsApp / phone and email.',
-    'Pick country and currency (drives tax label and ₹ / € etc.).',
-    'Create a strong password (10+ characters) and confirm it.',
-    'Complete any OTP / verification step if shown.',
-    'Submit Create my outlet — wait for success, then sign in with the new Outlet ID.',
-  ],
-  tips: [
-    'Write down Outlet ID + username + password for the owner.',
-    'Staff later get separate logins under Employees — do not share owner password on the floor.',
-  ],
-  highlight: '#tab-register-btn, #register-form, #reg-slug, #reg-password',
-});
-
-step({
-  id: '05-login-form',
-  phase: '2 · Access',
-  title: 'Sign in to an existing outlet',
-  where: 'login',
-  goal: 'Log in with Outlet ID, username, and password.',
-  actions: [
-    'Open Sign in tab.',
-    'Workspace / Outlet ID: e.g. bbb (the code from registration).',
-    'Email or Username: staff or owner username.',
-    'Password: your password.',
-    'Optional: Keep me signed in (for trusted devices only).',
-    'Click Sign in securely → lands on Point of Sale.',
-  ],
-  tips: [
-    'Wrong outlet ID is the most common error — use the code, not the restaurant name.',
-    'Forgot password: use Recover access on this page.',
-  ],
-  highlight: '#login-form, #tenant-id, #username, #password, #login-submit',
-});
-
-// ─── Shell ─────────────────────────────────────────────────
-step({
-  id: '06-shell-overview',
-  phase: '3 · Workspace shell',
-  title: 'After login — layout of the console',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  goal: 'Know where navigation, cart, and status live.',
-  actions: [
-    'Left sidebar: all modules (POS, Kitchen, Bills, Inventory…).',
-    'Main area: active module screen.',
-    'Top bar: station, shift, search, WhatsApp status, time, version, help.',
-    'Bottom of sidebar: Settings (gear) and Sign out.',
-    'On phone: bottom tabs POS · Orders · Kitchen · Bills · More.',
-  ],
-  tips: ['Orange version chip (e.g. v209) — click to copy full build id for support.'],
-  highlight: '.sidebar, .sidebar-link, #open-settings',
-});
-
-step({
-  id: '07-sidebar-map',
-  phase: '3 · Workspace shell',
-  title: 'Sidebar map — every client module',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  goal: 'Memorise where each job lives.',
-  actions: [
-    'OPERATIONS: Point of Sale, QR Orders, Kitchen, Floor & Tables, Online Orders, Bills.',
-    'MANAGE: Kitchen Setup, Inventory, Menu Editor, Employees, Customers, Tax & GST.',
-    'GROW: Reports, Analytics, Growth Hub.',
-    'FOOT: Settings, Help, Sign out.',
-  ],
-  tips: ['Your role may hide some tabs — that is normal for cashiers vs owners.'],
-  highlight: '.sidebar',
-});
-
-// ─── POS ───────────────────────────────────────────────────
-step({
-  id: '08-pos-empty-ready',
-  phase: '4 · Point of Sale',
-  title: 'POS screen — menu grid + cart',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  seed: 'ensureMenu',
-  goal: 'Sell takeaway, dine-in, or delivery from one counter screen.',
-  actions: [
-    'Open Point of Sale from the sidebar (default after login).',
-    'Left/centre: menu categories and item tiles.',
-    'Right (or bottom on mobile): Current Order cart.',
-    'Top of cart: order type Takeaway · Dine-in · Delivery.',
-    'Search box filters menu; sort and size controls adjust the grid.',
-  ],
-  highlight: '#pos-tab, .sidebar-link[data-tab="pos-tab"]',
-});
-
-step({
-  id: '09-pos-add-items',
-  phase: '4 · Point of Sale',
-  title: 'Add items to the cart',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  seed: 'ensureCartItems',
-  goal: 'Build an order quickly during rush.',
-  actions: [
-    'Tap a category (e.g. Starters) if needed.',
-    'Tap menu items — they appear in the cart with qty.',
-    'Use + / − on a line to change quantity.',
-    'Optional: open line note for “less spicy”, “no onion”.',
-    'Optional: customer name + phone (needed for WhatsApp bill and CRM).',
-  ],
-  highlight: '#pos-tab .pos-grid, #pos-tab .cart-items, .cart-count-pill',
-});
-
-step({
-  id: '10-pos-pay',
-  phase: '4 · Point of Sale',
-  title: 'Choose payment and settle (Print & Pay)',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  seed: 'ensureCartItems',
-  goal: 'Collect money and finish the bill.',
-  actions: [
-    'Check subtotal, tax, and grand total in the cart footer.',
-    'Select payment: Cash, UPI, Card, Split, or Due (credit — needs customer).',
-    'Cash: use quick amounts or enter cash received if shown.',
-    'Tap Print & Pay (or Pay) to settle.',
-    'On Bill settled: Print thermal, WhatsApp PDF, or close.',
-  ],
-  tips: ['Due payment requires a registered customer — use Customers / quick register.'],
-  highlight: '.cart-payment, .cart-actions-final, #btn-print-pay, button:has-text("Print")',
-});
-
-step({
-  id: '11-pos-shift',
-  phase: '4 · Point of Sale',
-  title: 'Open / close shift (cash discipline)',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  goal: 'Start and end the day with a clear cash float and Z-report.',
-  actions: [
-    'Find Shift control in the top bar (Open shift / Close shift).',
-    'Open shift: enter opening cash (notes & coins).',
-    'Sell all day on this station.',
-    'Close shift: enter counted cash → see variance → Print / CSV Z-report.',
-    'Use station label (e.g. Counter 1) when multiple devices bill.',
-  ],
-  highlight: 'button:has-text("Shift"), #btn-shift, .rs-shift, [class*="shift"]',
-});
-
-// ─── Floor ─────────────────────────────────────────────────
-step({
-  id: '12-floor',
-  phase: '5 · Dining room',
-  title: 'Floor & Tables — seating map',
-  where: 'dashboard',
-  tab: 'floor-tab',
-  seed: 'ensureTables',
-  goal: 'See free / dining / held / QR tables at a glance.',
-  actions: [
-    'Open Floor & Tables.',
-    'Colours show state: free, seated, dining, held, QR pending, billed.',
-    'Tap a free table → Seat & order → sends you to POS for that table.',
-    'Held tables: Resume hold on POS.',
-    'Transfer moves open tickets to another free table.',
-    'Clear / free table when guests leave (confirm carefully).',
-  ],
-  highlight: '.sidebar-link[data-tab="floor-tab"], #floor-tab',
-});
-
-step({
-  id: '13-floor-qr-print',
-  phase: '5 · Dining room',
-  title: 'Print Table QR tents',
-  where: 'dashboard',
-  tab: 'floor-tab',
-  goal: 'Put scannable Order food + Call waiter cards on each table.',
-  actions: [
-    'On Floor toolbar: Print Table QRs (or View QR on one table).',
-    'Choose card size (Mini → Full) or Custom mm sizes.',
-    'Toggle Wi‑Fi, welcome line, Powered by (set Wi‑Fi under Settings first).',
-    'Live preview updates as you change options.',
-    'Print at 100% scale (not Fit-to-page).',
-  ],
-  tips: ['Table number is always on the card — required for guest orders.'],
-  highlight: 'button:has-text("Print"), button:has-text("QR")',
-});
-
-// ─── QR Orders ─────────────────────────────────────────────
-step({
-  id: '14-qr-orders',
-  phase: '6 · Guest QR',
-  title: 'QR Orders queue (staff)',
-  where: 'dashboard',
-  tab: 'qr-orders-tab',
-  seed: 'ensureQrContext',
-  goal: 'Accept or reject orders guests place from table QR.',
-  actions: [
-    'Open QR Orders from the sidebar.',
-    'New guest tickets appear with table number and items.',
-    'Accept → kitchen / KDS gets the ticket.',
-    'Reject if needed (wrong table / test).',
-    'Amend shared table orders before kitchen starts prep (when enabled).',
-  ],
-  highlight: '.sidebar-link[data-tab="qr-orders-tab"], #qr-orders-tab',
-});
-
-// ─── Kitchen ───────────────────────────────────────────────
-step({
-  id: '15-kds',
-  phase: '7 · Kitchen',
-  title: 'Kitchen Display (KDS)',
-  where: 'dashboard',
-  tab: 'kds-tab',
-  seed: 'ensureKitchenTicket',
-  goal: 'Cooks see tickets and mark items ready without paper KOTs.',
-  actions: [
-    'Open Kitchen from the sidebar (or kds.html on a kitchen tablet).',
-    'Tickets show table / token, items, and status.',
-    'Mark preparing → ready as food is cooked.',
-    'Clear when plated or handed to service.',
-  ],
-  tips: ['Use a bright tablet in landscape, fixed on the pass.'],
-  highlight: '.sidebar-link[data-tab="kds-tab"], #kds-tab',
-});
-
-// ─── Online ────────────────────────────────────────────────
-step({
-  id: '16-online',
-  phase: '8 · Channels',
-  title: 'Online Orders queue',
-  where: 'dashboard',
-  tab: 'aggregator-tab',
-  goal: 'One place for delivery-channel and manual online tickets.',
-  actions: [
-    'Open Online Orders.',
-    'Review items and customer details.',
-    'Accept (to kitchen) or Reject.',
-    'Phone orders: create manual online order, then process like POS.',
-  ],
-  highlight: '.sidebar-link[data-tab="aggregator-tab"]',
-});
-
-// ─── Bills ─────────────────────────────────────────────────
-step({
-  id: '17-bills',
-  phase: '9 · History',
-  title: 'Bills — search, reprint, export',
-  where: 'dashboard',
-  tab: 'bills-tab',
-  seed: 'ensureBill',
-  goal: 'Find any settled invoice and hand data to accounts.',
-  actions: [
-    'Open Bills.',
-    'Search by bill no, phone, or customer name.',
-    'Open a row: totals, tax, payment method, station.',
-    'Reprint receipt / thermal.',
-    'Refund / void only with manager PIN if configured.',
-    'Export CSV for the day or filtered set.',
-  ],
-  highlight: '.sidebar-link[data-tab="bills-tab"], #bills-tab',
-});
-
-// ─── Inventory ─────────────────────────────────────────────
-step({
-  id: '18-inventory',
-  phase: '10 · Stock',
-  title: 'Inventory — stock list',
-  where: 'dashboard',
-  tab: 'inventory-tab',
-  seed: 'ensureInventory',
-  goal: 'Track ingredients, low stock, and recipe use.',
-  actions: [
-    'Open Inventory.',
-    'Add stock items: name, unit, qty, reorder threshold.',
-    'Or import from a simple sheet when available.',
-    'Link recipes on Menu Editor so sales deduct stock.',
-    'Watch low-stock badges before weekend rush.',
-  ],
-  highlight: '.sidebar-link[data-tab="inventory-tab"], #inventory-tab',
-});
-
-// ─── Menu ──────────────────────────────────────────────────
-step({
-  id: '19-menu',
-  phase: '11 · Catalog',
-  title: 'Menu Editor — items, prices, GST slab',
-  where: 'dashboard',
-  tab: 'editor-tab',
-  seed: 'ensureMenu',
-  goal: 'Publish what POS and guest QR both sell.',
-  actions: [
-    'Open Menu Editor.',
-    'Create categories (Starters, Mains, Drinks…).',
-    'Add item: name, price, veg/non-veg, GST slab (5% / 12% / 18%…).',
-    'Optional: recipe link for inventory, addons, Hindi name.',
-    'Save — item appears on POS after refresh/sync.',
-    'Mark sold-out when kitchen is out of stock.',
-  ],
-  tips: ['India: most restaurant food 5%; some packaged drinks higher — ask your CA.'],
-  highlight: '.sidebar-link[data-tab="editor-tab"], #editor-tab',
-});
-
-// ─── Employees ─────────────────────────────────────────────
-step({
-  id: '20-employees',
-  phase: '12 · Team',
-  title: 'Employees — roles and logins',
-  where: 'dashboard',
-  tab: 'employees-tab',
-  goal: 'Give each staff member their own login and limited tabs.',
-  actions: [
-    'Open Employees.',
-    'Add staff: name, username, password, role (cashier, waiter, kitchen, manager…).',
-    'Limit tabs for cashiers (e.g. POS + Bills only).',
-    'Test login once as that user.',
-    'Deactivate login when someone leaves.',
-  ],
-  tips: ['Never share the owner password on the counter tablet.'],
-  highlight: '.sidebar-link[data-tab="employees-tab"]',
-});
-
-// ─── Customers ─────────────────────────────────────────────
-step({
-  id: '21-customers',
-  phase: '13 · CRM',
-  title: 'Customers — CRM, loyalty, dues',
-  where: 'dashboard',
-  tab: 'customers-tab',
-  seed: 'ensureCustomer',
-  goal: 'Know regulars, points, and outstanding credit.',
-  actions: [
-    'Open Customers.',
-    'Profiles build automatically when you bill with a phone number.',
-    'Open a card: visits, spend, loyalty, notes, dues badge.',
-    'Settle Dues: Cash / UPI / Card → receipt / WhatsApp.',
-    'Use Due payment on POS only with a selected customer.',
-  ],
-  highlight: '.sidebar-link[data-tab="customers-tab"]',
-});
-
-// ─── Tax ───────────────────────────────────────────────────
-step({
-  id: '22-tax',
-  phase: '14 · Compliance',
-  title: 'Tax & GST workspace',
-  where: 'dashboard',
-  tab: 'tax-tab',
-  goal: 'See GST collected and export accountant packs.',
-  actions: [
-    'Open Tax & GST.',
-    'Review period stats (taxable supplies, CGST/SGST style totals).',
-    'Download GSTR / period exports for your CA.',
-    'Manage rate slabs if offered (country tax packs).',
-  ],
-  tips: ['Per-item GST is set in Menu Editor; outlet toggles are in Settings → Taxes.'],
-  highlight: '.sidebar-link[data-tab="tax-tab"]',
-});
-
-// ─── Reports ───────────────────────────────────────────────
-step({
-  id: '23-reports',
-  phase: '15 · Numbers',
-  title: 'Sales Reports',
-  where: 'dashboard',
-  tab: 'reports-tab',
-  seed: 'ensureBill',
-  goal: 'See revenue, orders, payment mix, tax for Today / 30 days.',
-  actions: [
-    'Open Reports.',
-    'Pick period: Today, This week, This month, Last 30 / 90 days.',
-    'Read KPI cards: Revenue, Orders, AOV, Tax collected.',
-    'Daily revenue bars and Payment mix donut.',
-    'Top categories + Tax summary.',
-    'Download GSTR-ready CSV for the accountant.',
-  ],
-  highlight: '.sidebar-link[data-tab="reports-tab"], #reports-tab',
-});
-
-// ─── Analytics ─────────────────────────────────────────────
-step({
-  id: '24-analytics',
-  phase: '15 · Numbers',
-  title: 'Analytics — deeper trends',
-  where: 'dashboard',
-  tab: 'analytics-tab',
-  goal: 'Spot busy hours and bestsellers beyond the daily total.',
-  actions: [
-    'Open Analytics.',
-    'Choose period and refresh if needed.',
-    'Review revenue trend, peak hours, top items.',
-    'Use insights before changing staffing or promos.',
-  ],
-  highlight: '.sidebar-link[data-tab="analytics-tab"]',
-});
-
-// ─── Growth Hub ────────────────────────────────────────────
-step({
-  id: '25-growth',
-  phase: '16 · Growth Hub',
-  title: 'Growth Hub launcher',
-  where: 'dashboard',
-  tab: 'growth-hub-tab',
-  goal: 'Open ops tools beyond pure billing.',
-  actions: [
-    'Open Growth Hub.',
-    'Tiles: Reservations, Support tickets, Purchase orders, Recipe costing,',
-    'Offers & coupons, WhatsApp campaigns, Feedback, Loyalty.',
-    'Tap a tile to open that module and complete the form.',
-  ],
-  highlight: '.sidebar-link[data-tab="growth-hub-tab"], #hub-grid, .hub-grid',
-});
-
-// ─── Settings ──────────────────────────────────────────────
-step({
-  id: '26-settings-profile',
-  phase: '17 · Settings',
-  title: 'Settings → Outlet profile',
-  where: 'dashboard',
-  tab: 'settings-tab',
-  settingsPanel: 'profile',
-  goal: 'Set name, address, phone, country, currency, GSTIN.',
-  actions: [
-    'Click Settings (gear) at the bottom of the sidebar.',
-    'Open Outlet profile.',
-    'Fill restaurant name, address, phone, GSTIN.',
-    'Country & currency drive tax labels and ₹ formatting.',
-    'Guest QR: Wi‑Fi name, password, welcome line for table tents.',
-    'Save changes.',
-  ],
-  highlight: '#open-settings, .set-nav button[data-s="profile"]',
-});
-
-step({
-  id: '27-settings-tax',
-  phase: '17 · Settings',
-  title: 'Settings → Taxes & pricing',
-  where: 'dashboard',
-  tab: 'settings-tab',
-  settingsPanel: 'tax',
-  goal: 'Turn tax on/off, set default rate, inclusive pricing, service charge.',
-  actions: [
-    'Settings → Taxes & pricing.',
-    'Calculate taxes: ON for registered GST outlets (charges + prints tax).',
-    'Tax label: GST. Tax rate %: default (often 5) when item has no slab.',
-    'Inclusive pricing: ON if menu prices already include GST.',
-    'Service charge: optional dine-in %.',
-    'Show HSN: print HSN on invoice when you use codes.',
-    'Save. Per-item rates still come from Menu Editor GST slab.',
-  ],
-  tips: ['OFF Calculate taxes = no tax on cart/print (special cases only).'],
-  highlight: '.set-nav button[data-s="tax"], [data-skey="set_calculate_taxes"]',
-});
-
-step({
-  id: '28-settings-print-wa',
-  phase: '17 · Settings',
-  title: 'Settings → Printers & WhatsApp',
-  where: 'dashboard',
-  tab: 'settings-tab',
-  settingsPanel: 'printer',
-  goal: 'Connect paper receipts and WhatsApp bills.',
-  actions: [
-    'Printers & KOT: preferred printer name, auto-print options.',
-    'WhatsApp: scan gateway QR once on the office PC, keep gateway online.',
-    'Test send; top-bar icon green = connected.',
-    'On settle: WhatsApp PDF to customer phone when number is filled.',
-  ],
-  tips: ['Support: ' + SUPPORT],
-  highlight: '.set-nav button[data-s="printer"], .set-nav button[data-s="gateway"]',
-});
-
-// ─── Daily close ───────────────────────────────────────────
-step({
-  id: '29-day-close',
-  phase: '18 · End of day',
-  title: 'End-of-day checklist',
-  where: 'dashboard',
-  tab: 'reports-tab',
-  goal: 'Leave the till clean for tomorrow.',
-  actions: [
-    'Close open shifts on each station (cash count + Z-report).',
-    'Reports → Today → match totals to cash + UPI.',
-    'Download GSTR-ready CSV / day pack if needed.',
-    'Bills export for accountant if requested.',
-    'Backup export from Settings / Growth tools if available.',
-    'Sign out on shared tablets.',
-  ],
-  tips: ['Keep one owner device signed in for overnight monitoring if desired.'],
-  highlight: '.sidebar-link[data-tab="reports-tab"]',
-});
-
-step({
-  id: '30-support',
-  phase: '19 · Help',
-  title: 'Help & support',
-  where: 'dashboard',
-  tab: 'pos-tab',
-  goal: 'Know how to get unstuck.',
-  actions: [
-    'In-app Help / Demo checklist (Help button or right-click Help & Setup).',
-    'Email: ' + SUPPORT,
-    'Tell support: Outlet ID, username role, version chip (top bar), what you clicked.',
-    'Screenshot of the error if possible.',
-  ],
-  highlight: 'button:has-text("Help"), #open-help, .sb-foot-btn',
-});
+const STEPS = __OB.STEPS;
+const DETAIL = __OB.DETAIL;
 
 function ensureDirs() {
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -622,6 +56,8 @@ function toDataUri(filePath) {
 
 async function dismissOverlays(page) {
   const selectors = [
+    '#rs-profile-skip',
+    'button:has-text("Fill this in later")',
     'button[aria-label="Close"]',
     '.modal-close',
     '#tour-skip-btn',
@@ -630,19 +66,39 @@ async function dismissOverlays(page) {
     'button:has-text("Got it")',
     'button:has-text("Later")',
     'button:has-text("Not now")',
+    'button:has-text("Don\'t show again")',
     '#rs-demo-x',
-    '.product-guide-backdrop button',
+    '.product-guide-close',
+    '[data-guide-close]',
   ];
-  for (const sel of selectors) {
-    try {
-      const el = page.locator(sel).first();
-      if (await el.isVisible({ timeout: 300 }).catch(() => false)) {
-        await el.click({ timeout: 600 }).catch(() => {});
-      }
-    } catch (_) {}
+  for (let pass = 0; pass < 3; pass++) {
+    const skip = page.locator('#rs-profile-skip, button:has-text("Fill this in later")').first();
+    if (await skip.isVisible({ timeout: 400 }).catch(() => false)) {
+      await skip.click({ timeout: 1000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    for (const sel of selectors) {
+      try {
+        const el = page.locator(sel).first();
+        if (await el.isVisible({ timeout: 200 }).catch(() => false)) {
+          await el.click({ timeout: 600 }).catch(() => {});
+        }
+      } catch (_) {}
+    }
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(150);
   }
-  await page.keyboard.press('Escape').catch(() => {});
-  await page.waitForTimeout(120);
+  await page
+    .evaluate(() => {
+      document.querySelectorAll('.dash-modal, .product-guide-modal, [role="dialog"]').forEach((el) => {
+        const t = (el.textContent || '').toLowerCase();
+        if (t.includes("let's set up") || t.includes('set up your outlet') || t.includes('fill this in later')) {
+          el.remove();
+        }
+      });
+      document.body.classList.remove('product-guide-open');
+    })
+    .catch(() => {});
 }
 
 async function highlight(page, selector) {
@@ -681,55 +137,94 @@ async function clearHighlight(page) {
   }).catch(() => {});
 }
 
+/** Reliable tab switch on mobile: always await RS.activateTab + verify #id.active */
 async function openDashboardTab(page, tabId, settingsPanel) {
-  if (tabId === 'settings-tab') {
-    const ham = page.locator('#sidebarToggle, .sidebar-hamburger').first();
-    if (await ham.isVisible({ timeout: 800 }).catch(() => false)) await ham.click().catch(() => {});
-    await page.waitForTimeout(400);
-    await page.locator('#open-settings').click({ timeout: 8000 }).catch(async () => {
-      await page.evaluate(() => {
-        if (window.RS && RS.activateTab) RS.activateTab('settings-tab');
-      });
+  // Close leftover modals so they don't block the next screen
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.evaluate(() => {
+    document.querySelectorAll('.dash-modal.active, .rs-modal-backdrop, [data-rs-modal]').forEach((el) => {
+      try {
+        el.classList.remove('active');
+        el.setAttribute('hidden', '');
+        if (el.style) el.style.display = 'none';
+      } catch (_) {}
     });
-    await page.waitForTimeout(1000);
-    if (settingsPanel) {
-      const btn = page.locator('.set-nav button[data-s="' + settingsPanel + '"]').first();
-      if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await btn.click().catch(() => {});
-        await page.waitForTimeout(700);
-      }
+  }).catch(() => {});
+
+  // Prefer bottom-nav tap when the tab is on the bar (matches real user path)
+  const BOTTOM = new Set(['pos-tab', 'qr-orders-tab', 'kds-tab', 'bills-tab', 'reports-tab']);
+  if (BOTTOM.has(tabId)) {
+    const mlink = page.locator('.mnav-link[data-tab="' + tabId + '"]').first();
+    if (await mlink.isVisible({ timeout: 800 }).catch(() => false)) {
+      await mlink.click({ timeout: 5000 }).catch(() => {});
     }
-    return;
   }
-  // Bottom mobile nav
-  const mlink = page.locator('.mnav-link[data-tab="' + tabId + '"]').first();
-  if (await mlink.count() && (await mlink.isVisible().catch(() => false))) {
-    await mlink.click({ timeout: 5000 }).catch(() => {});
-    await page.waitForTimeout(1200);
-    return;
+
+  // Always force activateTab (await async module load) — this is the source of truth
+  const switched = await page.evaluate(async (id) => {
+    try {
+      if (window.RS && typeof RS.activateTab === 'function') {
+        await RS.activateTab(id);
+      } else if (typeof window.activateTab === 'function') {
+        await window.activateTab(id);
+      } else {
+        const el = document.getElementById(id);
+        if (el) {
+          document.querySelectorAll('.tab-content').forEach((t) => t.classList.remove('active'));
+          el.classList.add('active');
+        }
+      }
+      const active = document.querySelector('.tab-content.active');
+      return active ? active.id : null;
+    } catch (e) {
+      return 'ERR:' + (e && e.message);
+    }
+  }, tabId);
+
+  // Wait until the target tab content is active
+  await page
+    .waitForFunction(
+      (id) => {
+        const el = document.getElementById(id);
+        return !!(el && el.classList.contains('active'));
+      },
+      tabId,
+      { timeout: 12000 }
+    )
+    .catch(() => {});
+
+  const activeNow = await page.evaluate(() => {
+    const a = document.querySelector('.tab-content.active');
+    return a ? a.id : null;
+  });
+  if (activeNow !== tabId) {
+    process.stdout.write(`(want ${tabId} got ${activeNow}/${switched}) `);
   }
-  // Modules not on bottom bar → More or hamburger sidebar
-  const more = page.locator('#mnav-more').first();
-  if (await more.isVisible().catch(() => false)) {
-    await more.click().catch(() => {});
-    await page.waitForTimeout(500);
+
+  await page.waitForTimeout(900);
+
+  if (tabId === 'settings-tab' && settingsPanel) {
+    const btn = page.locator('.set-nav button[data-s="' + settingsPanel + '"]').first();
+    if (await btn.isVisible({ timeout: 2500 }).catch(() => false)) {
+      await btn.click().catch(() => {});
+      await page.waitForTimeout(700);
+    } else {
+      // Settings panels sometimes use different nav markup
+      await page
+        .evaluate((panel) => {
+          const b =
+            document.querySelector('.set-nav button[data-s="' + panel + '"]') ||
+            document.querySelector('[data-s="' + panel + '"]') ||
+            document.querySelector('button[data-panel="' + panel + '"]');
+          if (b) b.click();
+        }, settingsPanel)
+        .catch(() => {});
+      await page.waitForTimeout(600);
+    }
   }
-  const ham2 = page.locator('#sidebarToggle, .sidebar-hamburger').first();
-  if (await ham2.isVisible().catch(() => false)) {
-    await ham2.click().catch(() => {});
-    await page.waitForTimeout(400);
-  }
-  const link = page.locator('.sidebar-link[data-tab="' + tabId + '"]').first();
-  if (await link.count() && (await link.isVisible().catch(() => false))) {
-    await link.click({ timeout: 6000 }).catch(() => {});
-  } else {
-    await page.evaluate((id) => {
-      if (window.RS && typeof RS.activateTab === 'function') RS.activateTab(id);
-      else if (window.RS && typeof RS.switchTab === 'function') RS.switchTab(id);
-    }, tabId);
-  }
-  await page.waitForTimeout(1400);
 }
+
+/* prep helpers live in ./lib/onboarding-prep.cjs (applyStepUi) */
 
 /** Seed sample data in the live session so empty tabs look real */
 async function runSeed(page, name) {
@@ -880,28 +375,43 @@ async function captureStep(browser, page, s, index, total) {
   const file = path.join(SHOTS, s.id + '.png');
   process.stdout.write(`[${index + 1}/${total}] ${s.id} … `);
 
-  try {
-    async function shot() {
-      // Full visible UI, no crop — clip to app shell when possible
-      const app = page.locator('#app, body').first();
-      if (await app.count()) {
-        await app.screenshot({ path: file }).catch(async () => {
-          await page.screenshot({ path: file, fullPage: true });
-        });
-      } else {
-        await page.screenshot({ path: file, fullPage: true });
+  if (process.env.RS_RESUME === '1' && fs.existsSync(file)) {
+    try {
+      const st = fs.statSync(file);
+      if (st.size > 8000) {
+        console.log('SKIP (exists)');
+        return true;
       }
+    } catch (_) {}
+  }
+
+  try {
+    // Viewport only — fullPage on long pages becomes a thin ribbon in the PDF
+    async function shotViewport() {
+      await page.evaluate(() => {
+        try {
+          window.scrollTo(0, 0);
+          const app = document.getElementById('app');
+          if (app) app.scrollTop = 0;
+          document.querySelectorAll('.main, .content, .tab-content.active').forEach((el) => {
+            try {
+              el.scrollTop = 0;
+            } catch (_) {}
+          });
+        } catch (_) {}
+      });
+      await page.waitForTimeout(120);
+      await page.screenshot({ path: file, fullPage: false, type: 'png' });
     }
 
     if (s.where === 'google') {
-      // Captcha-free mock of “what you see when you search” (real Google blocks bots)
       const mock = path.join(OUT_DIR, 'mock-google-search.html');
       await page.goto('file:///' + mock.replace(/\\/g, '/'), {
         waitUntil: 'domcontentloaded',
         timeout: 30000,
       });
       await page.waitForTimeout(400);
-      await page.screenshot({ path: file, fullPage: true });
+      await shotViewport();
       console.log('OK (mock search — no captcha)');
       return true;
     }
@@ -909,8 +419,9 @@ async function captureStep(browser, page, s, index, total) {
     if (s.where === 'marketing') {
       await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForTimeout(2000);
+      await page.evaluate(() => window.scrollTo(0, 0));
       if (s.highlight) await highlight(page, s.highlight);
-      await page.screenshot({ path: file, fullPage: true });
+      await shotViewport();
       await clearHighlight(page);
       console.log('OK');
       return true;
@@ -931,7 +442,7 @@ async function captureStep(browser, page, s, index, total) {
         await page.fill('#username', CREDS.user).catch(() => {});
       }
       if (s.highlight) await highlight(page, s.highlight);
-      await page.screenshot({ path: file, fullPage: true });
+      await shotViewport();
       await clearHighlight(page);
       console.log('OK');
       return true;
@@ -941,231 +452,41 @@ async function captureStep(browser, page, s, index, total) {
     if (!page.url().includes('dashboard')) {
       await login(page);
     }
-    await dismissOverlays(page);
+    // Don't dismiss prep modals for steps that need them open
+    if (s.prep !== 'openMoreSheet' && s.prep !== 'openShiftUi' && s.prep !== 'openFloorQrPrint') {
+      await dismissOverlays(page);
+    } else {
+      // Still kill license/tour overlays only
+      await page.locator('#tour-skip-btn, #tour-close-btn').first().click({ timeout: 400 }).catch(() => {});
+    }
+
     if (s.seed) await runSeed(page, s.seed);
     if (s.seed === 'ensureCartItems') await seedCartViaUi(page);
     if (s.tab) await openDashboardTab(page, s.tab, s.settingsPanel);
-    await page.waitForTimeout(1000);
-    await dismissOverlays(page);
+    await page.waitForTimeout(500);
+    await applyStepUi(page, s);
+    const keepModal =
+      s.prep &&
+      /open|Shift|Qr|Recover|Help|Kitchen|More|Checkout|Split|Customer|Edit/i.test(s.prep);
+    if (!keepModal && !s.growthTile) await dismissOverlays(page);
     if (s.highlight) await highlight(page, s.highlight);
-    await shot();
+    await shotViewport();
     await clearHighlight(page);
+    if (s.prep || s.growthTile) {
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(200);
+      await page.keyboard.press('Escape').catch(() => {});
+    }
     console.log('OK');
     return true;
   } catch (e) {
     console.log('FAIL', e.message);
     try {
-      await page.screenshot({ path: file, fullPage: true });
+      await page.screenshot({ path: file, fullPage: false });
     } catch (_) {}
     return false;
   }
 }
-
-/** Exhaustive control maps — what each control does / next screen */
-const DETAIL = {
-  '01-google-search': [
-    { btn: 'Search box', why: 'You type the product name', does: 'Shows results for CodeArc RestroSuite', next: 'Open the official site link' },
-    { btn: 'Official result restrosuite.codearc.co.in', why: 'This is the real product', does: 'Opens the RestroSuite homepage', next: 'Homepage / marketing page' },
-    { btn: 'Sign-in result /login.html', why: 'Direct access for staff', does: 'Opens Access page', next: 'Login or Register' },
-  ],
-  '02-homepage': [
-    { btn: 'Sign Up Free', why: 'New outlet owners start here', does: 'Opens Register outlet flow', next: 'Registration form' },
-    { btn: 'Sign in', why: 'Existing outlets and staff', does: 'Opens Access → Sign in', next: 'Login form' },
-    { btn: 'Features section', why: 'Explains POS, WhatsApp, QR, CRM', does: 'Scrolls/marketing only', next: 'Decide to try the product' },
-    { btn: 'Live demo sandbox (if shown)', why: 'Try a fake bill without signup', does: 'Simulates Print & Pay', next: 'Still need real register for your outlet' },
-  ],
-  '03-login-page': [
-    { btn: 'Sign in tab', why: 'Existing workspace', does: 'Shows login fields', next: 'Fill Outlet ID + user + password' },
-    { btn: 'Register outlet tab', why: 'Brand-new restaurant', does: 'Shows multi-step register form', next: 'Create workspace' },
-    { btn: 'Forgot password / Recover', why: 'Lost owner password', does: 'Opens recovery with email code', next: 'Reset password email' },
-    { btn: 'Theme toggle', why: 'Light/dark preference', does: 'Switches theme', next: 'Same page, new theme' },
-  ],
-  '04-register-form': [
-    { btn: 'Business / restaurant name', why: 'Shown on bills and UI', does: 'Stores display name', next: 'Still need workspace code' },
-    { btn: 'Workspace code (Outlet ID)', why: 'Unique login slug staff type every day', does: 'Creates saas tenant slug', next: 'Must remember this code' },
-    { btn: 'Country + currency', why: 'Tax system and ₹/€ symbols', does: 'Seeds defaults', next: 'Tax label GST/VAT etc.' },
-    { btn: 'Owner phone / email', why: 'Recovery and support contact', does: 'Saves on tenant', next: 'OTP if enabled' },
-    { btn: 'Password + confirm', why: 'Owner security', does: 'Hashes password', next: 'Create outlet → then Sign in' },
-    { btn: 'Create my outlet', why: 'Submit registration', does: 'Provisions cloud workspace', next: 'Sign in with new Outlet ID' },
-  ],
-  '05-login-form': [
-    { btn: 'Workspace / Outlet ID', why: 'Which restaurant database', does: 'Scopes the login', next: 'Must match registration code' },
-    { btn: 'Username', why: 'Which staff account', does: 'Loads role + allowed tabs', next: 'Owner vs cashier see different menus' },
-    { btn: 'Password', why: 'Prove identity', does: 'Validates credentials', next: 'Session token stored' },
-    { btn: 'Keep me signed in', why: 'Trusted device only', does: 'Remember-me blob in browser', next: 'Next visit skips retype' },
-    { btn: 'Sign in securely', why: 'Enter the console', does: 'Redirects to dashboard POS', next: 'Point of Sale screen' },
-  ],
-  '06-shell-overview': [
-    { btn: 'Left sidebar links', why: 'Jump between modules', does: 'Opens that tab in main area', next: 'POS / Kitchen / Bills…' },
-    { btn: 'Top bar Shift', why: 'Cash session for the day', does: 'Open/close shift modals', next: 'Z-report on close' },
-    { btn: 'Top bar WhatsApp icon', why: 'Bill send status', does: 'Green=connected / red=off', next: 'Settings → WhatsApp to fix' },
-    { btn: 'Version chip', why: 'Support needs build id', does: 'Click copies full version', next: 'Paste in support email' },
-    { btn: 'Settings (gear)', why: 'Outlet configuration', does: 'Opens Settings tab', next: 'Profile / Tax / Printers…' },
-    { btn: 'Help', why: 'Setup tour and checklist', does: 'Opens product guide / demo steps', next: 'Guided tour' },
-    { btn: 'Sign out', why: 'Leave secure session', does: 'Clears session', next: 'Login page' },
-  ],
-  '07-sidebar-map': [
-    { btn: 'Point of Sale', why: 'Sell and bill', does: 'Opens POS', next: 'Cart + menu' },
-    { btn: 'QR Orders', why: 'Guest self-orders waiting', does: 'Opens accept/reject queue', next: 'Kitchen after accept' },
-    { btn: 'Kitchen', why: 'Cook screen', does: 'Opens KDS', next: 'Mark ready' },
-    { btn: 'Floor & Tables', why: 'Dining room map', does: 'Opens table grid', next: 'Seat / hold / QR print' },
-    { btn: 'Online Orders', why: 'Delivery channels', does: 'Opens online queue', next: 'Accept/reject' },
-    { btn: 'Bills', why: 'History & reprint', does: 'Opens bills list', next: 'Search / export / refund' },
-    { btn: 'Inventory', why: 'Stock control', does: 'Opens stock', next: 'Add items / low stock' },
-    { btn: 'Menu Editor', why: 'Prices & GST slabs', does: 'Opens catalog', next: 'Add/edit items' },
-    { btn: 'Employees', why: 'Staff logins', does: 'Opens staff list', next: 'Add role-limited users' },
-    { btn: 'Customers', why: 'CRM & dues', does: 'Opens customer cards', next: 'Settle dues / notes' },
-    { btn: 'Tax & GST', why: 'Compliance view', does: 'Opens tax workspace', next: 'Exports for CA' },
-    { btn: 'Reports', why: 'Sales KPIs', does: 'Opens sales reports', next: 'CSV / GSTR download' },
-    { btn: 'Analytics', why: 'Trends', does: 'Opens analytics', next: 'Peak hours / top items' },
-    { btn: 'Growth Hub', why: 'Extra ops tools', does: 'Opens tile launcher', next: 'Reservations, POs, offers…' },
-  ],
-  '08-pos-empty-ready': [
-    { btn: 'Search menu box', why: 'Find items fast in rush', does: 'Filters tiles by name/code', next: 'Fewer tiles shown' },
-    { btn: 'Sort & card size (sliders)', why: 'Comfortable grid', does: 'Changes sort and tile size', next: 'Same menu, new layout' },
-    { btn: 'Category chips', why: 'Browse by section', does: 'Filters by category', next: 'Only that category items' },
-    { btn: 'Menu item tile', why: 'Add to bill', does: 'Adds line to cart (+1 qty)', next: 'Cart updates total' },
-    { btn: 'Order type icons (bag / utensils / bike)', why: 'Takeaway vs dine-in vs delivery', does: 'Sets order channel', next: 'May show table or delivery fields' },
-    { btn: 'Cart count pill', why: 'How many lines', does: 'Display only', next: '—' },
-    { btn: 'Clear cart (trash)', why: 'Cancel whole order', does: 'Empties cart', next: 'Empty cart state' },
-  ],
-  '09-pos-add-items': [
-    { btn: 'Item + / − qty', why: 'Change quantity', does: 'Updates line qty and totals', next: 'Tax recalculates' },
-    { btn: 'Line note', why: 'Kitchen instructions', does: 'Saves note on line', next: 'Shows on KOT/KDS' },
-    { btn: 'Add customer toggle', why: 'CRM / WhatsApp / Due', does: 'Opens name+phone fields', next: 'Customer linked to bill' },
-    { btn: 'Table dropdown', why: 'Dine-in table', does: 'Binds order to table', next: 'Floor shows occupied' },
-    { btn: 'Covers / pax', why: 'Guest count', does: 'Stores covers', next: 'Reports / floor info' },
-    { btn: 'Discount controls (if shown)', why: 'Promo or manager disc', does: 'Reduces subtotal', next: 'Tax on net' },
-  ],
-  '10-pos-pay': [
-    { btn: 'Cash', why: 'Cash tender', does: 'Selects cash payment', next: 'May open cash received UI' },
-    { btn: 'UPI', why: 'UPI / QR pay', does: 'Selects UPI', next: 'Settle with UPI' },
-    { btn: 'Card', why: 'Card machine', does: 'Selects card', next: 'Settle' },
-    { btn: 'Split', why: 'Multi tender', does: 'Opens split amounts', next: 'Partial cash+UPI etc.' },
-    { btn: 'Due', why: 'Credit sale', does: 'Requires customer', next: 'Adds to customer dues' },
-    { btn: 'Print & Pay', why: 'Finish sale', does: 'Creates paid bill, inventory, KDS', next: 'Bill settled modal' },
-    { btn: 'WhatsApp on settle', why: 'Send PDF bill', does: 'Queues WhatsApp send', next: 'Customer phone receives bill' },
-    { btn: 'Thermal / Print', why: 'Paper receipt', does: 'Prints ESC/POS or browser print', next: 'Physical receipt' },
-  ],
-  '11-pos-shift': [
-    { btn: 'Open shift', why: 'Start cash session', does: 'Records float', next: 'Bills tag this shift' },
-    { btn: 'Close shift', why: 'End cash session', does: 'Asks counted cash', next: 'Z-report variance' },
-    { btn: 'Preview Z', why: 'Check before close', does: 'Shows expected cash', next: 'Still open shift' },
-    { btn: 'Station label', why: 'Multi-counter identity', does: 'Renames station', next: 'Reports filter by station' },
-  ],
-  '12-floor': [
-    { btn: 'Table card (free)', why: 'Seat guests', does: 'Seat & order / open actions', next: 'POS with that table' },
-    { btn: 'Table card (occupied)', why: 'Work open check', does: 'Checkout / transfer / print', next: 'POS cart or free table' },
-    { btn: 'Hold', why: 'Pause order', does: 'Saves draft', next: 'Held state on floor' },
-    { btn: 'Transfer', why: 'Move guests', does: 'Moves tickets to free table', next: 'Old free, new occupied' },
-    { btn: 'Clear / free', why: 'Turn table', does: 'Removes open tickets (confirm)', next: 'Table free' },
-    { btn: 'Edit tables / Save layout', why: 'Change floor plan', does: 'Add/remove tables to cloud', next: 'New map for all stations' },
-  ],
-  '13-floor-qr-print': [
-    { btn: 'Print Table QRs', why: 'Mass print tents', does: 'Opens size + preview modal', next: 'Browser print sheet' },
-    { btn: 'Size presets', why: 'Fit table space', does: 'Rebuilds card layout', next: 'Preview updates' },
-    { btn: 'Toggles (Wi‑Fi, steps…)', why: 'What guests see', does: 'Shows/hides card lines', next: 'Print reflects toggles' },
-    { btn: 'Open all QR / Close all', why: 'Bulk session control', does: 'Opens/closes guest QR per table', next: 'Guests can/cannot order' },
-  ],
-  '14-qr-orders': [
-    { btn: 'Accept', why: 'Send to kitchen', does: 'Confirms guest order', next: 'KDS ticket' },
-    { btn: 'Reject', why: 'Wrong/test order', does: 'Drops ticket', next: 'Guest may reorder' },
-    { btn: 'Amend (if shown)', why: 'Change before prep', does: 'Edits shared table order', next: 'Updated kitchen lines' },
-  ],
-  '15-kds': [
-    { btn: 'Ticket card', why: 'One order for cooks', does: 'Shows items + table/token', next: 'Tap to progress status' },
-    { btn: 'Mark ready / done', why: 'Food finished', does: 'Advances status', next: 'Service/pickup' },
-    { btn: 'Clear', why: 'Remove from board', does: 'Removes finished ticket', next: 'Cleaner KDS' },
-  ],
-  '16-online': [
-    { btn: 'Accept order', why: 'Take delivery job', does: 'Routes to kitchen/billing', next: 'KDS / active order' },
-    { btn: 'Reject', why: 'Cannot fulfil', does: 'Declines ticket', next: 'Channel notified if linked' },
-    { btn: 'Manual online entry', why: 'Phone order', does: 'Creates online ticket', next: 'Same accept flow' },
-  ],
-  '17-bills': [
-    { btn: 'Search box', why: 'Find old bill', does: 'Filters by no/phone/name', next: 'Matching rows' },
-    { btn: 'Bill row', why: 'Inspect invoice', does: 'Opens detail', next: 'Reprint / refund actions' },
-    { btn: 'Reprint', why: 'Lost paper', does: 'Prints again', next: 'Same receipt' },
-    { btn: 'Refund/void', why: 'Correct mistakes', does: 'PIN gate then void', next: 'Status refunded' },
-    { btn: 'Export CSV', why: 'Accountant handoff', does: 'Downloads file', next: 'Excel / CA tools' },
-  ],
-  '18-inventory': [
-    { btn: 'Add stock', why: 'New ingredient', does: 'Opens add modal', next: 'Row in stock list' },
-    { btn: 'Qty / reorder fields', why: 'Track levels', does: 'Saves thresholds', next: 'Low stock alerts' },
-    { btn: 'Import (if shown)', why: 'Bulk load', does: 'Reads sheet', next: 'Many rows at once' },
-  ],
-  '19-menu': [
-    { btn: 'Add item', why: 'Sell something new', does: 'Opens editor form', next: 'Name price GST save' },
-    { btn: 'GST slab dropdown', why: 'Correct tax per dish', does: 'Sets taxCategory', next: 'POS tax uses this' },
-    { btn: 'Category', why: 'POS navigation', does: 'Groups tiles', next: 'Category chips' },
-    { btn: 'Recipe link', why: 'Auto stock deduct', does: 'Binds ingredients', next: 'Inventory drops on sale' },
-    { btn: 'Save', why: 'Publish', does: 'Writes menu', next: 'Visible on POS/QR' },
-  ],
-  '20-employees': [
-    { btn: 'Add employee', why: 'New staff login', does: 'Creates user', next: 'They can sign in' },
-    { btn: 'Role selector', why: 'Limit power', does: 'Sets allowed tabs', next: 'Cashier sees fewer modules' },
-    { btn: 'Deactivate', why: 'Ex-staff', does: 'Blocks login', next: 'Cannot sign in' },
-  ],
-  '21-customers': [
-    { btn: 'Customer card', why: 'Open profile', does: 'Shows history/dues', next: 'Settle or note' },
-    { btn: 'Settle dues', why: 'Collect credit', does: 'Payment modal', next: 'Dues reduce + receipt' },
-    { btn: 'Search customers', why: 'Find phone/name', does: 'Filters grid', next: 'Matching cards' },
-  ],
-  '22-tax': [
-    { btn: 'Period selectors', why: 'Month for return', does: 'Filters stats', next: 'Updated totals' },
-    { btn: 'GSTR / CSV / PDF buttons', why: 'CA pack', does: 'Downloads file', next: 'File for accountant' },
-    { btn: 'Rate slabs editor', why: 'Country rates', does: 'Edits tax_rates', next: 'ResolveRate uses them' },
-  ],
-  '23-reports': [
-    { btn: 'Today / Week / Month / 30 / 90', why: 'Time range', does: 'Recomputes KPIs', next: 'New charts' },
-    { btn: 'Daily revenue bars', why: 'See busy days', does: 'Hover for value', next: '—' },
-    { btn: 'Payment mix donut', why: 'Cash vs UPI', does: 'Shows split', next: '—' },
-    { btn: 'Download GSTR-ready CSV', why: 'Compliance export', does: 'CSV file', next: 'CA software' },
-  ],
-  '24-analytics': [
-    { btn: 'Period control', why: 'Range for trends', does: 'Reloads analytics', next: 'New charts' },
-    { btn: 'Top items / peak hour', why: 'Decide staffing', does: 'Shows rankings', next: 'Ops decisions' },
-  ],
-  '25-growth': [
-    { btn: 'Reservations tile', why: 'Bookings', does: 'Opens reservations UI', next: 'Add booking' },
-    { btn: 'Purchase Orders', why: 'Buy stock', does: 'Opens PO UI', next: 'Raise PO' },
-    { btn: 'Offers & coupons', why: 'Promos', does: 'Opens offers', next: 'Create code' },
-    { btn: 'Recipe costing', why: 'Margins', does: 'Cost calculator', next: 'Price decisions' },
-    { btn: 'Feedback / Loyalty / Campaigns', why: 'Growth', does: 'Respective modules', next: 'Engage guests' },
-  ],
-  '26-settings-profile': [
-    { btn: 'Restaurant name / address / phone', why: 'Bills & QR cards', does: 'Saves profile', next: 'Prints show new name' },
-    { btn: 'Country / currency', why: 'Tax + money format', does: 'Updates RS_SETTINGS', next: '₹ and GST defaults' },
-    { btn: 'GSTIN', why: 'Legal invoice', does: 'Prints on bill', next: 'Compliant receipt' },
-    { btn: 'Guest Wi‑Fi + welcome', why: 'QR tents', does: 'Stored for print', next: 'Print Table QRs uses them' },
-    { btn: 'Save', why: 'Persist', does: 'Cloud + local', next: 'All stations sync' },
-  ],
-  '27-settings-tax': [
-    { btn: 'Calculate taxes ON/OFF', why: 'Master tax switch', does: 'POS tax = 0 if off', next: 'Bills/print follow' },
-    { btn: 'Tax label', why: 'GST vs VAT word', does: 'UI + receipts wording', next: 'Printed label' },
-    { btn: 'Tax rate %', why: 'Default when item has no slab', does: 'Fallback percent', next: 'Menu slab still wins if set' },
-    { btn: 'Inclusive pricing', why: 'Price includes tax?', does: 'Extract vs add tax', next: 'Totals change' },
-    { btn: 'Service charge + %', why: 'Dine-in SC', does: 'Adds SC line', next: 'May tax SC if enabled' },
-    { btn: 'Show HSN', why: 'Invoice detail', does: 'Print HSN if present', next: 'GST-style bill' },
-  ],
-  '28-settings-print-wa': [
-    { btn: 'Preferred printer', why: 'Which device prints', does: 'Routes print bridge', next: 'Thermal out' },
-    { btn: 'Auto-print toggles', why: 'Hands-free settle', does: 'Prints on pay', next: 'Paper without extra click' },
-    { btn: 'WhatsApp Get QR / status', why: 'Link restaurant number', does: 'Session to gateway', next: 'Green icon = ready' },
-    { btn: 'Send test', why: 'Verify path', does: 'Test message', next: 'Phone receives test' },
-  ],
-  '29-day-close': [
-    { btn: 'Close shift', why: 'Cash reconciliation', does: 'Z-report', next: 'Print/CSV variance' },
-    { btn: 'Reports → Today', why: 'Match sales', does: 'Period KPIs', next: 'Compare to drawer' },
-    { btn: 'GSTR CSV', why: 'CA pack', does: 'Download', next: 'Email accountant' },
-    { btn: 'Sign out', why: 'Secure device', does: 'Ends session', next: 'Login screen' },
-  ],
-  '30-support': [
-    { btn: 'Help', why: 'In-app guidance', does: 'Guide / checklist', next: 'Tour steps' },
-    { btn: 'Email support@codearc.co.in', why: 'Human help', does: 'Opens mail client', next: 'Reply from CodeArc' },
-    { btn: 'Version chip', why: 'Identify build', does: 'Copy id', next: 'Paste in ticket' },
-  ],
-};
 
 function buildHtml() {
   const logo = toDataUri(path.join(ROOT, 'assets', 'restrosuite-mark.png'));
@@ -1236,7 +557,7 @@ function buildHtml() {
     ${s.goal ? `<p class="shot-goal"><b>Goal:</b> ${esc(s.goal)}</p>` : ''}
     ${
       uri
-        ? `<figure class="fullshot-wide"><img src="${uri}" alt="${esc(s.title)}"><figcaption>Full screen · nothing cropped · orange outline = focus control</figcaption></figure>`
+        ? `<figure class="fullshot-wide"><img src="${uri}" alt="${esc(s.title)}"><figcaption>Phone viewport (390×844) · orange outline = focus control</figcaption></figure>`
         : `<div class="fullshot-wide empty">Screenshot missing — open live site and follow the detail page for this step.</div>`
     }
     <footer class="pf"><span>Step ${n} of ${STEPS.length} · Screen</span><span>${SUPPORT}</span></footer>
@@ -1250,6 +571,7 @@ function buildHtml() {
       <div class="pn">Step ${n} · Controls</div>
     </header>
     <h2>${esc(s.title)} — what every control does</h2>
+    <p class="goal" style="background:#fff8f4;border-left:3px solid #FF4F00;padding:6px 10px"><b>Rule:</b> Every visible button, toggle, field, and chip on this screen is listed below — purpose, click result, and next screen. If you can see it, it is covered.</p>
     ${s.goal ? `<p class="goal"><b>Why this screen exists:</b> ${esc(s.goal)}</p>` : ''}
     <h3>Walkthrough (do this in order)</h3>
     <ol class="actions">
@@ -1398,28 +720,32 @@ function buildHtml() {
   .shot-goal { font-size: 11.5px; margin: 0 10mm 2mm; color: #4a4640; line-height: 1.4; }
   .fullshot-wide {
     margin: 0 10mm;
-    border-radius: 10px;
+    border-radius: 12px;
     overflow: hidden;
     border: 1px solid #e0dbd0;
-    background: #f4f1ea;
-    height: 175mm;
-    display: flex;
-    flex-direction: column;
+    background: #0f0e0d;
+    /* Phone 9:19 shot — fill portrait page width, no thin-strip scaling */
+    display: block;
+    max-width: 95mm;
+    margin-left: auto;
+    margin-right: auto;
   }
   .fullshot-wide img {
     width: 100%;
-    height: 100%;
-    object-fit: contain; /* ENTIRE screen visible — no crop */
+    height: auto;
+    max-height: 175mm;
+    object-fit: contain;
     object-position: top center;
     display: block;
-    background: #f4f1ea;
+    background: #0f0e0d;
   }
   .fullshot-wide figcaption {
     font-size: 10px; color: #7a756c; padding: 4px 10px; background: #faf8f4;
-    border-top: 1px solid #eeeae2; flex: none;
+    border-top: 1px solid #eeeae2;
   }
   .fullshot-wide.empty {
-    display: grid; place-items: center; color: #999; font-size: 13px; padding: 20px; text-align: center;
+    display: grid; place-items: center; color: #999; font-size: 13px; padding: 40px 20px; text-align: center;
+    min-height: 100mm;
   }
 
   .detail-page { padding: 0 10mm 14mm; }
@@ -1555,6 +881,13 @@ async function main() {
   await writePdf(html);
   console.log('\nDone. Open:');
   console.log(PDF_PATH);
+  try {
+    require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'sync-downloads.cjs')], {
+      stdio: 'inherit',
+    });
+  } catch (e) {
+    console.warn('sync-downloads skipped:', e && e.message);
+  }
 }
 
 main().catch((e) => {
