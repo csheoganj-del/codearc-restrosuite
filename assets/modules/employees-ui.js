@@ -41,133 +41,24 @@
       .toUpperCase();
   }
 
-  function renderEmployees() {
-    const EMPLOYEES = getEmployees();
-    const avatarColors_ = avatarColors();
-  const totalStaff = EMPLOYEES.length;
-  const onShift = EMPLOYEES.filter(e => e.shift && e.shift !== 'Off').length;
-  let payrollSum = 0;
-  EMPLOYEES.forEach(e => {
-    if (e.payroll) {
-      const num = parseFloat(String(e.payroll).replace(/[^0-9.]/g, ''));
-      if (!isNaN(num)) payrollSum += num;
-    }
-  });
-
-  const empTab = document.getElementById('employees-tab');
-  if (empTab) {
-    const svElements = empTab.querySelectorAll('.stat-row .stat-card .sv');
-    // Attendance % = on shift / total (honest, not fake 100%)
-    const attendancePct = totalStaff > 0 ? Math.round((onShift / totalStaff) * 100) : 0;
-    if (svElements.length >= 4) {
-      svElements[0].textContent = totalStaff;
-      svElements[1].textContent = onShift;
-      svElements[2].textContent = payrollSum > 0 ? rs(payrollSum) : '₹0';
-      svElements[3].textContent = attendancePct + '%';
-    }
-  }
-
-  // Dispatch custom event to notify other modules
-  document.dispatchEvent(new CustomEvent('rs:render-employees'));
-
-  // Role definitions for edit modal (key -> { label, color, icon, tabs description })
+  // Module-level role catalog (must NOT be nested inside renderEmployees —
+  // openAddEmployeeModal is exported at load time and must stay in scope).
   const ROLE_DEFS = [
-    { key:'owner',     label:'Owner',             color:'#FF4F00', icon:'fa-crown',        desc:'Full access to all tabs' },
-    { key:'manager',   label:'Manager',            color:'#7c3aed', icon:'fa-user-tie',     desc:'All ops tabs -- no super-admin' },
-    { key:'cashier',   label:'Cashier',            color:'#0891b2', icon:'fa-cash-register',desc:'POS · Floor · Bills · Customers' },
-    { key:'waiter',    label:'Waiter',             color:'#059669', icon:'fa-utensils',     desc:'POS · Floor · Kitchen Display' },
-    { key:'captain',   label:'Captain',            color:'#2563eb', icon:'fa-star',         desc:'POS · Floor · KDS · QR Orders' },
-    { key:'kitchen',   label:'Kitchen Staff',      color:'#dc2626', icon:'fa-fire-burner',  desc:'Kitchen Display only' },
-    { key:'inventory', label:'Inventory Manager',  color:'#b45309', icon:'fa-boxes-stacked',desc:'Inventory · Menu Editor · Reports' },
+    { key: 'owner', label: 'Owner', color: '#FF4F00', icon: 'fa-crown', desc: 'Full access to all tabs' },
+    { key: 'manager', label: 'Manager', color: '#7c3aed', icon: 'fa-user-tie', desc: 'All ops tabs -- no super-admin' },
+    { key: 'cashier', label: 'Cashier', color: '#0891b2', icon: 'fa-cash-register', desc: 'POS · Floor · Bills · Customers' },
+    { key: 'waiter', label: 'Waiter', color: '#059669', icon: 'fa-utensils', desc: 'POS · Floor · Kitchen Display' },
+    { key: 'captain', label: 'Captain', color: '#2563eb', icon: 'fa-star', desc: 'POS · Floor · KDS · QR Orders' },
+    { key: 'kitchen', label: 'Kitchen Staff', color: '#dc2626', icon: 'fa-fire-burner', desc: 'Kitchen Display only' },
+    { key: 'inventory', label: 'Inventory Manager', color: '#b45309', icon: 'fa-boxes-stacked', desc: 'Inventory · Menu Editor · Reports' },
   ];
-
-  async function openEditRoleModal(empIndex) {
-    const emp = EMPLOYEES[empIndex];
-    if (!emp) return;
-    const currentKey = (emp.roleKey || emp.role || '').toLowerCase();
-    const body = `
-      <div style="margin-bottom:12px;font-size:13px;color:var(--text-soft)">
-        Choosing a role controls which tabs <b>${_e(emp.name)}</b> can see after login.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px" id="role-picker">
-        ${ROLE_DEFS.map(r=>`
-          <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass);transition:var(--t)" class="role-opt ${currentKey===r.key?'selected':''}">
-            <input type="radio" name="emp-role" value="${r.key}" ${currentKey===r.key?'checked':''} style="display:none">
-            <span style="width:34px;height:34px;border-radius:50%;background:${r.color}22;display:grid;place-items:center;flex-shrink:0">
-              <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:14px"></i>
-            </span>
-            <div style="flex:1">
-              <div style="font-weight:700;font-size:14px">${r.label}</div>
-              <div style="font-size:12px;color:var(--text-mute)">${r.desc}</div>
-            </div>
-            <i class="fa-solid fa-circle-check" style="color:${r.color};font-size:16px;opacity:${currentKey===r.key?1:0};transition:var(--t)" class="role-chk"></i>
-          </label>`).join('')}
-      </div>`;
-    if (!window.RSModal) {
-      const pick = prompt(`Role for ${emp.name}:\n${ROLE_DEFS.map((r,i)=>`${i+1}. ${r.label} -- ${r.desc}`).join('\n')}\n\nEnter number:`);
-      const idx = parseInt(pick,10)-1;
-      if (idx>=0 && idx<ROLE_DEFS.length) {
-        const chosen = ROLE_DEFS[idx];
-        EMPLOYEES[empIndex].role = chosen.label;
-        EMPLOYEES[empIndex].roleKey = chosen.key;
-        EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
-        await RS_DB.save('employees', EMPLOYEES[empIndex]);
-        renderEmployees();
-        toast(`${emp.name} -> ${chosen.label}`,'fa-user-check');
-      }
-      return;
-    }
-    const modal = RSModal.open({
-      title: `Set role -- ${emp.name}`,
-      icon: 'fa-user-gear',
-      body,
-      foot: `<button class="btn btn-ghost" id="role-cancel">Cancel</button>
-             <button class="btn btn-primary" id="role-save"><i class="fa-solid fa-check"></i> Save role</button>`,
-      onOpen: (el) => {
-        // Style selected state on click
-        el.querySelectorAll('.role-opt').forEach(opt => {
-          opt.addEventListener('click', () => {
-            el.querySelectorAll('.role-opt').forEach(o => {
-              o.style.borderColor=''; o.style.background='var(--glass)';
-              o.querySelector('.fa-circle-check').style.opacity='0';
-            });
-            opt.style.borderColor='var(--orange)';
-            opt.style.background='var(--orange-tint)';
-            opt.querySelector('.fa-circle-check').style.opacity='1';
-            opt.querySelector('input').checked=true;
-          });
-        });
-        // Pre-highlight current
-        el.querySelectorAll('.role-opt').forEach(opt => {
-          if (opt.querySelector('input').checked) {
-            opt.style.borderColor='var(--orange)';
-            opt.style.background='var(--orange-tint)';
-            opt.querySelector('.fa-circle-check').style.opacity='1';
-          }
-        });
-        el.querySelector('#role-cancel').onclick = () => RSModal.close();
-        el.querySelector('#role-save').onclick = async () => {
-          const checked = el.querySelector('input[name="emp-role"]:checked');
-          if (!checked) return;
-          const chosen = ROLE_DEFS.find(r=>r.key===checked.value);
-          if (!chosen) return;
-          EMPLOYEES[empIndex].role = chosen.label;
-          EMPLOYEES[empIndex].roleKey = chosen.key;
-          EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
-          try { await RS_DB.save('employees', EMPLOYEES[empIndex]); } catch(e) { console.warn('Role save failed',e); }
-          RSModal.close();
-          renderEmployees();
-          toast(`${emp.name} is now ${chosen.label}`,'fa-user-check');
-        };
-      }
-    });
-  }
 
   async function openAddEmployeeModal() {
     if (!window.RSModal) {
       toast('Modal unavailable — try again', 'fa-circle-exclamation');
       return;
     }
+    const EMPLOYEES = getEmployees();
     const roleOpts = ROLE_DEFS.map(
       (r) => `<option value="${r.key}">${_e(r.label)}</option>`
     ).join('');
@@ -262,6 +153,117 @@
   }
 
   global.openAddEmployeeModal = openAddEmployeeModal;
+
+  function renderEmployees() {
+    const EMPLOYEES = getEmployees();
+    const avatarColors_ = avatarColors();
+  const totalStaff = EMPLOYEES.length;
+  const onShift = EMPLOYEES.filter(e => e.shift && e.shift !== 'Off').length;
+  let payrollSum = 0;
+  EMPLOYEES.forEach(e => {
+    if (e.payroll) {
+      const num = parseFloat(String(e.payroll).replace(/[^0-9.]/g, ''));
+      if (!isNaN(num)) payrollSum += num;
+    }
+  });
+
+  const empTab = document.getElementById('employees-tab');
+  if (empTab) {
+    const svElements = empTab.querySelectorAll('.stat-row .stat-card .sv');
+    // Attendance % = on shift / total (honest, not fake 100%)
+    const attendancePct = totalStaff > 0 ? Math.round((onShift / totalStaff) * 100) : 0;
+    if (svElements.length >= 4) {
+      svElements[0].textContent = totalStaff;
+      svElements[1].textContent = onShift;
+      svElements[2].textContent = payrollSum > 0 ? rs(payrollSum) : '₹0';
+      svElements[3].textContent = attendancePct + '%';
+    }
+  }
+
+  // Dispatch custom event to notify other modules
+  document.dispatchEvent(new CustomEvent('rs:render-employees'));
+
+  async function openEditRoleModal(empIndex) {
+    const emp = EMPLOYEES[empIndex];
+    if (!emp) return;
+    const currentKey = (emp.roleKey || emp.role || '').toLowerCase();
+    const body = `
+      <div style="margin-bottom:12px;font-size:13px;color:var(--text-soft)">
+        Choosing a role controls which tabs <b>${_e(emp.name)}</b> can see after login.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="role-picker">
+        ${ROLE_DEFS.map(r=>`
+          <label style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass);transition:var(--t)" class="role-opt ${currentKey===r.key?'selected':''}">
+            <input type="radio" name="emp-role" value="${r.key}" ${currentKey===r.key?'checked':''} style="display:none">
+            <span style="width:34px;height:34px;border-radius:50%;background:${r.color}22;display:grid;place-items:center;flex-shrink:0">
+              <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:14px"></i>
+            </span>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:14px">${r.label}</div>
+              <div style="font-size:12px;color:var(--text-mute)">${r.desc}</div>
+            </div>
+            <i class="fa-solid fa-circle-check" style="color:${r.color};font-size:16px;opacity:${currentKey===r.key?1:0};transition:var(--t)" class="role-chk"></i>
+          </label>`).join('')}
+      </div>`;
+    if (!window.RSModal) {
+      const pick = prompt(`Role for ${emp.name}:\n${ROLE_DEFS.map((r,i)=>`${i+1}. ${r.label} -- ${r.desc}`).join('\n')}\n\nEnter number:`);
+      const idx = parseInt(pick,10)-1;
+      if (idx>=0 && idx<ROLE_DEFS.length) {
+        const chosen = ROLE_DEFS[idx];
+        EMPLOYEES[empIndex].role = chosen.label;
+        EMPLOYEES[empIndex].roleKey = chosen.key;
+        EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
+        await RS_DB.save('employees', EMPLOYEES[empIndex]);
+        renderEmployees();
+        toast(`${emp.name} -> ${chosen.label}`,'fa-user-check');
+      }
+      return;
+    }
+    const modal = RSModal.open({
+      title: `Set role -- ${emp.name}`,
+      icon: 'fa-user-gear',
+      body,
+      foot: `<button class="btn btn-ghost" id="role-cancel">Cancel</button>
+             <button class="btn btn-primary" id="role-save"><i class="fa-solid fa-check"></i> Save role</button>`,
+      onOpen: (el) => {
+        // Style selected state on click
+        el.querySelectorAll('.role-opt').forEach(opt => {
+          opt.addEventListener('click', () => {
+            el.querySelectorAll('.role-opt').forEach(o => {
+              o.style.borderColor=''; o.style.background='var(--glass)';
+              o.querySelector('.fa-circle-check').style.opacity='0';
+            });
+            opt.style.borderColor='var(--orange)';
+            opt.style.background='var(--orange-tint)';
+            opt.querySelector('.fa-circle-check').style.opacity='1';
+            opt.querySelector('input').checked=true;
+          });
+        });
+        // Pre-highlight current
+        el.querySelectorAll('.role-opt').forEach(opt => {
+          if (opt.querySelector('input').checked) {
+            opt.style.borderColor='var(--orange)';
+            opt.style.background='var(--orange-tint)';
+            opt.querySelector('.fa-circle-check').style.opacity='1';
+          }
+        });
+        el.querySelector('#role-cancel').onclick = () => RSModal.close();
+        el.querySelector('#role-save').onclick = async () => {
+          const checked = el.querySelector('input[name="emp-role"]:checked');
+          if (!checked) return;
+          const chosen = ROLE_DEFS.find(r=>r.key===checked.value);
+          if (!chosen) return;
+          EMPLOYEES[empIndex].role = chosen.label;
+          EMPLOYEES[empIndex].roleKey = chosen.key;
+          EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
+          try { await RS_DB.save('employees', EMPLOYEES[empIndex]); } catch(e) { console.warn('Role save failed',e); }
+          RSModal.close();
+          renderEmployees();
+          toast(`${emp.name} is now ${chosen.label}`,'fa-user-check');
+        };
+      }
+    });
+  }
 
   // Wire header Add button (dashboard.html)
   (function wireHeaderAdd() {
