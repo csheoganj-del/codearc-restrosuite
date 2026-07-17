@@ -1,8 +1,4 @@
-# Keep Vercel Hobby deploys under size limits.
-# Large Windows portable is served via GitHub Releases / separate hosting when needed.
-downloads/RestroSuite-Windows-Portable.exe
-
-# Never ship local build trees
+# Never ship local build trees (keep /downloads public assets)
 node_modules
 **/node_modules
 android-app/build
@@ -10,7 +6,11 @@ android-app/.tmp-gradle-build
 android-app/dist
 desktop/dist
 desktop/node_modules
+desktop/app
 scratch
 codearc-restrosuite
+codearc-restrosuite-1
 backups
 .git
+test-results
+uploads
