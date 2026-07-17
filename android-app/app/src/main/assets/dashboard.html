@@ -1965,8 +1965,14 @@
       })
       .then(function() {
         // Always overlay latest sources so stale critical.bundle cannot win.
-        // receipt.js: preview HTML / fonts / time. competitive-ops.js: thermal = same layout.
-        return loadSeq(['assets/receipt.js', 'assets/competitive-ops.js']).catch(function() {});
+        // print-bridge MUST reload after critical.bundle — the bundle still embeds an
+        // older RSPrintBridge that uses window.prompt (broken in Electron).
+        // competitive-ops: station bar + thermal helpers.
+        return loadSeq([
+          'assets/receipt.js',
+          'assets/print-bridge.js',
+          'assets/competitive-ops.js'
+        ]).catch(function() {});
       })
       .then(function() { return loadSeq(post); })
       .then(function() {

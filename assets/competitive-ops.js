@@ -441,99 +441,135 @@
     } catch (_) {}
   }
 
+  function openCounterRenameModal() {
+    const current = getStationLabel();
+    if (global.RSModal && typeof RSModal.open === 'function') {
+      RSModal.open({
+        title: 'Counter name',
+        sub: 'Multi-terminal label (Counter 1, Bar, Takeaway…)',
+        icon: 'fa-desktop',
+        size: 'sm',
+        body: `<label class="fl">Name</label>
+               <input class="form-input" id="rs-station-rename" value="${esc(current)}" maxlength="32" autocomplete="off">`,
+        foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+               <button type="button" class="btn btn-primary" style="flex:1" data-ok>Save</button>`,
+        onMount(modal, close) {
+          const inp = modal.querySelector('#rs-station-rename');
+          if (inp) { inp.focus(); inp.select(); }
+          modal.querySelector('[data-x]').onclick = close;
+          modal.querySelector('[data-ok]').onclick = () => {
+            const next = (inp && inp.value || '').trim();
+            if (next) setStationLabel(next);
+            close();
+          };
+        },
+      });
+      return;
+    }
+    if (global.RS && RS.toast) RS.toast('Rename counter from Settings if dialog unavailable', 'fa-desktop');
+  }
+
+  function openPrinterPicker() {
+    const bridge = global.RSPrintBridge;
+    if (bridge && typeof bridge.choosePreferredPrinter === 'function') {
+      Promise.resolve(bridge.choosePreferredPrinter()).catch((err) => {
+        console.warn('[printer chip]', err);
+        if (global.RS && RS.toast) RS.toast('Could not open printer list', 'fa-print');
+      });
+      return;
+    }
+    if (global.RS && RS.toast) RS.toast('Printer bridge unavailable', 'fa-print');
+  }
+
   function paintStationChip() {
     // Super-admin platform shell never shows POS station chrome
     try {
       if (document.documentElement.classList.contains('rs-role-superadmin')) return;
     } catch (_) {}
-    let chip = document.getElementById('rs-station-chip');
-    // Prefer left brand cluster so Counter sits next to page title (not lost in the tray)
     const host =
       document.getElementById('tb-left') ||
       document.querySelector('.topbar-right, .topbar-actions, .topbar');
     if (!host) return;
+
+    // Unified station group: one pill with Counter | Printer (desktop only)
+    // Matches topbar chip language (glass, stroke, pill radius) instead of two orphan buttons.
+    let group = document.getElementById('rs-station-group');
+    if (!group) {
+      group = document.createElement('div');
+      group.id = 'rs-station-group';
+      group.className = 'rs-station-group';
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-label', 'Station');
+      const title = host.querySelector('.tb-title');
+      if (title) host.insertBefore(group, title);
+      else host.insertBefore(group, host.firstChild);
+    }
+
+    // Remove legacy free-floating chips if an older paint left them outside the group
+    ['rs-station-chip', 'rs-printer-chip'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && el.parentElement !== group) el.remove();
+    });
+
+    let chip = document.getElementById('rs-station-chip');
     if (!chip) {
       chip = document.createElement('button');
       chip.id = 'rs-station-chip';
       chip.type = 'button';
-      chip.className = 'rs-station-chip';
-      chip.title = 'This counter name (multi-terminal)';
-      const title = host.querySelector('.tb-title');
-      if (title) host.insertBefore(chip, title);
-      else host.insertBefore(chip, host.firstChild);
-      chip.onclick = () => {
-        // Electron does not support window.prompt() — use RSModal when available
-        const current = getStationLabel();
-        if (global.RSModal && typeof RSModal.open === 'function') {
-          RSModal.open({
-            title: 'Counter name',
-            sub: 'Shown on multi-terminal shifts (e.g. Counter 1, Bar, Takeaway)',
-            icon: 'fa-desktop',
-            size: 'sm',
-            body: `<label class="fl">Name</label>
-                   <input class="form-input" id="rs-station-rename" value="${esc(current)}" maxlength="32" autocomplete="off">`,
-            foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
-                   <button type="button" class="btn btn-primary" style="flex:1" data-ok>Save</button>`,
-            onMount(modal, close) {
-              const inp = modal.querySelector('#rs-station-rename');
-              if (inp) {
-                inp.focus();
-                inp.select();
-              }
-              modal.querySelector('[data-x]').onclick = close;
-              modal.querySelector('[data-ok]').onclick = () => {
-                const next = (inp && inp.value || '').trim();
-                if (next) setStationLabel(next);
-                close();
-              };
-            },
-          });
-          return;
-        }
-        try {
-          const next = window.prompt('Counter name (e.g. Counter 1, Bar, Takeaway)', current);
-          if (next != null && next.trim()) setStationLabel(next.trim());
-        } catch (e) {
-          if (global.RS && RS.toast) RS.toast('Rename unavailable in this shell', 'fa-desktop');
-        }
-      };
+      chip.className = 'rs-station-seg rs-station-chip';
+      group.appendChild(chip);
+      chip.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        openCounterRenameModal();
+      });
     }
+
     const label = getStationLabel();
     const display = /^ST-/i.test(label) ? 'Counter' : label;
-    chip.innerHTML = '<i class="fa-solid fa-desktop"></i> ' + esc(display);
+    chip.innerHTML =
+      '<span class="rs-station-seg-ico" aria-hidden="true"><i class="fa-solid fa-desktop"></i></span>' +
+      '<span class="rs-station-seg-txt">' + esc(display) + '</span>';
     chip.title = 'Counter: ' + label + ' · click to rename';
-    // Desktop only: Printer chip next to Counter (not shown in browser/web —
-    // web uses the system print dialog; desktop can pick a preferred silent printer).
-    if (global.RS_DESKTOP && global.RSPrintBridge) {
-      let pchip = document.getElementById('rs-printer-chip');
-      if (!pchip && host) {
+    chip.setAttribute('aria-label', 'Counter ' + display);
+
+    // Desktop only — printer is a second segment inside the same pill
+    const isDesktop = !!(global.RS_DESKTOP || global.rsDesktop);
+    let pchip = document.getElementById('rs-printer-chip');
+    if (isDesktop && global.RSPrintBridge) {
+      group.classList.add('has-printer');
+      if (!pchip) {
         pchip = document.createElement('button');
         pchip.id = 'rs-printer-chip';
         pchip.type = 'button';
-        pchip.className = 'rs-station-chip rs-printer-chip';
-        pchip.title = 'Preferred thermal printer for this PC';
-        host.insertBefore(pchip, chip.nextSibling);
-        pchip.onclick = (ev) => {
+        pchip.className = 'rs-station-seg rs-printer-chip';
+        group.appendChild(pchip);
+        pchip.addEventListener('click', (ev) => {
           ev.preventDefault();
-          if (global.RSPrintBridge.choosePreferredPrinter) {
-            Promise.resolve(RSPrintBridge.choosePreferredPrinter()).catch((err) => {
-              console.warn('[printer chip]', err);
-              if (global.RS && RS.toast) RS.toast('Could not open printer list', 'fa-print');
-            });
-          }
-        };
+          openPrinterPicker();
+        });
       }
-      if (pchip) {
-        pchip.innerHTML = '<i class="fa-solid fa-print"></i> Printer';
-        if (global.RS_DESKTOP.getPreferredPrinter) {
-          global.RS_DESKTOP.getPreferredPrinter().then((pref) => {
-            if (pref && pref.name) {
-              pchip.innerHTML = '<i class="fa-solid fa-print"></i> ' + esc(String(pref.name).slice(0, 18));
-              pchip.title = 'Preferred printer: ' + pref.name + ' · click to change';
-            }
-          }).catch(() => {});
-        }
+      let pLabel = 'Printer';
+      let pTitle = 'Preferred receipt printer · click to choose';
+      pchip.innerHTML =
+        '<span class="rs-station-seg-ico" aria-hidden="true"><i class="fa-solid fa-print"></i></span>' +
+        '<span class="rs-station-seg-txt" data-rs-printer-label>' + esc(pLabel) + '</span>';
+      pchip.title = pTitle;
+      pchip.setAttribute('aria-label', 'Preferred printer');
+      const desk = global.RS_DESKTOP || global.rsDesktop;
+      if (desk && desk.getPreferredPrinter) {
+        desk.getPreferredPrinter().then((pref) => {
+          if (!pref || !pref.name) return;
+          const short = String(pref.name).trim();
+          const shown = short.length > 14 ? short.slice(0, 13) + '…' : short;
+          const txt = pchip.querySelector('[data-rs-printer-label]');
+          if (txt) txt.textContent = shown;
+          pchip.title = 'Printer: ' + short + ' · click to change';
+          pchip.setAttribute('aria-label', 'Printer ' + short);
+        }).catch(() => {});
       }
+    } else {
+      group.classList.remove('has-printer');
+      if (pchip) pchip.remove();
     }
   }
 
