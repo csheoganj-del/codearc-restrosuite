@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-17T15:00:03.617Z",
+  "generatedAt": "2026-07-17T15:14:39.804Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
@@ -9,19 +9,19 @@
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
-    "version": "2.0.2",
+    "version": "2.0.3",
     "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
     "nsis": {
       "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Setup.exe",
-      "feedFile": "RestroSuite-2.0.2-x64.exe",
-      "size": 84848443,
-      "sizeLabel": "80.9 MB"
+      "feedFile": "RestroSuite-2.0.3-x64.exe",
+      "size": 84916205,
+      "sizeLabel": "81.0 MB"
     },
     "portable": {
       "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Portable.exe",
-      "size": 84533659,
-      "sizeLabel": "80.6 MB"
+      "size": 84611332,
+      "sizeLabel": "80.7 MB"
     }
   },
   "android": {

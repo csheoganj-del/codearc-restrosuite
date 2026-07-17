@@ -10,7 +10,7 @@
    ============================================================ */
 'use strict';
 
-const { app, BrowserWindow, Menu, shell, session, dialog, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, shell, session, dialog, ipcMain, safeStorage, Tray, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -47,6 +47,8 @@ function resolveWebRoot() {
 let mainWindow = null;
 let serverInstance = null;
 let appEntryUrl = null; // set in createWindow; used by the license re-check IPC
+let tray = null;
+let isQuitting = false; // true only for real Quit (tray / menu), not window X
 
 // --- Single-instance lock: second launch focuses the existing window -------
 const gotLock = app.requestSingleInstanceLock();
@@ -54,10 +56,8 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
+    // Re-open from tray if user launches the shortcut again
+    showMainWindow();
   });
 }
 
@@ -133,6 +133,80 @@ function installOriginRewrite() {
   });
 }
 
+function resolveAppIcon() {
+  const candidates = [
+    path.join(__dirname, 'build', 'icon.ico'),
+    path.join(__dirname, 'build', 'icon.png'),
+    path.join(process.resourcesPath || '', 'build', 'icon.ico'),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch (_) {}
+  }
+  return null;
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/** System tray: close (X) hides to tray; local server keeps running for silent POS. */
+function createTray() {
+  if (tray) return;
+  const iconPath = resolveAppIcon();
+  let image = null;
+  try {
+    if (iconPath) image = nativeImage.createFromPath(iconPath);
+  } catch (_) {}
+  if (!image || image.isEmpty()) {
+    // 16x16 orange fallback so tray still appears
+    image = nativeImage.createEmpty();
+  }
+  try {
+    tray = new Tray(image.isEmpty() ? nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKElEQVQ4T2NkYGD4z0ABYBzVMKoBBg0cNQAGDRw1AAYNHDUABg0cNQAAh/sD/Wq8pQAAAABJRU5ErkJggg=='
+    ) : image);
+  } catch (e) {
+    console.warn('[tray] create failed', e && e.message);
+    return;
+  }
+  tray.setToolTip('RestroSuite Desktop — running in background');
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open RestroSuite',
+      click: () => showMainWindow(),
+    },
+    {
+      label: 'Check for Updates…',
+      click: () => { try { autoUpdater.checkNow(); } catch (_) {} },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit RestroSuite',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+  tray.setContextMenu(contextMenu);
+  tray.on('double-click', () => showMainWindow());
+  tray.on('click', () => {
+    // Single click on Windows: toggle show
+    if (process.platform === 'win32') {
+      if (mainWindow && mainWindow.isVisible()) mainWindow.hide();
+      else showMainWindow();
+    }
+  });
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: (config.window && config.window.width) || 1280,
@@ -141,8 +215,8 @@ function createWindow() {
     minHeight: (config.window && config.window.minHeight) || 640,
     backgroundColor: '#0f1115',
     show: false,
-    icon: path.join(__dirname, 'build', 'icon.ico'),
-    title: config.appName || 'RestroSuite',
+    icon: resolveAppIcon() || undefined,
+    title: (config.appName || 'RestroSuite') + ' Desktop',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -155,6 +229,22 @@ function createWindow() {
       // DevTools only via explicit menu in development (see buildMenu)
       devTools: !app.isPackaged || process.env.RS_ALLOW_DEVTOOLS === '1',
     },
+  });
+
+  // Close (X) → hide to system tray (silent background). Real quit via tray menu.
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      win.hide();
+      if (process.platform === 'win32' && tray) {
+        try {
+          tray.displayBalloon({
+            title: 'RestroSuite is still running',
+            content: 'App is in the system tray. Double-click the tray icon to open again, or right-click → Quit.',
+          });
+        } catch (_) {}
+      }
+    }
   });
 
   // Show a small splash immediately, then load the app.
@@ -490,6 +580,7 @@ app.whenReady().then(async () => {
 
     serverInstance = await startLocalServer();
     buildMenu();
+    createTray();
     createWindow();
 
     // Auto-update: NSIS installs download silently; portable offers a download link.
@@ -501,18 +592,30 @@ app.whenReady().then(async () => {
     ipcMain.handle('rs-check-for-updates', () => autoUpdater.checkNow());
   } catch (err) {
     dialog.showErrorBox('RestroSuite could not start', String(err && err.message || err));
+    isQuitting = true;
     app.quit();
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    showMainWindow();
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+// With tray, do not quit when the window is hidden/closed — keep server + app alive.
+app.on('window-all-closed', (e) => {
+  if (process.platform === 'darwin') return;
+  // Windows/Linux: stay in tray unless user chose Quit
+  if (!isQuitting) {
+    // prevent default quit behavior by doing nothing
+    return;
+  }
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
 });
 
 app.on('quit', () => {
+  try { if (tray) { tray.destroy(); tray = null; } } catch (e) { /* noop */ }
   try { if (serverInstance) serverInstance.close(); } catch (e) { /* noop */ }
 });

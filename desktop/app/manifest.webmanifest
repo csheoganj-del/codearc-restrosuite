@@ -1,7 +1,7 @@
 {
-  "name": "CodeArc RestroSuite",
-  "short_name": "RestroSuite",
-  "description": "Restaurant POS, kitchen, inventory, billing, and customer ordering.",
+  "name": "RestroSuite Web",
+  "short_name": "RS Web",
+  "description": "RestroSuite in the browser / PWA — restaurant POS, kitchen, inventory, billing. (Desktop app uses a separate PC icon.)",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",

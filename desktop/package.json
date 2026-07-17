@@ -1,9 +1,9 @@
 {
   "name": "restrosuite-desktop",
-  "productName": "RestroSuite",
-  "version": "2.0.2",
+  "productName": "RestroSuite Desktop",
+  "version": "2.0.3",
   "private": true,
-  "description": "RestroSuite Windows desktop app -- offline-first restaurant POS wrapper around the RestroSuite web app. Shares the same Supabase backend as the web and Android apps.",
+  "description": "RestroSuite Windows desktop app -- offline-first restaurant POS. Closes to system tray; distinct PC-badged icon vs PWA.",
   "author": "RestroSuite",
   "main": "main.js",
   "scripts": {
@@ -84,10 +84,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "RestroSuite"
+      "shortcutName": "RestroSuite Desktop"
     },
     "portable": {
-      "artifactName": "RestroSuite-${version}-portable.exe"
+      "artifactName": "RestroSuite-Desktop-${version}-portable.exe"
     }
   }
 }
