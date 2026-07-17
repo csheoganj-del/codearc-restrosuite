@@ -1,12 +1,12 @@
 {
-  "version": "v209-20260716-mobile-license",
-  "date": "2026-07-16",
-  "title": "Mobile licence lock fix",
-  "summary": "Stops false \"Reconnect to continue\" on mobile browsers after login by waiting for session hydrate, retrying the licence lease, and only hard-locking when the server truly refuses.",
+  "version": "v210-20260717-launch",
+  "date": "2026-07-17",
+  "title": "Launch pack — downloads, guides, support brand",
+  "summary": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist.",
   "highlights": [
-    "Lease refresh retries after login on mobile Safari/Chrome",
-    "Soft path while online + signed in without a stored lease yet",
-    "Retry button multi-attempt + auto-retry loop on lock screen",
-    "Re-enforce on rs:ready / rs:hydrated"
+    "Public /downloads with manifest-driven homepage cards",
+    "support@codearc.co.in only (no @restrosuite.in)",
+    "Desktop onboarding full depth; mobile guide regenerated for launch",
+    "docs/GO_LIVE_CHECKLIST.md for 10/10 sign-off"
   ]
 }

@@ -108,7 +108,6 @@ const mirroredFiles = [
   "styles.css",
   "pwa.js",
   "manifest.webmanifest",
-  "supabase_migration.sql",
   "legal.css",
   "terms.html",
   "privacy.html",
