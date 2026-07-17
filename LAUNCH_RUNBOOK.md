@@ -2,15 +2,23 @@
 
 Use this runbook before every production launch or major release. It assumes the zero-cost launch model: Vercel for hosting, Supabase for database and Edge Functions, and optional paid services only after revenue.
 
+**Final gate (tick every box):** see **`docs/GO_LIVE_CHECKLIST.md`** — that document is the 10/10 sign-off.
+
+**Public site:** https://restrosuite.codearc.co.in  
+**Support:** support@codearc.co.in  
+**Downloads:** https://restrosuite.codearc.co.in/#downloads  
+
 ## Launch Order
 
 1. Prepare Supabase.
 2. Deploy Edge Functions.
-3. Deploy the static app to Vercel.
-4. Run production smoke tests.
-5. Run Android WebView smoke tests.
-6. Enable monitoring and daily review.
-7. Start client onboarding.
+3. Deploy the static app to Vercel (**commit as GitHub owner** on Hobby private repos).
+4. Run `npm run sync:downloads` so APK / EXE / PDFs match the build.
+5. Run production smoke tests (checklist §B).
+6. Run Android WebView + Windows portable smoke tests.
+7. Confirm WhatsApp gateway if promising bills.
+8. Enable monitoring and daily review.
+9. Start client onboarding (send PDF guides from Downloads).
 
 ## Supabase Setup
 

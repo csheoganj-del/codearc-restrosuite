@@ -244,11 +244,31 @@ async function runPrep(page, prep) {
     }
 
     if (prep === 'openFirstCustomer') {
-      const card = page.locator('#customers-tab .cust-card, #customers-tab tr, #customers-tab .card, #customers-tab [data-id]').first();
-      if (await card.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await card.click().catch(() => {});
-        await page.waitForTimeout(800);
+      // Prefer a card/button that opens detail; fall back to first clickable row
+      const candidates = [
+        '#customers-tab [data-id]',
+        '#customers-tab .cust-card',
+        '#customers-tab .customer-card',
+        '#customers-tab tbody tr',
+        '#customers-tab .card',
+        '#customers-tab button:has-text("Settle")',
+        '#customers-tab a',
+      ];
+      for (const sel of candidates) {
+        const el = page.locator(sel).first();
+        if (await el.isVisible({ timeout: 800 }).catch(() => false)) {
+          await el.click({ timeout: 3000 }).catch(() => {});
+          await page.waitForTimeout(900);
+          break;
+        }
       }
+      // Scroll settle/dues UI into view if present
+      await page
+        .locator('button:has-text("Settle"), button:has-text("Dues"), .dues, [class*="dues"]')
+        .first()
+        .scrollIntoViewIfNeeded()
+        .catch(() => {});
+      await page.waitForTimeout(300);
       return;
     }
 

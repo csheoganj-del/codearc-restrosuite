@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-17T04:41:01.787Z",
-  "appVersion": "v209-20260716-mobile-license",
+  "generatedAt": "2026-07-17T08:17:00.853Z",
+  "appVersion": "v210-20260717-launch",
   "desktopVersion": "2.0.2",
   "support": "support@codearc.co.in",
   "site": "https://restrosuite.codearc.co.in",
@@ -45,12 +45,12 @@
       "blurb": "Open the live web app — install to home screen from Chrome/Safari for offline use.",
       "icon": "fa-globe",
       "brand": "solid",
-      "version": "v209-20260716-mobile-license",
+      "version": "v210-20260717-launch",
       "filename": null,
       "url": "https://restrosuite.codearc.co.in/login.html",
       "size": 0,
       "sizeLabel": "Online",
-      "updatedAt": "2026-07-17T04:41:01.764Z",
+      "updatedAt": "2026-07-17T08:17:00.831Z",
       "available": true,
       "openInPlace": true
     },
@@ -97,9 +97,9 @@
       "version": null,
       "filename": "RestroSuite-Mobile-Onboarding-Guide.pdf",
       "url": "/downloads/RestroSuite-Mobile-Onboarding-Guide.pdf",
-      "size": 2321822,
-      "sizeLabel": "2.2 MB",
-      "updatedAt": "2026-07-16T14:48:54.919Z",
+      "size": 5199032,
+      "sizeLabel": "5.0 MB",
+      "updatedAt": "2026-07-17T08:16:55.278Z",
       "available": true
     }
   ]
