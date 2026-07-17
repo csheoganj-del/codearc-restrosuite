@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-07-17T11:00:06.588Z",
-  "appVersion": "v210-20260717-launch",
+  "generatedAt": "2026-07-17T15:00:03.618Z",
+  "appVersion": "2.0.0",
   "desktopVersion": "2.0.2",
   "androidVersion": "2.0.2",
   "androidVersionCode": 4,
@@ -37,9 +37,9 @@
       "version": "2.0.2",
       "filename": "RestroSuite-Windows-Portable.exe",
       "url": "/downloads/RestroSuite-Windows-Portable.exe",
-      "size": 84530151,
+      "size": 84533659,
       "sizeLabel": "80.6 MB",
-      "updatedAt": "2026-07-17T11:00:05.771Z",
+      "updatedAt": "2026-07-17T15:00:03.059Z",
       "available": true
     },
     {
@@ -53,9 +53,9 @@
       "version": "2.0.2",
       "filename": "RestroSuite-Windows-Setup.exe",
       "url": "/downloads/RestroSuite-Windows-Setup.exe",
-      "size": 84844937,
+      "size": 84848443,
       "sizeLabel": "80.9 MB",
-      "updatedAt": "2026-07-17T10:59:57.203Z",
+      "updatedAt": "2026-07-17T14:59:55.380Z",
       "available": true
     },
     {
@@ -69,9 +69,9 @@
       "version": "2.0.2",
       "filename": "RestroSuite-Windows-Portable.exe",
       "url": "/downloads/RestroSuite-Windows-Portable.exe",
-      "size": 84530151,
+      "size": 84533659,
       "sizeLabel": "80.6 MB",
-      "updatedAt": "2026-07-17T11:00:05.771Z",
+      "updatedAt": "2026-07-17T15:00:03.059Z",
       "available": true
     },
     {
@@ -82,12 +82,12 @@
       "blurb": "Open the live web app — service worker + app-update.json auto-prompt reload after deploys.",
       "icon": "fa-globe",
       "brand": "solid",
-      "version": "v210-20260717-launch",
+      "version": "2.0.0",
       "filename": null,
       "url": "https://restrosuite.codearc.co.in/login.html",
       "size": 0,
       "sizeLabel": "Online",
-      "updatedAt": "2026-07-17T11:00:06.557Z",
+      "updatedAt": "2026-07-17T15:00:03.588Z",
       "available": true,
       "openInPlace": true
     },

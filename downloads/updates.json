@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-07-17T11:00:06.587Z",
+  "generatedAt": "2026-07-17T15:00:03.617Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v210-20260717-launch",
-    "title": "Launch pack — downloads, guides, support brand",
-    "summary": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist.",
+    "version": "2.0.0",
+    "title": null,
+    "summary": null,
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
@@ -15,12 +15,12 @@
     "nsis": {
       "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Setup.exe",
       "feedFile": "RestroSuite-2.0.2-x64.exe",
-      "size": 84844937,
+      "size": 84848443,
       "sizeLabel": "80.9 MB"
     },
     "portable": {
       "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Portable.exe",
-      "size": 84530151,
+      "size": 84533659,
       "sizeLabel": "80.6 MB"
     }
   },
@@ -30,6 +30,6 @@
     "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Android.apk",
     "size": 12544161,
     "sizeLabel": "12.0 MB",
-    "notes": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist."
+    "notes": "Performance and reliability improvements."
   }
 }

@@ -1,12 +1,12 @@
-{
-  "version": "v210-20260717-launch",
-  "date": "2026-07-17",
-  "title": "Launch pack — downloads, guides, support brand",
-  "summary": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist.",
-  "highlights": [
-    "Public /downloads with manifest-driven homepage cards",
-    "support@codearc.co.in only (no @restrosuite.in)",
-    "Desktop onboarding full depth; mobile guide regenerated for launch",
-    "docs/GO_LIVE_CHECKLIST.md for 10/10 sign-off"
-  ]
+﻿{
+    "version":  "v211-20260717-session-print-fix",
+    "date":  "2026-07-17",
+    "title":  "Session, printer \u0026 desktop stability",
+    "summary":  "Keep-me-signed-in / offline resume fix, desktop login proxy, printer modal (no prompt crash), critical.bundle syntax fix, station bar UI.",
+    "highlights":  [
+                       "Keep me signed in and offline resume work again on web and desktop",
+                       "Windows EXE login matches browser (Edge Function proxy)",
+                       "Printer picker uses a proper dialog (Electron-safe)",
+                       "Dashboard no longer crashes on critical.bundle syntax error"
+                   ]
 }

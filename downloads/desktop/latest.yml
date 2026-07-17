@@ -1,8 +1,8 @@
 version: 2.0.2
 files:
   - url: RestroSuite-2.0.2-x64.exe
-    sha512: kLP4SCbDIOlF2IoZCHbgwm/TfBPPvZMxgQWfmdFGIljiZ75bt3FNdUP8KpVmAhoWEJn7bi+yalh8A91TxVdV5A==
-    size: 84844937
+    sha512: CMD8WG+wRe4s4/mpRWdz2blI83wh4hRqNatUPi34Xm4w0P4tXm0P94c6Db/nD4V8fZszhnL7SOeHWOWG6mdBmQ==
+    size: 84848443
 path: RestroSuite-2.0.2-x64.exe
-sha512: kLP4SCbDIOlF2IoZCHbgwm/TfBPPvZMxgQWfmdFGIljiZ75bt3FNdUP8KpVmAhoWEJn7bi+yalh8A91TxVdV5A==
-releaseDate: '2026-07-17T11:00:05.800Z'
+sha512: CMD8WG+wRe4s4/mpRWdz2blI83wh4hRqNatUPi34Xm4w0P4tXm0P94c6Db/nD4V8fZszhnL7SOeHWOWG6mdBmQ==
+releaseDate: '2026-07-17T15:00:03.085Z'
