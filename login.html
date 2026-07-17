@@ -1148,15 +1148,70 @@
   }
   window.addEventListener('online', updateOfflineResume);
   window.addEventListener('offline', updateOfflineResume);
+
+  // Keep me signed in → open dashboard by default (do not park on login form).
+  // ?stay=1 keeps the login form for switching accounts.
+  let _autoResumeTried = false;
+  async function tryAutoResumeToDashboard() {
+    try {
+      if (_autoResumeTried) return;
+      const params = new URLSearchParams(location.search || '');
+      if (params.get('stay') === '1' || params.get('switch') === '1') {
+        updateOfflineResume();
+        return;
+      }
+      const s = savedClientSession();
+      if (!s || !s.token) {
+        updateOfflineResume();
+        return;
+      }
+      // Only auto-jump when this device asked to be remembered
+      let wantRemember = true;
+      try {
+        const p = sessionStorage.getItem('rs_session_persistent');
+        if (p === '0') wantRemember = false;
+      } catch (_) {}
+      if (!wantRemember) {
+        updateOfflineResume();
+        return;
+      }
+      _autoResumeTried = true;
+      updateOfflineResume();
+      showOk(navigator.onLine ? 'Welcome back — opening dashboard…' : 'Opening offline dashboard…');
+      // Online: soft-validate; if server rejects (401), clear and stay on login
+      if (navigator.onLine && window.RS_API && typeof RS_API.validateSession === 'function' && RS_API.configured) {
+        try {
+          const sess = await RS_API.validateSession();
+          if (sess === null) {
+            try { RS_API.logout(); } catch (_) {}
+            _autoResumeTried = false;
+            updateOfflineResume();
+            showErr('Saved session expired — please sign in again.');
+            return;
+          }
+        } catch (_) {
+          // Network blip — still open local dashboard with remembered session
+        }
+      }
+      setTimeout(function () { location.href = 'dashboard'; }, 280);
+    } catch (e) {
+      updateOfflineResume();
+    }
+  }
+
   // Hydrate remember-me as soon as API is ready (and again after config load).
   updateOfflineResume();
-  setTimeout(updateOfflineResume, 200);
-  setTimeout(updateOfflineResume, 800);
+  setTimeout(tryAutoResumeToDashboard, 120);
+  setTimeout(tryAutoResumeToDashboard, 500);
+  setTimeout(tryAutoResumeToDashboard, 1200);
   (window.__configReady || Promise.resolve()).then(function () {
-    updateOfflineResume();
-  }, updateOfflineResume);
+    tryAutoResumeToDashboard();
+  }, tryAutoResumeToDashboard);
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible') updateOfflineResume();
+    if (document.visibilityState === 'visible') {
+      updateOfflineResume();
+      tryAutoResumeToDashboard();
+    }
   });
 
   async function waitForRuntimeConfig(){

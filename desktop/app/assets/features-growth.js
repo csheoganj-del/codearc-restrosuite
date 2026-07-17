@@ -5172,11 +5172,12 @@
         let feedbackUrl = '';
         try {
           const slug = sessionStorage.getItem('tenant_slug') || '';
-          if (slug) feedbackUrl = location.origin + '/feedback?tenant=' + encodeURIComponent(slug);
+          // Guests must open the public site — never desktop localhost:8001
+          if (slug) feedbackUrl = guestOrderBaseUrl() + '/feedback?tenant=' + encodeURIComponent(slug);
         } catch (e) {}
         const linkBar = feedbackUrl
           ? `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;padding:10px 12px;background:var(--panel-2,rgba(0,0,0,.03));border:1px solid var(--stroke);border-radius:12px">
-              <div style="flex:1;min-width:160px;font-size:12px;color:var(--text-soft)"><b style="color:var(--text)">Guest QR link</b><br><span style="word-break:break-all">${esc(feedbackUrl)}</span></div>
+              <div style="flex:1;min-width:160px;font-size:12px;color:var(--text-soft)"><b style="color:var(--text)">Guest QR link</b> <span style="font-size:11px;opacity:.85">(public URL for customers)</span><br><span style="word-break:break-all">${esc(feedbackUrl)}</span></div>
               <button type="button" class="btn btn-ghost btn-sm" data-copy-feedback><i class="fa-solid fa-copy"></i> Copy</button>
               <button type="button" class="btn btn-ghost btn-sm" data-open-feedback><i class="fa-solid fa-arrow-up-right-from-square"></i> Open</button>
             </div>`
@@ -5248,7 +5249,7 @@
             copyFb.onclick = async () => {
               try {
                 const slug = sessionStorage.getItem('tenant_slug') || '';
-                const url = location.origin + '/feedback?tenant=' + encodeURIComponent(slug);
+                const url = guestOrderBaseUrl() + '/feedback?tenant=' + encodeURIComponent(slug);
                 await navigator.clipboard.writeText(url);
                 RS.toast('Guest feedback link copied', 'fa-copy');
               } catch (e) { RS.toast('Could not copy link', 'fa-circle-exclamation'); }
@@ -5259,7 +5260,7 @@
             openFb.onclick = () => {
               try {
                 const slug = sessionStorage.getItem('tenant_slug') || '';
-                window.open(location.origin + '/feedback?tenant=' + encodeURIComponent(slug), '_blank', 'noopener');
+                window.open(guestOrderBaseUrl() + '/feedback?tenant=' + encodeURIComponent(slug), '_blank', 'noopener');
               } catch (e) {}
             };
           }
