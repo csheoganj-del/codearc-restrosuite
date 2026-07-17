@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
   printEscPos: (payload) => ipcRenderer.invoke('rs-print-escpos', payload || {}),
   getPreferredPrinter: () => ipcRenderer.invoke('rs-get-preferred-printer'),
   setPreferredPrinter: (name) => ipcRenderer.invoke('rs-set-preferred-printer', name),
+  // Auto-updater (NSIS silent download; portable opens download link)
+  checkForUpdates: () => ipcRenderer.invoke('rs-check-for-updates'),
 });
 
 // Mark the DOM as native desktop as early as possible (app-like chrome, hide PWA install)

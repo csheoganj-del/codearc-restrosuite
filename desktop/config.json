@@ -10,7 +10,7 @@
   },
   "enableDemoTools": false,
   "zeroCostLaunchMode": false,
-  "productionOrigin": "https://codearc-restrosuite.vercel.app",
+  "productionOrigin": "https://restrosuite.codearc.co.in",
   "supabaseUrl": "https://htkauiibuejetimfiavs.supabase.co",
   "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk"
 }

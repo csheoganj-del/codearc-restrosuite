@@ -44,20 +44,27 @@ const REWRITES = {
  * @param {string} opts.root   Absolute path to the folder holding the web app.
  * @param {object} opts.config Parsed config.json { supabaseUrl, supabaseAnonKey, ... }
  */
+function normalizeSupabaseUrl(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/(rest|auth|storage|functions)\/v1$/, '')
+    .replace(/\/+$/, '');
+}
+
 function createServer(opts) {
   const root = opts.root;
   const config = opts.config || {};
   const app = express();
+  // JSON body for Edge Function proxy (login, tenant-data, etc.)
+  app.use(express.json({ limit: '4mb' }));
+  app.use(express.text({ type: ['text/*', 'application/x-www-form-urlencoded'], limit: '1mb' }));
+
+  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
+  const supabaseAnonKey = String(config.supabaseAnonKey || '').trim();
 
   // --- /api/config : mirror the production Vercel function ------------------
   app.get('/api/config', (req, res) => {
-    const supabaseUrl = String(config.supabaseUrl || '')
-      .trim()
-      .replace(/\/+$/, '')
-      .replace(/\/(rest|auth|storage|functions)\/v1$/, '')
-      .replace(/\/+$/, '');
-    const supabaseAnonKey = String(config.supabaseAnonKey || '').trim();
-
     if (!supabaseUrl || !supabaseAnonKey) {
       return res.status(503).json({
         error: 'Supabase credentials missing. Edit desktop/config.json.',
@@ -71,6 +78,67 @@ function createServer(opts) {
       enableDemoTools: !!config.enableDemoTools,
       zeroCostLaunchMode: !!config.zeroCostLaunchMode,
     });
+  });
+
+  // --- Edge Function proxy -------------------------------------------------
+  // doppio-api.js sets BASE='' on localhost so fetch('/functions/v1/tenant-access')
+  // hits THIS local server, not Supabase directly. That avoids Electron CORS
+  // breakage (browser OK, EXE failed with generic "Login failed").
+  // We forward the body + auth headers to Supabase and return the response as-is.
+  async function proxyToSupabase(req, res, remotePath) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(503).json({ error: 'Supabase not configured in desktop/config.json' });
+    }
+    const target = supabaseUrl + remotePath + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    const headers = {
+      'Content-Type': req.headers['content-type'] || 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: req.headers.authorization || ('Bearer ' + supabaseAnonKey),
+      // Edge Functions CORS allowlist production origins; server-side fetch is not CORS-bound.
+      Origin: String(config.productionOrigin || 'https://restrosuite.codearc.co.in').replace(/\/+$/, ''),
+    };
+    // Forward optional client info headers if present
+    if (req.headers['x-client-info']) headers['x-client-info'] = req.headers['x-client-info'];
+
+    let body;
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      if (typeof req.body === 'string') body = req.body;
+      else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length) {
+        body = JSON.stringify(req.body);
+      } else {
+        body = undefined;
+      }
+    }
+
+    try {
+      const upstream = await fetch(target, {
+        method: req.method,
+        headers,
+        body,
+      });
+      const text = await upstream.text();
+      res.status(upstream.status);
+      const ct = upstream.headers.get('content-type');
+      if (ct) res.setHeader('Content-Type', ct);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(text);
+    } catch (err) {
+      console.error('[desktop-proxy]', remotePath, err && err.message);
+      return res.status(502).json({
+        error: 'Desktop could not reach Supabase: ' + String(err && err.message || err),
+      });
+    }
+  }
+
+  app.all('/functions/v1/:fnName', (req, res) => {
+    const fn = encodeURIComponent(req.params.fnName);
+    return proxyToSupabase(req, res, '/functions/v1/' + fn);
+  });
+
+  // REST API (menu/sync occasionally uses fetch to /rest/v1 when BASE is '')
+  app.all(/^\/rest\/v1(\/.*)?$/, (req, res) => {
+    const sub = req.path.replace(/^\/rest\/v1/, '') || '';
+    return proxyToSupabase(req, res, '/rest/v1' + sub);
   });
 
   // --- Parametric rewrite: /bill/:slug/:no -> /bill.html?slug=..&no=.. ------

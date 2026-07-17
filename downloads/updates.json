@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-07-17T11:00:06.587Z",
+  "site": "https://restrosuite.codearc.co.in",
+  "support": "support@codearc.co.in",
+  "web": {
+    "version": "v210-20260717-launch",
+    "title": "Launch pack — downloads, guides, support brand",
+    "summary": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist.",
+    "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
+  },
+  "desktop": {
+    "version": "2.0.2",
+    "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
+    "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
+    "nsis": {
+      "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Setup.exe",
+      "feedFile": "RestroSuite-2.0.2-x64.exe",
+      "size": 84844937,
+      "sizeLabel": "80.9 MB"
+    },
+    "portable": {
+      "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Portable.exe",
+      "size": 84530151,
+      "sizeLabel": "80.6 MB"
+    }
+  },
+  "android": {
+    "versionName": "2.0.2",
+    "versionCode": 4,
+    "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Android.apk",
+    "size": 12544161,
+    "sizeLabel": "12.0 MB",
+    "notes": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist."
+  }
+}

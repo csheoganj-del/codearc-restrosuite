@@ -16,6 +16,20 @@ try {
         npm run build:android
     }
 
+    # Desktop Windows builds (NSIS + portable) when available on this machine
+    if ($env:SKIP_DESKTOP_BUILD -ne "1" -and (Test-Path (Join-Path $Root "desktop/package.json"))) {
+        Push-Location (Join-Path $Root "desktop")
+        try {
+            if (-not (Test-Path "node_modules")) { npm install }
+            npm run dist
+        } finally {
+            Pop-Location
+        }
+    }
+
+    # Publish APK/EXE + auto-update feeds (updates.json, desktop/latest.yml)
+    npm run sync:downloads
+
     if ($env:SKIP_VERCEL_DEPLOY -ne "1") {
         vercel --prod --yes
     }

@@ -64,6 +64,68 @@
     /* ===== SMOOTH SCROLL ===== */
     html { scroll-behavior: smooth; }
 
+    /* ===== DOWNLOADS HUB ===== */
+    .dl-section { padding-top: 28px; padding-bottom: 20px; }
+    .dl-meta {
+      text-align: center; font-size: 13px; color: var(--text-mute); margin: -8px 0 22px;
+    }
+    .dl-meta b { color: var(--text-soft); font-weight: 700; }
+    .dl-subhead {
+      font-size: 15px; font-weight: 800; letter-spacing: -.01em; margin: 28px 0 14px; color: var(--text);
+    }
+    .dl-grid {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
+    }
+    .dl-grid-guides { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .dl-card {
+      background: var(--panel-solid, var(--surface-solid, #fff));
+      border: 1px solid var(--stroke-2);
+      border-radius: 18px;
+      padding: 20px 18px 16px;
+      display: flex; flex-direction: column; gap: 10px;
+      box-shadow: var(--shadow-md, 0 12px 30px -18px rgba(0,0,0,.18));
+      transition: border-color .2s, transform .2s, box-shadow .2s;
+      min-height: 100%;
+    }
+    .dl-card:hover { border-color: rgba(255,79,0,.35); transform: translateY(-2px); }
+    .dl-card.unavailable { opacity: .72; }
+    .dl-card-top { display: flex; align-items: flex-start; gap: 12px; }
+    .dl-ic {
+      width: 44px; height: 44px; border-radius: 12px; flex: none;
+      display: grid; place-items: center; font-size: 20px;
+      background: rgba(255,79,0,.1); color: var(--orange);
+    }
+    .dl-ic.android { background: rgba(61,220,132,.12); color: #1fa463; }
+    .dl-ic.windows { background: rgba(0,120,215,.1); color: #0078d4; }
+    .dl-ic.web { background: rgba(42,155,143,.12); color: var(--teal, #2a9b8f); }
+    .dl-ic.pdf { background: rgba(239,68,68,.1); color: #dc2626; }
+    .dl-card h3 { font-size: 16px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 0; }
+    .dl-card .platform {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--text-mute); margin-top: 2px;
+    }
+    .dl-card p { font-size: 13.5px; line-height: 1.45; color: var(--text-soft); margin: 0; flex: 1; }
+    .dl-stats {
+      display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; color: var(--text-mute);
+    }
+    .dl-stats span { display: inline-flex; align-items: center; gap: 5px; }
+    .dl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .dl-actions .btn { min-height: 40px; padding: 0 14px; font-size: 13.5px; border-radius: 11px; }
+    .dl-actions .btn[disabled], .dl-actions .btn.is-disabled {
+      opacity: .5; pointer-events: none; cursor: not-allowed;
+    }
+    .dl-foot {
+      text-align: center; margin-top: 22px; font-size: 13px; color: var(--text-mute); line-height: 1.5;
+    }
+    .dl-foot a { color: var(--orange); font-weight: 600; text-decoration: none; }
+    .dl-foot a:hover { text-decoration: underline; }
+    @media (max-width: 960px) {
+      .dl-grid, .dl-grid-guides { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .dl-grid, .dl-grid-guides { grid-template-columns: 1fr; }
+    }
+
     /* ===== COMPAT SHIM — homepage → design tokens ===== */
     :root {
       --bg: var(--bg-0); --bg-2: var(--bg-1);
@@ -1351,6 +1413,7 @@
       </a>
 
       <nav class="nav-links" aria-label="Main navigation">
+        <a href="#downloads">Downloads</a>
         <a href="#features">Features</a>
         <a href="#demo">Live Demo</a>
         <a href="#compare">Compare</a>
@@ -1374,6 +1437,7 @@
 
   <!-- FIX: Mobile navigation panel -->
   <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" hidden>
+    <a href="#downloads"    onclick="closeMobileNav()"><i class="fa-solid fa-download fa-fw" aria-hidden="true"></i>Downloads</a>
     <a href="#features"     onclick="closeMobileNav()"><i class="fa-solid fa-bolt fa-fw" aria-hidden="true"></i>Features</a>
     <a href="#demo"         onclick="closeMobileNav()"><i class="fa-solid fa-play fa-fw" aria-hidden="true"></i>Live Demo</a>
     <a href="#compare"      onclick="closeMobileNav()"><i class="fa-solid fa-scale-balanced fa-fw" aria-hidden="true"></i>Compare</a>
@@ -1400,6 +1464,9 @@
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="login.html?tab=register" id="hero-cta-buy">
               Create free outlet
+            </a>
+            <a class="btn btn-ghost btn-lg" href="#downloads">
+              <i class="fa-solid fa-download" aria-hidden="true"></i> Downloads
             </a>
             <a class="btn btn-ghost btn-lg" href="#demo">
               See how it works
@@ -1522,6 +1589,112 @@
         <span>Brew &amp; Co</span><span>Masala House</span><span>Pixel Pizza</span>
       </div>
     </div>
+
+    <!-- ===== DOWNLOADS (static cards always visible; sizes refresh from manifest when available) ===== -->
+    <section class="section dl-section" id="downloads" aria-labelledby="downloads-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Apps &amp; guides</span>
+          <h2 id="downloads-title">Download RestroSuite</h2>
+          <p>Get the Android app, Windows portable app, and full PDF guides. Links stay current when we publish a new build.</p>
+        </div>
+        <div class="dl-meta" id="dl-meta" aria-live="polite">Apps · PDFs · always free during launch</div>
+
+        <div class="dl-grid" id="dl-apps" role="list" aria-label="Apps">
+          <article class="dl-card" role="listitem" data-dl-id="android-apk">
+            <div class="dl-card-top">
+              <div class="dl-ic android"><i class="fa-brands fa-android" aria-hidden="true"></i></div>
+              <div><h3>RestroSuite for Android</h3><div class="platform">Android APK</div></div>
+            </div>
+            <p>Install on kitchen tablets and counter phones. Allow “Install unknown apps” for your browser if asked.</p>
+            <div class="dl-stats" data-dl-stats><span>APK</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Android.apk" download data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download APK
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="windows-exe">
+            <div class="dl-card-top">
+              <div class="dl-ic windows"><i class="fa-brands fa-windows" aria-hidden="true"></i></div>
+              <div><h3>RestroSuite for Windows</h3><div class="platform">Windows portable</div></div>
+            </div>
+            <p>Portable .exe for counter PCs — no install wizard. Run and sign in with your Outlet ID.</p>
+            <div class="dl-stats" data-dl-stats><span>EXE</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Windows-Portable.exe" download data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download EXE
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="web-pwa">
+            <div class="dl-card-top">
+              <div class="dl-ic web"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+              <div><h3>Use in browser (PWA)</h3><div class="platform">Web · any device</div></div>
+            </div>
+            <p>Open the live web app now. On Chrome/Safari you can “Install” / Add to Home Screen for offline use.</p>
+            <div class="dl-stats" data-dl-stats><span>Online</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="login.html" data-dl-href>
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open app
+              </a>
+            </div>
+          </article>
+        </div>
+
+        <h3 class="dl-subhead">PDF guides</h3>
+        <div class="dl-grid dl-grid-guides" id="dl-guides" role="list" aria-label="PDF guides">
+          <article class="dl-card" role="listitem" data-dl-id="pdf-product">
+            <div class="dl-card-top">
+              <div class="dl-ic pdf"><i class="fa-solid fa-book-open" aria-hidden="true"></i></div>
+              <div><h3>Product features guide</h3><div class="platform">PDF brochure</div></div>
+            </div>
+            <p>Full feature brochure — every client module for owners evaluating the product.</p>
+            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-desktop">
+            <div class="dl-card-top">
+              <div class="dl-ic pdf"><i class="fa-solid fa-desktop" aria-hidden="true"></i></div>
+              <div><h3>Desktop / web onboarding</h3><div class="platform">PDF guide</div></div>
+            </div>
+            <p>Step-by-step with real screenshots: every tab, button, and flow on desktop.</p>
+            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Complete-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
+              </a>
+            </div>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-mobile">
+            <div class="dl-card-top">
+              <div class="dl-ic pdf"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></div>
+              <div><h3>Mobile / Android onboarding</h3><div class="platform">PDF guide</div></div>
+            </div>
+            <p>Same depth for phone layout — bottom nav, More menu, checkout bar.</p>
+            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="downloads/RestroSuite-Mobile-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
+              </a>
+            </div>
+          </article>
+        </div>
+
+        <p class="dl-foot">
+          Support: <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
+          · Direct folder: <a href="downloads/">/downloads/</a>
+        </p>
+      </div>
+    </section>
 
     <!-- ===== FEATURES ===== -->
     <section class="section" id="features">
@@ -1954,6 +2127,7 @@
         </div>
         <div class="footer-col">
           <h5>Product</h5>
+          <a href="#downloads">Downloads</a>
           <a href="#features">Features</a>
           <a href="#demo">Live Demo</a>
           <a href="#compare">Compare</a>
@@ -3201,6 +3375,46 @@
     SIM_COUNTRY = detectCountry();
     renderSimMenu();
     onSandboxGuestInput();
+
+    // ===== DOWNLOADS HUB — cards are static HTML; manifest only refreshes size/date =====
+    (function loadDownloadsHub() {
+      var meta = document.getElementById('dl-meta');
+      function fmtDate(iso) {
+        if (!iso) return '';
+        try {
+          return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (e) { return String(iso).slice(0, 10); }
+      }
+      fetch('downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(function (m) {
+          var items = Array.isArray(m.items) ? m.items : [];
+          items.forEach(function (item) {
+            if (!item || !item.id) return;
+            var card = document.querySelector('[data-dl-id="' + item.id + '"]');
+            if (!card) return;
+            var stats = card.querySelector('[data-dl-stats]');
+            if (stats) {
+              var bits = [];
+              if (item.version) bits.push('v' + item.version);
+              if (item.sizeLabel) bits.push(item.sizeLabel);
+              if (item.updatedAt) bits.push(fmtDate(item.updatedAt));
+              if (bits.length) stats.innerHTML = bits.map(function (b) {
+                return '<span>' + String(b).replace(/</g, '&lt;') + '</span>';
+              }).join('');
+            }
+            var a = card.querySelector('[data-dl-href]');
+            if (a && item.url && item.available !== false) a.setAttribute('href', item.url);
+          });
+          if (meta) {
+            meta.innerHTML = 'Latest package set · <b>' + String(m.appVersion || '—').replace(/</g, '&lt;') + '</b>'
+              + (m.generatedAt ? ' · refreshed ' + fmtDate(m.generatedAt) : '');
+          }
+        })
+        .catch(function () {
+          /* keep static buttons — no blank screen */
+        });
+    })();
 
   </script>
   <script src="pwa.js"></script>

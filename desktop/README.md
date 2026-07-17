@@ -109,6 +109,26 @@ folder remains the single source of truth — `sync-app.mjs` only reads from it.
 
 ---
 
+## Auto-update
+
+Packaged builds check for updates automatically:
+
+| Build | Behaviour |
+|-------|-----------|
+| **NSIS Setup** | `electron-updater` downloads from `https://restrosuite.codearc.co.in/downloads/desktop` and prompts to restart |
+| **Portable** | Polls `downloads/updates.json` and opens a download link when a newer version ships |
+
+Publish pipeline after `npm run dist`:
+
+```bat
+cd ..
+npm run sync:downloads
+REM then deploy the site so /downloads/desktop/latest.yml + EXEs are live
+```
+
+Menu: **Help → Check for Updates…**  
+Details: [`docs/AUTO_UPDATE.md`](../docs/AUTO_UPDATE.md)
+
 ## Notes & safety
 
 - The local server binds to `127.0.0.1` only — it is never exposed on the network.

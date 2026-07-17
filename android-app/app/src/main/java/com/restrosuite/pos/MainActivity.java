@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean usingLocalShell = false;
     private boolean exitArmed = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private AppUpdateChecker appUpdateChecker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +93,14 @@ public class MainActivity extends AppCompatActivity {
 
         setupWebView();
         setupNetworkMonitoring();
+
+        appUpdateChecker = new AppUpdateChecker(this);
+        // After splash: silent native APK update check (UI still auto-updates via live site when online)
+        mainHandler.postDelayed(() -> {
+            if (isNetworkConnected() && appUpdateChecker != null) {
+                appUpdateChecker.checkQuietly();
+            }
+        }, 4500);
 
         mainHandler.postDelayed(this::fadeOutSplash, 1100);
     }
@@ -603,6 +612,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (appUpdateChecker != null) {
+            appUpdateChecker.dispose();
+            appUpdateChecker = null;
+        }
         if (jsInterface != null) jsInterface.shutdown();
         if (connectivityManager != null && networkCallback != null) {
             try {
@@ -668,6 +681,15 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
+        }
+
+        /** Trigger native APK update check (user-facing). */
+        @JavascriptInterface
+        public void checkForUpdates() {
+            runOnUiThread(() -> {
+                if (appUpdateChecker != null) appUpdateChecker.checkNow();
+                else Toast.makeText(MainActivity.this, "Update checker unavailable", Toast.LENGTH_SHORT).show();
             });
         }
     }

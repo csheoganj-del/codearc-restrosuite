@@ -147,6 +147,31 @@
           registration.update().catch(function () {});
         }
       });
+
+      // Extra safety: poll app-update.json so even if SW install is delayed
+      // (aggressive cache, odd browser), the banner still appears after deploy.
+      var lastSeenWebVersion = null;
+      function pollAppUpdateJson() {
+        fetch("/app-update.json?v=" + Date.now(), { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (info) {
+            if (!info || !info.version) return;
+            if (lastSeenWebVersion == null) {
+              lastSeenWebVersion = String(info.version);
+              try { sessionStorage.setItem("__rsWebVerSeen", lastSeenWebVersion); } catch (_) {}
+              return;
+            }
+            if (String(info.version) !== String(lastSeenWebVersion)) {
+              showUpdateBanner();
+            }
+          })
+          .catch(function () {});
+      }
+      try {
+        lastSeenWebVersion = sessionStorage.getItem("__rsWebVerSeen");
+      } catch (_) {}
+      setTimeout(pollAppUpdateJson, 8000);
+      setInterval(pollAppUpdateJson, 10 * 60 * 1000);
     }).catch(function (error) {
       console.warn("PWA registration failed:", error);
     });

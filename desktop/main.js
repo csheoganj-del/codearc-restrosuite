@@ -16,6 +16,7 @@ const fs = require('fs');
 const http = require('http');
 const { createServer } = require('./server');
 const licenseGate = require('./license-main');
+const autoUpdater = require('./auto-updater');
 
 // --- Load config -----------------------------------------------------------
 function loadConfig() {
@@ -77,16 +78,58 @@ function startLocalServer() {
   });
 }
 
-// Rewrite the Origin header on Supabase requests to the whitelisted
-// production origin. Safety net so online mode works even if port 8001
-// is taken and we fall back to another port (whose origin would not be
-// in ALLOWED_ORIGINS). The page itself is still served locally.
+// Desktop serves the UI from http://localhost:<port>, but Supabase Edge
+// Functions CORS-allowlist production origins. Without a bridge, Chromium
+// blocks login as a CORS failure (works in browser, fails in the .exe).
+//
+// Bridge:
+//   1) Outbound: set Origin to a production origin the functions accept.
+//   2) Inbound: rewrite Access-Control-Allow-Origin back to the real page
+//      origin (http://localhost:<port>) so Chromium's CORS check passes.
+//
+// Also covers fallback ports if 8001 is busy.
 function installOriginRewrite() {
   const filter = { urls: ['https://*.supabase.co/*', 'wss://*.supabase.co/*'] };
+  const localOrigin = () => `http://localhost:${PORT}`;
+
   session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, cb) => {
     const headers = details.requestHeaders || {};
-    headers['Origin'] = PROD_ORIGIN;
+    // Prefer configured production origin (must be in Edge ALLOWED_ORIGINS).
+    headers['Origin'] = PROD_ORIGIN || 'https://restrosuite.codearc.co.in';
+    // Some stacks also key off Referer.
+    if (headers['Referer'] || headers['referer']) {
+      headers['Referer'] = (PROD_ORIGIN || 'https://restrosuite.codearc.co.in') + '/';
+    }
     cb({ requestHeaders: headers });
+  });
+
+  session.defaultSession.webRequest.onHeadersReceived(filter, (details, cb) => {
+    const headers = { ...(details.responseHeaders || {}) };
+    const allow = localOrigin();
+    // Electron header maps are case-sensitive arrays of strings.
+    const drop = ['access-control-allow-origin', 'Access-Control-Allow-Origin'];
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === 'access-control-allow-origin') delete headers[k];
+    }
+    headers['Access-Control-Allow-Origin'] = [allow];
+    headers['Access-Control-Allow-Credentials'] = ['true'];
+    // Ensure preflight / custom headers survive
+    const hasAllowHeaders = Object.keys(headers).some(
+      (k) => k.toLowerCase() === 'access-control-allow-headers'
+    );
+    if (!hasAllowHeaders) {
+      headers['Access-Control-Allow-Headers'] = [
+        'authorization, x-client-info, apikey, content-type',
+      ];
+    }
+    const hasAllowMethods = Object.keys(headers).some(
+      (k) => k.toLowerCase() === 'access-control-allow-methods'
+    );
+    if (!hasAllowMethods) {
+      headers['Access-Control-Allow-Methods'] = ['POST, GET, OPTIONS, PUT, DELETE'];
+    }
+    void drop;
+    cb({ responseHeaders: headers });
   });
 }
 
@@ -214,17 +257,26 @@ function buildMenu() {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates…',
+          click() { autoUpdater.checkNow().catch(() => {}); },
+        },
+        {
           label: 'About RestroSuite Desktop',
           click() {
+            const kind = autoUpdater.isPortable() ? 'Portable' : 'Installed';
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'RestroSuite Desktop',
               message: `${config.appName || 'RestroSuite'} Desktop`,
               detail:
-                `Version ${app.getVersion()}\n` +
+                `Version ${app.getVersion()} (${kind})\n` +
                 `Local server: http://localhost:${PORT}\n` +
-                `Backend: ${config.supabaseUrl || '(not set)'}\n\n` +
-                `Works offline-first and syncs to the cloud when online.`,
+                `Backend: ${config.supabaseUrl || '(not set)'}\n` +
+                `Update feed: ${autoUpdater.FEED_URL}\n\n` +
+                `Works offline-first and syncs to the cloud when online.\n` +
+                (autoUpdater.isPortable()
+                  ? 'Portable: new versions open a download link.\n'
+                  : 'Installed: updates download in the background, then prompt to restart.\n'),
             });
           },
         },
@@ -439,6 +491,14 @@ app.whenReady().then(async () => {
     serverInstance = await startLocalServer();
     buildMenu();
     createWindow();
+
+    // Auto-update: NSIS installs download silently; portable offers a download link.
+    try {
+      autoUpdater.start({ getMainWindow: () => mainWindow });
+    } catch (e) {
+      console.warn('[main] auto-updater start failed:', e && e.message);
+    }
+    ipcMain.handle('rs-check-for-updates', () => autoUpdater.checkNow());
   } catch (err) {
     dialog.showErrorBox('RestroSuite could not start', String(err && err.message || err));
     app.quit();
