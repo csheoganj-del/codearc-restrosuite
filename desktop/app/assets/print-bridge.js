@@ -511,7 +511,9 @@
       if (!desk || !desk.listPrinters) {
         // Mobile: offer Web Bluetooth pair
         if (navigator.bluetooth) {
-          const ok = confirm('Pair a Bluetooth thermal printer for raw ESC/POS?\n\n(Or use Android Print for USB/Wi‑Fi printers.)');
+          const ok = window.confirm
+            ? confirm('Pair a Bluetooth thermal printer for raw ESC/POS?\n\n(Or use Android Print for USB/Wi‑Fi printers.)')
+            : false;
           if (ok) {
             const res = await printWebBluetoothEscPos(btoa('\nRestroSuite BT test\n\n\n'));
             if (res && res.ok && global.RS && RS.toast) RS.toast('Bluetooth printer ready: ' + (res.device || ''), 'fa-bluetooth');
@@ -526,19 +528,112 @@
       const printers = await desk.listPrinters();
       const list = Array.isArray(printers) ? printers : [];
       if (!list.length) {
+        if (global.RS && RS.toast) RS.toast('No printers found — install a Windows printer first', 'fa-print');
+        return null;
+      }
+      const names = list.map((p) => p.name || p.displayName || String(p)).filter(Boolean);
+      if (!names.length) {
         if (global.RS && RS.toast) RS.toast('No printers found', 'fa-print');
         return null;
       }
-      const names = list.map((p) => p.name || p.displayName || String(p));
-      const pick = window.prompt('Preferred thermal printer:\n' + names.map((n, i) => (i + 1) + '. ' + n).join('\n'), names[0]);
-      if (!pick) return null;
-      const byNum = Number(pick);
-      const name = (Number.isFinite(byNum) && byNum >= 1 && byNum <= names.length) ? names[byNum - 1] : pick;
+
+      // Electron/Chromium desktop does NOT support window.prompt() — use RSModal or a simple picker.
+      const name = await pickPrinterName(names, desk);
+      if (!name) return null;
       if (desk.setPreferredPrinter) await desk.setPreferredPrinter(name);
       if (global.RS && RS.toast) RS.toast('Printer set: ' + name, 'fa-print');
+      try {
+        const pchip = document.getElementById('rs-printer-chip');
+        if (pchip) pchip.innerHTML = '<i class="fa-solid fa-print"></i> ' + String(name).slice(0, 18).replace(/</g, '');
+      } catch (_) {}
       return name;
     },
   };
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  /** Pick a printer without window.prompt (unsupported in Electron). */
+  function pickPrinterName(names, desk) {
+    return new Promise(async (resolve) => {
+      let current = '';
+      try {
+        if (desk && desk.getPreferredPrinter) {
+          const pref = await desk.getPreferredPrinter();
+          if (pref && pref.name) current = String(pref.name);
+        }
+      } catch (_) {}
+
+      if (global.RSModal && typeof RSModal.open === 'function') {
+        const opts = names
+          .map((n) => {
+            const sel = n === current ? ' selected' : '';
+            return `<option value="${escHtml(n)}"${sel}>${escHtml(n)}</option>`;
+          })
+          .join('');
+        RSModal.open({
+          title: 'Preferred printer',
+          sub: 'Used for silent thermal / receipt print on this PC',
+          icon: 'fa-print',
+          size: 'sm',
+          body: `
+            <label class="fl" style="display:block;margin-bottom:6px;font-weight:600">Windows printer</label>
+            <select class="form-input" id="rs-pick-printer" style="width:100%">${opts}</select>
+            <p style="font-size:12px;color:var(--text-soft);margin:10px 0 0;line-height:1.45">
+              Install the printer in Windows first. Leave connected for auto-print after bills.
+            </p>`,
+          foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+                 <button type="button" class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-check"></i> Use printer</button>`,
+          onMount(modal, close) {
+            modal.querySelector('[data-x]').onclick = () => {
+              close();
+              resolve(null);
+            };
+            modal.querySelector('[data-ok]').onclick = () => {
+              const sel = modal.querySelector('#rs-pick-printer');
+              const v = sel && sel.value ? String(sel.value) : '';
+              close();
+              resolve(v || null);
+            };
+          },
+        });
+        return;
+      }
+
+      // Fallback lightweight picker (no prompt / no RSModal)
+      const wrap = document.createElement('div');
+      wrap.setAttribute('role', 'dialog');
+      wrap.style.cssText =
+        'position:fixed;inset:0;z-index:2147483000;background:rgba(15,17,21,.55);display:flex;align-items:center;justify-content:center;padding:20px';
+      wrap.innerHTML =
+        '<div style="background:#fff;border-radius:14px;max-width:400px;width:100%;padding:20px;box-shadow:0 16px 48px rgba(0,0,0,.2)">' +
+        '<div style="font-weight:800;font-size:16px;margin-bottom:6px">Preferred printer</div>' +
+        '<div style="font-size:12.5px;color:#6b6570;margin-bottom:12px">Select the Windows printer for receipts</div>' +
+        '<select id="rs-pick-printer-fb" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:14px">' +
+        names.map((n) => `<option value="${escHtml(n)}"${n === current ? ' selected' : ''}>${escHtml(n)}</option>`).join('') +
+        '</select>' +
+        '<div style="display:flex;gap:8px;margin-top:16px">' +
+        '<button type="button" id="rs-pick-x" style="flex:1;padding:10px;border-radius:8px;border:1px solid #ddd;background:#f5f5f5;font-weight:700;cursor:pointer">Cancel</button>' +
+        '<button type="button" id="rs-pick-ok" style="flex:1;padding:10px;border-radius:8px;border:none;background:#FF4F00;color:#fff;font-weight:700;cursor:pointer">Use printer</button>' +
+        '</div></div>';
+      document.body.appendChild(wrap);
+      wrap.querySelector('#rs-pick-x').onclick = () => {
+        wrap.remove();
+        resolve(null);
+      };
+      wrap.querySelector('#rs-pick-ok').onclick = () => {
+        const sel = wrap.querySelector('#rs-pick-printer-fb');
+        const v = sel && sel.value ? String(sel.value) : '';
+        wrap.remove();
+        resolve(v || null);
+      };
+    });
+  }
 
   // Override / enhance RSPrint when features-pos defines it later
   function installRsPrintShim() {

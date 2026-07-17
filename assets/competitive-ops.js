@@ -462,33 +462,75 @@
       if (title) host.insertBefore(chip, title);
       else host.insertBefore(chip, host.firstChild);
       chip.onclick = () => {
-        const next = window.prompt('Counter name (e.g. Counter 1, Bar, Takeaway)', getStationLabel());
-        if (next != null && next.trim()) setStationLabel(next.trim());
+        // Electron does not support window.prompt() — use RSModal when available
+        const current = getStationLabel();
+        if (global.RSModal && typeof RSModal.open === 'function') {
+          RSModal.open({
+            title: 'Counter name',
+            sub: 'Shown on multi-terminal shifts (e.g. Counter 1, Bar, Takeaway)',
+            icon: 'fa-desktop',
+            size: 'sm',
+            body: `<label class="fl">Name</label>
+                   <input class="form-input" id="rs-station-rename" value="${esc(current)}" maxlength="32" autocomplete="off">`,
+            foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>
+                   <button type="button" class="btn btn-primary" style="flex:1" data-ok>Save</button>`,
+            onMount(modal, close) {
+              const inp = modal.querySelector('#rs-station-rename');
+              if (inp) {
+                inp.focus();
+                inp.select();
+              }
+              modal.querySelector('[data-x]').onclick = close;
+              modal.querySelector('[data-ok]').onclick = () => {
+                const next = (inp && inp.value || '').trim();
+                if (next) setStationLabel(next);
+                close();
+              };
+            },
+          });
+          return;
+        }
+        try {
+          const next = window.prompt('Counter name (e.g. Counter 1, Bar, Takeaway)', current);
+          if (next != null && next.trim()) setStationLabel(next.trim());
+        } catch (e) {
+          if (global.RS && RS.toast) RS.toast('Rename unavailable in this shell', 'fa-desktop');
+        }
       };
     }
     const label = getStationLabel();
     const display = /^ST-/i.test(label) ? 'Counter' : label;
     chip.innerHTML = '<i class="fa-solid fa-desktop"></i> ' + esc(display);
     chip.title = 'Counter: ' + label + ' · click to rename';
-    // Desktop: printer chip next to station
+    // Desktop only: Printer chip next to Counter (not shown in browser/web —
+    // web uses the system print dialog; desktop can pick a preferred silent printer).
     if (global.RS_DESKTOP && global.RSPrintBridge) {
       let pchip = document.getElementById('rs-printer-chip');
       if (!pchip && host) {
         pchip = document.createElement('button');
         pchip.id = 'rs-printer-chip';
         pchip.type = 'button';
-        pchip.title = 'Preferred thermal printer';
-        pchip.style.cssText = chip.style.cssText;
+        pchip.className = 'rs-station-chip rs-printer-chip';
+        pchip.title = 'Preferred thermal printer for this PC';
         host.insertBefore(pchip, chip.nextSibling);
-        pchip.onclick = () => {
-          if (global.RSPrintBridge.choosePreferredPrinter) RSPrintBridge.choosePreferredPrinter();
+        pchip.onclick = (ev) => {
+          ev.preventDefault();
+          if (global.RSPrintBridge.choosePreferredPrinter) {
+            Promise.resolve(RSPrintBridge.choosePreferredPrinter()).catch((err) => {
+              console.warn('[printer chip]', err);
+              if (global.RS && RS.toast) RS.toast('Could not open printer list', 'fa-print');
+            });
+          }
         };
       }
       if (pchip) {
         pchip.innerHTML = '<i class="fa-solid fa-print"></i> Printer';
         if (global.RS_DESKTOP.getPreferredPrinter) {
           global.RS_DESKTOP.getPreferredPrinter().then((pref) => {
-            if (pref && pref.name) pchip.innerHTML = '<i class="fa-solid fa-print"></i> ' + esc(String(pref.name).slice(0, 18));
+            if (pref && pref.name) {
+              pchip.innerHTML = '<i class="fa-solid fa-print"></i> ' + esc(String(pref.name).slice(0, 18));
+              pchip.title = 'Preferred printer: ' + pref.name + ' · click to change';
+            }
           }).catch(() => {});
         }
       }
