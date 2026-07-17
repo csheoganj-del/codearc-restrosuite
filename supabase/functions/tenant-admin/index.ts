@@ -238,7 +238,8 @@ async function verifySuperadminToken(req: Request) {
 function getGatewayUrlAndToken() {
   let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("GATEWAY_URL") || "";
   const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
-  const ngrokFallback = (Deno.env.get("NGROK_GATEWAY_URL") || "https://goldsmith-finalist-guise.ngrok-free.dev").trim().replace(/\/+$/, "");
+  // Never hardcode free ngrok hosts — set WHATSAPP_GATEWAY_URL or NGROK_GATEWAY_URL.
+  const publicTunnel = (Deno.env.get("NGROK_GATEWAY_URL") || "").trim().replace(/\/+$/, "");
 
   if (!url) {
     const relayUrl = Deno.env.get("EMAIL_RELAY_URL") || "";
@@ -251,19 +252,18 @@ function getGatewayUrlAndToken() {
       }
     }
   }
+  if (!url && publicTunnel) url = publicTunnel;
 
-  if (!url) {
-    url = ngrokFallback;
-  }
-
-  url = url.trim().replace(/\/+$/, "");
+  url = (url || "").trim().replace(/\/+$/, "");
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local")) {
-      url = ngrokFallback;
+    if (url) {
+      const host = new URL(url).hostname.toLowerCase();
+      if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local")) {
+        url = publicTunnel || "";
+      }
     }
   } catch (_) {
-    url = ngrokFallback;
+    url = publicTunnel || "";
   }
   return { url, token: token.trim() };
 }

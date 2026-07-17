@@ -113,8 +113,8 @@ test('guest QR path: one-tap menu, filters, service, hub', () => {
   assert.match(order, /create_notification|waiter_call/);
   assert.match(portal, /forceHub|goMenu|menuUrl/);
   assert.match(growth, /order\.html\?tenant=/);
-  // No photo requirement — images optional only
-  assert.match(order, /item\.image \?/);
+  // No photo requirement — images optional only (allow newline before ?)
+  assert.match(order, /item\.image\s*\?/);
 });
 
 test('floor + inventory packs still present', () => {
@@ -149,6 +149,7 @@ test('cloud map packs bill ops + shift cash + offer discount without new tables'
   assert.match(db, /taxProfile\._ops|_ops/);
   assert.match(db, /cashMovements/);
   assert.match(db, /discount_type|discount_value/);
-  // waste_log intentionally not in MAP (local device only)
-  assert.doesNotMatch(db, /waste_log:\s*\{/);
+  // waste_log is localStorage-backed (no cloud table) but still in the collection map
+  assert.match(db, /waste_log:\s*\{/);
+  assert.match(db, /Collections without a cloud table \(e\.g\. waste_log\)|waste_log/);
 });

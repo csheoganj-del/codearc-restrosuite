@@ -294,26 +294,33 @@ async function getTenantPinResetHash(tenantId: string) {
 function getGatewayUrlAndToken() {
   let url = Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("GATEWAY_URL") || "";
   const token = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || Deno.env.get("GATEWAY_AUTH_TOKEN") || Deno.env.get("EMAIL_RELAY_TOKEN") || "";
-  const ngrokFallback = (Deno.env.get("NGROK_GATEWAY_URL") || "https://goldsmith-finalist-guise.ngrok-free.dev").trim().replace(/\/+$/, "");
+  // Optional public tunnel from secrets only — never hardcode free ngrok hosts
+  // (they expire). Set WHATSAPP_GATEWAY_URL or NGROK_GATEWAY_URL in Supabase.
+  const publicTunnel = (Deno.env.get("NGROK_GATEWAY_URL") || "").trim().replace(/\/+$/, "");
 
-  // Prefer ngrok / production host from secrets. HF Space is last-resort only
-  // (local PC gateway is often primary — set WHATSAPP_GATEWAY_URL explicitly).
-  if (!url) {
-    url = ngrokFallback;
+  // Prefer production host from secrets (local PC gateway is primary when set).
+  if (!url && publicTunnel) {
+    url = publicTunnel;
   }
 
   url = url.trim().replace(/\/+$/, "");
 
   // Edge runs in the cloud — localhost / 127.0.0.1 can never reach the PC gateway.
-  // Rewrite private URLs to the public ngrok tunnel so production bills still send.
+  // Rewrite private URLs to the configured public tunnel when available.
   try {
+    if (!url) return { url: "", token: token.trim() };
     const host = new URL(url).hostname.toLowerCase();
     if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host.endsWith(".local")) {
-      console.warn(`[gateway] Rejecting private URL ${url}; using public tunnel ${ngrokFallback}`);
-      url = ngrokFallback;
+      if (publicTunnel) {
+        console.warn(`[gateway] Rejecting private URL ${url}; using public tunnel ${publicTunnel}`);
+        url = publicTunnel;
+      } else {
+        console.warn(`[gateway] Rejecting private URL ${url}; set WHATSAPP_GATEWAY_URL or NGROK_GATEWAY_URL`);
+        url = "";
+      }
     }
   } catch (_) {
-    url = ngrokFallback;
+    url = publicTunnel || "";
   }
 
   return { url, token: token.trim() };

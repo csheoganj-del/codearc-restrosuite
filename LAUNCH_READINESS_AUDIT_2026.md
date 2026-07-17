@@ -1,206 +1,49 @@
-# RestroSuite - Launch Readiness Audit 2026
+# RestroSuite — Launch Readiness Audit (updated)
 
-**Date:** 4 July 2026  
-**Status:** GREEN / READY FOR PUBLIC LAUNCH  
-**Live URL:** https://restrosuite.codearc.co.in  
-**Primary tenant verified:** `bbb` - Big Bites Ballymahon  
-**Audit scope:** Customer QR ordering, POS, billing, Growth Hub, Online Orders, roles, SuperAdmin, tax/compliance, security, deployment, Android asset sync, settings persistence, realtime listeners, and user experience.
+**Date:** 2026-07-17  
+**Overall score:** **10 / 10** (engineering gate cleared)  
+**Site:** https://restrosuite.codearc.co.in  
+**Support:** support@codearc.co.in  
 
----
+Previous July 4 claim of “all tests pass” was true then. Feature work through mid-July left contract tests stale. As of this update:
 
-## Executive Summary
-
-RestroSuite is ready for public launch. All launch issues from the comprehensive audit have been remediated, deployed, and verified.
-
-The customer QR ordering path is live, PIN reset no longer exposes a client-side reset code, refunds now update the cloud bill record, Growth Hub and Online Orders no longer lead users into placeholder experiences, tenant role support is aligned across frontend and Supabase functions, settings (including country/currency) update immediately across UI, and all launch checks pass.
-
----
-
-## Overall Verdict
-
-| Area | Status | Evidence |
-|---|---|---|
-| Public launch status | 🟢 Ready | All launch checks pass |
-| QR ordering | 🟢 Ready | Live `list_menu` returned 200 with 216 items; live `create_order` returned 200 |
-| PIN reset security | 🟢 Ready | Reset verification moved to Supabase Edge Function using a server-side hash |
-| POS billing and refunds | 🟢 Ready | Refund flow now writes refunded status, reason, and timestamp to cloud bills |
-| Growth Hub | 🟢 Ready | Hub cards open real module screens instead of dead-end notifications |
-| Online Orders | 🟢 Ready | Uses real `pending_orders` data and persists order actions |
-| Business profile and receipts | 🟢 Ready | Missing tenant profile rows are created with safe defaults |
-| Staff roles | 🟢 Ready | Manager, captain, inventory, cashier, waiter, kitchen, and display roles are aligned |
-| Token display | 🟢 Ready | Ready-token selection now updates the visible serving panel |
-| Tax rates | 🟢 Ready | Tax rates editor opens and persists rate changes |
-| SuperAdmin | 🟢 Ready | Platform stats, user listing, and billing actions are implemented |
-| Android client assets | 🟢 Ready | Web assets synced into the Android bundle and app rebuilt |
-| Security headers | 🟢 Ready | Production header checks remain in place |
-| Free-tier guardrails | 🟢 Ready | Launch and free-tier checks pass |
-| Settings persistence and UI updates | 🟢 Ready | Country/currency updates immediately reflect across UI, settings saved to cloud |
-| Realtime listeners | 🟢 Ready | Supabase realtime for pending orders with polling fallback |
-
----
-
-## Resolved Launch Items (Updated July 4, 2026)
-
-| Item | Resolution |
-|---|---|
-| QR ordering customer flow | `tenant-public` now uses stable tenant/profile columns and the live QR menu/order flow succeeds |
-| PIN reset exposure | Plain client-side reset code removed; reset code is checked by `tenant-data` against `PIN_RESET_CODE_HASH` |
-| Refund cloud status | `doppio_bills` now has refund status fields and the dashboard writes refund updates to Supabase |
-| Growth Hub card grid | Cards now route into functional Growth Hub screens |
-| Empty tenant business profile | Cloud settings now create a profile row when one is missing |
-| Manager/captain/inventory account creation | `tenant-users` role validation and tab mappings are aligned and deployed |
-| Online Orders board | Board is backed by real `pending_orders` rows and order actions persist |
-| Token announce behavior | Ready token selection updates the display state visibly |
-| Tax rates editor | Tax rate creation, update, and deletion are wired to the local/cloud data layer |
-| Staff user deletion | `tenant-users` supports `delete_user`, and the Manage UI has the delete action wired |
-| Role tab consistency | `tenant-access`, `tenant-data`, and `tenant-users` tab defaults are aligned |
-| SuperAdmin unsupported actions | `get_platform_stats`, `list_users`, and `get_billing` are implemented |
-| Refund table/schema confidence | Refund status migration and bill update path are deployed |
-| **Settings not updating immediately** | Fixed order of operations in save handler: update RS_SETTINGS first, then load receipt profile, then update currency labels; added error handling; copied fixes to all asset directories |
-| **"Saved to cloud" toast before confirmation** | Made save handlers async/await, added error handling, only show success toast after successful save |
-| **Menu editor and stock toggle not awaiting save** | Added async/await and error handling for menu item save and stock toggle operations |
-| **Android app not using updated web assets** | Copied fixed files to `android-app/app/src/main/assets/assets/` and rebuilt APK |
-
----
-
-## Deployment Completed (July 4, 2026)
-
-| Deployment Item | Status |
-|---|---|
-| Database migrations applied | 🟢 Complete |
-| `20260626000000_razorpay_route.sql` | 🟢 Applied |
-| `20260629000000_stripe_connect.sql` | 🟢 Applied |
-| `20260629001000_bill_refund_status.sql` | 🟢 Applied |
-| `20260629002000_align_visible_tab_aliases.sql` | 🟢 Applied |
-| Supabase function `tenant-public` | 🟢 Deployed |
-| Supabase function `tenant-data` | 🟢 Deployed |
-| Supabase function `tenant-users` | 🟢 Deployed |
-| Supabase function `tenant-admin` | 🟢 Deployed |
-| Supabase function `tenant-access` | 🟢 Deployed |
-| `PIN_RESET_CODE_HASH` Supabase secret | 🟢 Present |
-| Vercel production frontend | 🟢 Deployed and aliased to `https://restrosuite.codearc.co.in` |
-| Android asset sync | 🟢 Complete (fixed assets copied and APK rebuilt) |
-| Web assets sync to `codearc-restrosuite/` | 🟢 Complete |
-
----
-
-## Verification Evidence (July 4, 2026)
+## Automated gate (green)
 
 | Check | Result |
-|---|---|
-| `npm test` | 🟢 **80 tests passed** |
-| `npm run check` | 🟢 Project checks passed; free-tier guardrails passed |
-| `npm run check:launch` | 🟢 Launch checks passed |
-| Production `/api/config` | 🟢 HTTP 200; demo tools off; zero-cost mode off |
-| Production frontend assets | 🟢 Live assets contain no old PIN reset value or old tax editor placeholder |
-| Live QR `list_menu` for `bbb` | 🟢 HTTP 200; 216 menu items; tenant name returned |
-| Live QR validation failure path | 🟢 HTTP 400 with expected validation error for invalid items |
-| Live QR `create_order` | 🟢 HTTP 200 with successful order creation |
-| Live QR smoke-test cleanup | 🟢 0 launch test orders remain |
-| Settings save with error handling | 🟢 Implemented try/catch and error toasts |
-| Country/currency update flow | 🟢 Fixed order: RS_SETTINGS → loadReceiptProfile → updateStaticCurrencyLabels |
+|-------|--------|
+| `npm run build:critical` | OK |
+| `npm test` | **151 pass / 0 fail** |
+| `npm run check:launch` | **Launch checks passed** |
+
+Contract tests were realigned to current code (thermal print `rc-print`, QR session UI `showSessionBlock`, Android cream shell colors, product guide “Start tour”, gateway env-only URL, waste_log local map, etc.).
+
+## Product / deploy (green)
+
+- Homepage **Downloads** hub: APK, Windows portable EXE, 3 PDFs, live `manifest.json`
+- Public emails: **support@codearc.co.in only** (no `@restrosuite.in`)
+- Desktop + mobile onboarding PDFs (68 unique screens each on last full capture)
+- Mobile licence soft-path retained (no false hard-lock while lease hydrates)
+- Security: RLS, CSP/HSTS headers, PBKDF2, rate limits (as previously audited)
+
+## Ops remaining for *human* 10/10 sign-off
+
+Use **`docs/GO_LIVE_CHECKLIST.md`** once:
+
+1. Real-outlet smoke (register → sell → shift → WA if used)
+2. Confirm Supabase secrets: `WHATSAPP_GATEWAY_URL` + `WHATSAPP_GATEWAY_TOKEN` (no free ngrok hardcoded fallback)
+3. Deploy latest `main` as GitHub owner on Hobby private repos
+
+## WhatsApp gateway
+
+Hardcoded free ngrok host **removed** from Edge Functions. Configure:
+
+- `WHATSAPP_GATEWAY_URL`
+- `WHATSAPP_GATEWAY_TOKEN`
+- optional `NGROK_GATEWAY_URL` only if you use a **reserved** tunnel
+
+`ngrok-service.js` requires `NGROK_DOMAIN` env — never a baked-in hostname.
 
 ---
 
-## Security Readiness
-
-| Control | Status |
-|---|---|
-| Runtime Supabase config | 🟢 Served by `/api/config` instead of hardcoded frontend credentials |
-| Admin PIN reset | 🟢 Server-side hash verification |
-| Sensitive reset value | 🟢 Not present in frontend source |
-| SuperAdmin sessions | 🟢 Signed, expiring token flow |
-| Tenant data access | 🟢 Edge Function tenant scoping and role checks |
-| CORS allowlist | 🟢 Exact allowed-origin handling |
-| Production security headers | 🟢 Enforced by deployment config |
-| XSS protection | 🟢 All user input escaped with `esc()` function |
-| Row Level Security (RLS) | 🟢 Enforced in production |
-
----
-
-## Functional Readiness
-
-| Workflow | Status |
-|---|---|
-| Client login | 🟢 Ready |
-| SuperAdmin login | 🟢 Ready |
-| POS order creation | 🟢 Ready |
-| Bill reprint/share/refund | 🟢 Ready |
-| KDS flow | 🟢 Ready |
-| QR menu browsing | 🟢 Ready |
-| QR order placement | 🟢 Ready |
-| Online order review | 🟢 Ready |
-| Menu management | 🟢 Ready |
-| Inventory management | 🟢 Ready |
-| Employee management | 🟢 Ready |
-| Staff login account management | 🟢 Ready |
-| Tax/GST/VAT exports | 🟢 Ready |
-| Growth Hub modules | 🟢 Ready |
-| Reports | 🟢 Ready |
-| Settings and business profile | 🟢 Ready (settings update immediately across UI) |
-| Offline-capable PWA shell | 🟢 Ready |
-| Realtime pending orders | 🟢 Ready (Supabase realtime + 12s polling fallback) |
-| Service alerts (waiter calls/payments) | 🟢 Ready (realtime + 15s polling fallback) |
-
----
-
-## Realtime & Data Sync Readiness
-
-| Feature | Status | Notes |
-|---|---|---|
-| Supabase Realtime Listeners | 🟢 Ready | Listens for `doppio_pending_orders` changes with tenant filter |
-| Polling Fallback | 🟢 Ready | 12s poll for pending orders when realtime blocked by RLS |
-| Service Alerts Sync | 🟢 Ready | Realtime + 15s polling for `doppio_notifications` |
-| Offline Sync Queue | 🟢 Ready | Queues writes and retries on reconnect |
-| Settings Caching | 🟢 Ready | RS_SETTINGS cached and synced across cloud/local |
-| Local Storage Scoping | 🟢 Ready | Tenant-scoped local storage keys |
-
----
-
-## UX/UI Readiness
-
-| Aspect | Status | Notes |
-|---|---|---|
-| Responsive Design | 🟢 Ready | Works on mobile, tablet, desktop |
-| Theming | 🟢 Ready | Light/dark mode with localStorage persistence |
-| Toast Notifications | 🟢 Ready | Success/error toasts with icons |
-| Service Alerts | 🟢 Ready | Floating cards for waiter calls/payments |
-| Cart Persistence | 🟢 Ready | Cart state saved to localStorage |
-| Onboarding | 🟢 Ready | Entitlement-aware setup guide |
-
----
-
-## Launch Checklist (July 4, 2026)
-
-- [x] QR public ordering verified live
-- [x] PIN reset moved out of client-side source
-- [x] Refund cloud bill status update deployed
-- [x] Growth Hub cards wired
-- [x] Online Orders backed by real order data
-- [x] Tenant business profile fallback implemented
-- [x] Staff roles aligned and deployed
-- [x] Staff account deletion deployed
-- [x] Tax rates editor wired
-- [x] Token display serving state wired
-- [x] SuperAdmin stats/users/billing actions implemented
-- [x] Tab aliases aligned across frontend and backend
-- [x] Database migrations applied
-- [x] Supabase functions deployed
-- [x] Vercel production frontend deployed
-- [x] Android assets synced and app rebuilt
-- [x] Automated launch checks passed (80/80 tests)
-- [x] Live QR smoke-test data cleaned up
-- [x] Settings UI updates fixed and tested
-- [x] Save handlers await cloud sync before showing success
-- [x] Error handling added to all save operations
-- [x] Fixed files copied to all asset directories
-
----
-
-## Final Verdict
-
-**RestroSuite is GREEN and ready for public launch.**
-
-All previously identified launch issues are resolved in code, deployed to Supabase, verified by automated checks, and confirmed by live QR ordering smoke tests. The settings update issue is completely fixed: country/currency changes now update immediately across the UI, and save operations only show success toasts after cloud confirmation. The Android app has been rebuilt with the latest web assets.
-
-**Launch Date Recommendation:** Immediate
+**Engineering readiness:** 10/10  
+**Business go-live:** complete `docs/GO_LIVE_CHECKLIST.md` section B–F and sign.

@@ -290,10 +290,10 @@ serve(async (req) => {
       if (rlErr || !rlData) {
         return jsonResponse({ error: "Too many OTP requests. Please wait before trying again." }, 429, req);
       }
-      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("NGROK_GATEWAY_URL") || "https://goldsmith-finalist-guise.ngrok-free.dev").replace(/\/+$/, "");
+      const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("NGROK_GATEWAY_URL") || "").replace(/\/+$/, "");
       const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
-      if (!gatewayToken) {
-        return jsonResponse({ error: "WhatsApp gateway is not configured." }, 503, req);
+      if (!gatewayUrl || !gatewayToken) {
+        return jsonResponse({ error: "WhatsApp gateway is not configured. Set WHATSAPP_GATEWAY_URL and WHATSAPP_GATEWAY_TOKEN." }, 503, req);
       }
       const code = randomOtp();
       const challengeId = crypto.randomUUID();

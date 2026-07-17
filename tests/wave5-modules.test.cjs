@@ -246,8 +246,8 @@ test('product pack: Z-report scope, WA retry, demo script (wave product)', () =>
   const demo = fs.readFileSync(path.join(root, 'assets/modules/demo-script.js'), 'utf8');
   assert.match(demo, /RSDemoScript|openDemoScript/);
   assert.ok(fs.existsSync(path.join(root, 'docs/DEMO_SCRIPT.md')));
-  const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
-  assert.match(dash, /stationLabel|shiftId|Tenders/);
+  // Shift / station labels live in competitive-ops (Z-report), not dashboard.js
+  assert.match(ops, /stationLabel|shiftId|byStation/);
   const reports = fs.readFileSync(path.join(root, 'assets/modules/reports-ui.js'), 'utf8');
   assert.match(reports, /Taxable Value|TOTALS/);
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');

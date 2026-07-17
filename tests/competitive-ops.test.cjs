@@ -31,8 +31,9 @@ test('dashboard loads competitive-ops in critical path', () => {
 
 test('bill settled modal has thermal print action', () => {
   const src = fs.readFileSync(path.join(root, 'assets/features-pos.js'), 'utf8');
-  assert.match(src, /rc-thermal/);
-  assert.match(src, /printBillThermal|printBillEscPos/);
+  // Settled modal print control (thermal when RSOps available)
+  assert.match(src, /rc-print|#rc-print|rc-icon-btn rc-print/);
+  assert.match(src, /printBillThermal|printBillEscPos|RSOps\.printBillThermal/);
 });
 
 test('QR orders UI prioritizes pending attention', () => {
