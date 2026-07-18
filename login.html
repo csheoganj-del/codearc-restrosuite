@@ -1166,7 +1166,7 @@
       // Manual offline open is intentional — allow dashboard even after a prior sign-out flag
       try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
       showOk(navigator.onLine ? 'Opening your dashboard...' : 'Opening offline dashboard...');
-      setTimeout(()=>location.href='dashboard',250);
+      setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),250);
     };
   }
   window.addEventListener('online', updateOfflineResume);
@@ -1233,7 +1233,7 @@
           }
         }
       }
-      setTimeout(function () { location.href = 'dashboard'; }, 280);
+      setTimeout(function () { location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'); }, 280);
     } catch (e) {
       updateOfflineResume();
     }
@@ -1286,7 +1286,7 @@
         }
         try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
         showOk('Offline mode — opening your saved dashboard…');
-        setTimeout(()=>location.href='dashboard',350);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),350);
       } else {
         showErr('Offline login needs a saved session. Connect to internet, sign in once with “Keep me signed in” checked, then you can open the app offline.');
         loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
@@ -1300,7 +1300,7 @@
       if(window.RS_API && RS_API.configured){
         await RS_API.login({ slug, username:u, password:p, remember });
         showOk('Verified — opening your console…');
-        setTimeout(()=>location.href='dashboard',700);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
       } else {
         if(slug === 'superadmin'){
           throw new Error('Super-Admin is cloud-only. Please wait a moment and try again.');
@@ -1314,7 +1314,7 @@
           showOk('Demo mode — opening your console…');
           // Tab-scoped only — never write live tenant identity into shared localStorage.
           try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
-          setTimeout(()=>location.href='dashboard',700);
+          setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
         } else {
           // Cloud not configured yet (slow /api/config or host missing env) — not the same as unknown outlet
           const cloudReady = !!(window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__);
@@ -1570,7 +1570,7 @@
           sessionStorage.setItem('tenant_slug', tenantId);
         } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
-        setTimeout(()=>location.href='dashboard',900);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),900);
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;

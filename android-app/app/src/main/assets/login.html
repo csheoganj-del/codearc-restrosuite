@@ -22,11 +22,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="RestroSuite">
-<link rel="apple-touch-icon" href="assets/restrosuite-mark.png?v=7">
-<link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=7">
-<link rel="icon" href="assets/restrosuite-mark.png?v=7" type="image/png">
+<link rel="apple-touch-icon" href="assets/restrosuite-mark.png?v=8">
+<link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=8">
+<link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
 <meta name="theme-color" content="#FF4F00">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+<!-- Native shells (Android offline / early inject): sets ENV_SUPABASE_* before config.js -->
+<script src="env-config.js"></script>
 <script src="config.js"></script>
 <script>
   // Ensure we read runtime config (window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__)
@@ -353,7 +355,7 @@
           </div>
         </div>
         <div class="row-between">
-          <label class="remember"><input type="checkbox" id="remember-me" checked> Keep me signed in</label>
+          <label class="remember"><input type="checkbox" id="remember-me" checked> Keep me signed in <span style="font-weight:500;color:var(--text-mute)">(needed for offline access)</span></label>
           <button type="button" class="link-btn" id="open-recovery-btn">Forgot password?</button>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="login-submit">Sign in securely <i class="fa-solid fa-right-to-bracket"></i></button>
@@ -1057,11 +1059,11 @@
   const offlineResumeTitle=document.getElementById('offline-resume-title');
   const offlineResumeSub=document.getElementById('offline-resume-sub');
   const continueOfflineBtn=document.getElementById('continue-offline-btn');
-  function savedClientSession(){
+  function savedClientSession(force){
     try {
-      // Force remember-me hydrate (localStorage blob → sessionStorage)
+      // force=true: Continue offline / offline form — may hydrate even after a soft block
       if (window.RS_API && typeof RS_API.session === 'function') {
-        const s = RS_API.session();
+        const s = RS_API.session(force ? { force: true } : undefined);
         if (!s || !s.token) return null;
         if (s.role === 'superadmin' || s.role === 'brand_admin') return null;
         return s;
@@ -1074,15 +1076,33 @@
   function sessionLabel(s){
     return s.tenant_name || s.tenant_slug || s.username || 'saved workspace';
   }
+  function justSignedOut(){
+    try {
+      if (window.RS_API && typeof RS_API.wasExplicitLogout === 'function') {
+        return RS_API.wasExplicitLogout();
+      }
+      // Fallback: only the global key (ignore tenant-scoped leftovers)
+      try {
+        return !!Storage.prototype.getItem.call(localStorage, 'rs_explicit_logout_v1');
+      } catch (_) {
+        return !!localStorage.getItem('rs_explicit_logout_v1');
+      }
+    } catch (_) { return false; }
+  }
   function updateOfflineResume(){
-    const s = savedClientSession();
     if (!offlineResume) return;
+    // After intentional Sign out the keep-me-signed-in blob is cleared so another
+    // staff member cannot open the previous outlet offline without logging in.
+    // Offline access returns after the next online sign-in with "Keep me signed in".
+    const s = savedClientSession(false);
     if (!s) {
       offlineResume.hidden = true;
+      // No green banner: login form after Sign out is enough. A loud "Signed out /
+      // offline cleared" message looked like an error and confused keep-me-signed-in.
       return;
     }
     offlineResume.hidden = false;
-    offlineResumeMode.textContent = navigator.onLine ? 'Saved session on this device' : 'Offline access';
+    offlineResumeMode.textContent = navigator.onLine ? 'Saved session on this device' : 'Offline access ready';
     offlineResumeTitle.textContent = navigator.onLine ? 'Continue without re-typing password' : 'Continue offline';
     offlineResumeSub.textContent = `${sessionLabel(s)}${s.username ? ' · ' + s.username : ''}`;
     const tenantInput = document.getElementById('tenant-id');
@@ -1132,9 +1152,10 @@
   }
   if (continueOfflineBtn) {
     continueOfflineBtn.onclick = async () => {
-      const s = savedClientSession();
+      // Manual continue may force-hydrate the saved offline blob
+      const s = savedClientSession(true);
       if (!s) {
-        showErr('No saved workspace session found on this device. Sign in online once before using offline access.');
+        showErr('No saved workspace on this device. Sign in online once with “Keep me signed in” checked, then you can work offline.');
         return;
       }
       const ok = await offlinePinGate();
@@ -1142,15 +1163,19 @@
         showErr('PIN required to open the saved workspace offline.');
         return;
       }
+      // Manual offline open is intentional — allow dashboard even after a prior sign-out flag
+      try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
       showOk(navigator.onLine ? 'Opening your dashboard...' : 'Opening offline dashboard...');
-      setTimeout(()=>location.href='dashboard',250);
+      setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),250);
     };
   }
   window.addEventListener('online', updateOfflineResume);
   window.addEventListener('offline', updateOfflineResume);
 
   // Keep me signed in → open dashboard by default (do not park on login form).
-  // ?stay=1 keeps the login form for switching accounts.
+  // ?stay=1 / ?switch=1 keeps the login form after intentional logout or account switch.
+  // Offline is NOT removed: it uses the same keep-me-signed-in blob. Only intentional
+  // Sign out clears that blob (so the next person cannot open your outlet offline).
   let _autoResumeTried = false;
   async function tryAutoResumeToDashboard() {
     try {
@@ -1160,12 +1185,18 @@
         updateOfflineResume();
         return;
       }
-      const s = savedClientSession();
+      // User just clicked Sign out — stay on form (do not auto-jump)
+      if (justSignedOut()) {
+        updateOfflineResume();
+        return;
+      }
+      const s = savedClientSession(false);
       if (!s || !s.token) {
         updateOfflineResume();
         return;
       }
-      // Only auto-jump when this device asked to be remembered
+      // Auto-jump when keep-me-signed-in was ON (default). Missing flag = treat as yes
+      // for older saved blobs so offline resume keeps working.
       let wantRemember = true;
       try {
         const p = sessionStorage.getItem('rs_session_persistent');
@@ -1179,26 +1210,42 @@
       updateOfflineResume();
       showOk(navigator.onLine ? 'Welcome back — opening dashboard…' : 'Opening offline dashboard…');
       // Online: soft-validate; if server rejects (401), clear and stay on login
-      if (navigator.onLine && window.RS_API && typeof RS_API.validateSession === 'function' && RS_API.configured) {
+      if (navigator.onLine && window.RS_API && typeof RS_API.validateSession === 'function') {
+        // Wait for config so we do not treat "not configured yet" as logged out
         try {
-          const sess = await RS_API.validateSession();
-          if (sess === null) {
-            try { RS_API.logout(); } catch (_) {}
-            _autoResumeTried = false;
-            updateOfflineResume();
-            showErr('Saved session expired — please sign in again.');
-            return;
+          if (window.__configReady) await window.__configReady;
+        } catch (_) {}
+        try {
+          if (window.RS_API.refreshConfig) window.RS_API.refreshConfig();
+        } catch (_) {}
+        if (window.RS_API.configured) {
+          try {
+            const sess = await RS_API.validateSession();
+            if (sess === null) {
+              try { RS_API.logout({ intentional: false }); } catch (_) {}
+              _autoResumeTried = false;
+              updateOfflineResume();
+              showErr('Saved session expired — please sign in again.');
+              return;
+            }
+          } catch (_) {
+            // Network blip / offline — open local dashboard with remembered session
           }
-        } catch (_) {
-          // Network blip — still open local dashboard with remembered session
         }
       }
-      setTimeout(function () { location.href = 'dashboard'; }, 280);
+      setTimeout(function () { location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'); }, 280);
     } catch (e) {
       updateOfflineResume();
     }
   }
 
+  // Clear sticky logout flags left by older builds, then resume if session saved.
+  try {
+    if (window.RS_API && typeof RS_API.clearExplicitLogout === 'function' &&
+        typeof RS_API.hasRememberBlob === 'function' && RS_API.hasRememberBlob()) {
+      RS_API.clearExplicitLogout();
+    }
+  } catch (_) {}
   // Hydrate remember-me as soon as API is ready (and again after config load).
   updateOfflineResume();
   setTimeout(tryAutoResumeToDashboard, 120);
@@ -1229,7 +1276,7 @@
     const slug=document.getElementById('tenant-id').value.trim().toLowerCase(), u=document.getElementById('username').value.trim(), p=document.getElementById('password').value;
     const remember = document.getElementById('remember-me').checked;
     if(!navigator.onLine){
-      const saved = savedClientSession();
+      const saved = savedClientSession(true);
       if(saved){
         const ok = await offlinePinGate();
         if (!ok) {
@@ -1237,10 +1284,11 @@
           loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
           return;
         }
-        showOk('Offline mode - opening your saved dashboard...');
-        setTimeout(()=>location.href='dashboard',350);
+        try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
+        showOk('Offline mode — opening your saved dashboard…');
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),350);
       } else {
-        showErr('No saved workspace session found on this device. Sign in online once before using offline access.');
+        showErr('Offline login needs a saved session. Connect to internet, sign in once with “Keep me signed in” checked, then you can open the app offline.');
         loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
       }
       return;
@@ -1252,7 +1300,7 @@
       if(window.RS_API && RS_API.configured){
         await RS_API.login({ slug, username:u, password:p, remember });
         showOk('Verified — opening your console…');
-        setTimeout(()=>location.href='dashboard',700);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
       } else {
         if(slug === 'superadmin'){
           throw new Error('Super-Admin is cloud-only. Please wait a moment and try again.');
@@ -1266,9 +1314,15 @@
           showOk('Demo mode — opening your console…');
           // Tab-scoped only — never write live tenant identity into shared localStorage.
           try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
-          setTimeout(()=>location.href='dashboard',700);
+          setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
         } else {
-          showErr('Outlet "'+slug+'" not found. Register it first, or sign in with a live outlet account.');
+          // Cloud not configured yet (slow /api/config or host missing env) — not the same as unknown outlet
+          const cloudReady = !!(window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__);
+          if (!cloudReady) {
+            showErr('Connecting to cloud… Wait 2 seconds and try again. If this keeps happening, the host is missing Supabase config.');
+          } else {
+            showErr('Could not reach live login. Check internet, or wait for config to finish loading, then try again.');
+          }
           loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
         }
       }
@@ -1516,7 +1570,7 @@
           sessionStorage.setItem('tenant_slug', tenantId);
         } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
-        setTimeout(()=>location.href='dashboard',900);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),900);
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;

@@ -211,8 +211,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                 if (assetLoader != null && request != null && request.getUrl() != null) {
-                    WebResourceResponse local = assetLoader.shouldInterceptRequest(request.getUrl());
+                    Uri uri = request.getUrl();
+                    // Clean-URL fallback: /assets/dashboard → /assets/dashboard.html
+                    Uri tryUri = rewriteLocalCleanUrl(uri);
+                    WebResourceResponse local = assetLoader.shouldInterceptRequest(tryUri);
                     if (local != null) return local;
+                    if (!tryUri.equals(uri)) {
+                        local = assetLoader.shouldInterceptRequest(uri);
+                        if (local != null) return local;
+                    }
                 }
                 return super.shouldInterceptRequest(view, request);
             }
@@ -220,12 +227,23 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (request == null || request.getUrl() == null) return false;
-                return handleUrl(request.getUrl().toString());
+                String raw = request.getUrl().toString();
+                String fixed = rewriteLocalCleanUrlString(raw);
+                if (!fixed.equals(raw)) {
+                    view.loadUrl(fixed);
+                    return true;
+                }
+                return handleUrl(raw);
             }
 
             @Override
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                String fixed = rewriteLocalCleanUrlString(url);
+                if (url != null && !fixed.equals(url)) {
+                    view.loadUrl(fixed);
+                    return true;
+                }
                 return handleUrl(url);
             }
 
@@ -294,12 +312,58 @@ public class MainActivity extends AppCompatActivity {
         loadAppOrLock();
     }
 
+    /**
+     * Offline shell has no Vercel cleanUrls. Map /assets/dashboard → dashboard.html
+     * so login redirects (location.href='dashboard') work inside WebViewAssetLoader.
+     */
+    private Uri rewriteLocalCleanUrl(Uri uri) {
+        if (uri == null) return null;
+        String host = uri.getHost();
+        if (host == null || !host.contains("androidplatform.net")) return uri;
+        String path = uri.getPath();
+        if (path == null || path.isEmpty()) return uri;
+        // Already a static asset with extension
+        int slash = path.lastIndexOf('/');
+        String last = slash >= 0 ? path.substring(slash + 1) : path;
+        if (last.isEmpty() || last.contains(".")) return uri;
+        // Known app routes without .html
+        String[] pages = {
+                "dashboard", "login", "home", "order", "qr-order", "kds", "tokens",
+                "bill", "feedback", "privacy", "terms", "refund-policy", "index",
+                "install", "status"
+        };
+        boolean match = false;
+        for (String p : pages) {
+            if (p.equals(last)) { match = true; break; }
+        }
+        if (!match) return uri;
+        Uri.Builder b = uri.buildUpon().path(path + ".html");
+        return b.build();
+    }
+
+    private String rewriteLocalCleanUrlString(String url) {
+        if (url == null || !url.startsWith(LOCAL_ORIGIN)) return url == null ? "" : url;
+        try {
+            return rewriteLocalCleanUrl(Uri.parse(url)).toString();
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
     private boolean handleUrl(String url) {
         if (url == null) return true;
         if (url.startsWith("javascript:") || url.startsWith("about:")) return false;
 
-        // Same-app origins stay in WebView
-        if (url.startsWith(REMOTE_ORIGIN) || url.startsWith(LOCAL_ORIGIN)) {
+        // Same-app origins stay in WebView (rewrite clean URLs first)
+        if (url.startsWith(LOCAL_ORIGIN)) {
+            String fixed = rewriteLocalCleanUrlString(url);
+            if (!fixed.equals(url) && myWebView != null) {
+                myWebView.loadUrl(fixed);
+                return true;
+            }
+            return false;
+        }
+        if (url.startsWith(REMOTE_ORIGIN)) {
             return false;
         }
         // WhatsApp / tel / mailto / external
@@ -373,18 +437,48 @@ public class MainActivity extends AppCompatActivity {
         myWebView.loadDataWithBaseURL(LOCAL_ORIGIN, html, "text/html", "utf-8", null);
     }
 
+    /** Public anon credentials — same as web. Required when offline shell has no /api/config. */
+    private static final String SUPABASE_URL = "https://htkauiibuejetimfiavs.supabase.co";
+    private static final String SUPABASE_ANON_KEY =
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk";
+
+    /** Runs before page scripts when API allows; keeps offline-shell login cloud-capable. */
+    private String envBootstrapJs() {
+        return "(function(){try{"
+                + "window.ENV_SUPABASE_URL='" + SUPABASE_URL + "';"
+                + "window.ENV_SUPABASE_ANON_KEY='" + SUPABASE_ANON_KEY + "';"
+                + "window.__SUPABASE_URL__=window.__SUPABASE_URL__||window.ENV_SUPABASE_URL;"
+                + "window.__SUPABASE_ANON_KEY__=window.__SUPABASE_ANON_KEY__||window.ENV_SUPABASE_ANON_KEY;"
+                + "window.RS_ANDROID=true;window.RS_NATIVE_APP=true;window.RS_PLATFORM='android';"
+                + "}catch(e){}})();";
+    }
+
     private void injectPlatformFlags() {
         // Tell the web shell it is inside a native Android package — hide PWA install,
         // use app safe-area, denser mobile chrome, haptics via AndroidInterface.
-        String js = "(function(){try{"
-                + "window.RS_ANDROID=true;"
-                + "window.RS_PLATFORM='android';"
-                + "window.RS_NATIVE_APP=true;"
+        // Also re-apply Supabase env (page may have loaded before document-start JS).
+        String js = envBootstrapJs().replace("})();", "")
                 + "window.RS_APP_VERSION='" + BuildConfig.VERSION_NAME + "';"
                 + "window.RS_OFFLINE_SHELL=" + (usingLocalShell ? "true" : "false") + ";"
+                // Offline shell: map clean routes to .html (no Vercel rewrites)
+                + "if(" + (usingLocalShell ? "true" : "false") + "){try{"
+                + "window.RS_LOCAL_PAGE=function(n){n=String(n||'').replace(/^\\//,'').replace(/\\.html$/i,'');"
+                + "return n? (n+'.html'):'dashboard.html';};"
+                + "if(!window.__rsCleanNavPatched){window.__rsCleanNavPatched=1;"
+                + "var _as=HTMLAnchorElement&&HTMLAnchorElement.prototype;"
+                + "document.addEventListener('click',function(ev){"
+                + "var a=ev.target&&ev.target.closest&&ev.target.closest('a[href]');if(!a)return;"
+                + "var h=a.getAttribute('href')||'';if(!h||h.charAt(0)==='#'||/^(https?:|mailto:|tel:|javascript:)/i.test(h))return;"
+                + "if(/\\.html?(?:[?#]|$)/i.test(h)||/\\.[a-z0-9]+(?:[?#]|$)/i.test(h))return;"
+                + "if(/^(dashboard|login|home|order|qr-order|kds|tokens|bill|feedback|index)(?:[?#]|$)/i.test(h)){"
+                + "ev.preventDefault();location.href=h.replace(/^([^?#]+)/,function(m){return m.replace(/\\/?$/,'')+'.html';});}"
+                + "},true);}"
+                + "}catch(e){}}"
                 + "document.documentElement.setAttribute('data-rs-android','1');"
                 + "document.documentElement.setAttribute('data-rs-native','1');"
                 + "document.documentElement.classList.add('rs-android-app','rs-native-app');"
+                + "try{if(window.RS_API&&typeof RS_API.refreshConfig==='function')RS_API.refreshConfig();"
+                + "else if(window.__SUPABASE_URL__&&window.RS_API){window.RS_API.configured=true;}}catch(e){}"
                 + "var s=document.getElementById('rs-android-app-css');"
                 + "if(!s){s=document.createElement('style');s.id='rs-android-app-css';"
                 + "s.textContent="
