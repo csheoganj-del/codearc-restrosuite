@@ -33,6 +33,7 @@
     { ic: 'fa-bullhorn', bg: 'bg-o', t: 'WhatsApp Campaigns', d: 'Broadcast to your customer list', m: 'Open' },
     { ic: 'fa-star', bg: 'bg-v', t: 'Feedback & Reviews', d: 'Collect & respond to ratings', m: 'Open' },
     { ic: 'fa-gift', bg: 'bg-g', t: 'Loyalty Program', d: 'Points, tiers & rewards', m: 'Open' },
+    { ic: 'fa-graduation-cap', bg: 'bg-a', t: 'Learning Center', d: 'PDFs, videos & training for your team', m: 'Open' },
   ];
 
   function liveMeta(title) {

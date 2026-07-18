@@ -4900,7 +4900,8 @@
       {ic:'fa-tags',bg:'bg-a',t:'Offers & Coupons',d:'Build promos & festival deals',m:'Open module'},
       {ic:'fa-bullhorn',bg:'bg-o',t:'WhatsApp Campaigns',d:'Broadcast to your customer list',m:'Open module'},
       {ic:'fa-star',bg:'bg-v',t:'Feedback & Reviews',d:'Collect & respond to ratings',m:'Open module'},
-      {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'Open module'}
+      {ic:'fa-gift',bg:'bg-g',t:'Loyalty Program',d:'Points, tiers & rewards',m:'Open module'},
+      {ic:'fa-graduation-cap',bg:'bg-a',t:'Learning Center',d:'PDFs, videos & training for your team',m:'Open module'}
     ];
     function renderHub(){
       const grid = $('#hub-grid');
@@ -4923,6 +4924,97 @@
     }
     function hubLocalSave(kind, rows) {
       try { localStorage.setItem(hubLocalKey(kind), JSON.stringify(rows || [])); } catch (e) {}
+    }
+
+    /** Built-in learning pack (PDFs already in /downloads). Videos/links added by staff. */
+    function learningCenterDefaults() {
+      const base = (function () {
+        try {
+          const h = (location.hostname || '').toLowerCase();
+          if (h === 'localhost' || h === '127.0.0.1') return 'https://restrosuite.codearc.co.in';
+          return location.origin || 'https://restrosuite.codearc.co.in';
+        } catch (_) {
+          return 'https://restrosuite.codearc.co.in';
+        }
+      })();
+      return [
+        {
+          id: 'learn-pdf-product',
+          title: 'Product features guide',
+          type: 'pdf',
+          category: 'Product',
+          description: 'Full brochure of client modules for owners evaluating RestroSuite.',
+          url: base + '/downloads/RestroSuite-Product-Features-Guide.pdf',
+          builtin: true,
+          createdAt: '2026-07-16',
+        },
+        {
+          id: 'learn-pdf-desktop',
+          title: 'Desktop / web onboarding',
+          type: 'pdf',
+          category: 'Getting started',
+          description: 'Step-by-step with screenshots — every tab and flow on desktop.',
+          url: base + '/downloads/RestroSuite-Complete-Onboarding-Guide.pdf',
+          builtin: true,
+          createdAt: '2026-07-17',
+        },
+        {
+          id: 'learn-pdf-mobile',
+          title: 'Mobile / Android onboarding',
+          type: 'pdf',
+          category: 'Getting started',
+          description: 'Phone layout, bottom nav, More menu, checkout bar.',
+          url: base + '/downloads/RestroSuite-Mobile-Onboarding-Guide.pdf',
+          builtin: true,
+          createdAt: '2026-07-17',
+        },
+        {
+          id: 'learn-video-placeholder',
+          title: 'Training videos (coming soon)',
+          type: 'video',
+          category: 'Videos',
+          description: 'Upload or link YouTube / Drive training videos here when ready.',
+          url: '',
+          builtin: true,
+          placeholder: true,
+          createdAt: '2026-07-18',
+        },
+      ];
+    }
+    function learningTypeIcon(type) {
+      const t = String(type || 'link').toLowerCase();
+      if (t === 'pdf') return 'fa-file-pdf';
+      if (t === 'video') return 'fa-circle-play';
+      if (t === 'doc') return 'fa-file-lines';
+      return 'fa-link';
+    }
+    function learningCenterListHtml(rows) {
+      if (!rows || !rows.length) {
+        return '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-graduation-cap"></i></div><div style="font-weight:700;margin-bottom:4px">No materials yet</div><div style="font-size:13px;color:var(--text-soft)">Add a PDF, video link, or document for your team.</div></div>';
+      }
+      return `<div style="display:flex;flex-direction:column;gap:10px">` + rows.map((r) => {
+        const type = String(r.type || 'link').toLowerCase();
+        const ic = learningTypeIcon(type);
+        const cat = r.category || 'General';
+        const isPh = !!r.placeholder || !r.url;
+        return `<div class="learn-card" data-learn-type="${esc(type)}" style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--stroke);border-radius:14px;background:var(--panel)">
+          <div style="width:42px;height:42px;border-radius:12px;background:var(--orange-tint,rgba(255,79,0,.12));display:grid;place-items:center;flex-shrink:0;color:var(--orange)">
+            <i class="fa-solid ${ic}"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;font-size:14px;color:var(--text)">${esc(r.title || 'Untitled')}</div>
+            <div style="font-size:11px;color:var(--text-mute);margin-top:2px;text-transform:uppercase;letter-spacing:.04em">${esc(type)} · ${esc(cat)}${r.builtin ? ' · Built-in' : ''}</div>
+            <div style="font-size:12.5px;color:var(--text-soft);margin-top:6px;line-height:1.45">${esc(r.description || '')}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+            ${isPh
+              ? `<span class="btn btn-ghost btn-sm" style="opacity:.6;cursor:default;pointer-events:none">Soon</span>`
+              : `<button type="button" class="btn btn-primary btn-sm" data-learn-open="${esc(r.id)}"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open</button>
+                 <button type="button" class="btn btn-ghost btn-sm" data-learn-copy="${esc(r.id)}"><i class="fa-solid fa-copy"></i></button>`}
+            ${r.builtin ? '' : `<button type="button" class="btn btn-ghost btn-sm" data-learn-del="${esc(r.id)}" title="Remove" style="color:var(--red,#b91c1c)"><i class="fa-solid fa-trash"></i></button>`}
+          </div>
+        </div>`;
+      }).join('') + `</div>`;
     }
 
     async function hubSave(coll, row) {
@@ -5209,6 +5301,34 @@
             }).join(''))
           : '<div class="sr-empty"><div style="font-size:28px;opacity:.35;margin-bottom:8px"><i class="fa-solid fa-star"></i></div><div style="font-weight:700;margin-bottom:4px">No reviews yet</div><div style="font-size:13px;color:var(--text-soft)">Share the guest QR link (also on digital bills) or log walk-out scores. Approve what goes on the homepage.</div></div>');
       }
+      else if(name==='Learning Center'){
+        icon = 'fa-graduation-cap';
+        sub = 'PDFs · videos · links · team training';
+        size = 'lg';
+        const builtin = learningCenterDefaults();
+        const custom = hubLocalList('learning');
+        // Custom first (newest), then built-in guides not overridden by id
+        const customIds = new Set(custom.map((r) => String(r.id)));
+        records = custom.concat(builtin.filter((b) => !customIds.has(String(b.id))));
+        const byType = (t) => records.filter((r) => String(r.type || '').toLowerCase() === t).length;
+        body = `
+          <div class="crm-stats" style="margin-bottom:12px">
+            <div class="cs"><div class="csv">${records.length}</div><div class="csl">Materials</div></div>
+            <div class="cs"><div class="csv">${byType('pdf')}</div><div class="csl">PDFs</div></div>
+            <div class="cs"><div class="csv">${byType('video')}</div><div class="csl">Videos</div></div>
+            <div class="cs"><div class="csv">${byType('link') + byType('doc')}</div><div class="csl">Links / docs</div></div>
+          </div>
+          <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px;line-height:1.5">
+            Train staff with guides and videos. Built-in PDFs ship with RestroSuite; add your own links or uploads
+            (videos via YouTube/Drive URL for now — keep files small if uploading PDF).
+          </p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            ${['all','pdf','video','link','doc'].map((t) =>
+              `<button type="button" class="btn btn-ghost btn-sm" data-learn-filter="${t}" style="border-radius:999px">${t === 'all' ? 'All' : t.toUpperCase()}</button>`
+            ).join('')}
+          </div>
+          <div id="learn-list">${learningCenterListHtml(records)}</div>`;
+      }
       else if(name==='Purchase Orders'){ 
         RS.activateTab('inventory-tab'); 
         setTimeout(()=>{
@@ -5224,6 +5344,7 @@
       const hideNewBtn = ['Recipe Costing', 'Loyalty Program'].includes(name);
       const newLabel = name === 'WhatsApp Campaigns' ? 'New campaign'
         : name === 'Feedback & Reviews' ? 'Log review'
+        : name === 'Learning Center' ? 'Add material'
         : 'New';
 
       RSModal.open({ title:name, sub, icon, size, body,
@@ -5263,6 +5384,67 @@
                 window.open(guestOrderBaseUrl() + '/feedback?tenant=' + encodeURIComponent(slug), '_blank', 'noopener');
               } catch (e) {}
             };
+          }
+
+          // Learning Center: filter / open / copy / delete
+          if (name === 'Learning Center') {
+            const allRows = (function () {
+              const builtin = learningCenterDefaults();
+              const custom = hubLocalList('learning');
+              const ids = new Set(custom.map((r) => String(r.id)));
+              return custom.concat(builtin.filter((b) => !ids.has(String(b.id))));
+            })();
+            const listEl = modal.querySelector('#learn-list');
+            const applyFilter = (ft) => {
+              modal.querySelectorAll('[data-learn-filter]').forEach((b) => {
+                const on = b.getAttribute('data-learn-filter') === ft;
+                b.classList.toggle('btn-primary', on);
+                b.classList.toggle('btn-ghost', !on);
+              });
+              const filtered = ft === 'all' ? allRows : allRows.filter((r) => String(r.type || '').toLowerCase() === ft);
+              if (listEl) listEl.innerHTML = learningCenterListHtml(filtered);
+              wireLearnRows();
+            };
+            const findRow = (id) => allRows.find((r) => String(r.id) === String(id));
+            function wireLearnRows() {
+              modal.querySelectorAll('[data-learn-open]').forEach((btn) => {
+                btn.onclick = () => {
+                  const row = findRow(btn.getAttribute('data-learn-open'));
+                  if (!row || !row.url) {
+                    RS.toast('No link yet — add a video or PDF URL', 'fa-circle-info');
+                    return;
+                  }
+                  window.open(row.url, '_blank', 'noopener');
+                };
+              });
+              modal.querySelectorAll('[data-learn-copy]').forEach((btn) => {
+                btn.onclick = async () => {
+                  const row = findRow(btn.getAttribute('data-learn-copy'));
+                  if (!row || !row.url) return;
+                  try {
+                    await navigator.clipboard.writeText(row.url);
+                    RS.toast('Link copied', 'fa-copy');
+                  } catch (_) {
+                    RS.toast('Could not copy', 'fa-circle-exclamation');
+                  }
+                };
+              });
+              modal.querySelectorAll('[data-learn-del]').forEach((btn) => {
+                btn.onclick = () => {
+                  const id = btn.getAttribute('data-learn-del');
+                  if (!window.confirm('Remove this learning material?')) return;
+                  const next = hubLocalList('learning').filter((r) => String(r.id) !== String(id));
+                  hubLocalSave('learning', next);
+                  RS.toast('Material removed', 'fa-trash');
+                  close();
+                  hubScreen('Learning Center');
+                };
+              });
+            }
+            modal.querySelectorAll('[data-learn-filter]').forEach((b) => {
+              b.onclick = () => applyFilter(b.getAttribute('data-learn-filter') || 'all');
+            });
+            applyFilter('all');
           }
 
           // Row actions: tickets / reservations / offers
@@ -5650,6 +5832,109 @@
                       RS.toast('Campaign saved · send from the list', 'fa-bullhorn');
                     };
                     load();
+                  },
+                });
+              } else if (name === 'Learning Center') {
+                const formBody = `
+                  <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Title</label>
+                      <input type="text" id="ln-title" class="form-control" placeholder="e.g. POS training week 1" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    </div>
+                    <div class="form-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Type</label>
+                        <select id="ln-type" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                          <option value="pdf">PDF guide</option>
+                          <option value="video">Video (YouTube / Drive link)</option>
+                          <option value="link">Web link</option>
+                          <option value="doc">Document / other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Category</label>
+                        <select id="ln-cat" class="form-control" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                          <option value="Getting started">Getting started</option>
+                          <option value="POS">POS</option>
+                          <option value="Kitchen">Kitchen</option>
+                          <option value="Product">Product</option>
+                          <option value="Videos">Videos</option>
+                          <option value="Internal">Internal / outlet</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">URL (PDF, video, or page)</label>
+                      <input type="url" id="ln-url" class="form-control" placeholder="https://… or /downloads/your-guide.pdf" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text)">
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Or upload a small PDF (optional, max ~2 MB)</label>
+                      <input type="file" id="ln-file" accept=".pdf,application/pdf" style="width:100%;font-size:12px">
+                    </div>
+                    <div>
+                      <label class="form-label" style="display:block;font-size:12px;margin-bottom:4px;color:var(--text-soft)">Description</label>
+                      <textarea id="ln-desc" rows="2" class="form-control" placeholder="What should staff learn from this?" style="width:100%;padding:8px;border:1px solid var(--stroke);border-radius:6px;background:var(--panel);color:var(--text);resize:vertical"></textarea>
+                    </div>
+                  </div>`;
+                RSModal.open({
+                  title: 'Add learning material',
+                  sub: 'PDF, video link, or training doc',
+                  icon: 'fa-graduation-cap',
+                  size: 'sm',
+                  body: formBody,
+                  foot: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-confirm><i class="fa-solid fa-plus"></i> Save</button>`,
+                  onMount(lnModal, lnClose) {
+                    lnModal.querySelector('[data-cancel]').onclick = lnClose;
+                    lnModal.querySelector('[data-confirm]').onclick = async () => {
+                      const title = (lnModal.querySelector('#ln-title').value || '').trim();
+                      if (!title) {
+                        RS.toast('Enter a title', 'fa-circle-exclamation');
+                        return;
+                      }
+                      let url = (lnModal.querySelector('#ln-url').value || '').trim();
+                      const type = lnModal.querySelector('#ln-type').value || 'link';
+                      const category = lnModal.querySelector('#ln-cat').value || 'General';
+                      const description = (lnModal.querySelector('#ln-desc').value || '').trim();
+                      const fileInput = lnModal.querySelector('#ln-file');
+                      const file = fileInput && fileInput.files && fileInput.files[0];
+                      if (file) {
+                        if (file.size > 2.2 * 1024 * 1024) {
+                          RS.toast('PDF too large (max ~2 MB). Host online and paste URL instead.', 'fa-circle-exclamation');
+                          return;
+                        }
+                        try {
+                          url = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(String(reader.result || ''));
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                          });
+                        } catch (e) {
+                          RS.toast('Could not read file', 'fa-circle-exclamation');
+                          return;
+                        }
+                      }
+                      if (!url) {
+                        RS.toast('Add a URL or upload a PDF', 'fa-circle-exclamation');
+                        return;
+                      }
+                      const row = {
+                        id: 'learn_' + Date.now(),
+                        title,
+                        type: file ? 'pdf' : type,
+                        category,
+                        description,
+                        url,
+                        builtin: false,
+                        createdAt: new Date().toISOString(),
+                      };
+                      const prev = hubLocalList('learning');
+                      prev.unshift(row);
+                      hubLocalSave('learning', prev.slice(0, 100));
+                      lnClose();
+                      RS.toast('Learning material saved', 'fa-graduation-cap');
+                      hubScreen('Learning Center');
+                    };
                   },
                 });
               } else if (name === 'Feedback & Reviews') {
