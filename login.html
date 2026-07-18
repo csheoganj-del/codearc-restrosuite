@@ -27,6 +27,8 @@
 <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
 <meta name="theme-color" content="#FF4F00">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+<!-- Native shells (Android offline / early inject): sets ENV_SUPABASE_* before config.js -->
+<script src="env-config.js"></script>
 <script src="config.js"></script>
 <script>
   // Ensure we read runtime config (window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__)

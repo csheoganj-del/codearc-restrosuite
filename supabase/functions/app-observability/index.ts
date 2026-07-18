@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://codearc-restrosuite.vercel.app";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist (see tenant-access for rationale). Configure extra
 // origins via ALLOWED_ORIGINS="https://a.com,https://b.com". Never suffix-match.
 const ALLOWED_ORIGINS = new Set(
@@ -11,10 +11,20 @@ const ALLOWED_ORIGINS = new Set(
     .filter(Boolean),
 );
 ALLOWED_ORIGINS.add(ALLOWED_ORIGIN.replace(/\/+$/, ""));
+for (const o of [
+  "https://restrosuite.codearc.co.in",
+  "https://restrosuite-live.vercel.app",
+  "https://codearc-restrosuite.vercel.app",
+  "https://appassets.androidplatform.net",
+  "http://localhost:8001",
+  "http://127.0.0.1:8001",
+]) {
+  ALLOWED_ORIGINS.add(o);
+}
 
 function getCorsHeaders(req: Request) {
   const origin = (req.headers.get("origin") || "").replace(/\/+$/, "");
-  const allowed = ALLOWED_ORIGINS.has(origin) ? origin : ALLOWED_ORIGIN;
+  const allowed = !origin ? ALLOWED_ORIGIN : (ALLOWED_ORIGINS.has(origin) ? origin : ALLOWED_ORIGIN);
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

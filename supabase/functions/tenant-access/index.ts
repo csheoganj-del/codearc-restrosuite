@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://codearc-restrosuite.vercel.app";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist. Add extra origins (e.g. preview deploys, custom domain)
 // via ALLOWED_ORIGINS="https://app.example.com,https://preview.example.com".
 // SECURITY: never use suffix matches like .endsWith(".vercel.app") — any attacker can
@@ -13,10 +13,26 @@ const ALLOWED_ORIGINS = new Set(
     .filter(Boolean),
 );
 ALLOWED_ORIGINS.add(ALLOWED_ORIGIN.replace(/\/+$/, ""));
+// Built-in product hosts (always allow even if secret not updated yet)
+for (const o of [
+  "https://restrosuite.codearc.co.in",
+  "https://restrosuite-live.vercel.app",
+  "https://codearc-restrosuite.vercel.app",
+  // Android WebViewAssetLoader offline shell
+  "https://appassets.androidplatform.net",
+  // Electron desktop local server
+  "http://localhost:8001",
+  "http://127.0.0.1:8001",
+]) {
+  ALLOWED_ORIGINS.add(o);
+}
 
 function getCorsHeaders(req: Request) {
   const origin = (req.headers.get("origin") || "").replace(/\/+$/, "");
-  const allowed = ALLOWED_ORIGINS.has(origin) ? origin : ALLOWED_ORIGIN;
+  // No Origin header (some WebViews / same-origin tooling) — reflect default app host
+  const allowed = !origin
+    ? ALLOWED_ORIGIN
+    : (ALLOWED_ORIGINS.has(origin) ? origin : ALLOWED_ORIGIN);
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

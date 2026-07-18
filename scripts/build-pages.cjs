@@ -19,7 +19,7 @@ const ROOT_FILES = [
   'order.html', 'qr-order.html', 'kds.html', 'tokens.html', 'privacy.html',
   'terms.html', 'refund-policy.html', 'feedback.html', '404.html',
   'install.html', 'status.html',
-  'config.js', 'pwa.js', 'script.js', 'service-worker.js', 'manifest.webmanifest',
+  'config.js', 'env-config.js', 'pwa.js', 'script.js', 'service-worker.js', 'manifest.webmanifest',
   'app-update.json', 'robots.txt', 'sitemap.xml', 'styles.css',
   'dashboard-styles.css', 'legal.css',
   // Vercel cleanUrls + /login → /login.html rewrites (needed when deploying this folder)

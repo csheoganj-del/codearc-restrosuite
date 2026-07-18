@@ -33,6 +33,7 @@ $FilesToCopy = @(
     "bill.html",
     "app-update.json",
     "config.js",
+    "env-config.js",
     "styles.css",
     "script.js",
     "recipes.json",

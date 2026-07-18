@@ -23,7 +23,7 @@ const ROOT_FILES = [
   'index.html', 'login.html', 'dashboard.html', 'home.html', 'order.html',
   'qr-order.html', 'kds.html', 'tokens.html', 'bill.html', 'privacy.html',
   'terms.html', 'refund-policy.html', '404.html',
-  'config.js', 'pwa.js', 'service-worker.js', 'script.js',
+  'config.js', 'env-config.js', 'pwa.js', 'service-worker.js', 'script.js',
   'manifest.webmanifest', 'robots.txt', 'sitemap.xml',
 ];
 
