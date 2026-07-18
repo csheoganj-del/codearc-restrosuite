@@ -1,35 +1,35 @@
 {
-  "generatedAt": "2026-07-17T15:14:39.804Z",
+  "generatedAt": "2026-07-18T10:07:40.374Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "2.0.0",
-    "title": null,
-    "summary": null,
+    "version": "v212-20260718-session-logout-fix",
+    "title": "Session resume, logout UX & multi-device builds",
+    "summary": "Keep-me-signed-in works after tab close; Sign out no longer double-prompts; homepage returns staff to console; Desktop 2.0.4 and Android 2.0.4 bundles.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
-    "version": "2.0.3",
+    "version": "2.0.4",
     "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
     "nsis": {
       "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Setup.exe",
-      "feedFile": "RestroSuite-2.0.3-x64.exe",
-      "size": 84916205,
-      "sizeLabel": "81.0 MB"
+      "feedFile": "RestroSuite-2.0.4-x64.exe",
+      "size": 84854439,
+      "sizeLabel": "80.9 MB"
     },
     "portable": {
       "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Windows-Portable.exe",
-      "size": 84611332,
-      "sizeLabel": "80.7 MB"
+      "size": 84539693,
+      "sizeLabel": "80.6 MB"
     }
   },
   "android": {
-    "versionName": "2.0.2",
-    "versionCode": 4,
+    "versionName": "2.0.4",
+    "versionCode": 5,
     "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Android.apk",
-    "size": 12544161,
-    "sizeLabel": "12.0 MB",
-    "notes": "Performance and reliability improvements."
+    "size": 12729096,
+    "sizeLabel": "12.1 MB",
+    "notes": "Keep-me-signed-in works after tab close; Sign out no longer double-prompts; homepage returns staff to console; Desktop 2.0.4 and Android 2.0.4 bundles."
   }
 }

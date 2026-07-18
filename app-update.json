@@ -1,12 +1,12 @@
-﻿{
-    "version":  "v211-20260717-session-print-fix",
-    "date":  "2026-07-17",
-    "title":  "Session, printer \u0026 desktop stability",
-    "summary":  "Keep-me-signed-in / offline resume fix, desktop login proxy, printer modal (no prompt crash), critical.bundle syntax fix, station bar UI.",
-    "highlights":  [
-                       "Keep me signed in and offline resume work again on web and desktop",
-                       "Windows EXE login matches browser (Edge Function proxy)",
-                       "Printer picker uses a proper dialog (Electron-safe)",
-                       "Dashboard no longer crashes on critical.bundle syntax error"
-                   ]
+{
+  "version": "v212-20260718-session-logout-fix",
+  "date": "2026-07-18",
+  "title": "Session resume, logout UX & multi-device builds",
+  "summary": "Keep-me-signed-in works after tab close; Sign out no longer double-prompts; homepage returns staff to console; Desktop 2.0.4 and Android 2.0.4 bundles.",
+  "highlights": [
+    "Keep me signed in survives closing the browser tab",
+    "Single in-app Sign out dialog (no double system alerts)",
+    "Sticky signed-out flag fixed so auto-login works again",
+    "Desktop 2.0.4 + Android 2.0.4 with matching session fixes"
+  ]
 }
