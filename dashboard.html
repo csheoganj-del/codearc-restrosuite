@@ -1745,19 +1745,14 @@
 <script src="src/dashboard/chain.js"></script>
 <script>
   (function() {
-    var lockMessage = 'You may have unsynced data. Confirm logout only if you understand bills may still be pending upload.';
+    // Single logout entry-point: one in-app modal (no native confirm spam).
+    var lockToast = 'Stay signed in if you may still have bills waiting to sync.';
 
     function queueDepth() {
       try {
         if (typeof window.RS_DB_SYNC_DEPTH === 'function') return window.RS_DB_SYNC_DEPTH() || 0;
         return Number(window.__rsSyncQueueDepth || 0) || 0;
       } catch (e) { return 0; }
-    }
-
-    function hasRecentCloudFailure() {
-      var last = window.RS_LAST_CLOUD_ERROR;
-      // Only treat as soft warning (not hard lock)  -  60s window
-      return !!(last && last.time && (Date.now() - last.time < 60000));
     }
 
     function trulyOffline() {
@@ -1768,10 +1763,8 @@
       }
     }
 
-    // Soft lock: warn when offline or queue has money rows; allow force logout with confirm
     window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE = function() {
       try {
-        if (document.body.classList.contains('rs-offline-lock') && trulyOffline()) return true;
         if (trulyOffline()) return true;
         if (queueDepth() > 0) return true;
         return false;
@@ -1780,49 +1773,115 @@
       }
     };
 
-    window.RS_SHOW_OFFLINE_LOGOUT_LOCK = function() {
+    function logoutCopy() {
       var depth = queueDepth();
-      var msg = depth > 0
-        ? (depth + ' change(s) still pending cloud sync. Logout anyway? Unsynced bills stay on this device until you sign in again.')
-        : 'You appear offline. Logout anyway? Prefer staying signed in until connection returns.';
-      var ok = false;
-      try { ok = window.confirm(msg); } catch (e) { ok = false; }
-      if (!ok) {
-        if (window.RS && typeof window.RS.toast === 'function') {
-          window.RS.toast(lockMessage, 'fa-cloud-arrow-up');
-        }
+      if (depth > 0) {
+        return {
+          title: 'Unsynced changes',
+          icon: 'fa-cloud-arrow-up',
+          body: '<p style="color:var(--text-soft);font-size:14.5px;line-height:1.5;margin:0">' +
+            '<b style="color:var(--text)">' + depth + ' change' + (depth === 1 ? '' : 's') + '</b> still waiting to upload. ' +
+            'If you sign out now, unsynced bills stay on this device until you sign in again.</p>',
+          ok: 'Sign out anyway'
+        };
+      }
+      if (trulyOffline()) {
+        return {
+          title: 'You appear offline',
+          icon: 'fa-wifi',
+          body: '<p style="color:var(--text-soft);font-size:14.5px;line-height:1.5;margin:0">' +
+            'Connection looks down. Prefer staying signed in until you are back online so you do not lose local work.</p>',
+          ok: 'Sign out anyway'
+        };
+      }
+      return {
+        title: 'Sign out?',
+        icon: 'fa-right-from-bracket',
+        body: '<p style="color:var(--text-soft);font-size:14.5px;line-height:1.5;margin:0">' +
+          'This ends your session on this device. Unsaved cart items may be cleared if someone else signs in here.</p>',
+        ok: 'Sign out'
+      };
+    }
+
+    async function doSignOut() {
+      try { if (window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); } catch (e) {}
+      try {
+        if (window.RS_DB && typeof window.RS_DB.signOut === 'function') await window.RS_DB.signOut();
+        else if (window.RS_API && typeof window.RS_API.logout === 'function') window.RS_API.logout();
+      } catch (e) {
+        try { if (window.RS_API && window.RS_API.logout) window.RS_API.logout(); } catch (e2) {}
+      }
+      try { sessionStorage.clear(); } catch (e3) {}
+      location.href = 'login?stay=1';
+    }
+
+    function openLogoutModal() {
+      if (window.__RS_LOGOUT_MODAL_OPEN__) return;
+      window.__RS_LOGOUT_MODAL_OPEN__ = true;
+      var copy = logoutCopy();
+      var done = function() { window.__RS_LOGOUT_MODAL_OPEN__ = false; };
+
+      if (window.RSModal && typeof window.RSModal.open === 'function') {
+        window.RSModal.open({
+          title: copy.title,
+          icon: copy.icon,
+          size: 'sm',
+          body: copy.body,
+          foot:
+            '<button type="button" class="btn btn-ghost" style="flex:1" data-x>Stay signed in</button>' +
+            '<button type="button" class="btn btn-primary" style="flex:1;background:var(--red,#ef4444);box-shadow:none" data-ok>' +
+            '<i class="fa-solid fa-right-from-bracket"></i> ' + copy.ok + '</button>',
+          onMount: function(modal, close) {
+            var cancel = modal.querySelector('[data-x]');
+            var ok = modal.querySelector('[data-ok]');
+            if (cancel) cancel.onclick = function() {
+              done();
+              close();
+              if (window.RS && typeof window.RS.toast === 'function') {
+                window.RS.toast(lockToast, 'fa-shield-halved');
+              }
+            };
+            if (ok) ok.onclick = function() {
+              done();
+              close();
+              doSignOut();
+            };
+          }
+        });
         return;
       }
-      // Force logout path  -  clear soft lock and re-click after releasing guard
-      window.__RS_FORCE_LOGOUT__ = true;
+
+      // Fallback only if RSModal not loaded yet
+      var ok = false;
       try {
-        if (window.RS_API && typeof RS_API.signOut === 'function') {
-          RS_API.signOut();
-          return;
-        }
-      } catch (e) {}
-      try {
-        sessionStorage.clear();
-      } catch (e2) {}
-      location.href = 'login.html';
+        ok = window.confirm(copy.title + '\n\n' + copy.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+      } catch (e) { ok = false; }
+      done();
+      if (ok) doSignOut();
+      else if (window.RS && typeof window.RS.toast === 'function') {
+        window.RS.toast(lockToast, 'fa-shield-halved');
+      }
+    }
+
+    // Public API — used by shell / dashboard / mobile more sheet
+    window.RS_REQUEST_LOGOUT = function() {
+      openLogoutModal();
+    };
+    window.RS_SHOW_OFFLINE_LOGOUT_LOCK = function() {
+      openLogoutModal();
     };
 
+    // Capture-phase for sidebar / settings logout only.
+    // Mobile "More → Sign out" uses data-go="logout" and calls RS_REQUEST_LOGOUT after closing its sheet.
     document.addEventListener('click', function(e) {
-      var target = e.target && e.target.closest && e.target.closest('.logout, [data-go="logout"], #sa-settings-logout');
+      var target = e.target && e.target.closest && e.target.closest('.sb-foot-btn.logout, button.logout, a.logout, #sa-settings-logout');
       if (!target) return;
-      if (window.__RS_FORCE_LOGOUT__) {
-        window.__RS_FORCE_LOGOUT__ = false;
-        return;
-      }
-      if (!window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return;
-      // Soft warn on recent cloud errors only
-      if (!trulyOffline() && queueDepth() === 0 && hasRecentCloudFailure()) {
-        return; // allow logout after brief cloud blip
-      }
+      // Ignore cards inside other modals that only tag data-go
+      if (target.getAttribute && target.getAttribute('data-go') === 'logout' && !target.classList.contains('logout')) return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+      openLogoutModal();
     }, true);
   })();
 </script>

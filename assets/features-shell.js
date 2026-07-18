@@ -2150,26 +2150,17 @@
       // ── Reflect signed-in user on sidebar pill ────────────────────────
       if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
 
-      // ── Route sign-out through the data layer ─────────────────────────
+      // Sign-out: single path via RS_REQUEST_LOGOUT (dashboard.html) — no second confirm.
       const logout = document.querySelector('.sb-foot-btn.logout');
-      if(logout){
+      if (logout) {
         logout.removeAttribute('onclick');
-        logout.addEventListener('click', async ()=>{
-          if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
-            if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-            else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
-            return;
-          }
-          const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
-          if(!confirm(msg)) return;
-          // Stop background gateway polling so the reconnect loop can't
-          // delay or wedge the navigation to the login page.
-          try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(e){}
-          try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
-          try{ if(window.RS_API) RS_API.logout(); }catch(e){}
-          // stay=1: do not auto-login after intentional sign-out
-          location.href='login?stay=1';
-        });
+        // Capture handler in dashboard.html owns the click; keep a safe fallback only.
+        if (typeof window.RS_REQUEST_LOGOUT !== 'function') {
+          logout.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+          });
+        }
       }
     })();
 
@@ -2217,22 +2208,10 @@
             if (legacy) legacy.style.display = 'none';
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
-                if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
-                  if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-                  else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
-                  return;
-                }
-                const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
-                if(!confirm(msg)) return;
+                // Capture handler + RS_REQUEST_LOGOUT show one in-app modal
                 close();
-                try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(err){}
-                const goLogin = () => { location.href = 'login?stay=1'; };
-                if (window.RS_DB) {
-                  RS_DB.signOut().then(goLogin).catch(goLogin);
-                } else {
-                  try { if (window.RS_API) RS_API.logout(); } catch (_) {}
-                  goLogin();
-                }
+                if (typeof window.RS_REQUEST_LOGOUT === 'function') window.RS_REQUEST_LOGOUT();
+                else if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
               } else {
                 close();
                 if (legacy) legacy.style.display = 'none';

@@ -3030,60 +3030,8 @@
     }
   }).catch(()=>{});
 
-  function showOfflineLogoutLock(){
-    if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) {
-      window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-      return;
-    }
-    toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
-  }
-
-  function hasRecentCloudFailure(){
-    const last = window.RS_LAST_CLOUD_ERROR;
-    return !!(last && last.time && (Date.now() - last.time < 120000));
-  }
-
-  async function logoutWouldLockOut(){
-    if (window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()) return true;
-    if (navigator.onLine === false || window.__OFFLINE_CONFIG__ || hasRecentCloudFailure()) return true;
-    if (!(window.RS_API && RS_API.configured)) return false;
-
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), 1800) : null;
-    try {
-      const response = await fetch('/api/config?logout_probe=' + Date.now(), {
-        cache: 'no-store',
-        signal: controller ? controller.signal : undefined
-      });
-      return !response.ok;
-    } catch(e) {
-      return true;
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
-
-  // Wire up logout button cleanly
-  $$('.logout').forEach(b => {
-    b.addEventListener('click', async e => {
-      e.preventDefault();
-      e.stopPropagation();
-      if(await logoutWouldLockOut()){
-        showOfflineLogoutLock();
-        return;
-      }
-      const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
-      if(!confirm(msg)) return;
-      try {
-        if (window.RS_DB && typeof RS_DB.signOut === 'function') await RS_DB.signOut();
-        else if (window.RS_API) RS_API.logout();
-      } catch (err) {
-        try { if (window.RS_API) RS_API.logout(); } catch (_) {}
-      }
-      // stay=1 disables keep-me-signed-in auto-resume on the login page
-      location.href = 'login?stay=1';
-    });
-  });
+  // Logout is handled once by dashboard.html capture → window.RS_REQUEST_LOGOUT (in-app modal).
+  // Do not attach a second confirm() here — it caused double native dialogs.
 
   // superadmin toggle (role switch demo) -- only show for non-superadmin users
   if(!isSuper) {
