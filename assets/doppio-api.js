@@ -250,7 +250,7 @@
   const EXPLICIT_LOGOUT_KEY = 'rs_explicit_logout_v1';
   function markExplicitLogout(){
     try {
-      // Blocks keep-me-signed-in auto-resume until the next successful login.
+      // Always unscoped — never tenant-prefix (blocks resume incorrectly).
       rawLocalSet(EXPLICIT_LOGOUT_KEY, String(Date.now()));
       try { LS_SESS.setItem(EXPLICIT_LOGOUT_KEY, String(Date.now())); } catch (_) {}
     } catch (_) {}
@@ -258,12 +258,42 @@
   function clearExplicitLogout(){
     try { LS_SESS.removeItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
     rawLocalRemove(EXPLICIT_LOGOUT_KEY);
+    // Wipe any legacy tenant-scoped copies (rs_t:…:rs_explicit_logout_v1)
+    try {
+      const doomed = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k === EXPLICIT_LOGOUT_KEY || k.indexOf(':' + EXPLICIT_LOGOUT_KEY) !== -1 || k.endsWith(EXPLICIT_LOGOUT_KEY)) {
+          doomed.push(k);
+        }
+      }
+      doomed.forEach((k) => rawLocalRemove(k));
+    } catch (_) {}
   }
   function wasExplicitLogout(){
     try {
-      let v = null;
-      try { v = LS_SESS.getItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
-      if (!v) v = rawLocalGet(EXPLICIT_LOGOUT_KEY);
+      // If a keep-me-signed-in blob exists, a leftover logout flag is stale
+      // (often left by older tenant-scoped keys after a successful login).
+      if (hasRememberBlob()) {
+        clearExplicitLogout();
+        return false;
+      }
+      let v = rawLocalGet(EXPLICIT_LOGOUT_KEY);
+      if (!v) {
+        try { v = LS_SESS.getItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
+      }
+      if (!v) {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k === EXPLICIT_LOGOUT_KEY || k.endsWith(EXPLICIT_LOGOUT_KEY))) {
+              v = rawLocalGet(k);
+              if (v) break;
+            }
+          }
+        } catch (_) {}
+      }
       return !!v;
     } catch (_) {
       return false;

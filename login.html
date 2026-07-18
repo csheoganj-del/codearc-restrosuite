@@ -1076,8 +1076,15 @@
   }
   function justSignedOut(){
     try {
-      if (window.RS_API && typeof RS_API.wasExplicitLogout === 'function' && RS_API.wasExplicitLogout()) return true;
-      return !!localStorage.getItem('rs_explicit_logout_v1');
+      if (window.RS_API && typeof RS_API.wasExplicitLogout === 'function') {
+        return RS_API.wasExplicitLogout();
+      }
+      // Fallback: only the global key (ignore tenant-scoped leftovers)
+      try {
+        return !!Storage.prototype.getItem.call(localStorage, 'rs_explicit_logout_v1');
+      } catch (_) {
+        return !!localStorage.getItem('rs_explicit_logout_v1');
+      }
     } catch (_) { return false; }
   }
   function updateOfflineResume(){
@@ -1090,8 +1097,7 @@
       offlineResume.hidden = true;
       if (justSignedOut()) {
         try {
-          const note = document.getElementById('login-error') || document.getElementById('login-msg');
-          // Soft info only once per page view
+          // Soft info only once per page view — only when truly signed out (no saved session)
           if (!window.__rsLogoutOfflineHintShown) {
             window.__rsLogoutOfflineHintShown = true;
             showOk('Signed out. Offline access was cleared on this device — sign in online once (with Keep me signed in) to use offline again.');
@@ -1238,6 +1244,13 @@
     }
   }
 
+  // Clear sticky logout flags left by older builds, then resume if session saved.
+  try {
+    if (window.RS_API && typeof RS_API.clearExplicitLogout === 'function' &&
+        typeof RS_API.hasRememberBlob === 'function' && RS_API.hasRememberBlob()) {
+      RS_API.clearExplicitLogout();
+    }
+  } catch (_) {}
   // Hydrate remember-me as soon as API is ready (and again after config load).
   updateOfflineResume();
   setTimeout(tryAutoResumeToDashboard, 120);

@@ -48,6 +48,9 @@
     'rs:session': true,
     'rs_last_tenant_id': true,
     'rs_remembered_session_v1': true,
+    // Must stay global — tenant-scoping left a sticky "signed out" flag that blocked
+    // keep-me-signed-in after every tab close.
+    'rs_explicit_logout_v1': true,
     'restrosuite_runtime_config_v1': true,
     'rs_station_label': true,
     'rs_station_label_friendly': true,
