@@ -188,9 +188,14 @@ function main() {
   let apkMeta = null;
 
   // ── Android ──────────────────────────────────────────────────────────
+  // APK (~12MB) can stay on Vercel; if GitHub release has it, prefer that too.
+  const ghEarly = readJsonSafe(path.join(OUT, 'github-release.json'));
+  const androidGhEarly = (ghEarly && ghEarly.androidApk) || null;
+
   if (apk) {
     apkMeta = copyStable(apk, 'RestroSuite-Android.apk');
     if (apkMeta) {
+      const apkUrl = androidGhEarly || apkMeta.url;
       items.push({
         id: 'android-apk',
         kind: 'app',
@@ -202,13 +207,14 @@ function main() {
         version: androidVer.versionName || desktopPkg.version || rootPkg.version || '2.0.2',
         versionCode: androidVer.versionCode || null,
         filename: apkMeta.file,
-        url: apkMeta.url,
+        url: apkUrl,
         size: apkMeta.size,
         sizeLabel: apkMeta.sizeLabel,
         updatedAt: apkMeta.updatedAt,
         available: true,
+        host: androidGhEarly ? 'github-releases' : 'vercel',
       });
-      console.log('APK  →', apkMeta.file, apkMeta.sizeLabel, 'from', apk.name,
+      console.log('APK  →', apkUrl, apkMeta.sizeLabel, 'from', apk.name,
         `(versionCode ${androidVer.versionCode || '?'})`);
     }
   } else {
@@ -232,46 +238,75 @@ function main() {
   }
 
   // ── Windows desktop feed (auto-updater + public downloads) ───────────
+  // Large EXEs live on GitHub Releases (Vercel Hobby cannot host ~80MB files).
+  // Prefer github-release.json written by: node scripts/publish-github-release.cjs
+  const ghRelease = readJsonSafe(path.join(OUT, 'github-release.json'));
+  const winPortableUrl = (ghRelease && ghRelease.windowsPortable)
+    || (ghRelease && ghRelease.assets && ghRelease.assets.portable && ghRelease.assets.portable.url)
+    || null;
+  const winSetupUrl = (ghRelease && ghRelease.windowsSetup)
+    || (ghRelease && ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.url)
+    || null;
+  const winNsisUrl = (ghRelease && ghRelease.windowsNsis)
+    || (ghRelease && ghRelease.assets && ghRelease.assets.nsis && ghRelease.assets.nsis.url)
+    || null;
+  const androidGhUrl = (ghRelease && ghRelease.androidApk)
+    || (ghRelease && ghRelease.assets && ghRelease.assets.apk && ghRelease.assets.apk.url)
+    || null;
+
+  if (winPortableUrl || winSetupUrl) {
+    console.log('GitHub Release URLs active:', ghRelease.tag || '', ghRelease.baseUrl || '');
+  } else {
+    console.warn('No downloads/github-release.json — Windows links will 404 on Vercel until you run:');
+    console.warn('  node scripts/publish-github-release.cjs');
+  }
+
   const desk = publishDesktopFeed(desktopDir, desktopPkg);
 
-  if (desk.portableMeta || desk.nsisMeta) {
-    if (desk.portableMeta) {
+  // Public URLs: GitHub for large EXEs; site paths only if GH missing (local/dev)
+  const portablePublicUrl = winPortableUrl || '/downloads/RestroSuite-Windows-Portable.exe';
+  const setupPublicUrl = winSetupUrl || '/downloads/RestroSuite-Windows-Setup.exe';
+
+  if (desk.portableMeta || desk.nsisMeta || winPortableUrl || winSetupUrl) {
+    if (desk.portableMeta || winPortableUrl) {
       items.push({
         id: 'windows-portable',
         kind: 'app',
         platform: 'Windows',
         title: 'RestroSuite for Windows (Portable)',
-        blurb: 'Single .exe — no install. Checks for updates and opens download when a newer build ships.',
+        blurb: 'Single .exe — no install. Hosted on GitHub Releases (not Vercel) so large files always download.',
         icon: 'fa-windows',
         brand: 'brands',
         version: desktopPkg.version || '2.0.2',
         filename: 'RestroSuite-Windows-Portable.exe',
-        url: '/downloads/RestroSuite-Windows-Portable.exe',
-        size: desk.portableMeta.size,
-        sizeLabel: desk.portableMeta.sizeLabel,
-        updatedAt: desk.portableMeta.updatedAt,
+        url: portablePublicUrl,
+        size: desk.portableMeta ? desk.portableMeta.size : (ghRelease.assets && ghRelease.assets.portable && ghRelease.assets.portable.size) || 0,
+        sizeLabel: desk.portableMeta ? desk.portableMeta.sizeLabel : formatBytes((ghRelease.assets && ghRelease.assets.portable && ghRelease.assets.portable.size) || 0),
+        updatedAt: desk.portableMeta ? desk.portableMeta.updatedAt : (ghRelease.generatedAt || null),
         available: true,
+        host: winPortableUrl ? 'github-releases' : 'local',
       });
-      console.log('EXE portable → RestroSuite-Windows-Portable.exe', desk.portableMeta.sizeLabel);
+      console.log('EXE portable →', portablePublicUrl, desk.portableMeta && desk.portableMeta.sizeLabel);
     }
-    if (desk.nsisMeta) {
+    if (desk.nsisMeta || winSetupUrl) {
       items.push({
         id: 'windows-setup',
         kind: 'app',
         platform: 'Windows',
         title: 'RestroSuite for Windows (Setup)',
-        blurb: 'Full installer with Start Menu shortcuts. Auto-downloads updates in the background (recommended for shop PCs).',
+        blurb: 'Full installer with Start Menu shortcuts. Binary on GitHub Releases; auto-update feed on this site.',
         icon: 'fa-windows',
         brand: 'brands',
         version: desktopPkg.version || '2.0.2',
         filename: 'RestroSuite-Windows-Setup.exe',
-        url: '/downloads/RestroSuite-Windows-Setup.exe',
-        size: desk.nsisMeta.size,
-        sizeLabel: desk.nsisMeta.sizeLabel,
-        updatedAt: desk.nsisMeta.updatedAt,
+        url: setupPublicUrl,
+        size: desk.nsisMeta ? desk.nsisMeta.size : (ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0,
+        sizeLabel: desk.nsisMeta ? desk.nsisMeta.sizeLabel : formatBytes((ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0),
+        updatedAt: desk.nsisMeta ? desk.nsisMeta.updatedAt : (ghRelease.generatedAt || null),
         available: true,
+        host: winSetupUrl ? 'github-releases' : 'local',
       });
-      console.log('EXE setup    → RestroSuite-Windows-Setup.exe', desk.nsisMeta.sizeLabel);
+      console.log('EXE setup    →', setupPublicUrl, desk.nsisMeta && desk.nsisMeta.sizeLabel);
     }
     // Backward-compatible id used by older homepage markup
     items.push({
@@ -284,11 +319,12 @@ function main() {
       brand: 'brands',
       version: desktopPkg.version || '2.0.2',
       filename: 'RestroSuite-Windows-Portable.exe',
-      url: '/downloads/RestroSuite-Windows-Portable.exe',
+      url: portablePublicUrl,
       size: (desk.portableMeta && desk.portableMeta.size) || (desk.nsisMeta && desk.nsisMeta.size) || 0,
       sizeLabel: (desk.portableMeta && desk.portableMeta.sizeLabel) || (desk.nsisMeta && desk.nsisMeta.sizeLabel) || '—',
       updatedAt: (desk.portableMeta && desk.portableMeta.updatedAt) || (desk.nsisMeta && desk.nsisMeta.updatedAt) || null,
       available: true,
+      host: winPortableUrl ? 'github-releases' : 'local',
     });
   } else {
     items.push({
@@ -413,19 +449,22 @@ function main() {
       version: desktopPkg.version || null,
       feedUrl: SITE + '/downloads/desktop',
       latestYml: SITE + '/downloads/desktop/latest.yml',
-      nsis: desk.nsisMeta
+      host: winSetupUrl || winPortableUrl ? 'github-releases' : 'local',
+      githubRelease: ghRelease.tag || null,
+      nsis: (desk.nsisMeta || winSetupUrl)
         ? {
-            url: SITE + '/downloads/RestroSuite-Windows-Setup.exe',
+            url: setupPublicUrl.startsWith('http') ? setupPublicUrl : SITE + setupPublicUrl,
             feedFile: desk.nsisName || null,
-            size: desk.nsisMeta.size,
-            sizeLabel: desk.nsisMeta.sizeLabel,
+            nsisAsset: winNsisUrl || null,
+            size: desk.nsisMeta ? desk.nsisMeta.size : null,
+            sizeLabel: desk.nsisMeta ? desk.nsisMeta.sizeLabel : null,
           }
         : null,
-      portable: desk.portableMeta
+      portable: (desk.portableMeta || winPortableUrl)
         ? {
-            url: SITE + '/downloads/RestroSuite-Windows-Portable.exe',
-            size: desk.portableMeta.size,
-            sizeLabel: desk.portableMeta.sizeLabel,
+            url: portablePublicUrl.startsWith('http') ? portablePublicUrl : SITE + portablePublicUrl,
+            size: desk.portableMeta ? desk.portableMeta.size : null,
+            sizeLabel: desk.portableMeta ? desk.portableMeta.sizeLabel : null,
           }
         : null,
     },
@@ -433,7 +472,9 @@ function main() {
       ? {
           versionName: androidVer.versionName || desktopPkg.version || null,
           versionCode: androidVer.versionCode || 0,
-          url: SITE + '/downloads/RestroSuite-Android.apk',
+          url: (androidGhUrl || androidGhEarly)
+            ? (androidGhUrl || androidGhEarly)
+            : SITE + '/downloads/RestroSuite-Android.apk',
           size: apkMeta.size,
           sizeLabel: apkMeta.sizeLabel,
           notes: appUpdate.summary || 'Performance and reliability improvements.',
@@ -444,6 +485,24 @@ function main() {
           url: null,
         },
   };
+
+  // electron-updater: rewrite latest.yml file URLs to absolute GitHub assets
+  // (publishDesktopFeed copies relative paths from desktop/dist — fix after copy)
+  if (winNsisUrl) {
+    const ymlPath = path.join(DESKTOP_OUT, 'latest.yml');
+    if (fs.existsSync(ymlPath)) {
+      let yml = fs.readFileSync(ymlPath, 'utf8');
+      const nsisName = (desk.nsisName || path.basename(winNsisUrl)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      yml = yml.replace(new RegExp(`url:\\s*${nsisName}`, 'g'), `url: ${winNsisUrl}`);
+      yml = yml.replace(new RegExp(`^path:\\s*${nsisName}`, 'm'), `path: ${winNsisUrl}`);
+      // Also replace bare relative if still present
+      if (desk.nsisName && yml.indexOf(winNsisUrl) === -1) {
+        yml = yml.split(desk.nsisName).join(winNsisUrl);
+      }
+      fs.writeFileSync(ymlPath, yml);
+      console.log('latest.yml → absolute GitHub NSIS URL');
+    }
+  }
 
   fs.writeFileSync(path.join(OUT, 'updates.json'), JSON.stringify(updates, null, 2));
   console.log('updates.json → /downloads/updates.json');
@@ -483,10 +542,55 @@ function main() {
       'node scripts/sync-downloads.cjs',
       '```',
       '',
-      'Release flow: build desktop + android → sync-downloads → deploy site.',
+      'Release flow (large EXEs on GitHub, site on Vercel):',
+      '',
+      '```bash',
+      'cd desktop && npm run dist',
+      'node scripts/sync-downloads.cjs',
+      'node scripts/publish-github-release.cjs',
+      'node scripts/sync-downloads.cjs',
+      'npm run pages:build',
+      '```',
+      '',
+      'Then deploy `publish-static` to Vercel (no EXEs uploaded).',
       '',
     ].join('\n')
   );
+
+  // vercel-redirects fragment for optional merge (also written into vercel.json by publish script)
+  if (winSetupUrl || winPortableUrl) {
+    const redirects = [];
+    if (winSetupUrl) {
+      redirects.push({
+        source: '/downloads/RestroSuite-Windows-Setup.exe',
+        destination: winSetupUrl,
+        permanent: false,
+      });
+    }
+    if (winPortableUrl) {
+      redirects.push({
+        source: '/downloads/RestroSuite-Windows-Portable.exe',
+        destination: winPortableUrl,
+        permanent: false,
+      });
+    }
+    if (winNsisUrl && desk.nsisName) {
+      redirects.push({
+        source: '/downloads/desktop/' + desk.nsisName,
+        destination: winNsisUrl,
+        permanent: false,
+      });
+    }
+    if (androidGhUrl || androidGhEarly) {
+      redirects.push({
+        source: '/downloads/RestroSuite-Android.apk',
+        destination: androidGhUrl || androidGhEarly,
+        permanent: false,
+      });
+    }
+    fs.writeFileSync(path.join(OUT, 'vercel-redirects.json'), JSON.stringify(redirects, null, 2) + '\n');
+    console.log('Wrote downloads/vercel-redirects.json (', redirects.length, 'rules)');
+  }
 
   console.log('\nManifest written:', path.join(OUT, 'manifest.json'));
   console.log('Items:', items.filter((i) => i.available).length, 'available /', items.length, 'total');

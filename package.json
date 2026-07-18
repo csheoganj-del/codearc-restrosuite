@@ -28,6 +28,8 @@
     "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-android.ps1",
     "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release.ps1",
     "sync:downloads": "node scripts/sync-downloads.cjs",
+    "publish:release": "node scripts/publish-github-release.cjs",
+    "release:binaries": "node scripts/sync-downloads.cjs && node scripts/publish-github-release.cjs && node scripts/sync-downloads.cjs",
     "pages:build": "node scripts/build-pages.cjs"
   },
   "engines": {

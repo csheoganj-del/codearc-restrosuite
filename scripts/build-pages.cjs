@@ -75,7 +75,7 @@ function main() {
     copyDir(path.join(ROOT, d), path.join(OUT, d));
   }
 
-  // Small public downloads only (no .exe)
+  // Small public downloads only (no .exe — large binaries on GitHub Releases)
   const dl = path.join(ROOT, 'downloads');
   const dlOut = path.join(OUT, 'downloads');
   fs.mkdirSync(dlOut, { recursive: true });
@@ -83,10 +83,16 @@ function main() {
     for (const name of fs.readdirSync(dl)) {
       const src = path.join(dl, name);
       const st = fs.statSync(src);
-      if (!st.isFile()) continue;
-      if (/\.exe$/i.test(name) || /\.blockmap$/i.test(name)) continue;
-      if (st.size > 20 * 1024 * 1024) continue;
-      copyFile(src, path.join(dlOut, name));
+      if (st.isFile()) {
+        if (/\.exe$/i.test(name) || /\.blockmap$/i.test(name)) continue;
+        if (st.size > 20 * 1024 * 1024) continue;
+        copyFile(src, path.join(dlOut, name));
+      }
+    }
+    // electron-updater feed: tiny latest.yml only (EXE URLs point at GitHub)
+    const yml = path.join(dl, 'desktop', 'latest.yml');
+    if (fs.existsSync(yml) && fs.statSync(yml).size < 100 * 1024) {
+      copyFile(yml, path.join(dlOut, 'desktop', 'latest.yml'));
     }
   }
 

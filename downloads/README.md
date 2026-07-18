@@ -16,4 +16,14 @@ Regenerate:
 node scripts/sync-downloads.cjs
 ```
 
-Release flow: build desktop + android → sync-downloads → deploy site.
+Release flow (large EXEs on GitHub, site on Vercel):
+
+```bash
+cd desktop && npm run dist
+node scripts/sync-downloads.cjs
+node scripts/publish-github-release.cjs
+node scripts/sync-downloads.cjs
+npm run pages:build
+```
+
+Then deploy `publish-static` to Vercel (no EXEs uploaded).
