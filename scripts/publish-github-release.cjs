@@ -50,15 +50,15 @@ function main() {
   const ti = process.argv.indexOf('--tag');
   if (ti >= 0 && process.argv[ti + 1]) tag = process.argv[ti + 1];
 
-  const repo = (function () {
-    try {
-      const u = execSync('git remote get-url origin', { cwd: ROOT, encoding: 'utf8' }).trim();
-      // https://github.com/owner/repo.git or git@github.com:owner/repo.git
-      const m = u.match(/github\.com[:/]([^/]+)\/([^/.]+)/i);
-      if (m) return m[1] + '/' + m[2];
-    } catch (_) {}
-    return 'csheoganj-del/codearc-restrosuite';
-  })();
+  // Public downloads-only repo (source repo may be private — release assets must be public).
+  // Override: --repo owner/name
+  let repo = 'csheoganj-del/restrosuite-downloads';
+  const argRepo = process.argv.find((a) => a.startsWith('--repo='));
+  if (argRepo) repo = argRepo.slice('--repo='.length);
+  const ri = process.argv.indexOf('--repo');
+  if (ri >= 0 && process.argv[ri + 1] && !process.argv[ri + 1].startsWith('-')) {
+    repo = process.argv[ri + 1];
+  }
 
   const baseRelease = `https://github.com/${repo}/releases/download/${tag}`;
 

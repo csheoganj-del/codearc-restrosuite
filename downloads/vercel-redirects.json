@@ -1,22 +1,22 @@
 [
   {
     "source": "/downloads/RestroSuite-Windows-Setup.exe",
-    "destination": "https://github.com/csheoganj-del/codearc-restrosuite/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe",
     "permanent": false
   },
   {
     "source": "/downloads/RestroSuite-Windows-Portable.exe",
-    "destination": "https://github.com/csheoganj-del/codearc-restrosuite/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe",
     "permanent": false
   },
   {
     "source": "/downloads/desktop/RestroSuite-2.0.4-x64.exe",
-    "destination": "https://github.com/csheoganj-del/codearc-restrosuite/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe",
     "permanent": false
   },
   {
     "source": "/downloads/RestroSuite-Android.apk",
-    "destination": "https://github.com/csheoganj-del/codearc-restrosuite/releases/download/v2.0.4/RestroSuite-Android.apk",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk",
     "permanent": false
   }
 ]
