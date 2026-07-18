@@ -1184,7 +1184,7 @@
         updateOfflineResume();
         return;
       }
-      // User just signed out — never bounce them straight back into the dashboard
+      // User just clicked Sign out — stay on form (do not auto-jump)
       if (justSignedOut()) {
         updateOfflineResume();
         return;
@@ -1209,18 +1209,27 @@
       updateOfflineResume();
       showOk(navigator.onLine ? 'Welcome back — opening dashboard…' : 'Opening offline dashboard…');
       // Online: soft-validate; if server rejects (401), clear and stay on login
-      if (navigator.onLine && window.RS_API && typeof RS_API.validateSession === 'function' && RS_API.configured) {
+      if (navigator.onLine && window.RS_API && typeof RS_API.validateSession === 'function') {
+        // Wait for config so we do not treat "not configured yet" as logged out
         try {
-          const sess = await RS_API.validateSession();
-          if (sess === null) {
-            try { RS_API.logout(); } catch (_) {}
-            _autoResumeTried = false;
-            updateOfflineResume();
-            showErr('Saved session expired — please sign in again.');
-            return;
+          if (window.__configReady) await window.__configReady;
+        } catch (_) {}
+        try {
+          if (window.RS_API.refreshConfig) window.RS_API.refreshConfig();
+        } catch (_) {}
+        if (window.RS_API.configured) {
+          try {
+            const sess = await RS_API.validateSession();
+            if (sess === null) {
+              try { RS_API.logout({ intentional: false }); } catch (_) {}
+              _autoResumeTried = false;
+              updateOfflineResume();
+              showErr('Saved session expired — please sign in again.');
+              return;
+            }
+          } catch (_) {
+            // Network blip / offline — open local dashboard with remembered session
           }
-        } catch (_) {
-          // Network blip / offline — open local dashboard with remembered session
         }
       }
       setTimeout(function () { location.href = 'dashboard'; }, 280);

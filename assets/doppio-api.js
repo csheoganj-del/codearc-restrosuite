@@ -291,11 +291,18 @@
     try { LS_SESS.removeItem('rs:session'); } catch (_) {}
     rawLocalRemove('rs:session');
   }
-  function ssClear(){
+  /**
+   * @param {{ intentional?: boolean }} [opts]
+   * intentional (default true) = user clicked Sign out → block auto-resume + show signed-out hint.
+   * intentional false = expired/invalid token → clear save but do not treat as user sign-out.
+   */
+  function ssClear(opts){
+    const intentional = !(opts && opts.intentional === false);
     SESSION_KEYS.forEach(k => { SS.removeItem(k); });
     purgeLegacyFlatSessionKeys();
     clearAllRememberBlobs();
-    markExplicitLogout();
+    if (intentional) markExplicitLogout();
+    else clearExplicitLogout();
     SS.removeItem(IMP_ORIGIN_KEY);
     SS.removeItem(IMP_TARGET_KEY);
   }
@@ -461,11 +468,15 @@
     async resetPassword({ token, password }){ return post('tenant-access', { action:'reset_password', token, password }, ANON, 'Password reset failed'); },
 
     async validateSession(){
+      // Never treat "config still loading" as logged-out — that caused:
+      // homepage → dashboard flash → login (wiping keep-me-signed-in).
       if(!CONFIGURED) {
-        if (!enableDemoTools) return null;
-        const localSession = api.session();
-        if (localSession && localSession.role === 'superadmin') return null;
-        return api.session();
+        try { absorbRuntimeConfig(); } catch (_) {}
+        if (!CONFIGURED) {
+          const localSession = api.session();
+          if (localSession && localSession.role === 'superadmin' && !enableDemoTools) return localSession;
+          return localSession;
+        }
       }
       const token = ssGet(K.token);
       if(!token) return null;
@@ -484,8 +495,10 @@
           // keep same persistence preference
           const persist = ssGet(K.persist) !== '0';
           storeSession(r.session, persist);
+          return r.session;
         }
-        return r.session || null;
+        // 200 but no session object — keep local tab session (do not wipe offline save)
+        return api.session();
       } catch (err) {
         // If the server explicitly rejected it with 401 or 403, bounce to login (sess = null)
         if (err.status === 401 || err.status === 403 || err.status === 402) {
@@ -525,7 +538,10 @@
       };
     },
 
-    logout(){ ssClear(); },
+    /**
+     * @param {{ intentional?: boolean }} [opts] intentional:false = session expired (no "you signed out" hint)
+     */
+    logout(opts){ ssClear(opts); },
     /** True after intentional Sign out — login page must not auto-jump to dashboard. */
     wasExplicitLogout(){ return wasExplicitLogout(); },
     clearExplicitLogout(){ clearExplicitLogout(); },

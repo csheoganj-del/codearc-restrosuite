@@ -66,8 +66,8 @@
       // Persist flag '0' means user unchecked keep-me-signed-in
       if (blob.rs_session_persistent === '0') return;
 
-      // Straight to console — session hydrates from the saved blob on dashboard load
-      location.replace('dashboard');
+      // Go through login auto-resume (validates safely). Avoids dashboard flash → kick-to-login.
+      location.replace('login');
     } catch (e) { /* stay on homepage */ }
   })();
   </script>

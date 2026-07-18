@@ -3023,8 +3023,13 @@
   (window.__configReady || Promise.resolve()).then(() => {
     if(window.RS_API && RS_API.configured){
       RS_API.validateSession().then(sess => {
-        if(sess === null){ try{ RS_API.logout(); }catch(e){} location.href='login'; }
+        if(sess === null){
+          // Expired / revoked only — do not mark as user Sign out (that blocked re-open)
+          try { RS_API.logout({ intentional: false }); } catch (e) {}
+          location.href = 'login?stay=1';
+        }
       }).catch(() => {
+        // Offline / network blip: keep local keep-me-signed-in session
         console.warn('[RS] validateSession network error -- keeping local session alive.');
       });
     }
