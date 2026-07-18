@@ -21,12 +21,21 @@ const ROOT_FILES = [
   'config.js', 'pwa.js', 'script.js', 'service-worker.js', 'manifest.webmanifest',
   'app-update.json', 'robots.txt', 'sitemap.xml', 'styles.css',
   'dashboard-styles.css', 'legal.css',
+  // Vercel cleanUrls + /login → /login.html rewrites (needed when deploying this folder)
+  'vercel.json',
 ];
 
 const DIRS = ['assets', 'src', 'images'];
 
 function rmrf(p) {
-  fs.rmSync(p, { recursive: true, force: true });
+  try {
+    fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 });
+  } catch (e) {
+    // Windows: directory busy — write into a fresh sibling then rename
+    if (fs.existsSync(p)) {
+      console.warn('[pages:build] could not remove', p, e.code || e.message);
+    }
+  }
 }
 
 function copyFile(src, dest) {
