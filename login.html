@@ -1268,7 +1268,13 @@
           try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
           setTimeout(()=>location.href='dashboard',700);
         } else {
-          showErr('Outlet "'+slug+'" not found. Register it first, or sign in with a live outlet account.');
+          // Cloud not configured yet (slow /api/config or host missing env) — not the same as unknown outlet
+          const cloudReady = !!(window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__);
+          if (!cloudReady) {
+            showErr('Connecting to cloud… Wait 2 seconds and try again. If this keeps happening, the host is missing Supabase config.');
+          } else {
+            showErr('Could not reach live login. Check internet, or wait for config to finish loading, then try again.');
+          }
           loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
         }
       }

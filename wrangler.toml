@@ -1,0 +1,18 @@
+# Cloudflare: use Pages with npm run pages:build → publish-static
+# Do NOT set deploy command to "npx wrangler deploy" on the full repo
+# (that uploads node_modules and fails the 25 MiB asset limit).
+#
+# Pages dashboard settings:
+#   Build command:      npm run pages:build
+#   Build output dir:   publish-static
+#   Root directory:     /
+#
+# This file is only needed if you later use Workers Assets intentionally
+# on the slim folder. Default Pages static deploy needs no wrangler deploy.
+
+name = "codearc-restrosuite"
+compatibility_date = "2026-07-18"
+
+[assets]
+directory = "./publish-static"
+not_found_handling = "404-page"

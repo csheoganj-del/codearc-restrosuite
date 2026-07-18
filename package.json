@@ -27,7 +27,8 @@
     "sync:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./sync-assets.ps1",
     "build:android": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-android.ps1",
     "deploy:production": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/release.ps1",
-    "sync:downloads": "node scripts/sync-downloads.cjs"
+    "sync:downloads": "node scripts/sync-downloads.cjs",
+    "pages:build": "node scripts/build-pages.cjs"
   },
   "engines": {
     "node": ">=20 <26"

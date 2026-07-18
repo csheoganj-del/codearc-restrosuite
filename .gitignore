@@ -32,6 +32,9 @@ local.properties
 android-app/gradle.properties
 
 
+# Cloudflare / static publish output (built on CI)
+publish-static/
+
 # Node
 node_modules/
 **/node_modules/
