@@ -3074,8 +3074,14 @@
       }
       const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
       if(!confirm(msg)) return;
-      if(window.RS_API) RS_API.logout();
-      location.href = 'login';
+      try {
+        if (window.RS_DB && typeof RS_DB.signOut === 'function') await RS_DB.signOut();
+        else if (window.RS_API) RS_API.logout();
+      } catch (err) {
+        try { if (window.RS_API) RS_API.logout(); } catch (_) {}
+      }
+      // stay=1 disables keep-me-signed-in auto-resume on the login page
+      location.href = 'login?stay=1';
     });
   });
 

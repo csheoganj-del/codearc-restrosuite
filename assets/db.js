@@ -1822,7 +1822,13 @@
     async signUp(p){ if(isCloudConfigured()) return window.RS_API.register(p); throw new Error('Cloud not configured'); },
     async signIn(p){ if(isCloudConfigured()){ const r=await window.RS_API.login(p); if(r.token) localStorage.setItem('rs:session',JSON.stringify(r)); return r; } throw new Error('Cloud not configured'); },
     async signOut(){
-      if(isCloudConfigured() && signedIn()){ try{ await window.RS_API.logout(); }catch(e){} }
+      // Always clear auth, even if cloud looks "not configured" momentarily —
+      // otherwise keep-me-signed-in rehydrates and login auto-resumes.
+      try {
+        if (window.RS_API && typeof window.RS_API.logout === 'function') {
+          await window.RS_API.logout();
+        }
+      } catch (e) {}
       for (const k in lastListFetchTime) delete lastListFetchTime[k];
       cachedSettingsMap = {};
 
@@ -1842,7 +1848,8 @@
         keysToRemove.forEach(k => localStorage.removeItem(k));
       } catch(e) {}
 
-      localStorage.removeItem('rs:session');
+      try { localStorage.removeItem('rs:session'); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
       return true;
     },
     async session(){ if(window.RS_API) { const s = window.RS_API.session(); if(s) return s; } try{ return JSON.parse(localStorage.getItem('rs:session'))||null; }catch(e){ return null; } }

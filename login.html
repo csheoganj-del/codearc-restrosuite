@@ -1150,7 +1150,7 @@
   window.addEventListener('offline', updateOfflineResume);
 
   // Keep me signed in → open dashboard by default (do not park on login form).
-  // ?stay=1 keeps the login form for switching accounts.
+  // ?stay=1 / ?switch=1 keeps the login form after intentional logout or account switch.
   let _autoResumeTried = false;
   async function tryAutoResumeToDashboard() {
     try {
@@ -1160,16 +1160,27 @@
         updateOfflineResume();
         return;
       }
+      // User just signed out — never bounce them straight back into the dashboard
+      try {
+        if (window.RS_API && typeof RS_API.wasExplicitLogout === 'function' && RS_API.wasExplicitLogout()) {
+          updateOfflineResume();
+          return;
+        }
+        if (localStorage.getItem('rs_explicit_logout_v1')) {
+          updateOfflineResume();
+          return;
+        }
+      } catch (_) {}
       const s = savedClientSession();
       if (!s || !s.token) {
         updateOfflineResume();
         return;
       }
-      // Only auto-jump when this device asked to be remembered
-      let wantRemember = true;
+      // Only auto-jump when keep-me-signed-in was explicitly ON (persist flag === '1')
+      let wantRemember = false;
       try {
         const p = sessionStorage.getItem('rs_session_persistent');
-        if (p === '0') wantRemember = false;
+        wantRemember = (p === '1');
       } catch (_) {}
       if (!wantRemember) {
         updateOfflineResume();

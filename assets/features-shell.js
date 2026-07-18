@@ -2166,7 +2166,9 @@
           // delay or wedge the navigation to the login page.
           try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(e){}
           try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
-          location.href='login';
+          try{ if(window.RS_API) RS_API.logout(); }catch(e){}
+          // stay=1: do not auto-login after intentional sign-out
+          location.href='login?stay=1';
         });
       }
     })();
@@ -2224,10 +2226,12 @@
                 if(!confirm(msg)) return;
                 close();
                 try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(err){}
-                if(window.RS_DB) {
-                  RS_DB.signOut().then(()=>{ location.href='login'; });
+                const goLogin = () => { location.href = 'login?stay=1'; };
+                if (window.RS_DB) {
+                  RS_DB.signOut().then(goLogin).catch(goLogin);
                 } else {
-                  location.href='login';
+                  try { if (window.RS_API) RS_API.logout(); } catch (_) {}
+                  goLogin();
                 }
               } else {
                 close();

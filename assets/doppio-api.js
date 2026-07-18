@@ -181,6 +181,8 @@
   }
   function hydrateRememberedSessionOnce(){
     if (SS.getItem(K.token)) return true;
+    // After intentional Sign out, do not resurrect a keep-me-signed-in blob.
+    if (wasExplicitLogout()) return false;
     try {
       // Prefer the new blob; fall back once to legacy flat keys then migrate.
       let blob = null;
@@ -226,6 +228,28 @@
       try { LS_SESS.removeItem(k); } catch (_) {}
     }
   }
+  const EXPLICIT_LOGOUT_KEY = 'rs_explicit_logout_v1';
+  function markExplicitLogout(){
+    try {
+      // Blocks keep-me-signed-in auto-resume until the next successful login.
+      rawLocalSet(EXPLICIT_LOGOUT_KEY, String(Date.now()));
+      try { LS_SESS.setItem(EXPLICIT_LOGOUT_KEY, String(Date.now())); } catch (_) {}
+    } catch (_) {}
+  }
+  function clearExplicitLogout(){
+    try { LS_SESS.removeItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
+    rawLocalRemove(EXPLICIT_LOGOUT_KEY);
+  }
+  function wasExplicitLogout(){
+    try {
+      let v = null;
+      try { v = LS_SESS.getItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
+      if (!v) v = rawLocalGet(EXPLICIT_LOGOUT_KEY);
+      return !!v;
+    } catch (_) {
+      return false;
+    }
+  }
   function clearAllRememberBlobs(){
     try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
     rawLocalRemove(REMEMBER_BLOB_KEY);
@@ -233,15 +257,26 @@
       const doomed = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k === REMEMBER_BLOB_KEY || k.indexOf(':' + REMEMBER_BLOB_KEY) !== -1)) doomed.push(k);
+        if (!k) continue;
+        if (
+          k === REMEMBER_BLOB_KEY ||
+          k.indexOf(':' + REMEMBER_BLOB_KEY) !== -1 ||
+          k.endsWith(REMEMBER_BLOB_KEY) ||
+          k === 'rs:session' ||
+          k.indexOf(':rs:session') !== -1 ||
+          k.endsWith('rs:session')
+        ) doomed.push(k);
       }
       doomed.forEach((k) => rawLocalRemove(k));
     } catch (_) {}
+    try { LS_SESS.removeItem('rs:session'); } catch (_) {}
+    rawLocalRemove('rs:session');
   }
   function ssClear(){
     SESSION_KEYS.forEach(k => { SS.removeItem(k); });
     purgeLegacyFlatSessionKeys();
     clearAllRememberBlobs();
+    markExplicitLogout();
     SS.removeItem(IMP_ORIGIN_KEY);
     SS.removeItem(IMP_TARGET_KEY);
   }
@@ -304,9 +339,12 @@
       SS.removeItem('superadmin_admin_token');
     }
     purgeLegacyFlatSessionKeys();
+    // Successful auth always cancels a prior intentional logout block.
+    clearExplicitLogout();
     if (persist) writeRememberBlobFromSession();
     else {
       try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
+      rawLocalRemove(REMEMBER_BLOB_KEY);
     }
   }
 
@@ -467,6 +505,9 @@
     },
 
     logout(){ ssClear(); },
+    /** True after intentional Sign out — login page must not auto-jump to dashboard. */
+    wasExplicitLogout(){ return wasExplicitLogout(); },
+    clearExplicitLogout(){ clearExplicitLogout(); },
 
     /* ---------------- DATA (tenant-data) ---------------- */
     async data(payload){
