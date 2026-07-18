@@ -1,12 +1,12 @@
 {
-  "version": "v212-20260718-session-logout-fix",
+  "version": "v213-20260718-launch-10",
   "date": "2026-07-18",
-  "title": "Session resume, logout UX & multi-device builds",
-  "summary": "Keep-me-signed-in works after tab close; Sign out no longer double-prompts; homepage returns staff to console; Desktop 2.0.4 and Android 2.0.4 bundles.",
+  "title": "Launch pack: every-device install + health",
+  "summary": "Install guide for Windows/Android/iOS/browser, /status health, GitHub-hosted EXEs, production Supabase env on Vercel, Learning Center materials complete.",
   "highlights": [
-    "Keep me signed in survives closing the browser tab",
-    "Single in-app Sign out dialog (no double system alerts)",
-    "Sticky signed-out flag fixed so auto-login works again",
-    "Desktop 2.0.4 + Android 2.0.4 with matching session fixes"
+    "New /install page — Windows, Android, iPhone PWA, browser",
+    "New /status + /api/health launch checks",
+    "Large installers on public GitHub Releases (Vercel-safe)",
+    "SUPABASE env fixed on restrosuite-live production"
   ]
 }

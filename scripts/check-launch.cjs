@@ -17,8 +17,9 @@ const root = path.resolve(__dirname, "..");
 const failures = [];
 const warnings = [];
 
-const PROD_ORIGIN = "https://codearc-restrosuite.vercel.app";
+const PROD_ORIGIN = process.env.PROD_ORIGIN || "https://restrosuite.codearc.co.in";
 const LIVE_CONFIG_URL = process.env.LIVE_CONFIG_URL || `${PROD_ORIGIN}/api/config`;
+const LIVE_HEALTH_URL = process.env.LIVE_HEALTH_URL || `${PROD_ORIGIN}/api/health`;
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
@@ -157,6 +158,23 @@ async function resolveLiveConfig() {
       source: "environment variables",
     };
   }
+  try {
+    const health = await fetch(LIVE_HEALTH_URL);
+    if (health.ok) {
+      const h = await health.json();
+      if (!h.checks || !h.checks.supabaseConfigured) {
+        warn(`Live /api/health reports supabaseConfigured=false — set SUPABASE_* on Vercel.`);
+      }
+      if (h.checks && !h.checks.whatsappGatewayConfigured) {
+        warn(`WhatsApp gateway env not set on host (OTP/bills need WHATSAPP_GATEWAY_URL + TOKEN).`);
+      }
+    } else {
+      warn(`Live /api/health returned HTTP ${health.status} (optional endpoint).`);
+    }
+  } catch (e) {
+    warn(`Live /api/health unreachable: ${e.message || e}`);
+  }
+
   const response = await fetch(LIVE_CONFIG_URL);
   if (!response.ok) {
     fail(`Live /api/config returned HTTP ${response.status} — Vercel env vars missing or deploy broken.`);

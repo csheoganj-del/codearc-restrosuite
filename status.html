@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RestroSuite — System status</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="assets/restrosuite-mark.png" type="image/png">
+  <style>
+    :root { --ink:#1A1714; --soft:#6E675F; --paper:#F3EFE8; --brand:#FF4F00; --ok:#1F8A5B; --bad:#C2410C; --panel:#fff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui,Segoe UI,sans-serif; background:var(--paper); color:var(--ink); padding:24px; }
+    .wrap { max-width:720px; margin:0 auto; }
+    h1 { font-size:1.5rem; margin:0 0 8px; }
+    p.sub { color:var(--soft); margin:0 0 20px; }
+    .card { background:var(--panel); border-radius:14px; padding:16px 18px; margin-bottom:12px; border:1px solid rgba(0,0,0,.08); }
+    .row { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid rgba(0,0,0,.06); }
+    .row:last-child { border-bottom:0; }
+    .ok { color:var(--ok); font-weight:700; }
+    .bad { color:var(--bad); font-weight:700; }
+    .muted { color:var(--soft); font-size:13px; }
+    a { color:var(--brand); font-weight:600; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:800; }
+    .pill-ok { background:rgba(31,138,91,.12); color:var(--ok); }
+    .pill-bad { background:rgba(194,65,12,.12); color:var(--bad); }
+    ul { margin:8px 0 0; padding-left:18px; color:var(--soft); font-size:14px; line-height:1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>RestroSuite system status</h1>
+    <p class="sub">Live checks for launch. Support: <a href="mailto:support@codearc.co.in">support@codearc.co.in</a></p>
+    <div class="card">
+      <div id="overall" class="muted">Checking…</div>
+      <div id="rows"></div>
+    </div>
+    <div class="card">
+      <strong>What “ready” means by device</strong>
+      <ul>
+        <li><b>Browser / PWA</b> — use the live site; Add to Home Screen on phone</li>
+        <li><b>Windows</b> — download Setup or Portable; if SmartScreen appears, More info → Run anyway (unsigned build)</li>
+        <li><b>Android</b> — install APK; allow “Install unknown apps” for your browser</li>
+        <li><b>iPhone / iPad</b> — Safari → Share → Add to Home Screen (no App Store app yet)</li>
+        <li><b>WhatsApp bills / OTP</b> — needs gateway online (see status check)</li>
+      </ul>
+    </div>
+    <p class="muted"><a href="/">← Home</a> · <a href="/login">Sign in</a> · <a href="/install">Install guide</a></p>
+  </div>
+  <script>
+    function row(label, ok, detail) {
+      return '<div class="row"><div><div>' + label + '</div>' +
+        (detail ? '<div class="muted">' + detail + '</div>' : '') +
+        '</div><div class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'OK' : 'CHECK') + '</div></div>';
+    }
+    async function run() {
+      var html = '';
+      var allOk = true;
+      try {
+        var r = await fetch('/api/health?t=' + Date.now(), { cache: 'no-store' });
+        var j = await r.json();
+        html += row('API health', !!j.ok, j.time || '');
+        html += row('Supabase config', !!j.checks.supabaseConfigured, j.checks.supabaseConfigured ? 'Cloud login ready' : 'Set SUPABASE_URL + SUPABASE_ANON_KEY on Vercel');
+        html += row('WhatsApp gateway env', !!j.checks.whatsappGatewayConfigured, j.checks.whatsappGatewayConfigured ? 'Gateway URL + token set' : 'Optional until you send WA bills/OTP — set WHATSAPP_GATEWAY_URL + TOKEN');
+        if (!j.ok || !j.checks.supabaseConfigured) allOk = false;
+        // downloads
+        var dl = j.downloads || {};
+        html += row('Windows Setup download', true, '<a href="' + (dl.windowsSetup || '#') + '">Open</a>');
+        html += row('Android APK download', true, '<a href="' + (dl.android || '#') + '">Open</a>');
+        document.getElementById('overall').innerHTML = allOk
+          ? '<span class="pill pill-ok">LAUNCH CORE: GREEN</span>'
+          : '<span class="pill pill-bad">LAUNCH CORE: NEEDS FIX</span>';
+      } catch (e) {
+        allOk = false;
+        html = row('API health', false, String(e.message || e));
+        document.getElementById('overall').innerHTML = '<span class="pill pill-bad">OFFLINE OR API ERROR</span>';
+      }
+      try {
+        var m = await fetch('/downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' });
+        html += row('Downloads manifest', m.ok, m.ok ? 'manifest.json OK' : 'HTTP ' + m.status);
+        if (!m.ok) allOk = false;
+      } catch (e2) {
+        html += row('Downloads manifest', false, 'unreachable');
+        allOk = false;
+      }
+      document.getElementById('rows').innerHTML = html;
+    }
+    run();
+  </script>
+</body>
+</html>

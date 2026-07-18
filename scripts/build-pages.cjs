@@ -18,6 +18,7 @@ const ROOT_FILES = [
   'index.html', 'login.html', 'dashboard.html', 'home.html', 'bill.html',
   'order.html', 'qr-order.html', 'kds.html', 'tokens.html', 'privacy.html',
   'terms.html', 'refund-policy.html', 'feedback.html', '404.html',
+  'install.html', 'status.html',
   'config.js', 'pwa.js', 'script.js', 'service-worker.js', 'manifest.webmanifest',
   'app-update.json', 'robots.txt', 'sitemap.xml', 'styles.css',
   'dashboard-styles.css', 'legal.css',
@@ -102,6 +103,8 @@ function main() {
     [
       '/login /login.html 200',
       '/dashboard /dashboard.html 200',
+      '/install /install.html 200',
+      '/status /status.html 200',
       '/home /home.html 200',
       '/order /order.html 200',
       '/qr-order /qr-order.html 200',
@@ -114,6 +117,12 @@ function main() {
       '',
     ].join('\n')
   );
+
+  // Serverless API for Vercel when this folder is the deploy root
+  const apiDir = path.join(ROOT, 'api');
+  if (fs.existsSync(apiDir)) {
+    copyDir(apiDir, path.join(OUT, 'api'));
+  }
 
   // Optional: headers
   fs.writeFileSync(

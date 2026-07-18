@@ -89,6 +89,14 @@
       "destination": "/dashboard.html"
     },
     {
+      "source": "/install",
+      "destination": "/install.html"
+    },
+    {
+      "source": "/status",
+      "destination": "/status.html"
+    },
+    {
       "source": "/home",
       "destination": "/home.html"
     },
