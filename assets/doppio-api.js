@@ -179,10 +179,18 @@
       rawLocalSet(REMEMBER_BLOB_KEY, json);
     } catch (_) {}
   }
-  function hydrateRememberedSessionOnce(){
+  /**
+   * Hydrate sessionStorage from the keep-me-signed-in / offline blob.
+   * @param {{ force?: boolean }} [opts] force=true used by "Continue offline"
+   *   after an intentional Sign out is NOT allowed unless a blob still exists
+   *   (normally Sign out clears the blob). force does not re-enable auto-jump.
+   */
+  function hydrateRememberedSessionOnce(opts){
     if (SS.getItem(K.token)) return true;
-    // After intentional Sign out, do not resurrect a keep-me-signed-in blob.
-    if (wasExplicitLogout()) return false;
+    const force = !!(opts && opts.force);
+    // After intentional Sign out, block silent hydrate (prevents instant re-login).
+    // "Continue offline" can force-read only if a blob was kept (should be rare).
+    if (!force && wasExplicitLogout()) return false;
     try {
       // Prefer the new blob; fall back once to legacy flat keys then migrate.
       let blob = null;
@@ -219,6 +227,17 @@
   }
   function restorePersistentSessionToTab(){
     hydrateRememberedSessionOnce();
+  }
+  /** True when a keep-me-signed-in blob exists on this device (offline-capable). */
+  function hasRememberBlob(){
+    try {
+      const raw = readRememberBlobRaw();
+      if (!raw) return false;
+      const blob = JSON.parse(raw);
+      return !!(blob && blob[K.token]);
+    } catch (_) {
+      return false;
+    }
   }
   function ssSet(k, v, persist){
     SS.setItem(k, v);
@@ -477,8 +496,10 @@
       }
     },
 
-    session(){
-      restorePersistentSessionToTab();
+    session(opts){
+      // opts.force → hydrate even after intentional logout (manual offline continue)
+      if (opts && opts.force) hydrateRememberedSessionOnce({ force: true });
+      else restorePersistentSessionToTab();
       const t = ssGet(K.token); if(!t) return null;
       const role = ssGet(K.role);
       if (role === 'superadmin' && !CONFIGURED) {
@@ -508,6 +529,12 @@
     /** True after intentional Sign out — login page must not auto-jump to dashboard. */
     wasExplicitLogout(){ return wasExplicitLogout(); },
     clearExplicitLogout(){ clearExplicitLogout(); },
+    /** Offline / keep-me-signed-in blob present on this device. */
+    hasRememberBlob(){ return hasRememberBlob(); },
+    /** Manual offline resume (Continue button) — force-hydrate saved blob if any. */
+    resumeRememberedSession(){
+      return hydrateRememberedSessionOnce({ force: true });
+    },
 
     /* ---------------- DATA (tenant-data) ---------------- */
     async data(payload){
