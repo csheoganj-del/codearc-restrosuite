@@ -11,6 +11,11 @@ app/build/
 !desktop/build/icon.ico
 !desktop/build/icon.png
 !desktop/build/splash-mark.png
+# Gateway tray icons (electron-builder + system tray)
+!gateway-tray/build/
+!gateway-tray/build/**
+# Never commit Electron build output (huge); ship installer via downloads/
+gateway-tray/dist/
 *.apk
 *.aar
 *.exe
@@ -19,6 +24,8 @@ app/build/
 !downloads/**
 !downloads/RestroSuite-Android.apk
 !downloads/RestroSuite-Windows-Portable.exe
+!downloads/RestroSuite-Windows-Setup.exe
+!downloads/RestroSuite-Gateway-Setup.exe
 !downloads/*.pdf
 !downloads/manifest.json
 !downloads/README.md

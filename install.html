@@ -3,122 +3,620 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RestroSuite — Install on every device</title>
-  <meta name="description" content="Install RestroSuite on Windows, Android, iPhone, iPad, or use in any browser.">
+  <title>RestroSuite — Install on your device</title>
+  <meta name="description" content="Install RestroSuite on Windows, Android, iPhone, or use in any browser. Free during launch. Offline-first POS for Indian restaurants.">
+  <link rel="canonical" href="https://restrosuite.codearc.co.in/install">
   <link rel="icon" href="assets/restrosuite-mark.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="RestroSuite">
   <meta name="theme-color" content="#FF4F00">
+  <meta property="og:title" content="Install RestroSuite">
+  <meta property="og:description" content="Counter PC, kitchen tablet, or phone — free during launch.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
-    :root { --ink:#1A1714; --soft:#6E675F; --paper:#F3EFE8; --brand:#FF4F00; --panel:#fff; --ok:#1F8A5B; }
+    :root {
+      --ink: #1A1714;
+      --soft: #6E675F;
+      --mute: #9A9288;
+      --paper: #F3EFE8;
+      --brand: #FF4F00;
+      --brand-soft: rgba(255, 79, 0, 0.12);
+      --panel: #fff;
+      --ok: #1F8A5B;
+      --teal: #2a9b8f;
+      --win: #0078d4;
+      --and: #1fa463;
+      --stroke: rgba(0, 0, 0, 0.08);
+      --stroke-2: rgba(0, 0, 0, 0.12);
+      --shadow: 0 12px 32px -18px rgba(40, 30, 20, 0.18);
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui,Segoe UI,sans-serif; background:var(--paper); color:var(--ink); line-height:1.5; }
-    .top { background:#fff; border-bottom:1px solid rgba(0,0,0,.08); padding:14px 20px; display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-    .top a { color:var(--brand); font-weight:700; text-decoration:none; }
-    .wrap { max-width:900px; margin:0 auto; padding:28px 20px 60px; }
-    h1 { font-size:clamp(1.6rem,4vw,2.1rem); margin:0 0 8px; }
-    .lead { color:var(--soft); margin:0 0 28px; font-size:1.05rem; }
-    .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
-    .card { background:var(--panel); border-radius:16px; padding:20px; border:1px solid rgba(0,0,0,.08); box-shadow:0 8px 24px rgba(40,30,20,.06); }
-    .card h2 { margin:0 0 8px; font-size:1.15rem; display:flex; align-items:center; gap:8px; }
-    .card ol { margin:10px 0 0; padding-left:18px; color:#333; font-size:14.5px; }
-    .card li { margin:6px 0; }
-    .btn { display:inline-flex; align-items:center; gap:8px; margin-top:14px; background:var(--brand); color:#fff; font-weight:800; text-decoration:none; padding:12px 16px; border-radius:12px; font-size:14px; }
-    .btn:hover { filter:brightness(.95); }
-    .btn-ghost { background:#fff; color:var(--ink); border:1px solid rgba(0,0,0,.12); }
-    .note { font-size:13px; color:var(--soft); margin-top:12px; }
-    .warn { background:#FFF7ED; border:1px solid #FDBA74; border-radius:10px; padding:10px 12px; font-size:13px; margin-top:12px; color:#9A3412; }
-    .ok { color:var(--ok); font-weight:700; font-size:13px; }
-    footer { margin-top:32px; font-size:13px; color:var(--soft); }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    a { color: var(--brand); }
+    .top {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--stroke);
+      padding: 12px 20px;
+      display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    }
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-weight: 800; letter-spacing: -0.02em; text-decoration: none; color: var(--ink);
+    }
+    .brand img { width: 32px; height: 32px; border-radius: 8px; }
+    .top-nav { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; }
+    .top-nav a {
+      color: var(--soft); font-weight: 700; text-decoration: none; font-size: 14px;
+      padding: 8px 10px; border-radius: 10px;
+    }
+    .top-nav a:hover { color: var(--ink); background: rgba(0, 0, 0, 0.04); }
+    .top-nav .btn-sm {
+      background: var(--brand); color: #fff !important; padding: 9px 14px;
+    }
+    .top-nav .btn-sm:hover { filter: brightness(0.96); background: var(--brand); }
+
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 20px 72px; }
+
+    .hero { text-align: center; margin-bottom: 28px; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--brand); background: var(--brand-soft); padding: 6px 12px; border-radius: 999px;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: clamp(1.75rem, 4.2vw, 2.35rem);
+      letter-spacing: -0.03em; line-height: 1.15; margin: 0 0 10px;
+    }
+    .lead {
+      color: var(--soft); margin: 0 auto 22px; font-size: 1.06rem; max-width: 560px;
+    }
+    .path {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      max-width: 720px; margin: 0 auto 18px;
+    }
+    .step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: 14px;
+      background: var(--panel); border: 1px solid var(--stroke); text-align: left;
+      font-size: 13px; font-weight: 700; color: var(--soft);
+    }
+    .step b {
+      width: 26px; height: 26px; border-radius: 8px; flex: none;
+      display: grid; place-items: center; font-size: 12px;
+      background: var(--brand-soft); color: var(--brand);
+    }
+    .trust {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 22px;
+    }
+    .trust span {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12.5px; font-weight: 700; color: var(--soft);
+      padding: 6px 11px; border-radius: 999px;
+      background: #fff; border: 1px solid var(--stroke);
+    }
+    .trust i { color: var(--ok); font-size: 11px; }
+
+    .recommend {
+      display: none; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+      padding: 16px 18px; border-radius: 18px; margin-bottom: 22px;
+      background: linear-gradient(135deg, rgba(255, 79, 0, 0.12), rgba(42, 155, 143, 0.08));
+      border: 1px solid rgba(255, 79, 0, 0.28);
+    }
+    .recommend.is-on { display: flex; }
+    .recommend .rec-copy { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .recommend .rec-ic {
+      width: 44px; height: 44px; border-radius: 12px; flex: none;
+      display: grid; place-items: center; font-size: 18px;
+      background: #fff; color: var(--brand); box-shadow: var(--shadow);
+    }
+    .recommend strong { display: block; font-size: 15px; letter-spacing: -0.02em; }
+    .recommend span { font-size: 13px; color: var(--soft); }
+    .meta {
+      text-align: center; font-size: 12.5px; color: var(--mute); margin: 0 0 16px;
+    }
+    .meta b { color: var(--soft); }
+
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .card {
+      position: relative;
+      background: var(--panel);
+      border-radius: 18px;
+      padding: 22px 20px 18px;
+      border: 1px solid var(--stroke);
+      box-shadow: var(--shadow);
+      display: flex; flex-direction: column; gap: 10px;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover { transform: translateY(-2px); border-color: rgba(255, 79, 0, 0.28); }
+    .card.is-recommended {
+      border-color: rgba(255, 79, 0, 0.45);
+      box-shadow: 0 0 0 1px rgba(255, 79, 0, 0.1), 0 16px 40px -18px rgba(255, 79, 0, 0.35);
+    }
+    .badge {
+      position: absolute; top: 14px; right: 14px;
+      font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 4px 9px; border-radius: 999px; background: var(--brand); color: #fff;
+    }
+    .card-top { display: flex; align-items: flex-start; gap: 12px; padding-right: 80px; }
+    .ic {
+      width: 48px; height: 48px; border-radius: 14px; flex: none;
+      display: grid; place-items: center; font-size: 22px;
+      background: var(--brand-soft); color: var(--brand);
+    }
+    .ic.windows { background: rgba(0, 120, 215, 0.12); color: var(--win); }
+    .ic.android { background: rgba(61, 220, 132, 0.14); color: var(--and); }
+    .ic.ios { background: rgba(0, 0, 0, 0.06); color: #111; }
+    .ic.web { background: rgba(42, 155, 143, 0.14); color: var(--teal); }
+    .card h2 { margin: 0; font-size: 1.12rem; letter-spacing: -0.02em; }
+    .platform {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--mute); margin-top: 3px;
+    }
+    .card p { margin: 0; font-size: 14px; color: var(--soft); }
+    .ok { color: var(--ok); font-weight: 700; font-size: 13px; }
+    .stats {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      font-size: 12px; color: var(--mute);
+    }
+    .stats span {
+      padding: 3px 8px; border-radius: 999px;
+      background: rgba(0, 0, 0, 0.03); border: 1px solid var(--stroke);
+    }
+    ol {
+      margin: 4px 0 0; padding-left: 18px; color: #333; font-size: 13.5px;
+    }
+    li { margin: 6px 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      background: var(--brand); color: #fff; font-weight: 800; text-decoration: none;
+      padding: 12px 16px; border-radius: 12px; font-size: 14px; min-height: 44px;
+      border: 1px solid transparent;
+    }
+    .btn:hover { filter: brightness(0.96); }
+    .btn-ghost {
+      background: #fff; color: var(--ink); border: 1px solid var(--stroke-2);
+    }
+    .btn-ghost:hover { border-color: rgba(0, 0, 0, 0.2); filter: none; }
+    .tip, .warn, .note {
+      font-size: 13px; margin: 0; border-radius: 12px; padding: 10px 12px;
+    }
+    .tip {
+      background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E;
+    }
+    .warn {
+      background: #FFF7ED; border: 1px solid #FDBA74; color: #9A3412;
+    }
+    .note { color: var(--mute); padding: 0; }
+
+    .staff {
+      margin-top: 16px; padding: 20px;
+      background: var(--panel); border-radius: 18px; border: 1px solid var(--stroke);
+    }
+    .staff h2 { margin: 0 0 8px; font-size: 1.05rem; }
+
+    details.guides {
+      margin-top: 16px; border-radius: 16px; border: 1px solid var(--stroke);
+      background: var(--panel); overflow: hidden;
+    }
+    details.guides > summary {
+      list-style: none; cursor: pointer; user-select: none;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px 18px; font-size: 14.5px; font-weight: 800;
+    }
+    details.guides > summary::-webkit-details-marker { display: none; }
+    details.guides .g-meta { font-size: 12.5px; font-weight: 600; color: var(--mute); }
+    details.guides .chev { transition: transform 0.2s; color: var(--mute); }
+    details.guides[open] .chev { transform: rotate(180deg); }
+    .guides-body { padding: 0 16px 16px; }
+    .guides-grid {
+      display: grid; gap: 12px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .g-card {
+      border: 1px solid var(--stroke); border-radius: 14px; padding: 14px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .g-card h3 { margin: 0; font-size: 14px; }
+    .g-card p { margin: 0; font-size: 12.5px; color: var(--soft); }
+
+    footer {
+      margin-top: 28px; text-align: center; font-size: 13px; color: var(--mute); line-height: 1.6;
+    }
+    footer a { font-weight: 700; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 800px) {
+      .grid, .guides-grid { grid-template-columns: 1fr; }
+      .path { grid-template-columns: 1fr; max-width: 420px; }
+      .card-top { padding-right: 0; }
+      .badge { position: static; align-self: flex-start; }
+      .recommend { align-items: stretch; }
+      .recommend .btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <div class="top">
-    <strong>RestroSuite · Install</strong>
-    <div style="display:flex;gap:14px;flex-wrap:wrap">
+  <header class="top">
+    <a class="brand" href="/">
+      <img src="assets/restrosuite-mark.png" alt="" width="32" height="32">
+      RestroSuite
+    </a>
+    <nav class="top-nav" aria-label="Install page">
       <a href="/">Home</a>
       <a href="/login">Sign in</a>
       <a href="/status">Status</a>
       <a href="mailto:support@codearc.co.in">Support</a>
-    </div>
-  </div>
-  <div class="wrap">
-    <h1>Install on every device</h1>
-    <p class="lead">Same outlet account works everywhere. Sign in once per device with <b>Keep me signed in</b> for offline and quick reopen.</p>
+      <a class="btn-sm" href="/login?tab=register">Create free outlet</a>
+    </nav>
+  </header>
 
-    <div class="grid">
-      <article class="card" id="windows">
-        <h2>🖥 Windows PC (counter)</h2>
-        <p class="ok">Recommended for main POS / billing PC</p>
+  <main class="wrap">
+    <section class="hero">
+      <div class="eyebrow"><i class="fa-solid fa-bolt" aria-hidden="true"></i> Get started in minutes</div>
+      <h1>Install on the device you already use</h1>
+      <p class="lead">
+        Counter PC, kitchen tablet, or phone — same outlet account everywhere.
+        Free during launch. Works offline after first sign-in.
+      </p>
+
+      <div class="path" aria-label="How to start">
+        <div class="step"><b>1</b> Create free outlet</div>
+        <div class="step"><b>2</b> Install for this device</div>
+        <div class="step"><b>3</b> Sign in &amp; bill offline</div>
+      </div>
+
+      <div class="trust" aria-label="Why start here">
+        <span><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Free to start</span>
+        <span><i class="fa-solid fa-circle-check" aria-hidden="true"></i> No card required</span>
+        <span><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Offline billing</span>
+        <span><i class="fa-solid fa-circle-check" aria-hidden="true"></i> WhatsApp bills</span>
+      </div>
+    </section>
+
+    <div class="recommend" id="dl-recommend" aria-live="polite">
+      <div class="rec-copy">
+        <div class="rec-ic" id="dl-rec-ic"><i class="fa-solid fa-download" aria-hidden="true"></i></div>
+        <div>
+          <strong id="dl-rec-title">Best for this device</strong>
+          <span id="dl-rec-sub">We pick the right install for you</span>
+        </div>
+      </div>
+      <a class="btn" id="dl-rec-btn" href="#windows">
+        <i class="fa-solid fa-download" aria-hidden="true"></i>
+        <span id="dl-rec-btn-label">Download</span>
+      </a>
+    </div>
+
+    <p class="meta" id="dl-meta">Apps · always free during launch</p>
+
+    <div class="grid" id="dl-apps">
+      <!-- Windows -->
+      <article class="card" id="windows" data-dl-id="windows-exe" data-dl-platform="windows">
+        <span class="badge" hidden data-dl-badge>Recommended</span>
+        <div class="card-top">
+          <div class="ic windows"><i class="fa-brands fa-windows" aria-hidden="true"></i></div>
+          <div>
+            <h2>Windows PC</h2>
+            <div class="platform">Counter · desktop POS</div>
+          </div>
+        </div>
+        <p class="ok">Best for main billing / reports PC</p>
+        <div class="stats" data-dl-stats><span>EXE</span></div>
         <ol>
-          <li>Download <b>Setup</b> (installer) or <b>Portable</b> (no install)</li>
-          <li>If Windows says “Unknown publisher” / SmartScreen: click <b>More info</b> → <b>Run anyway</b></li>
-          <li>Sign in with Outlet ID + password, leave <b>Keep me signed in</b> checked</li>
-          <li>Close the window to tray when needed — don’t Sign out unless switching staff</li>
+          <li>Download <b>Setup</b> (Start Menu) or <b>Portable</b> (run only)</li>
+          <li>If SmartScreen appears: <b>More info → Run anyway</b></li>
+          <li>Sign in with Outlet ID + password · leave <b>Keep me signed in</b> on</li>
+          <li>Close window → stays in tray (don’t Sign out overnight)</li>
         </ol>
-        <a class="btn" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe">Download Setup 2.0.4</a>
-        <a class="btn btn-ghost" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe">Portable EXE</a>
-        <p class="note">Unsigned build (free launch). Code-signing certificate removes SmartScreen later.</p>
+        <div class="actions">
+          <a class="btn" data-dl-setup href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe">
+            <i class="fa-solid fa-download" aria-hidden="true"></i> Setup installer
+          </a>
+          <a class="btn btn-ghost" data-dl-href data-dl-primary href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe">
+            Portable EXE
+          </a>
+        </div>
+        <p class="tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Unsigned free-launch build — code signing later removes the SmartScreen step.</p>
       </article>
 
-      <article class="card" id="android">
-        <h2>📱 Android (kitchen / counter phone)</h2>
-        <p class="ok">APK install — works offline after first login</p>
+      <!-- Android -->
+      <article class="card" id="android" data-dl-id="android-apk" data-dl-platform="android">
+        <span class="badge" hidden data-dl-badge>Recommended</span>
+        <div class="card-top">
+          <div class="ic android"><i class="fa-brands fa-android" aria-hidden="true"></i></div>
+          <div>
+            <h2>Android</h2>
+            <div class="platform">Kitchen tablet · counter phone</div>
+          </div>
+        </div>
+        <p class="ok">APK · works offline after first login</p>
+        <div class="stats" data-dl-stats><span>APK</span></div>
         <ol>
           <li>Open this page on the Android device (Chrome)</li>
-          <li>Tap Download APK</li>
-          <li>If blocked: Settings → allow install from browser / files</li>
-          <li>Open RestroSuite → sign in with Keep me signed in</li>
+          <li>Tap <b>Download APK</b></li>
+          <li>If blocked: allow install from browser / Files</li>
+          <li>Open RestroSuite → sign in with <b>Keep me signed in</b></li>
         </ol>
-        <a class="btn" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk">Download Android APK 2.0.4</a>
-        <p class="note">Not on Play Store yet (side-load). Play listing can be added when you have a Google Play developer account.</p>
+        <div class="actions">
+          <a class="btn" data-dl-href href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk">
+            <i class="fa-solid fa-download" aria-hidden="true"></i> Download APK
+          </a>
+        </div>
+        <p class="tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Chrome may say “file may be harmful” — tap <b>Download anyway</b>. Not on Play Store yet.</p>
       </article>
 
-      <article class="card" id="ios">
-        <h2>🍎 iPhone / iPad</h2>
-        <p class="ok">Use Safari PWA (best iOS path without App Store)</p>
+      <!-- iOS -->
+      <article class="card" id="ios" data-dl-id="web-pwa-ios" data-dl-platform="ios">
+        <span class="badge" hidden data-dl-badge>Recommended</span>
+        <div class="card-top">
+          <div class="ic ios"><i class="fa-brands fa-apple" aria-hidden="true"></i></div>
+          <div>
+            <h2>iPhone / iPad</h2>
+            <div class="platform">Safari home screen app</div>
+          </div>
+        </div>
+        <p class="ok">Best free path without App Store</p>
+        <div class="stats"><span>PWA</span></div>
         <ol>
-          <li>Open <b>Safari</b> (not Chrome) → <a href="https://restrosuite.codearc.co.in/login">restrosuite.codearc.co.in/login</a></li>
+          <li>Open <b>Safari</b> (not Chrome) → login page</li>
           <li>Tap the <b>Share</b> button</li>
           <li>Tap <b>Add to Home Screen</b> → Add</li>
           <li>Open the icon → sign in with Keep me signed in</li>
         </ol>
-        <a class="btn" href="/login">Open login in Safari</a>
-        <div class="warn">Apple does not allow third-party app installs like Android APK. Home Screen web app is the official free path. Native App Store build needs Apple Developer ($99/yr) + separate build pipeline.</div>
+        <div class="actions">
+          <a class="btn" data-dl-href href="/login">
+            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open login in Safari
+          </a>
+        </div>
+        <div class="warn">Apple does not allow APK-style installs. Home Screen web app is the free path. Native App Store needs Apple Developer ($99/yr).</div>
       </article>
 
-      <article class="card" id="browser">
-        <h2>🌐 Any browser / Chromebook</h2>
-        <p class="ok">No install required</p>
+      <!-- Browser -->
+      <article class="card" id="browser" data-dl-id="web-pwa" data-dl-platform="web">
+        <span class="badge" hidden data-dl-badge>Recommended</span>
+        <div class="card-top">
+          <div class="ic web"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
+          <div>
+            <h2>Any browser</h2>
+            <div class="platform">Chrome · Edge · Chromebook</div>
+          </div>
+        </div>
+        <p class="ok">No install required — start now</p>
+        <div class="stats"><span>Online</span></div>
         <ol>
-          <li>Go to <a href="https://restrosuite.codearc.co.in/login">restrosuite.codearc.co.in/login</a></li>
-          <li>Sign in with Keep me signed in</li>
-          <li>Optional: Chrome menu → <b>Install app</b> / <b>Cast</b> for PWA window</li>
+          <li>Open the login page</li>
+          <li>Sign in with <b>Keep me signed in</b></li>
+          <li>Optional: Chrome/Edge → <b>Install app</b> for a desktop window</li>
           <li>Bookmark dashboard for one-tap open</li>
         </ol>
-        <a class="btn" href="/login">Open web console</a>
-        <p class="note">Works on Chrome, Edge, Firefox, Safari. Best: Chrome or Edge for PWA install.</p>
+        <div class="actions">
+          <a class="btn" data-dl-href href="/login">
+            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open web console
+          </a>
+          <a class="btn btn-ghost" href="/login?tab=register">Create free outlet</a>
+        </div>
+        <p class="note">Works on Chrome, Edge, Firefox, Safari. Best PWA: Chrome or Edge.</p>
       </article>
     </div>
 
-    <div class="card" style="margin-top:16px">
-      <h2>Shared device rules (staff)</h2>
+    <div class="staff">
+      <h2><i class="fa-solid fa-users" aria-hidden="true" style="color:var(--brand);margin-right:8px"></i>Shared device rules (staff)</h2>
       <ol>
-        <li><b>Sign out</b> only when another person must use a different account — this clears offline save on purpose</li>
-        <li>To stay ready overnight: close the tab/app — do not Sign out</li>
-        <li>Set a Security PIN in Settings for refunds/voids</li>
-        <li>WhatsApp receipts need the outlet gateway online (green WA icon)</li>
+        <li><b>Sign out</b> only when another person needs a different account — this clears offline save on purpose</li>
+        <li>To stay ready overnight: close the tab/app — do <b>not</b> Sign out</li>
+        <li>Set a Security PIN in Settings for refunds / voids</li>
+        <li>WhatsApp receipts need the outlet gateway online (green WA / Gateway tray on the office PC)</li>
       </ol>
     </div>
 
+    <details class="guides" id="guides">
+      <summary>
+        <span><i class="fa-solid fa-book-open" style="color:var(--brand);margin-right:8px" aria-hidden="true"></i>PDF guides for owners &amp; staff</span>
+        <span>
+          <span class="g-meta">3 guides · optional</span>
+          <i class="fa-solid fa-chevron-down chev" aria-hidden="true" style="margin-left:10px"></i>
+        </span>
+      </summary>
+      <div class="guides-body">
+        <div class="guides-grid">
+          <article class="g-card" data-dl-id="pdf-product">
+            <h3>Product features</h3>
+            <p>Brochure of every module for owners comparing tools.</p>
+            <div class="stats" data-dl-stats><span>PDF</span></div>
+            <a class="btn" style="min-height:40px;padding:10px 14px;font-size:13px" data-dl-href href="/downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener">Download</a>
+          </article>
+          <article class="g-card" data-dl-id="pdf-onboarding-desktop">
+            <h3>Desktop onboarding</h3>
+            <p>Tabs, buttons, and full desktop flows with screenshots.</p>
+            <div class="stats" data-dl-stats><span>PDF</span></div>
+            <a class="btn" style="min-height:40px;padding:10px 14px;font-size:13px" data-dl-href href="/downloads/RestroSuite-Complete-Onboarding-Guide.pdf" target="_blank" rel="noopener">Download</a>
+          </article>
+          <article class="g-card" data-dl-id="pdf-onboarding-mobile">
+            <h3>Mobile onboarding</h3>
+            <p>Phone layout — bottom nav, More menu, checkout bar.</p>
+            <div class="stats" data-dl-stats><span>PDF</span></div>
+            <a class="btn" style="min-height:40px;padding:10px 14px;font-size:13px" data-dl-href href="/downloads/RestroSuite-Mobile-Onboarding-Guide.pdf" target="_blank" rel="noopener">Download</a>
+          </article>
+        </div>
+      </div>
+    </details>
+
     <footer>
-      Guides: <a href="/downloads/RestroSuite-Complete-Onboarding-Guide.pdf">Desktop PDF</a> ·
-      <a href="/downloads/RestroSuite-Mobile-Onboarding-Guide.pdf">Mobile PDF</a> ·
-      <a href="/downloads/RestroSuite-Product-Features-Guide.pdf">Features PDF</a><br>
-      Support: <a href="mailto:support@codearc.co.in">support@codearc.co.in</a> ·
-      Status: <a href="/status">/status</a>
+      Need help?
+      <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
+      · Live status: <a href="/status">/status</a>
+      · <a href="/">Back to home</a>
     </footer>
-  </div>
+  </main>
+
+  <script>
+    (function () {
+      var ua = navigator.userAgent || '';
+      var platform = 'web';
+      if (/Android/i.test(ua)) platform = 'android';
+      else if (/Windows|Win64|Win32|WOW64/i.test(ua)) platform = 'windows';
+      else if (/iPhone|iPad|iPod/i.test(ua)) platform = 'ios';
+      else if (/Mac OS X|Macintosh/i.test(ua) && !('ontouchend' in document)) platform = 'mac';
+
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/"/g, '&quot;');
+      }
+      function fmtDate(iso) {
+        if (!iso) return '';
+        try {
+          return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (e) {
+          return String(iso).slice(0, 10);
+        }
+      }
+
+      function applyRecommend() {
+        var recPlat = platform === 'mac' ? 'web' : platform;
+        var map = {
+          windows: {
+            id: 'windows',
+            platform: 'windows',
+            title: 'You’re on Windows — install the desktop app',
+            sub: 'Setup for Start Menu, or Portable to run immediately',
+            btn: 'Download Windows Setup',
+            hrefSel: '[data-dl-setup]',
+            icon: 'fa-brands fa-windows',
+            color: '#0078d4',
+            scroll: '#windows'
+          },
+          android: {
+            id: 'android',
+            platform: 'android',
+            title: 'You’re on Android — install the APK',
+            sub: 'Best for kitchen tablets and counter phones',
+            btn: 'Download Android APK',
+            hrefSel: '#android [data-dl-href]',
+            icon: 'fa-brands fa-android',
+            color: '#1fa463',
+            scroll: '#android'
+          },
+          ios: {
+            id: 'ios',
+            platform: 'ios',
+            title: 'You’re on iPhone — use Safari home screen',
+            sub: 'Share → Add to Home Screen (no App Store APK)',
+            btn: 'Open login in Safari',
+            hrefSel: '#ios [data-dl-href]',
+            icon: 'fa-brands fa-apple',
+            color: '#111',
+            scroll: '#ios'
+          },
+          web: {
+            id: 'browser',
+            platform: 'web',
+            title: 'Open in browser on this device',
+            sub: 'No install required · optional Install app in Chrome/Edge',
+            btn: 'Open web console',
+            hrefSel: '#browser [data-dl-href]',
+            icon: 'fa-solid fa-globe',
+            color: '#2a9b8f',
+            scroll: '#browser'
+          }
+        };
+        var rec = map[recPlat] || map.web;
+
+        document.querySelectorAll('.card[data-dl-platform]').forEach(function (card) {
+          var isRec = card.getAttribute('data-dl-platform') === rec.platform;
+          card.classList.toggle('is-recommended', isRec);
+          var badge = card.querySelector('[data-dl-badge]');
+          if (badge) badge.hidden = !isRec;
+        });
+
+        var wrap = document.getElementById('dl-recommend');
+        var hrefEl = document.querySelector(rec.hrefSel);
+        var href = (hrefEl && hrefEl.getAttribute('href')) || rec.scroll;
+        if (wrap) {
+          wrap.classList.add('is-on');
+          document.getElementById('dl-rec-title').textContent = rec.title;
+          document.getElementById('dl-rec-sub').textContent = rec.sub;
+          var btn = document.getElementById('dl-rec-btn');
+          btn.setAttribute('href', href);
+          document.getElementById('dl-rec-btn-label').textContent = rec.btn;
+          var ic = document.getElementById('dl-rec-ic');
+          ic.innerHTML = '<i class="' + rec.icon + '" aria-hidden="true"></i>';
+          ic.style.color = rec.color;
+        }
+
+        // Deep-link hash support
+        if (location.hash && document.querySelector(location.hash)) {
+          try { document.querySelector(location.hash).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+        } else if (rec.scroll && document.querySelector(rec.scroll)) {
+          /* keep page top so user sees recommend banner first */
+        }
+      }
+
+      applyRecommend();
+
+      fetch('downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(function (m) {
+          var items = Array.isArray(m.items) ? m.items : [];
+          var byId = {};
+          items.forEach(function (item) { if (item && item.id) byId[item.id] = item; });
+          if (byId['windows-portable'] && !byId['windows-exe']) byId['windows-exe'] = byId['windows-portable'];
+
+          Object.keys(byId).forEach(function (id) {
+            var item = byId[id];
+            var card = document.querySelector('[data-dl-id="' + id + '"]');
+            if (!card) return;
+            var stats = card.querySelector('[data-dl-stats]');
+            if (stats) {
+              var bits = [];
+              if (item.version) bits.push('v' + item.version);
+              if (item.sizeLabel) bits.push(item.sizeLabel);
+              if (item.updatedAt) bits.push(fmtDate(item.updatedAt));
+              if (bits.length) {
+                stats.innerHTML = bits.map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('');
+              }
+            }
+            var a = card.querySelector('[data-dl-href]');
+            if (a && item.url && item.available !== false) a.setAttribute('href', item.url);
+          });
+
+          var setup = byId['windows-setup'];
+          var setupA = document.querySelector('[data-dl-setup]');
+          if (setup && setupA && setup.url) setupA.setAttribute('href', setup.url);
+
+          // Windows portable primary secondary
+          var portable = byId['windows-portable'] || byId['windows-exe'];
+          var portableA = document.querySelector('#windows [data-dl-primary]');
+          if (portable && portableA && portable.url) portableA.setAttribute('href', portable.url);
+
+          var meta = document.getElementById('dl-meta');
+          if (meta) {
+            var ver = m.desktopVersion || m.androidVersion || m.appVersion || '—';
+            meta.innerHTML = 'Current build · <b>' + esc(ver) + '</b>'
+              + (m.generatedAt ? ' · updated ' + esc(fmtDate(m.generatedAt)) : '')
+              + ' · free during launch';
+          }
+          applyRecommend();
+        })
+        .catch(function () { /* static links remain */ });
+    })();
+  </script>
 </body>
 </html>

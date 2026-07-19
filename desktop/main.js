@@ -189,6 +189,22 @@ function createTray() {
     },
     { type: 'separator' },
     {
+      label: 'Start with Windows',
+      type: 'checkbox',
+      checked: !!app.getLoginItemSettings().openAtLogin,
+      click: (item) => {
+        try {
+          app.setLoginItemSettings({
+            openAtLogin: item.checked,
+            openAsHidden: true,
+            path: process.execPath,
+            args: app.isPackaged ? [] : ['.'],
+          });
+        } catch (_) {}
+      },
+    },
+    { type: 'separator' },
+    {
       label: 'Quit RestroSuite',
       click: () => {
         isQuitting = true;
@@ -581,7 +597,26 @@ app.whenReady().then(async () => {
     serverInstance = await startLocalServer();
     buildMenu();
     createTray();
-    createWindow();
+
+    // Start with Windows (hidden to tray). User can toggle via tray menu.
+    try {
+      if (!app.getLoginItemSettings().openAtLogin) {
+        app.setLoginItemSettings({
+          openAtLogin: true,
+          openAsHidden: true,
+          path: process.execPath,
+          args: app.isPackaged ? [] : ['.'],
+        });
+      }
+    } catch (e) {
+      console.warn('[main] openAtLogin failed:', e && e.message);
+    }
+
+    // Login auto-start: stay in tray only; manual launch opens the window.
+    const openedAtLogin = !!(app.getLoginItemSettings && app.getLoginItemSettings().wasOpenedAtLogin);
+    if (!openedAtLogin) {
+      createWindow();
+    }
 
     // Auto-update: NSIS installs download silently; portable offers a download link.
     try {

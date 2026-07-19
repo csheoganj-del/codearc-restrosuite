@@ -9,15 +9,23 @@ if errorlevel 1 (
     call npm install -g pm2
 )
 echo.
-echo  Starting/Restarting RestroSuite Gateway via PM2...
+echo  Starting/Restarting RestroSuite Gateway + ngrok via PM2...
+echo  (ecosystem.config.cjs loads NGROK_DOMAIN from .env.local)
 call pm2 delete "restrosuite-gateway" >nul 2>&1
-call pm2 start whatsapp-gateway.js --name "restrosuite-gateway"
+call pm2 delete "restrosuite-ngrok" >nul 2>&1
+call pm2 start ecosystem.config.cjs
+call pm2 save
+echo.
+echo  Optional: backup PM2/gateway config to Google Drive...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\backup-gateway-pm2.ps1"
 echo.
 echo  ======================================================
-echo   Gateway is running silently in the background!
-echo   - To view live logs: pm2 logs restrosuite-gateway
-echo   - To check status: pm2 status
-echo   - To stop the server: pm2 stop restrosuite-gateway
+echo   Gateway + ngrok running in the background!
+echo   - Status:        pm2 status
+echo   - Gateway logs:  pm2 logs restrosuite-gateway
+echo   - Ngrok logs:    pm2 logs restrosuite-ngrok
+echo   - Stop both:     pm2 stop all
+echo   - Backup again:  powershell -File scripts\backup-gateway-pm2.ps1
 echo  ======================================================
 echo.
 pause

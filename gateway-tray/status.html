@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RestroSuite Gateway</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #0f1115;
+      color: #e8eaed;
+      padding: 20px;
+      user-select: none;
+    }
+    h1 { font-size: 16px; margin: 0 0 4px; font-weight: 700; }
+    .sub { color: #9aa0a6; font-size: 12px; margin-bottom: 16px; }
+    .card {
+      background: #1a1d24;
+      border: 1px solid #2a2f3a;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 6px 0; font-size: 13px; }
+    .label { color: #9aa0a6; }
+    .val { font-weight: 600; text-align: right; word-break: break-all; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    }
+    .pill.ok { background: rgba(34,197,94,.15); color: #4ade80; }
+    .pill.bad { background: rgba(239,68,68,.15); color: #f87171; }
+    .pill.warn { background: rgba(245,158,11,.15); color: #fbbf24; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    button {
+      border: 0; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600;
+      cursor: pointer; background: #2a2f3a; color: #e8eaed;
+    }
+    button.primary { background: #ea580c; color: #fff; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .hint { font-size: 11px; color: #6b7280; margin-top: 14px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>RestroSuite WhatsApp Gateway</h1>
+  <div class="sub">Closes to tray · starts with Windows · Quit only from tray menu</div>
+
+  <div class="card">
+    <div class="row">
+      <span class="label">Status</span>
+      <span id="status-pill" class="pill warn"><span class="dot"></span><span id="status-text">Checking…</span></span>
+    </div>
+    <div class="row"><span class="label">WhatsApp</span><span class="val" id="wa-num">—</span></div>
+    <div class="row"><span class="label">Local health</span><span class="val" id="local-url">http://127.0.0.1:3000</span></div>
+    <div class="row"><span class="label">Last check</span><span class="val" id="last-check">—</span></div>
+    <div class="row"><span class="label">Message</span><span class="val" id="msg" style="font-weight:500;color:#9aa0a6">—</span></div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="btn-restart">Restart gateway</button>
+    <button id="btn-refresh">Refresh</button>
+    <button id="btn-hide">Hide to tray</button>
+  </div>
+  <p class="hint">
+    Closing this window keeps the gateway running in the system tray.
+    Right-click the tray icon → <b>Quit Gateway</b> to stop WhatsApp automation fully.
+  </p>
+
+  <script>
+    const api = window.gatewayTray;
+    function setStatus(kind, text) {
+      const pill = document.getElementById('status-pill');
+      pill.className = 'pill ' + kind;
+      document.getElementById('status-text').textContent = text;
+    }
+    async function refresh() {
+      try {
+        const s = await api.getStatus();
+        document.getElementById('last-check').textContent = new Date().toLocaleTimeString();
+        document.getElementById('msg').textContent = s.message || '—';
+        document.getElementById('wa-num').textContent = s.number || (s.ready ? 'connected' : '—');
+        if (s.ready) setStatus('ok', 'Online · Ready');
+        else if (s.ok) setStatus('warn', 'Online · ' + (s.status || 'connecting'));
+        else setStatus('bad', 'Offline');
+      } catch (e) {
+        setStatus('bad', 'Error');
+        document.getElementById('msg').textContent = String(e && e.message || e);
+      }
+    }
+    document.getElementById('btn-refresh').onclick = refresh;
+    document.getElementById('btn-hide').onclick = () => api.hide();
+    document.getElementById('btn-restart').onclick = async () => {
+      const btn = document.getElementById('btn-restart');
+      btn.disabled = true;
+      btn.textContent = 'Restarting…';
+      try {
+        await api.restart();
+        await new Promise((r) => setTimeout(r, 2500));
+        await refresh();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Restart gateway';
+      }
+    };
+    refresh();
+    setInterval(refresh, 8000);
+  </script>
+</body>
+</html>
