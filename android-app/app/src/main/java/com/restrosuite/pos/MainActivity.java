@@ -1,9 +1,11 @@
 package com.restrosuite.pos;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
@@ -25,6 +27,7 @@ import android.view.animation.AlphaAnimation;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -37,8 +40,11 @@ import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.webkit.WebViewAssetLoader;
 
 /**
@@ -50,6 +56,7 @@ import androidx.webkit.WebViewAssetLoader;
  */
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "RestroSuiteMain";
+    private static final int REQ_CAMERA = 4101;
 
     /** Production web app origin (must stay HTTPS). */
     public static final String REMOTE_ORIGIN = "https://restrosuite.codearc.co.in";
@@ -68,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
     private ConnectivityManager.NetworkCallback networkCallback;
     private WebViewAssetLoader assetLoader;
     private ValueCallback<Uri[]> filePathCallback;
+    private PermissionRequest pendingWebPermissionRequest;
     private boolean usingLocalShell = false;
     private boolean exitArmed = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -290,6 +298,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
+            /** Required for getUserMedia / staff table QR scanner inside WebView. */
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                if (request == null) return;
+                runOnUiThread(() -> handleWebPermissionRequest(request));
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                pendingWebPermissionRequest = null;
+            }
+
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
                                              FileChooserParams fileChooserParams) {
@@ -347,6 +367,54 @@ public class MainActivity extends AppCompatActivity {
             return rewriteLocalCleanUrl(Uri.parse(url)).toString();
         } catch (Exception e) {
             return url;
+        }
+    }
+
+    private void handleWebPermissionRequest(PermissionRequest request) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || request == null) return;
+        boolean wantsCamera = false;
+        for (String res : request.getResources()) {
+            if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(res)
+                    || PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(res)) {
+                wantsCamera = true;
+                break;
+            }
+        }
+        if (wantsCamera) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                    != PackageManager.PERMISSION_GRANTED) {
+                pendingWebPermissionRequest = request;
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                return;
+            }
+        }
+        try {
+            request.grant(request.getResources());
+        } catch (Exception e) {
+            Log.e(TAG, "grant web permission failed: " + e.getMessage());
+            try { request.deny(); } catch (Exception ignored) {}
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_CAMERA) return;
+        PermissionRequest pending = pendingWebPermissionRequest;
+        pendingWebPermissionRequest = null;
+        if (pending == null) return;
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        try {
+            if (granted) pending.grant(pending.getResources());
+            else pending.deny();
+        } catch (Exception e) {
+            Log.e(TAG, "onRequestPermissionsResult: " + e.getMessage());
+        }
+        if (!granted) {
+            Toast.makeText(this, "Camera permission needed to scan table QR codes", Toast.LENGTH_LONG).show();
         }
     }
 
