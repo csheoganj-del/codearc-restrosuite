@@ -298,7 +298,30 @@ serve(async (req) => {
       const code = randomOtp();
       const challengeId = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-      const message = `Your RestroSuite ${purpose === "recovery" ? "password reset" : "verification"} code is: *${code}*\n\nValid for 10 minutes. Never share this code.`;
+      // Professional system SMS-style copy — gateway must not wrap this with bill greetings
+      const message = purpose === "recovery"
+        ? [
+            "*RestroSuite*",
+            "Password reset code",
+            "",
+            `Your code is: *${code}*`,
+            "",
+            "Valid for 10 minutes.",
+            "Never share this code with anyone. RestroSuite staff will never ask for it.",
+            "",
+            "— CodeArc Tech Labs",
+          ].join("\n")
+        : [
+            "*RestroSuite*",
+            "Outlet registration verification",
+            "",
+            `Your verification code is: *${code}*`,
+            "",
+            "Valid for 10 minutes.",
+            "Never share this code with anyone. RestroSuite staff will never ask for it.",
+            "",
+            "— CodeArc Tech Labs",
+          ].join("\n");
       const { error: challengeError } = await supabaseAdmin.from("public_otp_challenges").insert({
         id: challengeId,
         phone_hash: await phoneHash(phone),

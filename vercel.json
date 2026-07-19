@@ -73,6 +73,18 @@
   ],
   "rewrites": [
     {
+      "source": "/go",
+      "destination": "/go.html"
+    },
+    {
+      "source": "/wa",
+      "destination": "/go.html"
+    },
+    {
+      "source": "/start",
+      "destination": "/go.html"
+    },
+    {
       "source": "/bill/:tenantSlug/:billNo*",
       "destination": "/bill.html?slug=:tenantSlug&no=:billNo"
     },

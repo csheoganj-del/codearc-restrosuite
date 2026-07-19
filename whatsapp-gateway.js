@@ -75,11 +75,31 @@ function _isBusinessHour() {
 }
 
 /**
+ * System / transactional WhatsApp (OTP, alerts) must NEVER get bill openers like
+ * "Sharing your bill" / "Appreciate your visit" — that looks unprofessional and confusing.
+ */
+function isSystemOrTransactionalMessage(text) {
+    const t = String(text || '').trim();
+    if (!t) return false;
+    return (
+        /\b(verification code|password reset|otp|one[- ]time|security code|login code|auth code)\b/i.test(t) ||
+        /\b(never share this code|valid for \d+\s*minutes?)\b/i.test(t) ||
+        /\bRestroSuite\b.*\bcode is\b/i.test(t) ||
+        /\byour code is\b/i.test(t) ||
+        /\bcodearc\b.*\b(alert|monitor|gateway)\b/i.test(t)
+    );
+}
+
+/**
  * Natural bill captions — staff phrasing, not "Bill #DO-123"
+ * Only for guest bills / receipts. Skip for OTP and other system traffic.
  */
 function humanCraftCaption({ orderId, outletName, isPlatform, baseCaption }) {
     if (!HUMAN_CRAFT_MODE) {
         return (baseCaption || (orderId ? `Bill ${orderId}` : 'Your bill')).toString().slice(0, 200);
+    }
+    if (isSystemOrTransactionalMessage(baseCaption)) {
+        return String(baseCaption || '').trim().slice(0, 400);
     }
     const brand = String(outletName || '').trim().slice(0, 48);
     const billRef = orderId ? String(orderId).replace(/^DO-/i, '').slice(0, 24) : '';
@@ -2709,16 +2729,23 @@ app.post('/send', async (req, res) => {
 
             const hasPdf = pdfBase64.length > 64;
             let delivered = 'none';
-            // Human-crafted caption (staff phrasing) — PDF body stays exact preview
             const brand = String(outletName || req.headers['x-outlet-name'] || '').trim().slice(0, 60);
-            let shortCaption = humanCraftCaption({
-                orderId,
-                outletName: brand,
-                isPlatform: route.via === 'platform',
-                baseCaption: caption,
-            });
-            if (message && typeof message === 'string' && HUMAN_CRAFT_MODE && route.via === 'platform' && brand) {
-                // Soft intro only if message looks robotic
+            // OTP / security messages: send exactly as written — never wrap with bill greetings
+            const isSystemMsg = isSystemOrTransactionalMessage(message) || isSystemOrTransactionalMessage(caption);
+            const craftBills = HUMAN_CRAFT_MODE && !isSystemMsg;
+
+            // Human-crafted caption (staff phrasing) — PDF body stays exact preview; bills only
+            let shortCaption = craftBills
+                ? humanCraftCaption({
+                    orderId,
+                    outletName: brand,
+                    isPlatform: route.via === 'platform',
+                    baseCaption: caption,
+                })
+                : String(caption || message || (orderId ? `Bill ${orderId}` : 'Your bill')).trim().slice(0, 200);
+
+            if (message && typeof message === 'string' && craftBills && route.via === 'platform' && brand) {
+                // Soft intro only if message looks robotic (guest bills — not OTP)
                 if (/^bill\s/i.test(message.trim()) || message.length < 40) {
                     message = humanCraftCaption({
                         orderId,
@@ -2744,17 +2771,17 @@ app.post('/send', async (req, res) => {
                 const media = {
                     document: pdfBuffer,
                     mimetype: 'application/pdf',
-                    fileName: (HUMAN_CRAFT_MODE ? _pick(niceNames) : String(filename || `receipt-${orderId || 'bill'}.pdf`)).replace(/[^\w.\-]+/g, '_'),
+                    fileName: (craftBills ? _pick(niceNames) : String(filename || `receipt-${orderId || 'bill'}.pdf`)).replace(/[^\w.\-]+/g, '_'),
                     caption: shortCaption || undefined,
                 };
                 await humanSend(route.client, chatId, media, {}, route.sendAsTenantId);
                 delivered = 'pdf';
                 if (route.via === 'own') touchTenantActivity(tenantId);
-                console.log(`[Background Sent] WhatsApp PDF via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} (${pdfBuffer.length} bytes) [human-craft]`);
+                console.log(`[Background Sent] WhatsApp PDF via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} (${pdfBuffer.length} bytes) [${isSystemMsg ? 'system' : 'human-craft'}]`);
             } else if (message) {
-                // Text bill — optionally soft-wrap with a natural opener
+                // Text: bills may get a natural opener; OTP/security always exact
                 let textOut = message;
-                if (HUMAN_CRAFT_MODE && typeof textOut === 'string' && textOut.length > 20) {
+                if (craftBills && typeof textOut === 'string' && textOut.length > 20) {
                     // Keep full receipt text; prepend a short human line sometimes
                     if (Math.random() < 0.5) {
                         const intro = humanCraftCaption({
@@ -2769,7 +2796,7 @@ app.post('/send', async (req, res) => {
                 await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
                 delivered = 'text';
                 if (route.via === 'own') touchTenantActivity(tenantId);
-                console.log(`[Background Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} [human-craft]`);
+                console.log(`[Background Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} [${isSystemMsg ? 'system-exact' : 'human-craft'}]`);
             } else {
                 throw new Error('Nothing to send: empty message and no valid pdfData');
             }

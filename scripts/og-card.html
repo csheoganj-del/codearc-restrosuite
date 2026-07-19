@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>RestroSuite OG Card</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      font-family: "Segoe UI", Inter, system-ui, -apple-system, Roboto, Arial, sans-serif;
+      background: #0b0a09;
+      color: #fff;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: 1200px;
+      height: 630px;
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 55% 70% at 92% 12%, rgba(255, 79, 0, 0.36), transparent 58%),
+        radial-gradient(ellipse 42% 52% at 6% 90%, rgba(255, 140, 40, 0.14), transparent 55%),
+        linear-gradient(155deg, #12100e 0%, #0b0a09 44%, #16110d 100%);
+      display: grid;
+      grid-template-columns: 1fr 1.06fr;
+      padding: 48px 52px 44px;
+      gap: 24px;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px);
+      background-size: 40px 40px;
+      mask-image: radial-gradient(ellipse 85% 75% at 55% 45%, #000 10%, transparent 72%);
+      pointer-events: none;
+    }
+    .card::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 0%, #ff4f00 35%, #ff8c28 65%, transparent 100%);
+    }
+
+    .left {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+      padding-right: 6px;
+    }
+
+    .top-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand img {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08);
+    }
+    .brand-meta { display: flex; flex-direction: column; gap: 1px; }
+    .brand-name {
+      font-size: 25px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+    .brand-by {
+      font-size: 12.5px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 600;
+    }
+    .free-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px 7px 10px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(16,185,129,0.1));
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      color: #6ee7b7;
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .free-badge i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.02em;
+      margin-top: 2px;
+    }
+    .eyebrow .bar {
+      width: 18px;
+      height: 2px;
+      border-radius: 2px;
+      background: #ff4f00;
+    }
+
+    h1 {
+      font-size: 44px;
+      line-height: 1.08;
+      font-weight: 800;
+      letter-spacing: -0.038em;
+      max-width: 500px;
+    }
+    h1 .accent { color: #ff6a1a; }
+    h1 .sub {
+      display: block;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: rgba(255,255,255,0.9);
+      margin-top: 8px;
+    }
+
+    .desc {
+      font-size: 17px;
+      line-height: 1.45;
+      color: rgba(255,255,255,0.68);
+      max-width: 460px;
+      font-weight: 500;
+    }
+
+    .pillars {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 2px;
+      max-width: 460px;
+    }
+    .pillar {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      font-size: 13.5px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.92);
+    }
+    .pillar .ic {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      font-size: 13px;
+      background: rgba(255,79,0,0.16);
+      border: 1px solid rgba(255,79,0,0.28);
+      color: #ff8c28;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+      color: rgba(255,255,255,0.48);
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+    .footer .bar {
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #ff4f00, #ff8c28);
+    }
+    .footer .sep {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+    }
+
+    .right {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .frame-wrap {
+      position: relative;
+      width: 560px;
+      height: 510px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .glow {
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,79,0,0.32) 0%, transparent 68%);
+      filter: blur(8px);
+      z-index: 0;
+    }
+    .frame {
+      position: relative;
+      z-index: 1;
+      width: 536px;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #0f0e0d;
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow:
+        0 48px 96px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(255,79,0,0.12),
+        0 0 56px rgba(255,79,0,0.12),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      transform: perspective(1200px) rotateY(-5deg) rotateX(2.5deg) translateY(2px);
+    }
+    .frame-chrome {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 14px;
+      background: linear-gradient(180deg, #1a1816 0%, #141210 100%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .dot-r, .dot-y, .dot-g {
+      width: 9px; height: 9px; border-radius: 50%;
+    }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+    .chrome-title {
+      margin-left: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.45);
+    }
+    .shot {
+      display: block;
+      width: 100%;
+      height: 400px;
+      object-fit: cover;
+      object-position: left top;
+      background: #f7f4ef;
+    }
+
+    .float-chip {
+      position: absolute;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 13px;
+      border-radius: 14px;
+      background: rgba(20, 18, 16, 0.94);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .float-chip.off { top: 52px; right: -4px; }
+    .float-chip.wa { bottom: 48px; left: -6px; }
+    .float-chip .icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .float-chip.off .icon {
+      background: rgba(255,79,0,0.2);
+      color: #ff8c28;
+      border: 1px solid rgba(255,79,0,0.35);
+      font-size: 12px;
+    }
+    .float-chip.wa .icon {
+      background: #25d366;
+      color: #fff;
+    }
+    .float-chip.wa .icon svg { display: block; }
+    .float-chip small {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      margin-top: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="left">
+      <div class="top-row">
+        <div class="brand">
+          <img src="../assets/restrosuite-mark.png" alt="RestroSuite" />
+          <div class="brand-meta">
+            <div class="brand-name">RestroSuite</div>
+            <div class="brand-by">by CodeArc Tech Labs</div>
+          </div>
+        </div>
+        <div class="free-badge"><i></i> Free to start</div>
+      </div>
+
+      <div class="eyebrow"><span class="bar"></span> Built for Indian restaurants</div>
+
+      <h1>
+        Offline-first<br />
+        <span class="accent">restaurant POS</span>
+        <span class="sub">Bill when Wi‑Fi dies · one clear console</span>
+      </h1>
+
+      <p class="desc">
+        POS, kitchen display, WhatsApp receipts &amp; QR ordering — start free on the devices you already use.
+      </p>
+
+      <div class="pillars">
+        <div class="pillar"><span class="ic">⚡</span> Offline billing</div>
+        <div class="pillar"><span class="ic">💬</span> WhatsApp receipts</div>
+        <div class="pillar"><span class="ic">🍳</span> Kitchen display</div>
+        <div class="pillar"><span class="ic">📱</span> QR table orders</div>
+      </div>
+
+      <div class="footer">
+        <span class="bar"></span>
+        restrosuite.codearc.co.in
+        <span class="sep"></span>
+        Syncs when you reconnect
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="frame-wrap">
+        <div class="glow"></div>
+        <div class="frame">
+          <div class="frame-chrome">
+            <span class="dot-r"></span>
+            <span class="dot-y"></span>
+            <span class="dot-g"></span>
+            <span class="chrome-title">RestroSuite · Live POS checkout</span>
+          </div>
+          <img class="shot" src="../assets/screenshot-cart.png" alt="RestroSuite POS checkout" />
+        </div>
+        <div class="float-chip off">
+          <span class="icon">⚡</span>
+          <span>Works offline<small>Bill with zero Wi‑Fi</small></span>
+        </div>
+        <div class="float-chip wa">
+          <span class="icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.85 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+          </span>
+          <span>WhatsApp receipts<small>Built-in · free</small></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
