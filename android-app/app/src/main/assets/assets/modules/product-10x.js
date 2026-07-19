@@ -425,15 +425,28 @@
               if (status) status.textContent = 'Camera not available — type table number';
               return;
             }
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: { ideal: 'environment' } },
-              audio: false,
-            });
+            const tries = [
+              { video: { facingMode: { ideal: 'environment' } }, audio: false },
+              { video: { facingMode: 'user' }, audio: false },
+              { video: true, audio: false },
+            ];
+            let errLast = null;
+            for (const c of tries) {
+              try { stream = await navigator.mediaDevices.getUserMedia(c); errLast = null; break; }
+              catch (e) { errLast = e; }
+            }
+            if (!stream) {
+              if (status) status.textContent = 'Camera permission denied — enter table manually';
+              console.warn('[rs10 scan]', errLast);
+              return;
+            }
+            video.setAttribute('playsinline', 'true');
+            video.muted = true;
             video.srcObject = stream;
             await video.play();
             if (status) status.textContent = 'Scanning…';
 
-            // BarcodeDetector when available
+            // BarcodeDetector when available; else load jsQR
             if (global.BarcodeDetector) {
               const det = new BarcodeDetector({ formats: ['qr_code'] });
               timer = setInterval(async () => {
@@ -446,8 +459,37 @@
                   }
                 } catch (_) {}
               }, 500);
-            } else if (status) {
-              status.textContent = 'Live QR detect needs Chrome · enter table number below';
+            } else {
+              const runJsQr = () => {
+                if (!global.jsQR || !canvas) {
+                  if (status) status.textContent = 'Enter table number below (scanner lib unavailable)';
+                  return;
+                }
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                timer = setInterval(() => {
+                  try {
+                    if (video.readyState < 2) return;
+                    canvas.width = video.videoWidth || 640;
+                    canvas.height = video.videoHeight || 480;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = global.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+                    if (code && code.data) {
+                      stop();
+                      close();
+                      handleScannedTablePayload(code.data);
+                    }
+                  } catch (_) {}
+                }, 400);
+              };
+              if (global.jsQR) runJsQr();
+              else {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                s.onload = runJsQr;
+                s.onerror = () => { if (status) status.textContent = 'Enter table number below'; };
+                document.head.appendChild(s);
+              }
             }
           } catch (err) {
             if (status) status.textContent = 'Camera permission denied — enter table manually';

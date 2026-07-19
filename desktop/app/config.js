@@ -112,10 +112,20 @@
         window.__OFFLINE_CONFIG__ = true;
         return;
       }
-      console.error('[config.js] Failed to load runtime config and no offline cache exists:', err.message);
-      window.__CONFIG_ERROR__ = err.message;
-      // Apply empty config so the app can still render an error state
-      // rather than hanging indefinitely.
-      applyConfig('', '');
+      // Public anon fallback (same project as production). Keeps login working when
+      // a host (e.g. slim Vercel project / Cloudflare) has no SUPABASE_* env vars.
+      // Anon key is designed to be public; RLS / Edge Functions enforce security.
+      console.warn('[config.js] Using public production Supabase fallback.');
+      applyConfig(
+        'https://htkauiibuejetimfiavs.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk',
+        { enableDemoTools: false, zeroCostLaunchMode: false }
+      );
+      writeCachedRuntimeConfig({
+        supabaseUrl: 'https://htkauiibuejetimfiavs.supabase.co',
+        supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0a2F1aWlidWVqZXRpbWZpYXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4NTc2OTIsImV4cCI6MjA5NTQzMzY5Mn0.NsQ-nJqXlvPfW9lHuapz8w-2rnHwxIfQwt4XoPk7uyk',
+        enableDemoTools: false,
+        zeroCostLaunchMode: false,
+      });
     });
 })();

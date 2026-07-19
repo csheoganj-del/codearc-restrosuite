@@ -179,8 +179,18 @@
       rawLocalSet(REMEMBER_BLOB_KEY, json);
     } catch (_) {}
   }
-  function hydrateRememberedSessionOnce(){
+  /**
+   * Hydrate sessionStorage from the keep-me-signed-in / offline blob.
+   * @param {{ force?: boolean }} [opts] force=true used by "Continue offline"
+   *   after an intentional Sign out is NOT allowed unless a blob still exists
+   *   (normally Sign out clears the blob). force does not re-enable auto-jump.
+   */
+  function hydrateRememberedSessionOnce(opts){
     if (SS.getItem(K.token)) return true;
+    const force = !!(opts && opts.force);
+    // After intentional Sign out, block silent hydrate (prevents instant re-login).
+    // "Continue offline" can force-read only if a blob was kept (should be rare).
+    if (!force && wasExplicitLogout()) return false;
     try {
       // Prefer the new blob; fall back once to legacy flat keys then migrate.
       let blob = null;
@@ -218,12 +228,75 @@
   function restorePersistentSessionToTab(){
     hydrateRememberedSessionOnce();
   }
+  /** True when a keep-me-signed-in blob exists on this device (offline-capable). */
+  function hasRememberBlob(){
+    try {
+      const raw = readRememberBlobRaw();
+      if (!raw) return false;
+      const blob = JSON.parse(raw);
+      return !!(blob && blob[K.token]);
+    } catch (_) {
+      return false;
+    }
+  }
   function ssSet(k, v, persist){
     SS.setItem(k, v);
     // Never mirror live keys into localStorage. Remember-me is handled as a
     // single blob at the end of storeSession / logout.
     if (!persist) {
       try { LS_SESS.removeItem(k); } catch (_) {}
+    }
+  }
+  const EXPLICIT_LOGOUT_KEY = 'rs_explicit_logout_v1';
+  function markExplicitLogout(){
+    try {
+      // Always unscoped — never tenant-prefix (blocks resume incorrectly).
+      rawLocalSet(EXPLICIT_LOGOUT_KEY, String(Date.now()));
+      try { LS_SESS.setItem(EXPLICIT_LOGOUT_KEY, String(Date.now())); } catch (_) {}
+    } catch (_) {}
+  }
+  function clearExplicitLogout(){
+    try { LS_SESS.removeItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
+    rawLocalRemove(EXPLICIT_LOGOUT_KEY);
+    // Wipe any legacy tenant-scoped copies (rs_t:…:rs_explicit_logout_v1)
+    try {
+      const doomed = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k === EXPLICIT_LOGOUT_KEY || k.indexOf(':' + EXPLICIT_LOGOUT_KEY) !== -1 || k.endsWith(EXPLICIT_LOGOUT_KEY)) {
+          doomed.push(k);
+        }
+      }
+      doomed.forEach((k) => rawLocalRemove(k));
+    } catch (_) {}
+  }
+  function wasExplicitLogout(){
+    try {
+      // If a keep-me-signed-in blob exists, a leftover logout flag is stale
+      // (often left by older tenant-scoped keys after a successful login).
+      if (hasRememberBlob()) {
+        clearExplicitLogout();
+        return false;
+      }
+      let v = rawLocalGet(EXPLICIT_LOGOUT_KEY);
+      if (!v) {
+        try { v = LS_SESS.getItem(EXPLICIT_LOGOUT_KEY); } catch (_) {}
+      }
+      if (!v) {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k === EXPLICIT_LOGOUT_KEY || k.endsWith(EXPLICIT_LOGOUT_KEY))) {
+              v = rawLocalGet(k);
+              if (v) break;
+            }
+          }
+        } catch (_) {}
+      }
+      return !!v;
+    } catch (_) {
+      return false;
     }
   }
   function clearAllRememberBlobs(){
@@ -233,15 +306,33 @@
       const doomed = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k === REMEMBER_BLOB_KEY || k.indexOf(':' + REMEMBER_BLOB_KEY) !== -1)) doomed.push(k);
+        if (!k) continue;
+        if (
+          k === REMEMBER_BLOB_KEY ||
+          k.indexOf(':' + REMEMBER_BLOB_KEY) !== -1 ||
+          k.endsWith(REMEMBER_BLOB_KEY) ||
+          k === 'rs:session' ||
+          k.indexOf(':rs:session') !== -1 ||
+          k.endsWith('rs:session')
+        ) doomed.push(k);
       }
       doomed.forEach((k) => rawLocalRemove(k));
     } catch (_) {}
+    try { LS_SESS.removeItem('rs:session'); } catch (_) {}
+    rawLocalRemove('rs:session');
   }
-  function ssClear(){
+  /**
+   * @param {{ intentional?: boolean }} [opts]
+   * intentional (default true) = user clicked Sign out → block auto-resume + show signed-out hint.
+   * intentional false = expired/invalid token → clear save but do not treat as user sign-out.
+   */
+  function ssClear(opts){
+    const intentional = !(opts && opts.intentional === false);
     SESSION_KEYS.forEach(k => { SS.removeItem(k); });
     purgeLegacyFlatSessionKeys();
     clearAllRememberBlobs();
+    if (intentional) markExplicitLogout();
+    else clearExplicitLogout();
     SS.removeItem(IMP_ORIGIN_KEY);
     SS.removeItem(IMP_TARGET_KEY);
   }
@@ -304,9 +395,12 @@
       SS.removeItem('superadmin_admin_token');
     }
     purgeLegacyFlatSessionKeys();
+    // Successful auth always cancels a prior intentional logout block.
+    clearExplicitLogout();
     if (persist) writeRememberBlobFromSession();
     else {
       try { LS_SESS.removeItem(REMEMBER_BLOB_KEY); } catch (_) {}
+      rawLocalRemove(REMEMBER_BLOB_KEY);
     }
   }
 
@@ -322,7 +416,15 @@
       return out;
     } catch(err) {
       if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
-        const e = new Error('Connection failed: Failed to fetch. Ensure Vercel environment variables are correct, the Supabase project is active, and ALLOWED_ORIGINS includes https://restrosuite.codearc.co.in');
+        const isAndroid = !!(window.RS_ANDROID || window.RS_NATIVE_APP || /RestroSuiteAndroid/i.test(navigator.userAgent || ''));
+        const isLocalShell = /appassets\.androidplatform\.net/i.test(location.origin || '');
+        let hint = 'Connection failed: could not reach the cloud. Check internet, then retry.';
+        if (isAndroid || isLocalShell) {
+          hint = 'Connection failed on Android. 1) Enable internet / Wi‑Fi for BlueStacks or the phone. 2) Use the latest APK (2.0.4+). 3) Open Chrome and try https://restrosuite.codearc.co.in/login — if that works, reinstall the APK. 4) Support: support@codearc.co.in';
+        } else {
+          hint = 'Connection failed: Failed to fetch. Check internet, confirm the site loads, and that ALLOWED_ORIGINS includes https://restrosuite.codearc.co.in (and Android shell if offline).';
+        }
+        const e = new Error(hint);
         e.status = 0;
         throw e;
       }
@@ -404,11 +506,15 @@
     async resetPassword({ token, password }){ return post('tenant-access', { action:'reset_password', token, password }, ANON, 'Password reset failed'); },
 
     async validateSession(){
+      // Never treat "config still loading" as logged-out — that caused:
+      // homepage → dashboard flash → login (wiping keep-me-signed-in).
       if(!CONFIGURED) {
-        if (!enableDemoTools) return null;
-        const localSession = api.session();
-        if (localSession && localSession.role === 'superadmin') return null;
-        return api.session();
+        try { absorbRuntimeConfig(); } catch (_) {}
+        if (!CONFIGURED) {
+          const localSession = api.session();
+          if (localSession && localSession.role === 'superadmin' && !enableDemoTools) return localSession;
+          return localSession;
+        }
       }
       const token = ssGet(K.token);
       if(!token) return null;
@@ -427,8 +533,10 @@
           // keep same persistence preference
           const persist = ssGet(K.persist) !== '0';
           storeSession(r.session, persist);
+          return r.session;
         }
-        return r.session || null;
+        // 200 but no session object — keep local tab session (do not wipe offline save)
+        return api.session();
       } catch (err) {
         // If the server explicitly rejected it with 401 or 403, bounce to login (sess = null)
         if (err.status === 401 || err.status === 403 || err.status === 402) {
@@ -439,8 +547,10 @@
       }
     },
 
-    session(){
-      restorePersistentSessionToTab();
+    session(opts){
+      // opts.force → hydrate even after intentional logout (manual offline continue)
+      if (opts && opts.force) hydrateRememberedSessionOnce({ force: true });
+      else restorePersistentSessionToTab();
       const t = ssGet(K.token); if(!t) return null;
       const role = ssGet(K.role);
       if (role === 'superadmin' && !CONFIGURED) {
@@ -466,7 +576,19 @@
       };
     },
 
-    logout(){ ssClear(); },
+    /**
+     * @param {{ intentional?: boolean }} [opts] intentional:false = session expired (no "you signed out" hint)
+     */
+    logout(opts){ ssClear(opts); },
+    /** True after intentional Sign out — login page must not auto-jump to dashboard. */
+    wasExplicitLogout(){ return wasExplicitLogout(); },
+    clearExplicitLogout(){ clearExplicitLogout(); },
+    /** Offline / keep-me-signed-in blob present on this device. */
+    hasRememberBlob(){ return hasRememberBlob(); },
+    /** Manual offline resume (Continue button) — force-hydrate saved blob if any. */
+    resumeRememberedSession(){
+      return hydrateRememberedSessionOnce({ force: true });
+    },
 
     /* ---------------- DATA (tenant-data) ---------------- */
     async data(payload){

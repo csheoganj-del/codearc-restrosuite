@@ -1516,15 +1516,28 @@
           } else if (res.status === 'qr') {
             if (res.qr) {
               if (outletGatewayInterval) { clearInterval(outletGatewayInterval); outletGatewayInterval = setInterval(pollOutletGateway, 3000); }
+              const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+                || !!(window.RS_ANDROID || window.RS_NATIVE_APP)
+                || (window.matchMedia && window.matchMedia('(max-width: 820px)').matches);
+              const mobileHint = isMobile
+                ? `<div style="margin:0 0 10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,#f59e0b 12%,var(--panel));border:1px solid color-mix(in srgb,#f59e0b 30%,var(--stroke));font-size:12.5px;color:var(--text);line-height:1.5;text-align:left;max-width:340px">
+                    <b>Using a phone for RestroSuite?</b> You cannot scan this QR with the same phone’s camera easily.
+                    <br>• Best: open <b>Settings → WhatsApp</b> on a <b>tablet / PC / second screen</b>, then on <b>this phone</b> open WhatsApp → <b>Linked devices → Link a device</b> and scan.
+                    <br>• Or open this page on another device and scan with your WhatsApp phone.
+                  </div>`
+                : '';
               container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:18px;background:var(--panel)">
-                <div class="set-row" style="margin:0 0 14px"><div class="si"><div class="st">Connection</div><div class="sd">Scan with your phone to connect</div></div><span class="pill pill-amber" style="padding:5px 12px">Scan QR</span></div>
+                <div class="set-row" style="margin:0 0 14px"><div class="si"><div class="st">Connection</div><div class="sd">Scan with WhatsApp (not the RestroSuite camera)</div></div><span class="pill pill-amber" style="padding:5px 12px">Scan QR</span></div>
                 <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-                  <img src="${res.qr}" alt="WhatsApp QR" style="width:176px;height:176px;border-radius:10px;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.12)"/>
-                  <ol style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft);line-height:1.65;text-align:left;max-width:300px">
-                    <li>Open <b>WhatsApp</b> on your phone</li>
-                    <li><b>Settings → Linked devices → Link a device</b></li>
-                    <li>Scan this code</li>
+                  ${mobileHint}
+                  <img src="${res.qr}" alt="WhatsApp QR" style="width:min(220px,70vw);height:auto;aspect-ratio:1;border-radius:10px;border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.12);background:#fff"/>
+                  <ol style="margin:0;padding-left:18px;font-size:12.5px;color:var(--text-soft);line-height:1.65;text-align:left;max-width:320px">
+                    <li>On your <b>phone</b>, open the <b>WhatsApp</b> app</li>
+                    <li>Tap <b>⋮ / Settings → Linked devices → Link a device</b></li>
+                    <li>Point WhatsApp at <b>this QR</b> (shown on PC/tablet screen)</li>
+                    <li>Wait until status turns <b>Linked</b> (green)</li>
                   </ol>
+                  <p style="margin:0;font-size:11.5px;color:var(--text-mute);max-width:320px;line-height:1.45">This is <b>not</b> the table-order scanner. Table QR uses the camera button on Floor. WhatsApp link uses the <b>WhatsApp app’s</b> scanner only.</p>
                   <button type="button" class="btn btn-ghost btn-sm" data-wa-fresh-qr><i class="fa-solid fa-rotate-right"></i> New QR</button>
                 </div>
               </div>`;
@@ -1565,7 +1578,10 @@
             container.innerHTML = `<div style="border:1px solid var(--stroke);border-radius:14px;padding:28px 20px;text-align:center;background:var(--panel)">
               <div style="width:48px;height:48px;margin:0 auto 12px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,#25d366 12%,var(--panel));color:#25d366;font-size:22px"><i class="fa-brands fa-whatsapp"></i></div>
               <div style="font-weight:800;font-size:15px;color:var(--text);margin-bottom:6px">Connect WhatsApp</div>
-              <div style="font-size:12.5px;color:var(--text-soft);line-height:1.5;max-width:320px;margin:0 auto 16px">Get a QR code, then scan it from WhatsApp → Linked devices.</div>
+              <div style="font-size:12.5px;color:var(--text-soft);line-height:1.5;max-width:340px;margin:0 auto 16px">
+                Tap below to show a QR. On your <b>phone’s WhatsApp app</b>: Settings → <b>Linked devices → Link a device</b>, then scan this screen.
+                <br><span style="color:var(--text-mute)">Best on a PC/tablet screen while you scan with the phone. Gateway must be online.</span>
+              </div>
               <button type="button" class="btn btn-primary" data-wa-fresh-qr><i class="fa-solid fa-qrcode"></i> Get QR code</button>
             </div>`;
             wireFreshQrButtons(container, tenantId);
@@ -2150,24 +2166,17 @@
       // ── Reflect signed-in user on sidebar pill ────────────────────────
       if(window.RS_DB && RS_DB.session){ Promise.resolve(RS_DB.session()).then(s=>{ if(!s)return; const meta=(s.user&&(s.user.user_metadata||s.user.meta))||s||{}; const un=document.querySelector('.user-pill .un'), ur=document.querySelector('.user-pill .ur'), av=document.querySelector('.user-pill .avatar'); const name=meta.display_name||meta.name||meta.username||s.username||'Outlet User'; const outlet=s.tenant_name||meta.outlet||s.tenant_slug||'Outlet'; const role=s.role||meta.role||'Admin'; const properName=String(name).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); if(un) un.textContent=properName; if(av) av.textContent=properName.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase() || 'RS'; if(ur) { if(role==='superadmin') { ur.textContent='SaaS Super-Admin'; } else { ur.textContent=String(outlet).replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' · '+(String(role).charAt(0).toUpperCase()+String(role).slice(1)); } } }); }
 
-      // ── Route sign-out through the data layer ─────────────────────────
+      // Sign-out: single path via RS_REQUEST_LOGOUT (dashboard.html) — no second confirm.
       const logout = document.querySelector('.sb-foot-btn.logout');
-      if(logout){
+      if (logout) {
         logout.removeAttribute('onclick');
-        logout.addEventListener('click', async ()=>{
-          if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
-            if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-            else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
-            return;
-          }
-          const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
-          if(!confirm(msg)) return;
-          // Stop background gateway polling so the reconnect loop can't
-          // delay or wedge the navigation to the login page.
-          try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(e){}
-          try{ if(window.RS_DB) await RS_DB.signOut(); }catch(e){}
-          location.href='login';
-        });
+        // Capture handler in dashboard.html owns the click; keep a safe fallback only.
+        if (typeof window.RS_REQUEST_LOGOUT !== 'function') {
+          logout.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+          });
+        }
       }
     })();
 
@@ -2215,20 +2224,10 @@
             if (legacy) legacy.style.display = 'none';
             $$('[data-go]',modal).forEach(b=> b.onclick=()=>{
               if(b.dataset.go === 'logout') {
-                if(window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE && window.RS_OFFLINE_LOGOUT_LOCK_ACTIVE()){
-                  if(window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-                  else RS.toast('Logout is disabled while offline to prevent lock-out.', 'fa-circle-xmark');
-                  return;
-                }
-                const msg = "Warning: Logging out will end your session. Any unsaved cart items or local modifications will be cleared if another user logs in on this device. Do you want to proceed?";
-                if(!confirm(msg)) return;
+                // Capture handler + RS_REQUEST_LOGOUT show one in-app modal
                 close();
-                try{ if(window.stopTopbarWhatsAppPolling) window.stopTopbarWhatsAppPolling(); }catch(err){}
-                if(window.RS_DB) {
-                  RS_DB.signOut().then(()=>{ location.href='login'; });
-                } else {
-                  location.href='login';
-                }
+                if (typeof window.RS_REQUEST_LOGOUT === 'function') window.RS_REQUEST_LOGOUT();
+                else if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
               } else {
                 close();
                 if (legacy) legacy.style.display = 'none';

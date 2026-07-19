@@ -30,6 +30,47 @@
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=8">
   <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
   <title>RestroSuite — Offline-First Restaurant POS &amp; Billing</title>
+  <!-- Returning staff: skip marketing homepage when keep-me-signed-in session exists -->
+  <script>
+  (function () {
+    try {
+      // Allow marketing page while signed-in: /?home=1 or /?marketing=1
+      var q = String(location.search || '');
+      if (/(?:^|[?&])(?:home|marketing)=1(?:&|$)/.test(q)) return;
+      if (localStorage.getItem('rs_explicit_logout_v1')) return;
+
+      function readBlob() {
+        var key = 'rs_remembered_session_v1';
+        var raw = null;
+        try { raw = localStorage.getItem(key); } catch (e) {}
+        if (raw) return raw;
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (!k) continue;
+            if (k === key || k.indexOf(':' + key) !== -1 || k.endsWith(key)) {
+              raw = localStorage.getItem(k);
+              if (raw) return raw;
+            }
+          }
+        } catch (e2) {}
+        return null;
+      }
+
+      var raw = readBlob();
+      if (!raw) return;
+      var blob = JSON.parse(raw);
+      if (!blob || typeof blob !== 'object') return;
+      var token = blob.tenant_session_token || blob.session_token || blob.token || '';
+      if (!token) return;
+      // Persist flag '0' means user unchecked keep-me-signed-in
+      if (blob.rs_session_persistent === '0') return;
+
+      // Go through login auto-resume (validates safely). Avoids dashboard flash → kick-to-login.
+      location.replace('login');
+    } catch (e) { /* stay on homepage */ }
+  })();
+  </script>
   <!-- JSON-LD Structured Data (honest — no fabricated ratings) -->
   <script type="application/ld+json">
   {
@@ -1424,8 +1465,8 @@
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark/light theme">
           <i class="fa-solid fa-sun" aria-hidden="true"></i>
         </button>
-        <a class="link-signin" href="login.html">Sign In</a>
-        <a class="btn btn-primary btn-sm" href="login.html?tab=register" id="nav-cta-signup">Sign Up Free</a>
+        <a class="link-signin" href="login" id="nav-signin">Sign In</a>
+        <a class="btn btn-primary btn-sm" href="login?tab=register" id="nav-cta-signup">Sign Up Free</a>
         <!-- FIX: mobile hamburger button added to HTML -->
         <button class="mobile-menu-btn" id="mobile-menu-btn"
           aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
@@ -1443,8 +1484,8 @@
     <a href="#compare"      onclick="closeMobileNav()"><i class="fa-solid fa-scale-balanced fa-fw" aria-hidden="true"></i>Compare</a>
     <a href="#testimonials" onclick="closeMobileNav()"><i class="fa-solid fa-star fa-fw" aria-hidden="true"></i>Testimonials</a>
     <div class="mob-cta-row">
-      <a class="btn btn-ghost btn-block" href="login.html" onclick="closeMobileNav()">Sign In</a>
-      <a class="btn btn-primary btn-block" href="login.html?tab=register" onclick="closeMobileNav()">
+      <a class="btn btn-ghost btn-block" href="login" onclick="closeMobileNav()">Sign In</a>
+      <a class="btn btn-primary btn-block" href="login?tab=register" onclick="closeMobileNav()">
         <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free
       </a>
     </div>
@@ -1637,7 +1678,7 @@
             <p>Open the live web app now. On Chrome/Safari you can “Install” / Add to Home Screen for offline use.</p>
             <div class="dl-stats" data-dl-stats><span>Online</span></div>
             <div class="dl-actions">
-              <a class="btn btn-primary" href="login.html" data-dl-href>
+              <a class="btn btn-primary" href="login" data-dl-href>
                 <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open app
               </a>
             </div>

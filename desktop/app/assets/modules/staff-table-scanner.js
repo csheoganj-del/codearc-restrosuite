@@ -269,6 +269,18 @@
     } catch (_) {}
   }
 
+  function ensureJsQr() {
+    return new Promise(function (resolve) {
+      if (global.jsQR) return resolve(true);
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+      s.async = true;
+      s.onload = function () { resolve(!!global.jsQR); };
+      s.onerror = function () { resolve(false); };
+      document.head.appendChild(s);
+    });
+  }
+
   async function startCamera(root) {
     var video = root.querySelector('video');
     var status = root.querySelector('[data-status]');
@@ -277,19 +289,48 @@
       status.textContent = 'Camera not available — type table number below';
       return;
     }
+    // Prefer rear camera; fall back to any camera (BlueStacks / desktop webcam)
+    var attempts = [
+      { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+      { audio: false, video: { facingMode: 'user' } },
+      { audio: false, video: true },
+    ];
+    var opened = false;
+    var lastErr = null;
+    for (var i = 0; i < attempts.length; i++) {
+      try {
+        streamRef = await navigator.mediaDevices.getUserMedia(attempts[i]);
+        opened = true;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!opened) {
+      console.warn('[StaffScan] camera', lastErr);
+      var msg = 'Camera blocked — allow camera permission, then try again. Or type table # below.';
+      if (lastErr && /NotAllowed|Permission/i.test(String(lastErr.name || lastErr.message || ''))) {
+        msg = 'Camera permission denied. Allow Camera for RestroSuite in system settings, then reopen Scan.';
+      } else if (lastErr && /NotFound|DevicesNotFound/i.test(String(lastErr.name || ''))) {
+        msg = 'No camera found on this device. Type table number below.';
+      }
+      status.textContent = msg;
+      return;
+    }
     try {
-      streamRef = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('autoplay', 'true');
+      video.muted = true;
       video.srcObject = streamRef;
       await video.play();
       status.textContent = 'Point at the table QR…';
     } catch (e) {
-      console.warn('[StaffScan] camera', e);
-      status.textContent = 'Camera blocked — allow camera or type table #';
+      console.warn('[StaffScan] video play', e);
+      status.textContent = 'Camera opened but preview failed — type table # below';
       return;
     }
+
+    await ensureJsQr();
 
     var detector = null;
     try {
@@ -303,6 +344,9 @@
       }
     } catch (_) {
       detector = null;
+    }
+    if (!detector && !global.jsQR) {
+      status.textContent = 'Scanner library missing — type table # or paste QR link below';
     }
 
     var canvas = root.querySelector('canvas');

@@ -1,12 +1,12 @@
 {
-  "version": "v210-20260717-launch",
-  "date": "2026-07-17",
-  "title": "Launch pack — downloads, guides, support brand",
-  "summary": "Homepage Downloads hub (APK, Windows portable, three PDFs), CodeArc support email everywhere, expanded onboarding guides, mobile licence soft-path retained, go-live checklist.",
+  "version": "v213-20260718-launch-10",
+  "date": "2026-07-18",
+  "title": "Launch pack: every-device install + health",
+  "summary": "Install guide for Windows/Android/iOS/browser, /status health, GitHub-hosted EXEs, production Supabase env on Vercel, Learning Center materials complete.",
   "highlights": [
-    "Public /downloads with manifest-driven homepage cards",
-    "support@codearc.co.in only (no @restrosuite.in)",
-    "Desktop onboarding full depth; mobile guide regenerated for launch",
-    "docs/GO_LIVE_CHECKLIST.md for 10/10 sign-off"
+    "New /install page — Windows, Android, iPhone PWA, browser",
+    "New /status + /api/health launch checks",
+    "Large installers on public GitHub Releases (Vercel-safe)",
+    "SUPABASE env fixed on restrosuite-live production"
   ]
 }
