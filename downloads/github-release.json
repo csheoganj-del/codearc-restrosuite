@@ -1,44 +1,44 @@
 {
-  "generatedAt": "2026-07-18T13:21:28.074Z",
+  "generatedAt": "2026-07-20T14:17:23.666Z",
   "repo": "csheoganj-del/restrosuite-downloads",
-  "tag": "v2.0.4",
-  "version": "2.0.4",
-  "baseUrl": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4",
+  "tag": "v2.0.5",
+  "version": "2.0.5",
+  "baseUrl": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5",
   "assets": {
     "setup": {
       "name": "RestroSuite-Windows-Setup.exe",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe",
-      "size": 84854439
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Setup.exe",
+      "size": 85191251
     },
     "portable": {
       "name": "RestroSuite-Windows-Portable.exe",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe",
-      "size": 84539693
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
+      "size": 84876516
     },
     "nsis": {
-      "name": "RestroSuite-2.0.4-x64.exe",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe",
-      "size": 84854439
+      "name": "RestroSuite-2.0.5-x64.exe",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe",
+      "size": 85191251
     },
     "blockmap": {
-      "name": "RestroSuite-2.0.4-x64.exe.blockmap",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe.blockmap",
-      "size": 88621
+      "name": "RestroSuite-2.0.5-x64.exe.blockmap",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe.blockmap",
+      "size": 88809
     },
     "portableNamed": {
-      "name": "RestroSuite-Desktop-2.0.4-portable.exe",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Desktop-2.0.4-portable.exe",
-      "size": 84539693
+      "name": "RestroSuite-Desktop-2.0.5-portable.exe",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Desktop-2.0.5-portable.exe",
+      "size": 84876516
     },
     "apk": {
       "name": "RestroSuite-Android.apk",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk",
-      "size": 12729096
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk",
+      "size": 12728998
     }
   },
-  "windowsSetup": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe",
-  "windowsPortable": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe",
-  "windowsNsis": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe",
-  "windowsBlockmap": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe.blockmap",
-  "androidApk": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk"
+  "windowsSetup": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Setup.exe",
+  "windowsPortable": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
+  "windowsNsis": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe",
+  "windowsBlockmap": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe.blockmap",
+  "androidApk": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk"
 }

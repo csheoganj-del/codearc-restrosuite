@@ -1,12 +1,13 @@
 {
-  "version": "v213-20260718-launch-10",
-  "date": "2026-07-18",
-  "title": "Launch pack: every-device install + health",
-  "summary": "Install guide for Windows/Android/iOS/browser, /status health, GitHub-hosted EXEs, production Supabase env on Vercel, Learning Center materials complete.",
+  "version": "v214-20260720-ops-mode-live-update",
+  "date": "2026-07-20",
+  "title": "Kitchen modes + professional desktop live updates",
+  "summary": "Outlet operating modes (full ops / kitchen printer only / billing only). Desktop app can pull feature updates from the live site without waiting for a full EXE rebuild. Help → Check for Updates installs the new UI.",
   "highlights": [
-    "New /install page — Windows, Android, iPhone PWA, browser",
-    "New /status + /api/health launch checks",
-    "Large installers on public GitHub Releases (Vercel-safe)",
-    "SUPABASE env fixed on restrosuite-live production"
+    "Operating mode: Full ops, Kitchen printer only, Billing only",
+    "Kitchen thermal KOT with ADD/VOID slips; separate kitchen printer name",
+    "Desktop live UI updater — features ship with website deploy",
+    "Help → Check for Updates checks features + EXE shell",
+    "POS-only legacy toggle migrates to Billing only"
   ]
 }

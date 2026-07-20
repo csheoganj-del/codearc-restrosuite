@@ -278,18 +278,13 @@ function start(opts) {
 }
 
 /**
- * Menu / IPC: user-initiated check.
+ * Menu / IPC: user-initiated EXE/shell check.
+ * Feature/UI updates are handled by content-updater (live site) separately.
  */
 async function checkNow() {
   if (!app.isPackaged) {
-    await dialog.showMessageBox(parentWindow(), {
-      type: 'info',
-      title: 'RestroSuite updates',
-      message: 'Auto-update runs only in packaged builds.',
-      detail: 'Use a built installer/portable from desktop/dist to test updates.',
-      buttons: ['OK'],
-    });
-    return { status: 'dev' };
+    // Dev: shell update N/A — content updater still handles feature updates.
+    return { status: 'dev', version: app.getVersion() };
   }
   if (isPortable()) {
     return checkPortableUpdate({ silent: false });
@@ -299,11 +294,12 @@ async function checkNow() {
     if (r && r.status === 'checked') {
       await dialog.showMessageBox(parentWindow(), {
         type: 'info',
-        title: 'RestroSuite updates',
-        message: 'Checked for updates.',
+        title: 'App shell update',
+        message: 'Checked for a new installer build.',
         detail:
-          'If a newer version is available it will download automatically and prompt you to restart. ' +
-          `Current version: ${app.getVersion()}`,
+          'If a newer Setup (EXE shell) is available it downloads in the background, then asks to restart.\n\n' +
+          `Current shell: v${app.getVersion()}\n\n` +
+          'Tip: feature updates (new Settings, POS modes) come from the live site and do not need a new installer.',
         buttons: ['OK'],
       });
     }

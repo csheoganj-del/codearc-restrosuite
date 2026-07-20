@@ -42,6 +42,7 @@ const REWRITES = {
  * Build the Express app.
  * @param {object} opts
  * @param {string} opts.root   Absolute path to the folder holding the web app.
+ * @param {string} [opts.overlay] Optional live-update overlay (served first).
  * @param {object} opts.config Parsed config.json { supabaseUrl, supabaseAnonKey, ... }
  */
 function normalizeSupabaseUrl(value) {
@@ -56,6 +57,35 @@ function createServer(opts) {
   const root = opts.root;
   const config = opts.config || {};
   const app = express();
+
+  /** Live overlay may appear after first feature update — re-resolve every request. */
+  function currentOverlay() {
+    try {
+      if (typeof opts.getOverlay === 'function') {
+        const d = opts.getOverlay();
+        if (d && fs.existsSync(d)) return d;
+      }
+    } catch (_) {}
+    if (opts.overlay && fs.existsSync(opts.overlay)) return opts.overlay;
+    return null;
+  }
+
+  /** Resolve a relative app path: overlay wins, then packaged root. */
+  function resolveAppFile(relPath) {
+    const rel = String(relPath || '').replace(/^[/\\]+/, '');
+    const overlay = currentOverlay();
+    if (overlay) {
+      const o = path.join(overlay, rel);
+      try {
+        if (fs.existsSync(o) && fs.statSync(o).isFile()) return o;
+      } catch (_) {}
+    }
+    const p = path.join(root, rel);
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
+    } catch (_) {}
+    return null;
+  }
   // JSON body for Edge Function proxy (login, tenant-data, etc.)
   app.use(express.json({ limit: '4mb' }));
   app.use(express.text({ type: ['text/*', 'application/x-www-form-urlencoded'], limit: '1mb' }));
@@ -143,8 +173,8 @@ function createServer(opts) {
 
   // --- Parametric rewrite: /bill/:slug/:no -> /bill.html?slug=..&no=.. ------
   app.get(/^\/bill\/([^/]+)\/([^/]+)\/?$/, (req, res) => {
-    const file = path.join(root, 'bill.html');
-    if (fs.existsSync(file)) return res.sendFile(file);
+    const file = resolveAppFile('bill.html');
+    if (file) return res.sendFile(file);
     return res.status(404).end();
   });
 
@@ -155,24 +185,50 @@ function createServer(opts) {
 
     // Explicit named rewrites first.
     if (REWRITES[pathname]) {
-      const file = path.join(root, REWRITES[pathname]);
-      if (fs.existsSync(file)) return res.sendFile(file);
+      const file = resolveAppFile(REWRITES[pathname].replace(/^\//, ''));
+      if (file) return res.sendFile(file);
     }
 
     // cleanUrls: "/foo" -> "foo.html" when that file exists and the path has
     // no extension.
     if (pathname !== '/' && !path.extname(pathname)) {
-      const candidate = path.join(root, pathname + '.html');
-      if (fs.existsSync(candidate)) return res.sendFile(candidate);
+      const candidate = resolveAppFile(pathname.replace(/^\//, '') + '.html');
+      if (candidate) return res.sendFile(candidate);
     }
     next();
   });
 
-  // --- Static files (assets, src, config.js, service-worker.js, etc.) ------
+  // --- Static files: live overlay first (dynamic), then packaged app -------
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const overlay = currentOverlay();
+    if (!overlay) return next();
+    try {
+      let rel = decodeURIComponent(req.path || '').replace(/^\/+/, '');
+      if (!rel || rel.includes('..')) return next();
+      // Directory index
+      let candidate = path.join(overlay, rel);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        candidate = path.join(candidate, 'index.html');
+      }
+      if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) {
+        // try .html extension
+        if (!path.extname(rel)) {
+          const htmlTry = path.join(overlay, rel + '.html');
+          if (fs.existsSync(htmlTry) && fs.statSync(htmlTry).isFile()) candidate = htmlTry;
+          else return next();
+        } else return next();
+      }
+      res.setHeader('Cache-Control', 'no-cache');
+      return res.sendFile(candidate);
+    } catch (_) {
+      return next();
+    }
+  });
+
   app.use(express.static(root, {
     extensions: ['html'],
     setHeaders(res, filePath) {
-      // Service worker must not be cached so updates take effect.
       if (filePath.endsWith('service-worker.js')) {
         res.setHeader('Cache-Control', 'no-cache');
       }
@@ -182,9 +238,21 @@ function createServer(opts) {
   // --- Root -> the configured entry page -----------------------------------
   app.get('/', (req, res) => {
     const entry = (config.entry || '/login').replace(/^\//, '');
-    const file = path.join(root, entry.endsWith('.html') ? entry : entry + '.html');
-    if (fs.existsSync(file)) return res.sendFile(file);
-    return res.sendFile(path.join(root, 'index.html'));
+    const rel = entry.endsWith('.html') ? entry : entry + '.html';
+    const file = resolveAppFile(rel) || resolveAppFile('index.html');
+    if (file) return res.sendFile(file);
+    return res.status(404).end();
+  });
+
+  // Debug: which roots are active (local only)
+  app.get('/api/desktop-content', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const ov = currentOverlay();
+    res.json({
+      root,
+      overlay: ov || null,
+      overlayActive: !!ov,
+    });
   });
 
   return app;

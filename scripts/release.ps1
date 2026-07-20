@@ -9,6 +9,8 @@ try {
     # deploying, so both the web PWA and the Android WebView shell actually
     # pick up this release's files instead of serving a stale cached copy.
     npm run bump:sw-version
+    # Desktop live UI updater needs this list on the website
+    npm run build:content-manifest
     npm run sync:android
     npm run check
 

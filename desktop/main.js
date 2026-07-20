@@ -17,6 +17,7 @@ const http = require('http');
 const { createServer } = require('./server');
 const licenseGate = require('./license-main');
 const autoUpdater = require('./auto-updater');
+const contentUpdater = require('./content-updater');
 
 // --- Load config -----------------------------------------------------------
 function loadConfig() {
@@ -70,7 +71,20 @@ function startLocalServer() {
         '\nRun "npm run sync" in the desktop/ folder before building.'
       ));
     }
-    const expressApp = createServer({ root, config });
+    // Live feature updates land in userData/web-overlay and win over packaged files.
+    // getOverlay is re-read per request so first install of an update does not need
+    // a full process restart (window reload is enough).
+    const expressApp = createServer({
+      root,
+      config,
+      getOverlay: () => {
+        try {
+          return contentUpdater.getOverlayDir();
+        } catch (_) {
+          return null;
+        }
+      },
+    });
     const srv = http.createServer(expressApp);
     srv.on('error', reject);
     // Bind to loopback only -- never exposed on the network.
@@ -185,7 +199,7 @@ function createTray() {
     },
     {
       label: 'Check for Updates…',
-      click: () => { try { autoUpdater.checkNow(); } catch (_) {} },
+      click: () => { try { runFullUpdateCheck(); } catch (_) {} },
     },
     { type: 'separator' },
     {
@@ -334,6 +348,38 @@ function createWindow() {
   mainWindow = win;
 }
 
+/**
+ * Professional update check: features (live site) first, then EXE shell.
+ * Help → Check for Updates and tray "Check for updates" both use this.
+ */
+async function runFullUpdateCheck() {
+  const webRoot = resolveWebRoot();
+  // 1) Feature / UI content (works on every build: Setup, Portable, even dev)
+  let contentResult = { status: 'skipped' };
+  try {
+    contentResult = await contentUpdater.checkContentUpdate({
+      silent: false,
+      webRoot,
+    });
+  } catch (e) {
+    console.warn('[main] content check failed', e && e.message);
+  }
+
+  // If user just applied content update, don't spam shell dialogs
+  if (contentResult && contentResult.status === 'applied') {
+    return { content: contentResult, shell: { status: 'skipped' } };
+  }
+
+  // 2) App shell (packaged only)
+  let shellResult = { status: 'skipped' };
+  try {
+    shellResult = await autoUpdater.checkNow();
+  } catch (e) {
+    console.warn('[main] shell check failed', e && e.message);
+  }
+  return { content: contentResult, shell: shellResult };
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
   const template = [
@@ -364,25 +410,30 @@ function buildMenu() {
       submenu: [
         {
           label: 'Check for Updates…',
-          click() { autoUpdater.checkNow().catch(() => {}); },
+          click() { runFullUpdateCheck().catch(() => {}); },
         },
         {
           label: 'About RestroSuite Desktop',
           click() {
             const kind = autoUpdater.isPortable() ? 'Portable' : 'Installed';
+            let uiVer = '';
+            try {
+              uiVer = contentUpdater.localContentVersion(resolveWebRoot());
+            } catch (_) {}
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'RestroSuite Desktop',
               message: `${config.appName || 'RestroSuite'} Desktop`,
               detail:
-                `Version ${app.getVersion()} (${kind})\n` +
+                `App shell: v${app.getVersion()} (${kind})\n` +
+                `UI features: ${uiVer || 'bundled'}\n` +
                 `Local server: http://localhost:${PORT}\n` +
                 `Backend: ${config.supabaseUrl || '(not set)'}\n` +
-                `Update feed: ${autoUpdater.FEED_URL}\n\n` +
-                `Works offline-first and syncs to the cloud when online.\n` +
-                (autoUpdater.isPortable()
-                  ? 'Portable: new versions open a download link.\n'
-                  : 'Installed: updates download in the background, then prompt to restart.\n'),
+                `Feature feed: ${(config.productionOrigin || 'https://restrosuite.codearc.co.in')}/app-update.json\n` +
+                `EXE feed: ${autoUpdater.FEED_URL}\n\n` +
+                'Two update layers:\n' +
+                '• Features (Settings, POS, kitchen modes) — download from live site when we publish.\n' +
+                '• App shell (EXE) — Setup builds update silently; Portable opens a new download.\n',
             });
           },
         },
@@ -618,13 +669,39 @@ app.whenReady().then(async () => {
       createWindow();
     }
 
-    // Auto-update: NSIS installs download silently; portable offers a download link.
+    // Dual updates:
+    // 1) Content/UI — pulls latest screens from production after website deploy
+    // 2) Shell/EXE — electron-updater for Setup; portable opens download link
+    try {
+      contentUpdater.start({
+        getMainWindow: () => mainWindow,
+        getProductionOrigin: () => config.productionOrigin || 'https://restrosuite.codearc.co.in',
+        webRoot: resolveWebRoot(),
+        onApplied: () => {
+          // Overlay already on disk; reload window so Express serves new files.
+          // Server was started with overlay path that exists after apply — restart
+          // local window is enough if overlay was already configured; if first
+          // overlay, soft-relaunch is safer.
+          try {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              const url = appEntryUrl || `http://localhost:${PORT}/dashboard`;
+              mainWindow.loadURL(url + (url.includes('?') ? '&' : '?') + 'rs_content=' + Date.now());
+            }
+          } catch (e) {
+            console.warn('[main] content reload failed', e && e.message);
+          }
+        },
+      });
+    } catch (e) {
+      console.warn('[main] content-updater start failed:', e && e.message);
+    }
     try {
       autoUpdater.start({ getMainWindow: () => mainWindow });
     } catch (e) {
       console.warn('[main] auto-updater start failed:', e && e.message);
     }
-    ipcMain.handle('rs-check-for-updates', () => autoUpdater.checkNow());
+    ipcMain.handle('rs-check-for-updates', () => runFullUpdateCheck());
+    ipcMain.handle('rs-content-update-status', () => contentUpdater.getStatus());
   } catch (err) {
     dialog.showErrorBox('RestroSuite could not start', String(err && err.message || err));
     isQuitting = true;

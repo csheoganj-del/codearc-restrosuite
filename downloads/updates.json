@@ -1,38 +1,38 @@
 {
-  "generatedAt": "2026-07-18T13:21:28.514Z",
+  "generatedAt": "2026-07-20T14:17:24.207Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v212-20260718-session-logout-fix",
-    "title": "Session resume, logout UX & multi-device builds",
-    "summary": "Keep-me-signed-in works after tab close; Sign out no longer double-prompts; homepage returns staff to console; Desktop 2.0.4 and Android 2.0.4 bundles.",
+    "version": "v214-20260720-ops-mode-live-update",
+    "title": "Kitchen modes + professional desktop live updates",
+    "summary": "Outlet operating modes (full ops / kitchen printer only / billing only). Desktop app can pull feature updates from the live site without waiting for a full EXE rebuild. Help → Check for Updates installs the new UI.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
-    "version": "2.0.4",
+    "version": "2.0.5",
     "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
     "host": "github-releases",
-    "githubRelease": "v2.0.4",
+    "githubRelease": "v2.0.5",
     "nsis": {
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe",
-      "feedFile": "RestroSuite-2.0.4-x64.exe",
-      "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe",
-      "size": 84854439,
-      "sizeLabel": "80.9 MB"
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Setup.exe",
+      "feedFile": "RestroSuite-2.0.5-x64.exe",
+      "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe",
+      "size": 85191251,
+      "sizeLabel": "81.2 MB"
     },
     "portable": {
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe",
-      "size": 84539693,
-      "sizeLabel": "80.6 MB"
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
+      "size": 84876516,
+      "sizeLabel": "80.9 MB"
     }
   },
   "android": {
     "versionName": "2.0.4",
     "versionCode": 5,
-    "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk",
-    "size": 12729096,
+    "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk",
+    "size": 12728998,
     "sizeLabel": "12.1 MB",
-    "notes": "Keep-me-signed-in works after tab close; Sign out no longer double-prompts; homepage returns staff to console; Desktop 2.0.4 and Android 2.0.4 bundles."
+    "notes": "Outlet operating modes (full ops / kitchen printer only / billing only). Desktop app can pull feature updates from the live site without waiting for a full EXE rebuild. Help → Check for Updates installs the new UI."
   }
 }
