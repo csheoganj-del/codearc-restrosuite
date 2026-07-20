@@ -536,7 +536,7 @@
     const SET_PANE_META = {
       profile: { title: 'Outlet profile', sub: 'Name, address, country, and guest QR card details' },
       tax: { title: 'Taxes & pricing', sub: 'Tax rates, service charge, happy hour, loyalty & promo codes' },
-      printer: { title: 'Printers & KOT', sub: 'Receipt paper, auto-print, kitchen tickets, cash drawer' },
+      printer: { title: 'Printers & KOT', sub: 'Operating mode, receipt paper, kitchen tickets, cash drawer' },
       gateway: { title: 'WhatsApp', sub: 'Connect your restaurant number and bill preferences' },
       payments: { title: 'Payments', sub: 'Card / UPI settlement to your bank account' },
       security: { title: 'Security & PIN', sub: 'Admin PIN and which actions require manager approval' },
@@ -654,21 +654,34 @@
           </div>
           <p class="set-hint">Looks up active offers by code first, then falls back to the demo code.</p>`),
       printer:
+        setBlock('Kitchen &amp; billing style', 'How this outlet runs — pick once, everything else follows',
+          `${sel('Operating mode',[
+            'Full ops (KDS + kitchen)',
+            'Kitchen printer only',
+            'Billing only'
+          ],'Full ops (KDS + kitchen)')}
+          <div class="set-hint" style="margin-top:10px;line-height:1.45">
+            <b>Full ops</b> — Kitchen Display and/or KOT print; waiters fire tickets to kitchen.<br>
+            <b>Kitchen printer only</b> — No KDS screen; kitchen cooks from thermal KOT slips only.<br>
+            <b>Billing only</b> — Add items to table/cart and print the bill. Nothing goes to kitchen.
+          </div>
+          <p class="set-hint" style="margin-top:8px">Waiters can still open tables and add items in every mode. In <b>Billing only</b> they never fire kitchen tickets.</p>`) +
         setBlock('Printer hardware', 'Desktop app or Android bridge detects devices; browser uses the system print dialog',
           `<div class="form-grid-2">
-            ${field('Preferred printer name','','e.g. Counter 80mm — blank = system default')}
-            ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
+            ${field('Preferred printer name','','e.g. Counter 80mm — receipt / bill printer')}
+            ${field('Kitchen printer name','','e.g. Kitchen 80mm — blank = same as receipt')}
           </div>
-          <p class="set-hint" style="margin-top:10px">No fake device is assumed until a bridge reports printers.</p>`) +
+          <div class="form-grid-2" style="margin-top:12px">
+            ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
+            ${field('Kitchen station label','Main kitchen','Printed on KOT header')}
+          </div>
+          <p class="set-hint" style="margin-top:10px">Use two names when counter and kitchen have separate thermals. Leave kitchen blank to use the receipt printer.</p>`) +
         setBlock('Auto-print & drawer', 'When to fire receipts, KOTs, and cash drawer',
           `${toggle('Auto-print receipt','Print automatically after payment when a bridge is connected',false)}
-          ${toggle('Auto-print KOT','Send KOT to kitchen printer on order',true)}
+          ${toggle('Auto-print KOT','Print KOT on fire (recommended for kitchen printer mode)',true)}
           ${toggle('Open cash drawer on cash','Pulse cash drawer after cash / cash-split payment',true)}
-          <div class="form-grid-2" style="margin-top:12px">${sel('KOT copies',['1','2','3'],'2')}${field('Kitchen station label','Main kitchen','Kitchen routing label')}</div>
-          <div class="form-grid-2" style="margin-top:12px">${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}<div></div></div>
-          <p class="set-hint">Exact preview matches the settled bill screen. Fast thermal is lighter on slow devices.</p>`) +
-        setBlock('Operating mode', 'Advanced POS behaviour',
-          `${toggle('POS-only mode','Billing only — no KOT to Kitchen Display or waiter app. QR orders still work but stay in POS only.',false)}`) +
+          <div class="form-grid-2" style="margin-top:12px">${sel('KOT copies',['1','2','3'],'1')}${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}</div>
+          <p class="set-hint" style="margin-top:8px">KOT re-fires only print <b>new / cancelled lines</b> (ADD / VOID slips). Exact preview matches the settled bill screen.</p>`) +
         setBlock('Sounds &amp; alerts', 'New QR orders, waiter calls, and kitchen chimes',
           `<div class="set-row" style="border:0;padding:0 0 8px;align-items:center;gap:12px">
             <div class="si" style="flex:1"><div class="st">Alert sounds</div><div class="sd" id="set-sound-status">Chimes for new QR orders and “call waiter”</div></div>
@@ -1733,7 +1746,17 @@
         }
       }
 
-      function applyStore(){ $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; }); }
+      function applyStore(){
+        // Ensure operating mode select has a value when only legacy POS-only was saved
+        try {
+          if (window.RSOpsMode && typeof RSOpsMode.normalizeStore === 'function') {
+            RSOpsMode.normalizeStore(SET_STORE);
+          } else if (SET_STORE.set_pos_only_mode && !SET_STORE.set_operating_mode) {
+            SET_STORE.set_operating_mode = 'Billing only';
+          }
+        } catch (e) {}
+        $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; });
+      }
       function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
       function show(key){
         // Never render a section this role's nav doesn't include (e.g. a
@@ -2016,6 +2039,15 @@
         const lockedBiz = resolveLockedBusinessType(SET_STORE);
         SET_STORE['set_business_type'] = lockedBiz.key;
         try {
+          // Normalize operating mode (migrates legacy POS-only toggle)
+          try {
+            if (window.RSOpsMode && typeof RSOpsMode.normalizeStore === 'function') {
+              RSOpsMode.normalizeStore(SET_STORE);
+            } else {
+              const raw = String(SET_STORE.set_operating_mode || '').toLowerCase();
+              SET_STORE.set_pos_only_mode = raw.indexOf('billing') >= 0;
+            }
+          } catch (e) {}
           await (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve());
           // Update RS_SETTINGS immediately with new settings
           window.RS_SETTINGS = SET_STORE;
@@ -2031,7 +2063,11 @@
           if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
           if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
           try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
-          try{ if(window.RS_applyPosOnlyModeUI) window.RS_applyPosOnlyModeUI(); if(window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true }); } catch(e){}
+          try{
+            if(window.RS_applyOpsModeUI) window.RS_applyOpsModeUI();
+            else if(window.RS_applyPosOnlyModeUI) window.RS_applyPosOnlyModeUI();
+            if(window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true });
+          } catch(e){}
         } catch(err) {
           console.error(err);
           RS.toast('Failed to save settings: ' + err.message, 'fa-circle-exclamation');

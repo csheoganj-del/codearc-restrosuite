@@ -585,16 +585,47 @@
         const nextStatus = o.status === 'pending' ? 'preparing' : 'served';
         const dbStatus = nextStatus === 'preparing' ? 'preparing' : 'served';
         const tableLabel = qrTableShort(o.table);
+        // Billing only: accept stays on manager POS — never kitchen fire
+        const billingOnly =
+          window.RSOpsMode && typeof RSOpsMode.isBillingOnly === 'function'
+            ? RSOpsMode.isBillingOnly()
+            : !!(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
+        const printKitchen =
+          !billingOnly &&
+          nextStatus === 'preparing' &&
+          window.RSOpsMode &&
+          typeof RSOpsMode.usesKitchenPrint === 'function' &&
+          RSOpsMode.usesKitchenPrint() &&
+          (typeof RSOpsMode.autoPrintKot !== 'function' || RSOpsMode.autoPrintKot());
+
         if (o.id && window.RS_DB) {
           try {
             const rows = await RS_DB.list('pending_orders');
             const row = rows.find((r) => r.id === o.id);
             if (row) {
-              row.status = dbStatus;
+              row.status = billingOnly && nextStatus === 'preparing' ? 'Accepted' : dbStatus;
+              if (billingOnly) row.kitchenRoute = 'none';
               await RS_DB.put('pending_orders', o.id, row);
               syncPendingOrders();
             }
-            toast('Table ' + tableLabel + ' → ' + statusTxt[nextStatus]);
+            if (printKitchen && window.RSOps && typeof RSOps.printKotThermal === 'function') {
+              const items = (o.items || []).map((it) => ({
+                qty: it.qty || 1,
+                name: it.name || 'Item',
+                note: it.notes || it.note || '',
+              }));
+              await RSOps.printKotThermal(items, {
+                token: o.orderId || o.id,
+                table: o.table,
+                orderType: o.orderType || 'Dine-in',
+                kind: 'KOT',
+              });
+            }
+            toast(
+              billingOnly && nextStatus === 'preparing'
+                ? 'Table ' + tableLabel + ' accepted (billing only — no kitchen)'
+                : 'Table ' + tableLabel + ' → ' + statusTxt[nextStatus]
+            );
           } catch (e) {
             console.warn('Failed updating order status', e);
             toast('Could not update Table ' + tableLabel + ' — try again', 'fa-circle-exclamation');

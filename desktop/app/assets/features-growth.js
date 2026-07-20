@@ -3227,6 +3227,11 @@
 
     function printOnlineKot(order) {
       if (!order) return;
+      // Billing-only outlets never fire kitchen tickets
+      if (window.RSOpsMode && RSOpsMode.isBillingOnly && RSOpsMode.isBillingOnly()) {
+        RS.toast('Billing only — online order kept for POS settle (no kitchen ticket)', 'fa-receipt');
+        return;
+      }
       const items = (order.rawItems || order.row?.items || []).map((it) => ({
         qty: it.qty || 1,
         name: it.name || 'Item',
@@ -3236,6 +3241,7 @@
           token: order.oid,
           table: `${platName[order.plat]} · ${order.area}`,
           orderType: 'Online',
+          kind: 'KOT',
         });
       } else if (typeof window.RSPrint === 'function') {
         const lines = items
@@ -4969,14 +4975,13 @@
           createdAt: '2026-07-17',
         },
         {
-          id: 'learn-video-placeholder',
-          title: 'Training videos (coming soon)',
-          type: 'video',
-          category: 'Videos',
-          description: 'Upload or link YouTube / Drive training videos here when ready.',
-          url: '',
+          id: 'learn-onboarding-pdf',
+          title: 'Complete onboarding guide (desktop)',
+          type: 'pdf',
+          category: 'Getting started',
+          description: 'Step-by-step screenshots for every major tab on desktop and web.',
+          url: base + '/downloads/RestroSuite-Complete-Onboarding-Guide.pdf',
           builtin: true,
-          placeholder: true,
           createdAt: '2026-07-18',
         },
       ];

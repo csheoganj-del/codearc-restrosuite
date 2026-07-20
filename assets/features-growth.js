@@ -3227,6 +3227,11 @@
 
     function printOnlineKot(order) {
       if (!order) return;
+      // Billing-only outlets never fire kitchen tickets
+      if (window.RSOpsMode && RSOpsMode.isBillingOnly && RSOpsMode.isBillingOnly()) {
+        RS.toast('Billing only — online order kept for POS settle (no kitchen ticket)', 'fa-receipt');
+        return;
+      }
       const items = (order.rawItems || order.row?.items || []).map((it) => ({
         qty: it.qty || 1,
         name: it.name || 'Item',
@@ -3236,6 +3241,7 @@
           token: order.oid,
           table: `${platName[order.plat]} · ${order.area}`,
           orderType: 'Online',
+          kind: 'KOT',
         });
       } else if (typeof window.RSPrint === 'function') {
         const lines = items

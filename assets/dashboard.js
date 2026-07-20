@@ -1096,12 +1096,13 @@
         }
         rows = rows || [];
 
-        // 1. Update KDS -- skipped entirely in POS-only mode: billing still
-        // works and QR orders still land in the manager's own dashboard
-        // (QR_ORDERS below), but nothing is ever queued to the kitchen
-        // display or a waiter screen.
-        const posOnlyMode = !!(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
-        if (posOnlyMode) {
+        // 1. Update KDS — only in Full ops. Kitchen-printer and Billing-only
+        // never populate the kitchen display (kitchen cooks from thermal slips,
+        // or there is no kitchen path at all). QR orders still land below.
+        const usesKds = window.RSOpsMode
+          ? RSOpsMode.usesKds()
+          : !(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
+        if (!usesKds) {
           replaceArr(KDS, []);
         } else {
           const activeKds = rows.filter(r => r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review');
@@ -1205,11 +1206,12 @@
   window.RS = window.RS || {};
   window.RS.updateTabAttentionBlinking = updateTabAttentionBlinking;
 
-  // POS-only mode (Settings -> Printers & KOT -> "POS-only mode"): billing
-  // only, no order ever reaches the Kitchen Display or a waiter screen.
-  // Hides the now-pointless KDS nav entry and the "Send KOT" button so the
-  // UI doesn't offer actions that no longer do anything.
+  // Operating mode UI (Settings → Printers & KOT → Operating mode):
+  // billing_only | kitchen_printer | full — see assets/modules/ops-mode.js
   function applyPosOnlyModeUI() {
+    if (window.RSOpsMode && typeof RSOpsMode.applyUi === 'function') {
+      return RSOpsMode.applyUi();
+    }
     const posOnlyMode = !!(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
     document.querySelectorAll('[data-tab="kds-tab"]').forEach(el => {
       el.style.display = posOnlyMode ? 'none' : '';
@@ -1219,6 +1221,7 @@
     document.documentElement.classList.toggle('rs-pos-only-mode', posOnlyMode);
   }
   window.RS_applyPosOnlyModeUI = applyPosOnlyModeUI;
+  window.RS_applyOpsModeUI = applyPosOnlyModeUI;
 
   // WhatsApp gateway down/up banner -- subscribes to gateway_health_log
   // (already written by whatsapp-gateway.js on every disconnect/connect,

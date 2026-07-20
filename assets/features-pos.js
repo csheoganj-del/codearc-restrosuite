@@ -18,11 +18,23 @@
     let currentSettings = {};
     function normalizeReceiptProfile(settings){
       currentSettings = settings || {};
+      // Migrate legacy POS-only → operating mode label for UI
+      try {
+        if (window.RSOpsMode && typeof RSOpsMode.normalizeStore === 'function') {
+          RSOpsMode.normalizeStore(currentSettings);
+        } else if (currentSettings.set_pos_only_mode && !currentSettings.set_operating_mode) {
+          currentSettings.set_operating_mode = 'Billing only';
+        }
+      } catch (_) {}
       window.RS_SETTINGS = currentSettings; // Update global reference
       try {
         if (currentSettings && currentSettings.admin_pin_hash) {
           localStorage.setItem('rs:admin_pin_hash', String(currentSettings.admin_pin_hash));
         }
+      } catch (_) {}
+      try {
+        if (window.RS_applyOpsModeUI) window.RS_applyOpsModeUI();
+        else if (window.RSOpsMode && RSOpsMode.applyUi) RSOpsMode.applyUi();
       } catch (_) {}
       const raw = (settings && settings._raw) || {};
       return {
@@ -1456,6 +1468,12 @@
     function resetPayment(){
       paymentState.method = 'UPI';
       kotSentKey = '';
+      try {
+        const cust = RS.getCustomer ? RS.getCustomer() : {};
+        if (window.RSOpsMode && typeof RSOpsMode.clearSentMap === 'function') {
+          RSOpsMode.clearSentMap({ table: cust.table, orderType: orderType() });
+        }
+      } catch (_) {}
       const splitCash = document.getElementById('split-cash');
       const splitUpi = document.getElementById('split-upi');
       const splitCard = document.getElementById('split-card');
@@ -2205,7 +2223,10 @@
           RS.toast('Checkout already in progress…', 'fa-spinner');
           return;
         }
-        if(isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
+        const warnKot = window.RSOpsMode
+          ? RSOpsMode.shouldWarnKotOnCheckout()
+          : !(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
+        if (warnKot && isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
 
         checkoutInFlight = true;
         const checkoutBtn = document.getElementById('btn-checkout');
@@ -2736,35 +2757,129 @@
       await finalizeBill(payment.method, totals.grand, 0);
     }
 
-    /* ---------------- KOT ---------------- */
-    function printKotNow(totals, cust, tok, kotInner) {
-      if (window.RSOps && RSOps.printKotThermal) {
-        RSOps.printKotThermal(totals.items, {
-          token: tok,
-          table: cust.table,
-          orderType: orderType(),
-          covers: cust.covers || totals.covers || 0,
-        });
-      } else if (typeof RSPrint === 'function') {
-        RSPrint(`<div style="max-width:280px;margin:0 auto">${kotInner}</div>`, tok);
+    /* ---------------- KOT (mode-aware: full / kitchen printer / billing) ---------------- */
+    function opsMode() {
+      if (window.RSOpsMode && typeof RSOpsMode.getMode === 'function') return RSOpsMode.getMode();
+      if (window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode) return 'billing_only';
+      return 'full';
+    }
+    function usesKitchenQueue() {
+      return window.RSOpsMode ? RSOpsMode.usesKitchenQueue() : opsMode() === 'full';
+    }
+    function usesKitchenPrint() {
+      return window.RSOpsMode ? RSOpsMode.usesKitchenPrint() : opsMode() !== 'billing_only';
+    }
+    function autoPrintKot() {
+      return window.RSOpsMode ? RSOpsMode.autoPrintKot() : true;
+    }
+
+    function kotMeta(totals, cust, tok) {
+      return {
+        token: tok,
+        table: cust.table,
+        orderType: orderType(),
+        covers: cust.covers || totals.covers || 0,
+      };
+    }
+
+    /** Diff cart vs last fire → ADD / VOID / full ticket print payloads */
+    function buildKotDiff(totals, cust) {
+      if (!window.RSOpsMode || typeof RSOpsMode.diffItems !== 'function') {
+        return {
+          isFirst: true,
+          adds: (totals.items || []).map((i) => ({
+            name: i.name,
+            qty: i.qty,
+            note: i.note || i.notes || '',
+            notes: i.note || i.notes || '',
+          })),
+          voids: [],
+          sessionKey: null,
+          nextMap: null,
+        };
       }
+      return RSOpsMode.diffItems(totals.items || [], {
+        table: cust.table,
+        orderType: orderType(),
+      });
+    }
+
+    async function printKotDiff(totals, cust, tok, diff) {
+      if (!usesKitchenPrint()) return { ok: true, skipped: true };
+      const metaBase = kotMeta(totals, cust, tok);
+      const printFn =
+        window.RSOps && typeof RSOps.printKotThermal === 'function'
+          ? RSOps.printKotThermal.bind(RSOps)
+          : null;
+      if (!printFn) {
+        if (typeof RSPrint === 'function') {
+          const items = (diff && diff.isFirst ? totals.items : (diff.adds || [])).map(
+            (i) => `${i.qty}× ${i.name}`
+          );
+          RSPrint(
+            `<div style="max-width:280px;margin:0 auto"><b>KOT ${esc(tok)}</b><br>${esc(cust.table)}<br>${items.map(esc).join('<br>')}</div>`,
+            tok
+          );
+          return { ok: true };
+        }
+        return { ok: false, error: 'no_print' };
+      }
+
+      let last = { ok: true };
+      // First fire or no prior map → full KOT
+      if (!diff || diff.isFirst) {
+        last = await printFn(totals.items, Object.assign({}, metaBase, { kind: 'KOT', banner: 'KOT' }));
+      } else {
+        if (diff.voids && diff.voids.length) {
+          last = await printFn(
+            diff.voids.map((v) => Object.assign({}, v, { void: true })),
+            Object.assign({}, metaBase, { kind: 'VOID', banner: 'VOID' })
+          );
+        }
+        if (diff.adds && diff.adds.length) {
+          last = await printFn(
+            diff.adds,
+            Object.assign({}, metaBase, { kind: 'ADD', banner: 'ADD' })
+          );
+        }
+        // Nothing changed — reprint full as safety (staff tapped KOT again)
+        if (!(diff.adds && diff.adds.length) && !(diff.voids && diff.voids.length)) {
+          last = await printFn(
+            totals.items,
+            Object.assign({}, metaBase, { kind: 'KOT', banner: 'KOT' })
+          );
+        }
+      }
+      return last || { ok: true };
+    }
+
+    async function printKotNow(totals, cust, tok) {
+      const diff = buildKotDiff(totals, cust);
+      return printKotDiff(totals, cust, tok, diff);
     }
 
     async function sendKotToKitchen(totals, cust, tok, opts) {
       const options = opts || {};
+      const mode = opsMode();
+      if (mode === 'billing_only') {
+        RS.toast('Billing only — items stay on the bill. Nothing sent to kitchen.', 'fa-receipt');
+        return;
+      }
+
       const covers = Math.max(0, Number(cust.covers != null ? cust.covers : totals.covers) || 0);
-      if (window.RS_DB) {
+      const diff = buildKotDiff(totals, cust);
+      const queue = options.queue != null ? !!options.queue : usesKitchenQueue();
+      const doPrint = options.print != null ? !!options.print : autoPrintKot() || mode === 'kitchen_printer';
+
+      // Full ops: queue for KDS. Kitchen-printer: optional local ticket record only
+      // (not shown on KDS). Billing never reaches here.
+      if (queue && window.RS_DB) {
         try {
           const tempId = 'kot-' + Date.now();
-          // Tag staff KOTs so guest QR hub can label "Waiter took this"
-          // while still sharing the same table ticket list for add/amend/track.
           const guestName = String(cust.name || '').trim();
-          const staffLabel = guestName
-            ? guestName + ' · Staff'
-            : 'Staff order';
+          const staffLabel = guestName ? guestName + ' · Staff' : 'Staff order';
           let staffOrderId = String(tok || '');
           if (staffOrderId && !/^DO-(QR|WTR)-/i.test(staffOrderId)) {
-            // Keep kitchen token readable; prefix helps guest portal source detection
             staffOrderId = 'DO-WTR-' + staffOrderId.replace(/^DO-/i, '');
           }
           const orderData = {
@@ -2791,6 +2906,7 @@
             dateTime: new Date().toISOString(),
             priority: 'normal',
             source: 'waiter_pos',
+            kitchenRoute: mode === 'kitchen_printer' ? 'print_only' : 'kds',
           };
           await RS_DB.put('pending_orders', tempId, orderData);
           if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
@@ -2799,20 +2915,49 @@
           RS.toast('KOT saved locally. Cloud sync pending.', 'fa-cloud-arrow-up');
         }
       }
-      markKotSent();
-      if (options.print) {
-        printKotNow(totals, cust, tok, options.kotInner || '');
+
+      if (doPrint) {
+        await printKotDiff(totals, cust, tok, diff);
       }
-      RS.toast(
-        tok + (options.print ? ' printed + sent to kitchen' : ' fired to kitchen'),
-        'fa-fire'
-      );
+
+      // Commit delta map so next fire only prints changes
+      try {
+        if (window.RSOpsMode && typeof RSOpsMode.commitSentMap === 'function' && diff) {
+          RSOpsMode.commitSentMap(diff);
+        }
+      } catch (_) {}
+
+      markKotSent();
+
+      if (mode === 'kitchen_printer') {
+        const nAdd = (diff && diff.adds && diff.adds.length) || 0;
+        const nVoid = (diff && diff.voids && diff.voids.length) || 0;
+        let msg = tok + ' printed for kitchen';
+        if (!diff.isFirst && (nAdd || nVoid)) {
+          msg = tok + (nAdd ? ' ADD printed' : '') + (nVoid ? (nAdd ? ' · ' : ' ') + 'VOID printed' : '');
+        }
+        RS.toast(msg, 'fa-print');
+      } else {
+        RS.toast(
+          tok + (doPrint ? ' printed + sent to kitchen' : ' fired to kitchen'),
+          'fa-fire'
+        );
+      }
     }
 
     function kot() {
       const totals = RS.getTotals();
       const cust = RS.getCustomer();
       if (!totals.count) return RS.toast('Cart is empty', 'fa-circle-exclamation');
+
+      const mode = opsMode();
+      if (mode === 'billing_only') {
+        return RS.toast(
+          'Billing only mode — add items and print the bill. Kitchen tickets are off.',
+          'fa-receipt'
+        );
+      }
+
       const tok = RS.seedToken();
       const station =
         window.RSOps && RSOps.getStationLabel ? RSOps.getStationLabel() : '';
@@ -2823,28 +2968,61 @@
           const n = i.note || i.notes || '';
           return `<div class="kot-item"><span class="kq">${i.qty}×</span><span>${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
         }).join('')}`;
+
+      // Kitchen printer only + auto-print → one-tap fire (no modal friction)
+      if (mode === 'kitchen_printer' && autoPrintKot()) {
+        return sendKotToKitchen(totals, cust, tok, { print: true, queue: false });
+      }
+
+      // Full ops with auto-print → print + send in one step (still allow modal if auto off)
+      if (mode === 'full' && autoPrintKot()) {
+        return sendKotToKitchen(totals, cust, tok, { print: true, queue: true });
+      }
+
+      const printerOnly = mode === 'kitchen_printer';
       RSModal.open({
-        title: 'Kitchen ticket',
+        title: printerOnly ? 'Print kitchen ticket' : 'Kitchen ticket',
         sub: tok,
-        icon: 'fa-fire',
+        icon: printerOnly ? 'fa-print' : 'fa-fire',
         size: 'sm',
-        body: `<div class="kot-paper">${kotInner}</div>`,
-        foot: `<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
-              <button class="btn btn-ghost" id="kot-send" style="flex:1"><i class="fa-solid fa-fire"></i> Send</button>
-              <button class="btn btn-primary" id="kot-print-send" style="flex:1.2"><i class="fa-solid fa-bolt"></i> Print &amp; send</button>`,
+        body: `<div class="kot-paper">${kotInner}</div>
+          ${printerOnly ? '<p style="font-size:12px;color:#6b6960;margin:10px 0 0">No KDS — this prints on the kitchen thermal only.</p>' : ''}`,
+        foot: printerOnly
+          ? `<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print only</button>
+             <button class="btn btn-primary" id="kot-print-send" style="flex:1.2"><i class="fa-solid fa-bolt"></i> Print KOT</button>`
+          : `<button class="btn btn-ghost" id="kot-print" style="flex:1"><i class="fa-solid fa-print"></i> Print</button>
+             <button class="btn btn-ghost" id="kot-send" style="flex:1"><i class="fa-solid fa-fire"></i> Send</button>
+             <button class="btn btn-primary" id="kot-print-send" style="flex:1.2"><i class="fa-solid fa-bolt"></i> Print &amp; send</button>`,
         onMount(modal, close) {
-          modal.querySelector('#kot-print').onclick = () => {
-            printKotNow(totals, cust, tok, kotInner);
-          };
-          modal.querySelector('#kot-send').onclick = async () => {
-            close();
-            await sendKotToKitchen(totals, cust, tok, { print: false, kotInner });
-          };
-          // One-tap thermal print + kitchen queue
-          modal.querySelector('#kot-print-send').onclick = async () => {
-            close();
-            await sendKotToKitchen(totals, cust, tok, { print: true, kotInner });
-          };
+          const printBtn = modal.querySelector('#kot-print');
+          if (printBtn) {
+            printBtn.onclick = async () => {
+              await printKotNow(totals, cust, tok);
+              // Print-only still marks delta so kitchen isn't flooded on re-tap
+              try {
+                const diff = buildKotDiff(totals, cust);
+                if (window.RSOpsMode && RSOpsMode.commitSentMap) RSOpsMode.commitSentMap(diff);
+              } catch (_) {}
+              markKotSent();
+            };
+          }
+          const sendBtn = modal.querySelector('#kot-send');
+          if (sendBtn) {
+            sendBtn.onclick = async () => {
+              close();
+              await sendKotToKitchen(totals, cust, tok, { print: false, queue: true });
+            };
+          }
+          const both = modal.querySelector('#kot-print-send');
+          if (both) {
+            both.onclick = async () => {
+              close();
+              await sendKotToKitchen(totals, cust, tok, {
+                print: true,
+                queue: !printerOnly,
+              });
+            };
+          }
         },
       });
     }

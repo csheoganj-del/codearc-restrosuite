@@ -1777,20 +1777,114 @@
   }
 
   /* ---------------- KOT thermal print helper ---------------- */
-  function printKotThermal(items, meta) {
+  function kitchenDeviceName() {
+    try {
+      if (global.RSOpsMode && typeof RSOpsMode.kitchenPrinterName === 'function') {
+        return RSOpsMode.kitchenPrinterName() || null;
+      }
+    } catch (_) {}
+    const s = global.RS_SETTINGS || {};
+    return String(s.set_kitchen_printer_name || s.set_kot_printer_name || '').trim() || null;
+  }
+
+  function kotCopyCount() {
+    try {
+      if (global.RSOpsMode && typeof RSOpsMode.kotCopies === 'function') return RSOpsMode.kotCopies();
+    } catch (_) {}
+    const n = parseInt(String((global.RS_SETTINGS || {}).set_kot_copies || '1'), 10);
+    return Math.min(5, Math.max(1, isFinite(n) ? n : 1));
+  }
+
+  function kitchenStationForKot() {
+    try {
+      if (global.RSOpsMode && typeof RSOpsMode.kitchenStationLabel === 'function') {
+        return RSOpsMode.kitchenStationLabel();
+      }
+    } catch (_) {}
+    return String((global.RS_SETTINGS || {}).set_kitchen_station_label || '').trim() || getStationLabel();
+  }
+
+  /**
+   * Print kitchen ticket(s). Supports ADD / VOID banners (delta KOTs),
+   * multiple copies, and a dedicated kitchen printer when configured.
+   * Never fails silently — toasts if print bridge reports failure.
+   */
+  async function printKotThermal(items, meta) {
     const m = meta || {};
+    const kind = String(m.kind || m.banner || 'KOT').toUpperCase();
+    const banner =
+      kind === 'ADD' || kind === 'ADD-ON' || kind === 'ADDON'
+        ? 'ADD'
+        : kind === 'VOID' || kind === 'CANCEL'
+          ? 'VOID'
+          : kind === 'FULL' || kind === 'NEW'
+            ? 'KOT'
+            : kind === 'KOT'
+              ? 'KOT'
+              : String(m.banner || 'KOT').toUpperCase();
+
     const lines = (items || []).map((i) => {
       const n = i.note || i.notes || '';
-      return `<div class="kot-item"><span class="kq">${esc(i.qty)}×</span><span>${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
+      const voidMark = i.void || banner === 'VOID';
+      return `<div class="kot-item"${voidMark ? ' style="text-decoration:line-through;opacity:.85"' : ''}>` +
+        `<span class="kq">${esc(i.qty)}×</span>` +
+        `<span>${voidMark ? 'VOID ' : ''}${esc(i.name)}${n ? `<div style="font-size:11px;font-weight:600;color:#b45309;margin-top:2px">※ ${esc(n)}</div>` : ''}</span></div>`;
     }).join('');
+
+    if (!lines) {
+      return { ok: false, error: 'empty' };
+    }
+
     const coversN = Math.max(0, Number(m.covers != null ? m.covers : m.pax) || 0);
+    const station = kitchenStationForKot();
+    const bannerStyle =
+      banner === 'VOID'
+        ? 'background:#111;color:#fff;text-align:center;font-weight:800;padding:6px;margin-bottom:8px;letter-spacing:.08em'
+        : banner === 'ADD'
+          ? 'background:#b45309;color:#fff;text-align:center;font-weight:800;padding:6px;margin-bottom:8px;letter-spacing:.08em'
+          : 'display:none';
+
     const html = `<div style="max-width:280px;margin:0 auto">
-      <div class="kot-h"><span class="kt">KOT</span><span>${esc(m.token || m.no || '')}</span></div>
-      <div style="font-size:12px;margin-bottom:8px">${esc(m.table || '')} · ${esc(m.orderType || '')}${coversN ? ' · ' + coversN + ' pax' : ''} · ${esc(getStationLabel())}</div>
+      <div style="${bannerStyle}">${esc(banner === 'KOT' ? '' : banner)}</div>
+      <div class="kot-h"><span class="kt">${esc(banner === 'KOT' ? 'KOT' : banner)}</span><span>${esc(m.token || m.no || '')}</span></div>
+      <div style="font-size:12px;margin-bottom:8px">${esc(m.table || '')} · ${esc(m.orderType || '')}${coversN ? ' · ' + coversN + ' pax' : ''} · ${esc(station)}</div>
       ${lines}
       <div style="margin-top:12px;font-size:11px;color:#666">${new Date().toLocaleString()}</div>
     </div>`;
-    if (global.RSPrint) RSPrint(html, 'KOT');
+
+    const copies = Math.max(1, Number(m.copies) || kotCopyCount());
+    const deviceName = m.deviceName || kitchenDeviceName();
+    const title = (banner === 'KOT' ? 'KOT' : banner + ' KOT') + (m.token ? ' ' + m.token : '');
+    let last = { ok: false };
+    let anyOk = false;
+
+    for (let c = 0; c < copies; c++) {
+      try {
+        if (global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
+          last = await RSPrintBridge.printHtml(html, title, {
+            silent: true,
+            deviceName: deviceName || undefined,
+          });
+        } else if (global.RSPrint) {
+          const ret = global.RSPrint(html, title, { deviceName: deviceName || undefined });
+          last = ret && typeof ret.then === 'function' ? await ret : { ok: true, mode: 'rsprint' };
+        } else {
+          last = { ok: false, error: 'no_print_bridge' };
+        }
+        if (last && last.ok) anyOk = true;
+      } catch (e) {
+        console.warn('[KOT] print failed', e);
+        last = { ok: false, error: (e && e.message) || 'print_failed' };
+      }
+    }
+
+    if (!anyOk) {
+      toast(
+        'Kitchen printer offline — order saved, ticket not printed. Check printer cable / name in Settings.',
+        'fa-triangle-exclamation'
+      );
+    }
+    return anyOk ? Object.assign({ ok: true, copies }, last || {}) : last;
   }
 
   /* ---------------- Bill thermal (ESC/POS or HTML width) ---------------- */

@@ -639,11 +639,16 @@
   // Override / enhance RSPrint when features-pos defines it later
   function installRsPrintShim() {
     const prev = global.RSPrint;
-    global.RSPrint = function (innerHTML, title) {
-      // Prefer bridge (async fire-and-forget)
-      printHtml(innerHTML, title).catch(() => {
-        if (typeof prev === 'function') prev(innerHTML, title);
-      });
+    global.RSPrint = function (innerHTML, title, opts) {
+      // Prefer bridge; supports deviceName for kitchen vs counter printers
+      const p = printHtml(innerHTML, title, opts || {});
+      if (p && typeof p.then === 'function') {
+        return p.catch(() => {
+          if (typeof prev === 'function') return prev(innerHTML, title);
+          return { ok: false };
+        });
+      }
+      return p;
     };
     if (typeof prev === 'function') global.RSPrint.__previous = prev;
   }
