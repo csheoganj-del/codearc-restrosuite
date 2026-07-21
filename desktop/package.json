@@ -101,7 +101,8 @@
       "icon": "build/icon.png",
       "category": "public.app-category.business",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
-      "hardenedRuntime": true,
+      "identity": null,
+      "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "darkModeSupport": true
     },

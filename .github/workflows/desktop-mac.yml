@@ -69,21 +69,34 @@ jobs:
 
       - name: Build macOS packages
         env:
-          # Unsigned by default (no Apple Developer cert in secrets).
-          # Set CSC_IDENTITY_AUTO_DISCOVERY=true and provide cert secrets to sign.
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CERTS_P12_BASE64 != '' && 'true' || 'false' }}
-          CSC_LINK: ${{ secrets.MAC_CERTS_P12_BASE64 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Never pass empty CSC_LINK — electron-builder treats "" as a cert path
+          # and fails with: "<desktop dir> not a file".
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
           # electron-builder publish is not used here; we upload artifacts ourselves
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.event.inputs.dmg_only }}" = "true" ]; then
-            npm run dist:dmg
+          set -e
+          # Optional Apple signing (only if secrets are configured)
+          if [ -n "${{ secrets.MAC_CERTS_P12_BASE64 }}" ]; then
+            echo "Using Apple Developer certificate from secrets"
+            echo "${{ secrets.MAC_CERTS_P12_BASE64 }}" | base64 -d > /tmp/mac-cert.p12
+            export CSC_LINK=/tmp/mac-cert.p12
+            export CSC_KEY_PASSWORD="${{ secrets.MAC_CERTS_PASSWORD }}"
+            export CSC_IDENTITY_AUTO_DISCOVERY=true
+            export APPLE_ID="${{ secrets.APPLE_ID }}"
+            export APPLE_APP_SPECIFIC_PASSWORD="${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
+            export APPLE_TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
           else
-            npm run dist:mac
+            echo "Building UNSIGNED macOS app (Gatekeeper: Right-click → Open)"
+            unset CSC_LINK CSC_KEY_PASSWORD || true
+          fi
+
+          if [ "${{ github.event.inputs.dmg_only }}" = "true" ]; then
+            npm run sync
+            npx electron-builder --mac dmg --publish never
+          else
+            npm run sync
+            npx electron-builder --mac --publish never
           fi
 
       - name: List dist output
