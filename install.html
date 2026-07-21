@@ -510,6 +510,8 @@
     (function () {
       var ua = navigator.userAgent || '';
       var platform = 'web';
+      /** @type {'arm64'|'x64'|'unknown'} */
+      var macArch = 'unknown';
       if (/Android/i.test(ua)) platform = 'android';
       else if (/Windows|Win64|Win32|WOW64/i.test(ua)) platform = 'windows';
       else if (/iPhone|iPad|iPod/i.test(ua)) platform = 'ios';
@@ -530,6 +532,91 @@
         }
       }
 
+      /**
+       * Detect Apple Silicon vs Intel Mac.
+       * Safari still reports platform "MacIntel" on M1–M4, so we use:
+       *  1) Chromium User-Agent Client Hints (architecture)
+       *  2) WebGL renderer string (Apple GPU / M1… vs Intel / AMD)
+       * Returns Promise<'arm64'|'x64'|'unknown'>
+       */
+      function detectMacArch() {
+        if (platform !== 'mac') return Promise.resolve('unknown');
+
+        function fromWebGL() {
+          try {
+            var c = document.createElement('canvas');
+            var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+            if (!gl) return 'unknown';
+            var ext = gl.getExtension('WEBGL_debug_renderer_info');
+            var renderer = '';
+            if (ext) {
+              renderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '');
+            } else {
+              renderer = String(gl.getParameter(gl.RENDERER) || '');
+            }
+            // Apple Silicon: "Apple M1", "Apple M2", "Apple GPU", "Apple M3 Pro", etc.
+            if (/Apple\s*M\d|Apple\s*GPU|Apple\s*GPU/i.test(renderer) || (/Apple/i.test(renderer) && !/Intel|AMD|Radeon|NVIDIA/i.test(renderer))) {
+              return 'arm64';
+            }
+            if (/Intel|AMD|Radeon|NVIDIA|Iris|UHD|GeForce/i.test(renderer)) {
+              return 'x64';
+            }
+          } catch (e) {}
+          return 'unknown';
+        }
+
+        try {
+          if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+            return navigator.userAgentData.getHighEntropyValues(['architecture', 'bitness'])
+              .then(function (hints) {
+                var arch = String((hints && hints.architecture) || '').toLowerCase();
+                if (arch === 'arm' || arch === 'arm64') return 'arm64';
+                if (arch === 'x86' || arch === 'x86_64' || arch === 'x64') return 'x64';
+                return fromWebGL();
+              })
+              .catch(function () { return fromWebGL(); });
+          }
+        } catch (e) {}
+
+        return Promise.resolve(fromWebGL());
+      }
+
+      function styleMacButtons() {
+        var armA = document.querySelector('[data-dl-mac-arm]');
+        var intelA = document.querySelector('[data-dl-mac-intel]');
+        if (!armA || !intelA) return;
+        // Reset
+        armA.classList.remove('btn-ghost');
+        intelA.classList.remove('btn-ghost');
+        armA.classList.add('btn');
+        intelA.classList.add('btn');
+        if (macArch === 'x64') {
+          // Intel is primary
+          armA.classList.add('btn-ghost');
+          intelA.classList.remove('btn-ghost');
+          intelA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Intel DMG · recommended';
+          armA.innerHTML = 'Apple Silicon DMG';
+        } else if (macArch === 'arm64') {
+          intelA.classList.add('btn-ghost');
+          armA.classList.remove('btn-ghost');
+          armA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon · recommended';
+          intelA.innerHTML = 'Intel DMG';
+        } else {
+          // Unknown — keep both equal-weight with Apple Silicon slightly preferred (most new Macs)
+          intelA.classList.add('btn-ghost');
+          armA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon DMG';
+          intelA.innerHTML = 'Intel DMG';
+        }
+        var tip = document.querySelector('[data-dl-mac-tip]');
+        if (tip && macArch !== 'unknown') {
+          tip.innerHTML = macArch === 'arm64'
+            ? '<i class="fa-solid fa-check-circle" aria-hidden="true"></i> Detected <b>Apple Silicon</b> (M1–M4) on this Mac — use the highlighted DMG.'
+            : '<i class="fa-solid fa-check-circle" aria-hidden="true"></i> Detected <b>Intel</b> Mac — use the highlighted Intel DMG.';
+        } else if (tip && macArch === 'unknown') {
+          tip.innerHTML = '<i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Not sure which Mac? Apple menu → <b>About This Mac</b> — if it says Apple M1/M2/M3/M4, use Apple Silicon.';
+        }
+      }
+
       function applyRecommend() {
         var recPlat = platform;
         var map = {
@@ -547,10 +634,18 @@
           mac: {
             id: 'mac',
             platform: 'mac',
-            title: 'You’re on a Mac — install the desktop app',
-            sub: 'Apple Silicon (M1–M4) or Intel DMG · drag to Applications',
-            btn: 'Download Mac DMG',
-            hrefSel: '#mac [data-dl-mac-arm]',
+            title: macArch === 'x64'
+              ? 'You’re on an Intel Mac — install the desktop app'
+              : macArch === 'arm64'
+                ? 'You’re on Apple Silicon — install the desktop app'
+                : 'You’re on a Mac — install the desktop app',
+            sub: macArch === 'x64'
+              ? 'We recommend the Intel DMG · drag to Applications'
+              : macArch === 'arm64'
+                ? 'We recommend the Apple Silicon (M1–M4) DMG · drag to Applications'
+                : 'Choose Apple Silicon (M1–M4) or Intel · drag to Applications',
+            btn: macArch === 'x64' ? 'Download Intel DMG' : 'Download Apple Silicon DMG',
+            hrefSel: macArch === 'x64' ? '#mac [data-dl-mac-intel]' : '#mac [data-dl-mac-arm]',
             icon: 'fa-brands fa-apple',
             color: '#111',
             scroll: '#mac'
@@ -598,6 +693,8 @@
           if (badge) badge.hidden = !isRec;
         });
 
+        styleMacButtons();
+
         var wrap = document.getElementById('dl-recommend');
         var hrefEl = document.querySelector(rec.hrefSel);
         var href = (hrefEl && hrefEl.getAttribute('href')) || rec.scroll;
@@ -621,6 +718,10 @@
         }
       }
 
+      detectMacArch().then(function (arch) {
+        macArch = arch || 'unknown';
+        applyRecommend();
+      });
       applyRecommend();
 
       fetch('downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' })

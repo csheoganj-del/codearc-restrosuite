@@ -3611,6 +3611,8 @@
       var meta = document.getElementById('dl-meta');
       var ua = navigator.userAgent || '';
       var platform = 'web';
+      /** @type {'arm64'|'x64'|'unknown'} */
+      var macArch = 'unknown';
       if (/Android/i.test(ua)) platform = 'android';
       else if (/Windows/i.test(ua) || /Win64|Win32|WOW64/i.test(ua)) platform = 'windows';
       else if (/iPhone|iPad|iPod/i.test(ua)) platform = 'ios';
@@ -3624,6 +3626,74 @@
       }
       function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      }
+
+      /** Detect Apple Silicon vs Intel (Safari reports MacIntel even on M1–M4). */
+      function detectMacArch() {
+        if (platform !== 'mac') return Promise.resolve('unknown');
+        function fromWebGL() {
+          try {
+            var c = document.createElement('canvas');
+            var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+            if (!gl) return 'unknown';
+            var ext = gl.getExtension('WEBGL_debug_renderer_info');
+            var renderer = ext
+              ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '')
+              : String(gl.getParameter(gl.RENDERER) || '');
+            if (/Apple\s*M\d|Apple\s*GPU/i.test(renderer) || (/Apple/i.test(renderer) && !/Intel|AMD|Radeon|NVIDIA/i.test(renderer))) {
+              return 'arm64';
+            }
+            if (/Intel|AMD|Radeon|NVIDIA|Iris|UHD|GeForce/i.test(renderer)) return 'x64';
+          } catch (e) {}
+          return 'unknown';
+        }
+        try {
+          if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+            return navigator.userAgentData.getHighEntropyValues(['architecture', 'bitness'])
+              .then(function (hints) {
+                var arch = String((hints && hints.architecture) || '').toLowerCase();
+                if (arch === 'arm' || arch === 'arm64') return 'arm64';
+                if (arch === 'x86' || arch === 'x86_64' || arch === 'x64') return 'x64';
+                return fromWebGL();
+              })
+              .catch(function () { return fromWebGL(); });
+          }
+        } catch (e) {}
+        return Promise.resolve(fromWebGL());
+      }
+
+      function styleMacButtons() {
+        var armA = document.querySelector('[data-dl-mac-arm]');
+        var intelA = document.querySelector('[data-dl-mac-intel]');
+        if (!armA || !intelA) return;
+        armA.classList.remove('btn-ghost');
+        intelA.classList.remove('btn-ghost');
+        armA.classList.add('btn', 'btn-primary');
+        intelA.classList.add('btn');
+        if (macArch === 'x64') {
+          armA.classList.remove('btn-primary');
+          armA.classList.add('btn-ghost');
+          intelA.classList.add('btn-primary');
+          intelA.classList.remove('btn-ghost');
+          intelA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Intel · recommended';
+          armA.innerHTML = 'Apple Silicon';
+        } else if (macArch === 'arm64') {
+          intelA.classList.add('btn-ghost');
+          intelA.classList.remove('btn-primary');
+          armA.classList.add('btn-primary');
+          armA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon · recommended';
+          intelA.innerHTML = 'Intel DMG';
+        } else {
+          intelA.classList.add('btn-ghost');
+          armA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon';
+          intelA.innerHTML = 'Intel DMG';
+        }
+        var tip = document.querySelector('[data-dl-id="mac-dmg"] .dl-tip');
+        if (tip && macArch === 'arm64') {
+          tip.innerHTML = '<i class="fa-solid fa-check-circle" aria-hidden="true"></i> Detected <b>Apple Silicon</b> on this Mac — use the highlighted DMG.';
+        } else if (tip && macArch === 'x64') {
+          tip.innerHTML = '<i class="fa-solid fa-check-circle" aria-hidden="true"></i> Detected <b>Intel</b> Mac — use the highlighted Intel DMG.';
+        }
       }
 
       function applyRecommend() {
@@ -3647,9 +3717,17 @@
           },
           mac: {
             id: 'mac-dmg',
-            title: 'You’re on a Mac — install the desktop app',
-            sub: 'Apple Silicon (M1–M4) or Intel DMG · drag to Applications',
-            btn: 'Download Mac DMG',
+            title: macArch === 'x64'
+              ? 'You’re on an Intel Mac — install the desktop app'
+              : macArch === 'arm64'
+                ? 'You’re on Apple Silicon — install the desktop app'
+                : 'You’re on a Mac — install the desktop app',
+            sub: macArch === 'x64'
+              ? 'We recommend the Intel DMG · drag to Applications'
+              : macArch === 'arm64'
+                ? 'We recommend the Apple Silicon (M1–M4) DMG · drag to Applications'
+                : 'Choose Apple Silicon or Intel · drag to Applications',
+            btn: macArch === 'x64' ? 'Download Intel DMG' : 'Download Apple Silicon DMG',
             icon: 'fa-brands fa-apple',
             color: '#111'
           },
@@ -3672,9 +3750,19 @@
           var badge = card.querySelector('[data-dl-badge]');
           if (badge) badge.hidden = !isRec;
         });
+        styleMacButtons();
         var wrap = document.getElementById('dl-recommend');
         var card = document.querySelector('[data-dl-id="' + rec.id + '"]');
-        var hrefEl = card && (card.querySelector('[data-dl-mac-arm]') || card.querySelector('[data-dl-href]'));
+        var hrefEl = null;
+        if (card) {
+          if (recPlat === 'mac' && macArch === 'x64') {
+            hrefEl = card.querySelector('[data-dl-mac-intel]') || card.querySelector('[data-dl-mac-arm]');
+          } else if (recPlat === 'mac') {
+            hrefEl = card.querySelector('[data-dl-mac-arm]') || card.querySelector('[data-dl-mac-intel]');
+          } else {
+            hrefEl = card.querySelector('[data-dl-href]');
+          }
+        }
         if (wrap && hrefEl) {
           wrap.classList.add('is-on');
           var title = document.getElementById('dl-rec-title');
@@ -3696,11 +3784,16 @@
           heroInstall.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> '
             + (recPlat === 'android' ? 'Install Android app'
               : recPlat === 'windows' ? 'Install Windows app'
-              : recPlat === 'mac' ? 'Install Mac app'
+              : recPlat === 'mac'
+                ? (macArch === 'x64' ? 'Install Intel Mac app' : 'Install Apple Silicon app')
               : 'Install on your device');
         }
       }
 
+      detectMacArch().then(function (arch) {
+        macArch = arch || 'unknown';
+        applyRecommend();
+      });
       applyRecommend();
 
       fetch('downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' })
