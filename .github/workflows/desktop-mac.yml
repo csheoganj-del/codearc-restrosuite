@@ -91,12 +91,15 @@ jobs:
             unset CSC_LINK CSC_KEY_PASSWORD || true
           fi
 
+          # Build arches ONE AT A TIME. Parallel arm64+x64 dmg mounts race on
+          # GitHub macOS runners (hdiutil / .DS_Store FileNotFoundError).
+          npm run sync
           if [ "${{ github.event.inputs.dmg_only }}" = "true" ]; then
-            npm run sync
-            npx electron-builder --mac dmg --publish never
+            npx electron-builder --mac dmg --x64 --publish never
+            npx electron-builder --mac dmg --arm64 --publish never
           else
-            npm run sync
-            npx electron-builder --mac --publish never
+            npx electron-builder --mac dmg zip --x64 --publish never
+            npx electron-builder --mac dmg zip --arm64 --publish never
           fi
 
       - name: List dist output

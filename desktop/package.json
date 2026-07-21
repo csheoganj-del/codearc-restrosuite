@@ -107,8 +107,9 @@
       "darkModeSupport": true
     },
     "dmg": {
-      "title": "RestroSuite ${version}",
+      "title": "RestroSuite",
       "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "writeUpdateInfo": false,
       "contents": [
         {
           "x": 130,
