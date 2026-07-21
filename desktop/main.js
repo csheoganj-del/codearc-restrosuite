@@ -10,7 +10,7 @@
    ============================================================ */
 'use strict';
 
-const { app, BrowserWindow, Menu, shell, session, dialog, ipcMain, safeStorage, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, shell, session, dialog, ipcMain, safeStorage, Tray, nativeImage, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -169,9 +169,34 @@ function showMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+  if (process.platform === 'darwin' && app.dock) {
+    try { app.dock.show(); } catch (_) {}
+  }
 }
 
-/** System tray: close (X) hides to tray; local server keeps running for silent POS. */
+/** Notify once when hiding to tray/menu-bar (Windows balloon / macOS Notification). */
+let _hideNotified = false;
+function notifyStillRunning() {
+  if (_hideNotified) return;
+  _hideNotified = true;
+  const title = 'RestroSuite is still running';
+  const body = process.platform === 'darwin'
+    ? 'App is in the menu bar. Click the icon to open again, or Quit from the menu.'
+    : 'App is in the system tray. Double-click the tray icon to open again, or right-click → Quit.';
+  try {
+    if (process.platform === 'win32' && tray) {
+      tray.displayBalloon({ title, content: body });
+      return;
+    }
+  } catch (_) {}
+  try {
+    if (Notification && Notification.isSupported()) {
+      new Notification({ title, body }).show();
+    }
+  } catch (_) {}
+}
+
+/** System tray / menu bar: close (X) hides; local server keeps running for silent POS. */
 function createTray() {
   if (tray) return;
   const iconPath = resolveAppIcon();
@@ -192,6 +217,11 @@ function createTray() {
     return;
   }
   tray.setToolTip('RestroSuite Desktop — running in background');
+  const loginLabel = process.platform === 'darwin'
+    ? 'Open at Login'
+    : process.platform === 'win32'
+      ? 'Open at Login (Start with Windows)'
+      : 'Open at Login';
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Open RestroSuite',
@@ -203,7 +233,7 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: 'Start with Windows',
+      label: loginLabel,
       type: 'checkbox',
       checked: !!app.getLoginItemSettings().openAtLogin,
       click: (item) => {
@@ -228,11 +258,12 @@ function createTray() {
   ]);
   tray.setContextMenu(contextMenu);
   tray.on('double-click', () => showMainWindow());
+  // Windows + macOS: left-click toggles window (menu still available via right-click / long-press)
   tray.on('click', () => {
-    // Single click on Windows: toggle show
-    if (process.platform === 'win32') {
-      if (mainWindow && mainWindow.isVisible()) mainWindow.hide();
-      else showMainWindow();
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && mainWindow.isFocused()) {
+      mainWindow.hide();
+    } else {
+      showMainWindow();
     }
   });
 }
@@ -261,19 +292,12 @@ function createWindow() {
     },
   });
 
-  // Close (X) → hide to system tray (silent background). Real quit via tray menu.
+  // Close (X) → hide to tray / menu bar (silent background). Real quit via tray menu.
   win.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
       win.hide();
-      if (process.platform === 'win32' && tray) {
-        try {
-          tray.displayBalloon({
-            title: 'RestroSuite is still running',
-            content: 'App is in the system tray. Double-click the tray icon to open again, or right-click → Quit.',
-          });
-        } catch (_) {}
-      }
+      notifyStillRunning();
     }
   });
 
@@ -649,7 +673,7 @@ app.whenReady().then(async () => {
     buildMenu();
     createTray();
 
-    // Start with Windows (hidden to tray). User can toggle via tray menu.
+    // Open at login by default (Windows + macOS). User can toggle via tray / menu bar.
     try {
       if (!app.getLoginItemSettings().openAtLogin) {
         app.setLoginItemSettings({
@@ -663,10 +687,13 @@ app.whenReady().then(async () => {
       console.warn('[main] openAtLogin failed:', e && e.message);
     }
 
-    // Login auto-start: stay in tray only; manual launch opens the window.
+    // Login auto-start: stay in tray/menu-bar only; manual launch opens the window.
     const openedAtLogin = !!(app.getLoginItemSettings && app.getLoginItemSettings().wasOpenedAtLogin);
     if (!openedAtLogin) {
       createWindow();
+    } else if (process.platform === 'darwin' && app.dock) {
+      // Launched at login hidden — keep dock tile so user can re-open easily
+      try { app.dock.show(); } catch (_) {}
     }
 
     // Dual updates:
@@ -713,14 +740,12 @@ app.whenReady().then(async () => {
   });
 });
 
-// With tray, do not quit when the window is hidden/closed — keep server + app alive.
-app.on('window-all-closed', (e) => {
+// With tray/menu-bar, do not quit when the window is hidden/closed — keep server + app alive.
+app.on('window-all-closed', () => {
+  // macOS: never quit on last window close (standard + tray pattern)
   if (process.platform === 'darwin') return;
   // Windows/Linux: stay in tray unless user chose Quit
-  if (!isQuitting) {
-    // prevent default quit behavior by doing nothing
-    return;
-  }
+  if (!isQuitting) return;
 });
 
 app.on('before-quit', () => {

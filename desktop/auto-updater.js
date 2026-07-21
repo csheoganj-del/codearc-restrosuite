@@ -1,13 +1,17 @@
 /* ============================================================
    RestroSuite Desktop — auto-updater
    ------------------------------------------------------------
-   Installed (NSIS) builds: electron-updater against the generic
+   Windows Setup (NSIS): electron-updater against the generic
    feed at https://restrosuite.codearc.co.in/downloads/desktop
-   (latest.yml + Setup .exe + .blockmap published by sync-downloads).
+   (latest.yml + Setup .exe + .blockmap).
 
-   Portable builds: electron-updater cannot replace a running
-   portable safely, so we poll downloads/updates.json and offer
-   to open the new portable download when a higher version ships.
+   macOS installed (.app from DMG): electron-updater against the
+   same feed (latest-mac.yml + .zip). If the Mac feed is missing,
+   fall back to updates.json and open the matching DMG download
+   (Apple Silicon vs Intel).
+
+   Windows Portable: cannot self-replace; poll updates.json and
+   offer to open the new portable download.
 
    Dev (unpackaged): no-op.
    ============================================================ */
@@ -16,6 +20,7 @@
 const { app, dialog, shell } = require('electron');
 const https = require('https');
 const http = require('http');
+const os = require('os');
 
 const FEED_URL = 'https://restrosuite.codearc.co.in/downloads/desktop';
 const UPDATES_JSON = 'https://restrosuite.codearc.co.in/downloads/updates.json';
@@ -30,6 +35,10 @@ let _started = false;
 
 function isPortable() {
   return !!(process.env.PORTABLE_EXECUTABLE_DIR || process.env.PORTABLE_EXECUTABLE_FILE);
+}
+
+function isMac() {
+  return process.platform === 'darwin';
 }
 
 function parentWindow() {
@@ -82,6 +91,21 @@ function cmpSemver(a, b) {
     if (d) return d > 0 ? 1 : -1;
   }
   return 0;
+}
+
+/** Prefer matching Mac DMG (arm64 = Apple Silicon, else Intel). */
+function pickMacDmgUrl(remote) {
+  if (!remote || !remote.mac) return null;
+  const mac = remote.mac;
+  const arch = process.arch || os.arch();
+  if (arch === 'arm64') {
+    return (mac.appleSilicon && mac.appleSilicon.url) || (mac.intel && mac.intel.url) || null;
+  }
+  return (mac.intel && mac.intel.url) || (mac.appleSilicon && mac.appleSilicon.url) || null;
+}
+
+function macArchLabel() {
+  return process.arch === 'arm64' ? 'Apple Silicon' : 'Intel';
 }
 
 async function checkPortableUpdate({ silent } = {}) {
@@ -155,7 +179,82 @@ async function checkPortableUpdate({ silent } = {}) {
   }
 }
 
-function setupNsisUpdater() {
+/**
+ * macOS DMG installs: when latest-mac.yml is not published yet (or fails),
+ * offer the matching DMG from updates.json — same idea as Windows portable.
+ */
+async function checkMacDmgUpdate({ silent } = {}) {
+  if (_checking) return { status: 'busy' };
+  _checking = true;
+  try {
+    const data = await fetchJson(UPDATES_JSON);
+    const remote = data && data.desktop;
+    const remoteVer = remote && (remote.version || remote.versionName);
+    const localVer = app.getVersion();
+    if (!remoteVer) {
+      if (!silent) {
+        await dialog.showMessageBox(parentWindow(), {
+          type: 'info',
+          title: 'RestroSuite updates',
+          message: 'Could not read the update feed.',
+          detail: 'Try again later or visit the downloads page.',
+          buttons: ['OK', 'Open downloads'],
+          defaultId: 0,
+        }).then((r) => {
+          if (r.response === 1) shell.openExternal(DOWNLOADS_PAGE);
+        });
+      }
+      return { status: 'no-feed' };
+    }
+    if (cmpSemver(remoteVer, localVer) <= 0) {
+      if (!silent) {
+        await dialog.showMessageBox(parentWindow(), {
+          type: 'info',
+          title: 'RestroSuite updates',
+          message: 'You are up to date.',
+          detail: `This Mac app is v${localVer} (${macArchLabel()}).`,
+          buttons: ['OK'],
+        });
+      }
+      return { status: 'current', version: localVer };
+    }
+    const url = pickMacDmgUrl(remote) || DOWNLOADS_PAGE;
+    const r = await dialog.showMessageBox(parentWindow(), {
+      type: 'info',
+      title: 'Update available',
+      message: `RestroSuite ${remoteVer} is available`,
+      detail:
+        `You are running v${localVer} on ${macArchLabel()}.\n\n` +
+        'Download the new DMG, open it, drag RestroSuite to Applications (replace), then reopen.\n\n' +
+        'Tip: feature/UI updates often arrive from the live site without a new DMG (Help → Check for Updates).',
+      buttons: ['Download DMG', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (r.response === 0) {
+      await shell.openExternal(url);
+    }
+    return { status: 'available', version: remoteVer, url };
+  } catch (e) {
+    if (!silent) {
+      await dialog.showMessageBox(parentWindow(), {
+        type: 'warning',
+        title: 'Update check failed',
+        message: 'Could not check for updates.',
+        detail: String(e && e.message || e),
+        buttons: ['OK'],
+      });
+    }
+    return { status: 'error', error: String(e && e.message || e) };
+  } finally {
+    _checking = false;
+  }
+}
+
+/**
+ * electron-updater for Windows NSIS + macOS (latest.yml / latest-mac.yml).
+ */
+function setupShellUpdater() {
   let autoUpdater;
   try {
     autoUpdater = require('electron-updater').autoUpdater;
@@ -168,6 +267,7 @@ function setupNsisUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowDowngrade = false;
   try {
+    // Generic provider: Windows reads latest.yml, macOS reads latest-mac.yml
     autoUpdater.setFeedURL({ provider: 'generic', url: FEED_URL });
   } catch (e) {
     console.warn('[auto-updater] setFeedURL failed:', e && e.message);
@@ -235,75 +335,91 @@ function start(opts) {
     return;
   }
 
-  const autoUpdater = setupNsisUpdater();
-  if (!autoUpdater) return;
+  const autoUpdater = setupShellUpdater();
+  if (!autoUpdater) {
+    // No electron-updater — Mac can still use DMG fallback
+    if (isMac()) {
+      setTimeout(() => checkMacDmgUpdate({ silent: true }), CHECK_DELAY_MS);
+      setInterval(() => checkMacDmgUpdate({ silent: true }), PERIODIC_MS);
+      start._macDmgCheck = (silent) => checkMacDmgUpdate({ silent: !!silent });
+    }
+    return;
+  }
 
-  const run = (silent) => {
-    if (_checking) return Promise.resolve({ status: 'busy' });
+  const runShell = async (silent) => {
+    if (_checking) return { status: 'busy' };
     _checking = true;
-    return autoUpdater
-      .checkForUpdates()
-      .then((result) => {
-        if (!silent && result && result.updateInfo) {
-          // update-downloaded dialog handles install; if not available, say current
-        }
-        return { status: 'checked', updateInfo: result && result.updateInfo };
-      })
-      .catch((e) => {
-        console.warn('[auto-updater] check failed:', e && e.message);
-        if (!silent) {
-          dialog.showMessageBox(parentWindow(), {
-            type: 'warning',
-            title: 'Update check failed',
-            message: 'Could not check for updates.',
-            detail: String(e && e.message || e) + '\n\nYou can still download from the website.',
-            buttons: ['OK', 'Open downloads'],
-            defaultId: 0,
-          }).then((r) => {
-            if (r.response === 1) shell.openExternal(DOWNLOADS_PAGE);
-          });
-        }
-        return { status: 'error', error: String(e && e.message || e) };
-      })
-      .finally(() => {
+    let handedOffToDmg = false;
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return { status: 'checked', updateInfo: result && result.updateInfo };
+    } catch (e) {
+      console.warn('[auto-updater] check failed:', e && e.message);
+      // macOS: if latest-mac.yml missing, fall back to DMG download offer
+      if (isMac()) {
+        handedOffToDmg = true;
         _checking = false;
-      });
+        return checkMacDmgUpdate({ silent: !!silent });
+      }
+      if (!silent) {
+        dialog.showMessageBox(parentWindow(), {
+          type: 'warning',
+          title: 'Update check failed',
+          message: 'Could not check for updates.',
+          detail: String(e && e.message || e) + '\n\nYou can still download from the website.',
+          buttons: ['OK', 'Open downloads'],
+          defaultId: 0,
+        }).then((r) => {
+          if (r.response === 1) shell.openExternal(DOWNLOADS_PAGE);
+        });
+      }
+      return { status: 'error', error: String(e && e.message || e) };
+    } finally {
+      if (!handedOffToDmg) _checking = false;
+    }
   };
 
-  setTimeout(() => run(true), CHECK_DELAY_MS);
-  setInterval(() => run(true), PERIODIC_MS);
+  setTimeout(() => runShell(true), CHECK_DELAY_MS);
+  setInterval(() => runShell(true), PERIODIC_MS);
 
-  // Stash for manual menu action
-  start._nsisCheck = run;
+  start._shellCheck = runShell;
+  if (isMac()) {
+    start._macDmgCheck = (silent) => checkMacDmgUpdate({ silent: !!silent });
+  }
 }
 
 /**
- * Menu / IPC: user-initiated EXE/shell check.
+ * Menu / IPC: user-initiated shell check.
  * Feature/UI updates are handled by content-updater (live site) separately.
  */
 async function checkNow() {
   if (!app.isPackaged) {
-    // Dev: shell update N/A — content updater still handles feature updates.
     return { status: 'dev', version: app.getVersion() };
   }
   if (isPortable()) {
     return checkPortableUpdate({ silent: false });
   }
-  if (typeof start._nsisCheck === 'function') {
-    const r = await start._nsisCheck(false);
+  if (typeof start._shellCheck === 'function') {
+    const r = await start._shellCheck(false);
     if (r && r.status === 'checked') {
       await dialog.showMessageBox(parentWindow(), {
         type: 'info',
         title: 'App shell update',
-        message: 'Checked for a new installer build.',
+        message: 'Checked for a new desktop build.',
         detail:
-          'If a newer Setup (EXE shell) is available it downloads in the background, then asks to restart.\n\n' +
-          `Current shell: v${app.getVersion()}\n\n` +
-          'Tip: feature updates (new Settings, POS modes) come from the live site and do not need a new installer.',
+          (isMac()
+            ? 'If a newer Mac build is on the auto-update feed it downloads in the background, then asks to restart.\n'
+            : 'If a newer Setup (EXE shell) is available it downloads in the background, then asks to restart.\n') +
+          `\nCurrent shell: v${app.getVersion()}` +
+          (isMac() ? ` (${macArchLabel()})` : '') +
+          '\n\nTip: feature updates (new Settings, POS modes) come from the live site and do not need a new installer.',
         buttons: ['OK'],
       });
     }
     return r;
+  }
+  if (typeof start._macDmgCheck === 'function') {
+    return start._macDmgCheck(false);
   }
   return { status: 'unavailable' };
 }
@@ -312,6 +428,7 @@ module.exports = {
   start,
   checkNow,
   isPortable,
+  isMac,
   FEED_URL,
   UPDATES_JSON,
 };

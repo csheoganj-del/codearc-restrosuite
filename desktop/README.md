@@ -123,6 +123,16 @@ opened because the developer cannot be verified.”* Clients can still install:
 1. Open the `.dmg` and drag **RestroSuite** into **Applications**
 2. Right-click the app → **Open** → **Open** (one-time allow)
 
+### macOS shell behavior (same idea as Windows EXE)
+
+| Feature | Behavior |
+|---------|----------|
+| Close window (X) | Hides to **menu bar** (not quit); local server keeps running |
+| Menu bar icon | Open · Check for Updates · **Open at Login** · Quit |
+| Open at Login | On by default (same as Windows auto-start) |
+| Shell updates | Uses `latest-mac.yml` when published; otherwise offers matching **DMG** download (Apple Silicon vs Intel) |
+| Feature/UI updates | Same live-site content updater as Windows |
+
 ### Optional: Apple code signing + notarization (no Gatekeeper warning)
 
 Add these **GitHub repo secrets** (Settings → Secrets and variables → Actions):

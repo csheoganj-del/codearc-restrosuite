@@ -179,8 +179,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Public CDN used by the website (same repo as Windows EXEs)
+      # Public CDN used by the website (same repo as Windows EXEs).
+      # Needs DOWNLOADS_GH_TOKEN (PAT) with write access to restrosuite-downloads;
+      # default GITHUB_TOKEN cannot upload to another repo (HTTP 403).
       - name: Publish to restrosuite-downloads release
+        continue-on-error: true
         if: >
           (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
           || startsWith(github.ref, 'refs/tags/desktop-v')
