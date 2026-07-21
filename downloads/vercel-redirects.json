@@ -15,6 +15,16 @@
     "permanent": false
   },
   {
+    "source": "/downloads/RestroSuite-Mac-AppleSilicon.dmg",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-AppleSilicon.dmg",
+    "permanent": false
+  },
+  {
+    "source": "/downloads/RestroSuite-Mac-Intel.dmg",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-Intel.dmg",
+    "permanent": false
+  },
+  {
     "source": "/downloads/RestroSuite-Android.apk",
     "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk",
     "permanent": false

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-20T14:17:24.207Z",
+  "generatedAt": "2026-07-21T10:18:30.590Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
@@ -12,6 +12,7 @@
     "version": "2.0.5",
     "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
+    "latestMacYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest-mac.yml",
     "host": "github-releases",
     "githubRelease": "v2.0.5",
     "nsis": {
@@ -25,6 +26,18 @@
       "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
       "size": 84876516,
       "sizeLabel": "80.9 MB"
+    },
+    "mac": {
+      "appleSilicon": {
+        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-AppleSilicon.dmg",
+        "size": null,
+        "sizeLabel": null
+      },
+      "intel": {
+        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-Intel.dmg",
+        "size": null,
+        "sizeLabel": null
+      }
     }
   },
   "android": {

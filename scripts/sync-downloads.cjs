@@ -5,13 +5,15 @@
  * homepage "Downloads" section always points at current files after you rebuild.
  *
  * Also publishes the auto-update feeds:
- *   downloads/updates.json          — Android + portable + web versions
- *   downloads/desktop/latest.yml    — electron-updater (NSIS installer)
- *   downloads/desktop/*.exe         — Setup + blockmap for silent Windows updates
+ *   downloads/updates.json          — Android + portable + web + mac versions
+ *   downloads/desktop/latest.yml    — electron-updater (Windows NSIS)
+ *   downloads/desktop/latest-mac.yml— electron-updater (macOS)
+ *   downloads/desktop/*.exe|*.dmg   — binaries for auto-update
  *
  * Sources (latest preferred):
  *   Android APK  → android-app/dist/RestroSuite-POS-*.apk
  *   Windows      → desktop/dist/ (portable + nsis + latest.yml)
+ *   macOS        → desktop/dist/ (*-mac-*.dmg + latest-mac.yml)
  *   Product PDFs → docs/*.pdf
  *
  * Usage: node scripts/sync-downloads.cjs
@@ -162,12 +164,51 @@ function publishDesktopFeed(desktopDir, desktopPkg) {
     published.push({ file: 'latest.yml', url: '/downloads/desktop/latest.yml' });
   }
 
+  // macOS DMGs (built on macOS / GitHub Actions — may be absent on Windows dev machines)
+  const macArm = latestFile(desktopDir, /RestroSuite-.*-mac-arm64\.dmg$/i)
+    || latestFile(desktopDir, /.*-arm64\.dmg$/i);
+  const macX64 = latestFile(desktopDir, /RestroSuite-.*-mac-x64\.dmg$/i)
+    || latestFile(desktopDir, /.*-x64\.dmg$/i)
+    || latestFile(desktopDir, /RestroSuite-.*-mac-intel\.dmg$/i);
+  const macYml = latestFile(desktopDir, /^latest-mac\.yml$/i);
+  const macZipArm = latestFile(desktopDir, /RestroSuite-.*-mac-arm64\.zip$/i);
+  const macZipX64 = latestFile(desktopDir, /RestroSuite-.*-mac-x64\.zip$/i);
+
+  let macArmMeta = null;
+  let macX64Meta = null;
+  if (macArm) {
+    macArmMeta = copyStable(macArm, macArm.name, DESKTOP_OUT);
+    copyStable(macArm, 'RestroSuite-Mac-AppleSilicon.dmg', OUT);
+    if (macArmMeta) published.push(macArmMeta);
+  }
+  if (macX64) {
+    macX64Meta = copyStable(macX64, macX64.name, DESKTOP_OUT);
+    copyStable(macX64, 'RestroSuite-Mac-Intel.dmg', OUT);
+    if (macX64Meta) published.push(macX64Meta);
+  }
+  if (macYml) {
+    const m = copyStable(macYml, 'latest-mac.yml', DESKTOP_OUT);
+    if (m) published.push(m);
+  }
+  if (macZipArm) {
+    const m = copyStable(macZipArm, macZipArm.name, DESKTOP_OUT);
+    if (m) published.push(m);
+  }
+  if (macZipX64) {
+    const m = copyStable(macZipX64, macZipX64.name, DESKTOP_OUT);
+    if (m) published.push(m);
+  }
+
   return {
     published,
     nsisMeta,
     portableMeta,
     nsisName: nsis && nsis.name,
     portableName: portable && portable.name,
+    macArmMeta,
+    macX64Meta,
+    macArmName: macArm && macArm.name,
+    macX64Name: macX64 && macX64.name,
   };
 }
 
@@ -250,14 +291,20 @@ function main() {
   const winNsisUrl = (ghRelease && ghRelease.windowsNsis)
     || (ghRelease && ghRelease.assets && ghRelease.assets.nsis && ghRelease.assets.nsis.url)
     || null;
+  const macArmUrl = (ghRelease && ghRelease.macAppleSilicon)
+    || (ghRelease && ghRelease.assets && ghRelease.assets.macArm && ghRelease.assets.macArm.url)
+    || null;
+  const macX64Url = (ghRelease && ghRelease.macIntel)
+    || (ghRelease && ghRelease.assets && ghRelease.assets.macX64 && ghRelease.assets.macX64.url)
+    || null;
   const androidGhUrl = (ghRelease && ghRelease.androidApk)
     || (ghRelease && ghRelease.assets && ghRelease.assets.apk && ghRelease.assets.apk.url)
     || null;
 
-  if (winPortableUrl || winSetupUrl) {
+  if (winPortableUrl || winSetupUrl || macArmUrl || macX64Url) {
     console.log('GitHub Release URLs active:', ghRelease.tag || '', ghRelease.baseUrl || '');
   } else {
-    console.warn('No downloads/github-release.json — Windows links will 404 on Vercel until you run:');
+    console.warn('No downloads/github-release.json — Windows/Mac links will 404 on Vercel until you run:');
     console.warn('  node scripts/publish-github-release.cjs');
   }
 
@@ -344,6 +391,105 @@ function main() {
       available: false,
     });
     console.warn('EXE missing (desktop/dist/*)');
+  }
+
+  // ── macOS desktop (DMG) ──────────────────────────────────────────────
+  // Same hosting model as Windows: large DMGs on GitHub Releases.
+  const macArmPublicUrl = macArmUrl || (desk.macArmMeta ? '/downloads/RestroSuite-Mac-AppleSilicon.dmg' : null);
+  const macX64PublicUrl = macX64Url || (desk.macX64Meta ? '/downloads/RestroSuite-Mac-Intel.dmg' : null);
+
+  if (macArmPublicUrl || macX64PublicUrl) {
+    if (macArmPublicUrl) {
+      const armSize = desk.macArmMeta
+        ? desk.macArmMeta.size
+        : (ghRelease.assets && ghRelease.assets.macArm && ghRelease.assets.macArm.size) || 0;
+      items.push({
+        id: 'mac-arm64',
+        kind: 'app',
+        platform: 'macOS',
+        title: 'RestroSuite for Mac (Apple Silicon)',
+        blurb: 'DMG for M1/M2/M3/M4 Macs. Drag to Applications. Hosted on GitHub Releases.',
+        icon: 'fa-apple',
+        brand: 'brands',
+        version: desktopPkg.version || '2.0.2',
+        filename: 'RestroSuite-Mac-AppleSilicon.dmg',
+        url: macArmPublicUrl,
+        size: armSize,
+        sizeLabel: armSize ? formatBytes(armSize) : 'DMG',
+        updatedAt: (desk.macArmMeta && desk.macArmMeta.updatedAt) || ghRelease.generatedAt || null,
+        available: true,
+        host: macArmUrl ? 'github-releases' : 'local',
+        arch: 'arm64',
+      });
+      console.log('DMG arm64   →', macArmPublicUrl);
+    }
+    if (macX64PublicUrl) {
+      const x64Size = desk.macX64Meta
+        ? desk.macX64Meta.size
+        : (ghRelease.assets && ghRelease.assets.macX64 && ghRelease.assets.macX64.size) || 0;
+      items.push({
+        id: 'mac-x64',
+        kind: 'app',
+        platform: 'macOS',
+        title: 'RestroSuite for Mac (Intel)',
+        blurb: 'DMG for Intel Macs. Drag to Applications. Hosted on GitHub Releases.',
+        icon: 'fa-apple',
+        brand: 'brands',
+        version: desktopPkg.version || '2.0.2',
+        filename: 'RestroSuite-Mac-Intel.dmg',
+        url: macX64PublicUrl,
+        size: x64Size,
+        sizeLabel: x64Size ? formatBytes(x64Size) : 'DMG',
+        updatedAt: (desk.macX64Meta && desk.macX64Meta.updatedAt) || ghRelease.generatedAt || null,
+        available: true,
+        host: macX64Url ? 'github-releases' : 'local',
+        arch: 'x64',
+      });
+      console.log('DMG x64     →', macX64PublicUrl);
+    }
+    // Combined card id used by homepage / install hub
+    items.push({
+      id: 'mac-dmg',
+      kind: 'app',
+      platform: 'macOS',
+      title: 'RestroSuite for Mac',
+      blurb: 'Desktop app for macOS — Apple Silicon and Intel DMGs. Right-click → Open the first time if Gatekeeper warns.',
+      icon: 'fa-apple',
+      brand: 'brands',
+      version: desktopPkg.version || '2.0.2',
+      filename: 'RestroSuite-Mac-AppleSilicon.dmg',
+      url: macArmPublicUrl || macX64PublicUrl,
+      size: (desk.macArmMeta && desk.macArmMeta.size) || (desk.macX64Meta && desk.macX64Meta.size) || 0,
+      sizeLabel: (desk.macArmMeta && desk.macArmMeta.sizeLabel)
+        || (desk.macX64Meta && desk.macX64Meta.sizeLabel)
+        || 'DMG',
+      updatedAt: (desk.macArmMeta && desk.macArmMeta.updatedAt)
+        || (desk.macX64Meta && desk.macX64Meta.updatedAt)
+        || ghRelease.generatedAt
+        || null,
+      available: true,
+      host: (macArmUrl || macX64Url) ? 'github-releases' : 'local',
+      arm64Url: macArmPublicUrl || null,
+      x64Url: macX64PublicUrl || null,
+    });
+  } else {
+    items.push({
+      id: 'mac-dmg',
+      kind: 'app',
+      platform: 'macOS',
+      title: 'RestroSuite for Mac',
+      blurb: 'Mac DMG not published yet. Run GitHub Actions “Desktop Mac DMG”, then publish-github-release + sync-downloads.',
+      icon: 'fa-apple',
+      brand: 'brands',
+      version: desktopPkg.version || null,
+      filename: null,
+      url: null,
+      size: 0,
+      sizeLabel: '—',
+      updatedAt: null,
+      available: false,
+    });
+    console.warn('DMG missing (desktop/dist/*-mac-*.dmg) and no GitHub Mac URLs');
   }
 
   // ── PWA / web ────────────────────────────────────────────────────────
@@ -449,7 +595,8 @@ function main() {
       version: desktopPkg.version || null,
       feedUrl: SITE + '/downloads/desktop',
       latestYml: SITE + '/downloads/desktop/latest.yml',
-      host: winSetupUrl || winPortableUrl ? 'github-releases' : 'local',
+      latestMacYml: SITE + '/downloads/desktop/latest-mac.yml',
+      host: winSetupUrl || winPortableUrl || macArmUrl || macX64Url ? 'github-releases' : 'local',
       githubRelease: ghRelease.tag || null,
       nsis: (desk.nsisMeta || winSetupUrl)
         ? {
@@ -467,6 +614,22 @@ function main() {
             sizeLabel: desk.portableMeta ? desk.portableMeta.sizeLabel : null,
           }
         : null,
+      mac: {
+        appleSilicon: macArmPublicUrl
+          ? {
+              url: macArmPublicUrl.startsWith('http') ? macArmPublicUrl : SITE + macArmPublicUrl,
+              size: desk.macArmMeta ? desk.macArmMeta.size : null,
+              sizeLabel: desk.macArmMeta ? desk.macArmMeta.sizeLabel : null,
+            }
+          : null,
+        intel: macX64PublicUrl
+          ? {
+              url: macX64PublicUrl.startsWith('http') ? macX64PublicUrl : SITE + macX64PublicUrl,
+              size: desk.macX64Meta ? desk.macX64Meta.size : null,
+              sizeLabel: desk.macX64Meta ? desk.macX64Meta.sizeLabel : null,
+            }
+          : null,
+      },
     },
     android: apkMeta
       ? {
@@ -530,10 +693,13 @@ function main() {
       '',
       '| Path | Purpose |',
       '|------|---------|',
-      '| `updates.json` | Android + portable + web version feed |',
+      '| `updates.json` | Android + Windows + macOS + web version feed |',
       '| `desktop/latest.yml` | electron-updater (Windows Setup) |',
+      '| `desktop/latest-mac.yml` | electron-updater (macOS) |',
       '| `RestroSuite-Windows-Setup.exe` | Full installer (auto-updates) |',
       '| `RestroSuite-Windows-Portable.exe` | Portable (prompts download) |',
+      '| `RestroSuite-Mac-AppleSilicon.dmg` | macOS Apple Silicon DMG |',
+      '| `RestroSuite-Mac-Intel.dmg` | macOS Intel DMG |',
       '| `RestroSuite-Android.apk` | Android package (in-app update) |',
       '',
       'Regenerate:',
@@ -542,23 +708,24 @@ function main() {
       'node scripts/sync-downloads.cjs',
       '```',
       '',
-      'Release flow (large EXEs on GitHub, site on Vercel):',
+      'Release flow (large EXEs/DMGs on GitHub, site on Vercel):',
       '',
       '```bash',
-      'cd desktop && npm run dist',
+      'cd desktop && npm run dist          # Windows (on PC)',
+      '# Mac DMG: GitHub Actions → Desktop Mac DMG, then download into desktop/dist/',
       'node scripts/sync-downloads.cjs',
       'node scripts/publish-github-release.cjs',
       'node scripts/sync-downloads.cjs',
       'npm run pages:build',
       '```',
       '',
-      'Then deploy `publish-static` to Vercel (no EXEs uploaded).',
+      'Then deploy `publish-static` to Vercel (no large binaries uploaded).',
       '',
     ].join('\n')
   );
 
   // vercel-redirects fragment for optional merge (also written into vercel.json by publish script)
-  if (winSetupUrl || winPortableUrl) {
+  if (winSetupUrl || winPortableUrl || macArmUrl || macX64Url || androidGhUrl || androidGhEarly) {
     const redirects = [];
     if (winSetupUrl) {
       redirects.push({
@@ -578,6 +745,20 @@ function main() {
       redirects.push({
         source: '/downloads/desktop/' + desk.nsisName,
         destination: winNsisUrl,
+        permanent: false,
+      });
+    }
+    if (macArmUrl) {
+      redirects.push({
+        source: '/downloads/RestroSuite-Mac-AppleSilicon.dmg',
+        destination: macArmUrl,
+        permanent: false,
+      });
+    }
+    if (macX64Url) {
+      redirects.push({
+        source: '/downloads/RestroSuite-Mac-Intel.dmg',
+        destination: macX64Url,
         permanent: false,
       });
     }

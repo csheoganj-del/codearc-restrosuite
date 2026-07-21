@@ -47,27 +47,37 @@
   "redirects": [
     {
       "source": "/downloads/RestroSuite-Windows-Setup.exe",
-      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Setup.exe",
       "permanent": false
     },
     {
       "source": "/downloads/RestroSuite-Windows-Portable.exe",
-      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
       "permanent": false
     },
     {
-      "source": "/downloads/desktop/RestroSuite-2.0.4-x64.exe",
-      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-2.0.4-x64.exe",
+      "source": "/downloads/desktop/RestroSuite-2.0.5-x64.exe",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe",
       "permanent": false
     },
     {
-      "source": "/downloads/desktop/RestroSuite-Desktop-2.0.4-portable.exe",
-      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Desktop-2.0.4-portable.exe",
+      "source": "/downloads/desktop/RestroSuite-Desktop-2.0.5-portable.exe",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Desktop-2.0.5-portable.exe",
+      "permanent": false
+    },
+    {
+      "source": "/downloads/RestroSuite-Mac-AppleSilicon.dmg",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-AppleSilicon.dmg",
+      "permanent": false
+    },
+    {
+      "source": "/downloads/RestroSuite-Mac-Intel.dmg",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-Intel.dmg",
       "permanent": false
     },
     {
       "source": "/downloads/RestroSuite-Android.apk",
-      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk",
+      "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk",
       "permanent": false
     }
   ],

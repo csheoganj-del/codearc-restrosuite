@@ -209,6 +209,7 @@
     }
     .dl-ic.android { background: rgba(61,220,132,.14); color: #1fa463; }
     .dl-ic.windows { background: rgba(0,120,215,.12); color: #0078d4; }
+    .dl-ic.mac { background: rgba(0,0,0,.06); color: #111; }
     .dl-ic.web { background: rgba(42,155,143,.14); color: var(--teal, #2a9b8f); }
     .dl-ic.pdf { background: rgba(239,68,68,.1); color: #dc2626; }
     .dl-card h3 { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 0; }
@@ -1822,6 +1823,25 @@
               </a>
             </div>
             <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> SmartScreen may warn once — click <b>More info → Run anyway</b> (CodeArc unsigned launch builds).</p>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="mac-dmg" data-dl-platform="mac">
+            <span class="dl-badge" hidden data-dl-badge>Recommended</span>
+            <div class="dl-card-top">
+              <div class="dl-ic mac"><i class="fa-brands fa-apple" aria-hidden="true"></i></div>
+              <div><h3>Mac</h3><div class="platform">Desktop · counter POS</div></div>
+            </div>
+            <p>Native macOS app (DMG). Apple Silicon for M1–M4; Intel for older Macs. Drag into Applications.</p>
+            <div class="dl-stats" data-dl-stats><span>DMG</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="/downloads/RestroSuite-Mac-AppleSilicon.dmg" data-dl-mac-arm data-dl-href data-dl-primary>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon
+              </a>
+              <a class="btn btn-ghost" href="/downloads/RestroSuite-Mac-Intel.dmg" data-dl-mac-intel>
+                Intel DMG
+              </a>
+            </div>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> First open: <b>Right‑click → Open</b> if macOS says the developer is unverified.</p>
           </article>
 
           <article class="dl-card" role="listitem" data-dl-id="web-pwa" data-dl-platform="web">
@@ -3607,7 +3627,7 @@
       }
 
       function applyRecommend() {
-        var recPlat = platform === 'ios' || platform === 'mac' ? 'web' : platform;
+        var recPlat = platform === 'ios' ? 'web' : platform;
         var map = {
           android: {
             id: 'android-apk',
@@ -3624,6 +3644,14 @@
             btn: 'Download Windows app',
             icon: 'fa-brands fa-windows',
             color: '#0078d4'
+          },
+          mac: {
+            id: 'mac-dmg',
+            title: 'You’re on a Mac — install the desktop app',
+            sub: 'Apple Silicon (M1–M4) or Intel DMG · drag to Applications',
+            btn: 'Download Mac DMG',
+            icon: 'fa-brands fa-apple',
+            color: '#111'
           },
           web: {
             id: 'web-pwa',
@@ -3646,7 +3674,7 @@
         });
         var wrap = document.getElementById('dl-recommend');
         var card = document.querySelector('[data-dl-id="' + rec.id + '"]');
-        var hrefEl = card && card.querySelector('[data-dl-href]');
+        var hrefEl = card && (card.querySelector('[data-dl-mac-arm]') || card.querySelector('[data-dl-href]'));
         if (wrap && hrefEl) {
           wrap.classList.add('is-on');
           var title = document.getElementById('dl-rec-title');
@@ -3668,6 +3696,7 @@
           heroInstall.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> '
             + (recPlat === 'android' ? 'Install Android app'
               : recPlat === 'windows' ? 'Install Windows app'
+              : recPlat === 'mac' ? 'Install Mac app'
               : 'Install on your device');
         }
       }
@@ -3709,6 +3738,16 @@
           var setup = byId['windows-setup'];
           var setupA = document.querySelector('[data-dl-setup]');
           if (setup && setupA && setup.url) setupA.setAttribute('href', setup.url);
+
+          var macCombined = byId['mac-dmg'] || {};
+          var macArm = byId['mac-arm64'];
+          var macIntel = byId['mac-x64'];
+          var armUrl = (macArm && macArm.url) || macCombined.arm64Url || null;
+          var intelUrl = (macIntel && macIntel.url) || macCombined.x64Url || null;
+          var macArmA = document.querySelector('[data-dl-mac-arm]');
+          var macIntelA = document.querySelector('[data-dl-mac-intel]');
+          if (macArmA && armUrl) macArmA.setAttribute('href', armUrl);
+          if (macIntelA && intelUrl) macIntelA.setAttribute('href', intelUrl);
 
           if (meta) {
             var ver = m.desktopVersion || m.androidVersion || m.appVersion || '—';

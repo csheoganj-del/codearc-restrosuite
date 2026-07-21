@@ -171,6 +171,7 @@
     }
     .ic.windows { background: rgba(0, 120, 215, 0.12); color: var(--win); }
     .ic.android { background: rgba(61, 220, 132, 0.14); color: var(--and); }
+    .ic.mac { background: rgba(0, 0, 0, 0.06); color: #111; }
     .ic.ios { background: rgba(0, 0, 0, 0.06); color: #111; }
     .ic.web { background: rgba(42, 155, 143, 0.14); color: var(--teal); }
     .card h2 { margin: 0; font-size: 1.12rem; letter-spacing: -0.02em; }
@@ -346,6 +347,35 @@
         <p class="tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Unsigned free-launch build — code signing later removes the SmartScreen step.</p>
       </article>
 
+      <!-- macOS -->
+      <article class="card" id="mac" data-dl-id="mac-dmg" data-dl-platform="mac">
+        <span class="badge" hidden data-dl-badge>Recommended</span>
+        <div class="card-top">
+          <div class="ic mac"><i class="fa-brands fa-apple" aria-hidden="true"></i></div>
+          <div>
+            <h2>Mac</h2>
+            <div class="platform">Counter · desktop POS</div>
+          </div>
+        </div>
+        <p class="ok">Native desktop app for macOS (DMG)</p>
+        <div class="stats" data-dl-stats><span>DMG</span></div>
+        <ol>
+          <li>Download <b>Apple Silicon</b> (M1–M4) or <b>Intel</b> for older Macs</li>
+          <li>Open the <b>.dmg</b> → drag <b>RestroSuite</b> into Applications</li>
+          <li>First open: <b>Right‑click → Open → Open</b> (Gatekeeper, once)</li>
+          <li>Sign in with Outlet ID + password · leave <b>Keep me signed in</b> on</li>
+        </ol>
+        <div class="actions">
+          <a class="btn" data-dl-mac-arm href="/downloads/RestroSuite-Mac-AppleSilicon.dmg">
+            <i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon DMG
+          </a>
+          <a class="btn btn-ghost" data-dl-mac-intel data-dl-href data-dl-primary href="/downloads/RestroSuite-Mac-Intel.dmg">
+            Intel DMG
+          </a>
+        </div>
+        <p class="tip" data-dl-mac-tip><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Not sure which Mac? Apple menu → About This Mac — if it says Apple M1/M2/M3/M4, use Apple Silicon.</p>
+      </article>
+
       <!-- Android -->
       <article class="card" id="android" data-dl-id="android-apk" data-dl-platform="android">
         <span class="badge" hidden data-dl-badge>Recommended</span>
@@ -501,7 +531,7 @@
       }
 
       function applyRecommend() {
-        var recPlat = platform === 'mac' ? 'web' : platform;
+        var recPlat = platform;
         var map = {
           windows: {
             id: 'windows',
@@ -513,6 +543,17 @@
             icon: 'fa-brands fa-windows',
             color: '#0078d4',
             scroll: '#windows'
+          },
+          mac: {
+            id: 'mac',
+            platform: 'mac',
+            title: 'You’re on a Mac — install the desktop app',
+            sub: 'Apple Silicon (M1–M4) or Intel DMG · drag to Applications',
+            btn: 'Download Mac DMG',
+            hrefSel: '#mac [data-dl-mac-arm]',
+            icon: 'fa-brands fa-apple',
+            color: '#111',
+            scroll: '#mac'
           },
           android: {
             id: 'android',
@@ -616,6 +657,27 @@
           var portable = byId['windows-portable'] || byId['windows-exe'];
           var portableA = document.querySelector('#windows [data-dl-primary]');
           if (portable && portableA && portable.url) portableA.setAttribute('href', portable.url);
+
+          // macOS DMGs
+          var macCombined = byId['mac-dmg'] || {};
+          var macArm = byId['mac-arm64'];
+          var macIntel = byId['mac-x64'];
+          var armUrl = (macArm && macArm.url) || macCombined.arm64Url || null;
+          var intelUrl = (macIntel && macIntel.url) || macCombined.x64Url || null;
+          var macArmA = document.querySelector('[data-dl-mac-arm]');
+          var macIntelA = document.querySelector('[data-dl-mac-intel]');
+          if (macArmA && armUrl) macArmA.setAttribute('href', armUrl);
+          if (macIntelA && intelUrl) macIntelA.setAttribute('href', intelUrl);
+          var macCard = document.querySelector('#mac');
+          if (macCard) {
+            var macOk = !!(armUrl || intelUrl) && macCombined.available !== false;
+            if (!macOk && macCombined.available === false) {
+              var tip = macCard.querySelector('[data-dl-mac-tip]');
+              if (tip) {
+                tip.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> Mac DMG is being prepared — use <b>Any browser</b> below for now, or check back after the next desktop release.';
+              }
+            }
+          }
 
           var meta = document.getElementById('dl-meta');
           if (meta) {

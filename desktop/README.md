@@ -1,9 +1,10 @@
-# RestroSuite Desktop (Windows `.exe`)
+# RestroSuite Desktop (Windows `.exe` + macOS `.dmg`)
 
-A native Windows desktop version of RestroSuite. It is a **separate system** that
-wraps your existing web app in an Electron shell — **your web app and Android app
-are not touched.** All three targets (web, Android, desktop) share the **same
-Supabase backend**, so data stays in sync across them.
+A native desktop version of RestroSuite for **Windows and macOS**. It is a
+**separate system** that wraps your existing web app in an Electron shell —
+**your web app and Android app are not touched.** All three targets (web,
+Android, desktop) share the **same Supabase backend**, so data stays in sync
+across them.
 
 - **Offline-first:** launches and runs with no internet. Orders, bills, menu edits,
   etc. are written to a local cache immediately.
@@ -70,6 +71,73 @@ npm run dist:installer   REM installer only
 npm run dist:portable    REM portable only
 ```
 
+## Build the `.dmg` (macOS)
+
+**A Mac is required** (or GitHub Actions macOS). Windows cannot produce a real
+macOS `.dmg`.
+
+### Option A — GitHub Actions (recommended; no Mac needed on your desk)
+
+Workflow file: `.github/workflows/desktop-mac.yml`
+
+1. Push the latest `desktop/` changes to GitHub (`main`).
+2. Open the repo on GitHub → **Actions** → **Desktop Mac DMG** → **Run workflow**.
+3. Wait ~10–20 minutes (macOS runner builds Intel + Apple Silicon).
+4. Download **Artifacts** from the finished run, or open the draft **Release**
+   if you left “Create a GitHub Release” enabled.
+
+Or tag a release from your machine:
+
+```bash
+git tag desktop-v2.0.5
+git push origin desktop-v2.0.5
+```
+
+That triggers the same Mac build and attaches DMGs to the release.
+
+### Option B — Build on a Mac locally
+
+```bash
+cd desktop
+npm install
+npm run dist:mac
+```
+
+That produces, in `desktop/dist/`:
+
+- `RestroSuite-2.0.5-mac-arm64.dmg` — **Apple Silicon** (M1/M2/M3/M4)
+- `RestroSuite-2.0.5-mac-x64.dmg` — **Intel Mac**
+- Matching `.zip` archives (useful for auto-update)
+
+DMG only:
+
+```bash
+npm run dist:dmg
+```
+
+### Client install (unsigned build)
+
+Without an Apple Developer ID signature, macOS Gatekeeper shows *“cannot be
+opened because the developer cannot be verified.”* Clients can still install:
+
+1. Open the `.dmg` and drag **RestroSuite** into **Applications**
+2. Right-click the app → **Open** → **Open** (one-time allow)
+
+### Optional: Apple code signing + notarization (no Gatekeeper warning)
+
+Add these **GitHub repo secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Purpose |
+|--------|---------|
+| `MAC_CERTS_P12_BASE64` | Base64 of your Developer ID Application `.p12` |
+| `MAC_CERTS_PASSWORD` | Password for that `.p12` |
+| `APPLE_ID` | Apple ID email |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password |
+| `APPLE_TEAM_ID` | 10-character Team ID |
+
+The workflow enables signing automatically when `MAC_CERTS_P12_BASE64` is set.
+Requires an [Apple Developer](https://developer.apple.com) account (~$99/year).
+
 ## Run without building (to test)
 
 ```bat
@@ -78,6 +146,8 @@ npm start
 ```
 
 `npm start` runs `sync` (refresh the bundled app) then launches the Electron window.
+
+On a Mac the same commands work in Terminal.
 
 ---
 

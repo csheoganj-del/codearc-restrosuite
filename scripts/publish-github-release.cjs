@@ -93,6 +93,32 @@ function main() {
       local: path.join(ROOT, 'downloads', 'RestroSuite-Android.apk'),
       name: 'RestroSuite-Android.apk',
     },
+    {
+      key: 'macArm',
+      local: path.join(ROOT, 'downloads', 'RestroSuite-Mac-AppleSilicon.dmg'),
+      name: 'RestroSuite-Mac-AppleSilicon.dmg',
+    },
+    {
+      key: 'macX64',
+      local: path.join(ROOT, 'downloads', 'RestroSuite-Mac-Intel.dmg'),
+      name: 'RestroSuite-Mac-Intel.dmg',
+    },
+    // Versioned builder names (if stable copies not present yet)
+    {
+      key: 'macArmNamed',
+      local: path.join(ROOT, 'downloads', 'desktop', `RestroSuite-${version}-mac-arm64.dmg`),
+      name: `RestroSuite-${version}-mac-arm64.dmg`,
+    },
+    {
+      key: 'macX64Named',
+      local: path.join(ROOT, 'downloads', 'desktop', `RestroSuite-${version}-mac-x64.dmg`),
+      name: `RestroSuite-${version}-mac-x64.dmg`,
+    },
+    {
+      key: 'macYml',
+      local: path.join(ROOT, 'downloads', 'desktop', 'latest-mac.yml'),
+      name: 'latest-mac.yml',
+    },
   ].filter((a) => exists(a.local));
 
   if (!assets.length) {
@@ -114,12 +140,12 @@ function main() {
   }
 
   const notes =
-    `RestroSuite **${version}** — Windows + Android builds.\n\n` +
-    `- Session / keep-me-signed-in fixes\n` +
-    `- Single in-app Sign out dialog\n` +
+    `RestroSuite **${version}** — Windows + macOS + Android builds.\n\n` +
     `- Large installers hosted on GitHub Releases (not Vercel Hobby)\n\n` +
     `**Windows Setup:** RestroSuite-Windows-Setup.exe\n` +
     `**Windows Portable:** RestroSuite-Windows-Portable.exe\n` +
+    `**Mac Apple Silicon:** RestroSuite-Mac-AppleSilicon.dmg\n` +
+    `**Mac Intel:** RestroSuite-Mac-Intel.dmg\n` +
     `**Android:** RestroSuite-Android.apk\n`;
 
   if (!releaseExists) {
@@ -183,6 +209,17 @@ function main() {
   if (urls.assets.apk) {
     urls.androidApk = urls.assets.apk.url;
   }
+  // Prefer stable public names for the website
+  if (urls.assets.macArm) {
+    urls.macAppleSilicon = urls.assets.macArm.url;
+  } else if (urls.assets.macArmNamed) {
+    urls.macAppleSilicon = urls.assets.macArmNamed.url;
+  }
+  if (urls.assets.macX64) {
+    urls.macIntel = urls.assets.macX64.url;
+  } else if (urls.assets.macX64Named) {
+    urls.macIntel = urls.assets.macX64Named.url;
+  }
 
   fs.mkdirSync(path.dirname(OUT_JSON), { recursive: true });
   fs.writeFileSync(OUT_JSON, JSON.stringify(urls, null, 2) + '\n');
@@ -223,6 +260,8 @@ function main() {
   console.log('\nDone. Public URLs:');
   console.log('  Setup:   ', urls.windowsSetup || '(missing)');
   console.log('  Portable:', urls.windowsPortable || '(missing)');
+  console.log('  Mac M*:  ', urls.macAppleSilicon || '(missing)');
+  console.log('  Mac Intel:', urls.macIntel || '(missing)');
   console.log('  Android: ', urls.androidApk || '(missing)');
   console.log('\nNext: node scripts/sync-downloads.cjs && npm run pages:build');
 }

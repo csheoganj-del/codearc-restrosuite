@@ -1,0 +1,199 @@
+# Build RestroSuite macOS .dmg (+ .zip) on a real macOS runner.
+# Windows cannot produce these artifacts; this workflow is the CI path.
+#
+# How to run:
+#   1. GitHub → Actions → "Desktop Mac DMG" → Run workflow
+#   2. Or push a tag: desktop-v2.0.5
+#   3. Download Artifacts from the run (or the GitHub Release if enabled)
+#
+# Unsigned builds: clients open with Right-click → Open the first time.
+# Optional Apple signing: set repo secrets MAC_CERTS_P12_BASE64,
+# MAC_CERTS_PASSWORD, and (for notarize) APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
+# APPLE_TEAM_ID — then re-enable signing below.
+
+name: Desktop Mac DMG
+
+on:
+  # Manual: GitHub → Actions → "Desktop Mac DMG" → Run workflow
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: Create a GitHub Release and attach DMGs
+        type: boolean
+        default: true
+      dmg_only:
+        description: Build DMG only (skip zip) — faster
+        type: boolean
+        default: false
+  # Or: git tag desktop-v2.0.5 && git push origin desktop-v2.0.5
+  push:
+    tags:
+      - 'desktop-v*'
+
+concurrency:
+  group: desktop-mac-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-mac:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install desktop dependencies
+        run: npm ci
+
+      - name: Read app version
+        id: ver
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building RestroSuite Desktop v$VERSION"
+
+      - name: Build macOS packages
+        env:
+          # Unsigned by default (no Apple Developer cert in secrets).
+          # Set CSC_IDENTITY_AUTO_DISCOVERY=true and provide cert secrets to sign.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CERTS_P12_BASE64 != '' && 'true' || 'false' }}
+          CSC_LINK: ${{ secrets.MAC_CERTS_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # electron-builder publish is not used here; we upload artifacts ourselves
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event.inputs.dmg_only }}" = "true" ]; then
+            npm run dist:dmg
+          else
+            npm run dist:mac
+          fi
+
+      - name: List dist output
+        run: ls -lah dist/ || true
+
+      - name: Create stable public filenames
+        id: stable
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p dist/stable
+          # Prefer electron-builder names; fall back to any arm64/x64 dmg
+          ARM=$(ls dist/RestroSuite-*-mac-arm64.dmg 2>/dev/null | head -1 || true)
+          X64=$(ls dist/RestroSuite-*-mac-x64.dmg 2>/dev/null | head -1 || true)
+          if [ -z "$ARM" ]; then ARM=$(ls dist/*arm64*.dmg 2>/dev/null | head -1 || true); fi
+          if [ -z "$X64" ]; then X64=$(ls dist/*x64*.dmg 2>/dev/null | head -1 || true); fi
+          if [ -n "$ARM" ]; then
+            cp "$ARM" dist/stable/RestroSuite-Mac-AppleSilicon.dmg
+            cp "$ARM" "dist/stable/RestroSuite-${VERSION}-mac-arm64.dmg"
+            echo "arm=1" >> "$GITHUB_OUTPUT"
+            echo "Stable Apple Silicon: $ARM"
+          else
+            echo "arm=0" >> "$GITHUB_OUTPUT"
+            echo "::warning::No arm64 DMG found"
+          fi
+          if [ -n "$X64" ]; then
+            cp "$X64" dist/stable/RestroSuite-Mac-Intel.dmg
+            cp "$X64" "dist/stable/RestroSuite-${VERSION}-mac-x64.dmg"
+            echo "x64=1" >> "$GITHUB_OUTPUT"
+            echo "Stable Intel: $X64"
+          else
+            echo "x64=0" >> "$GITHUB_OUTPUT"
+            echo "::warning::No x64 DMG found"
+          fi
+          ls -lah dist/stable/ || true
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RestroSuite-mac-${{ steps.ver.outputs.version }}
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.blockmap
+            desktop/dist/latest-mac.yml
+            desktop/dist/stable/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release (source repo)
+        if: >
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+          || startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('desktop-v{0}', steps.ver.outputs.version) }}
+          name: RestroSuite Desktop ${{ steps.ver.outputs.version }} (macOS)
+          draft: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          generate_release_notes: true
+          body: |
+            ## macOS desktop build
+
+            | File | Use |
+            |------|-----|
+            | `RestroSuite-Mac-AppleSilicon.dmg` | Apple Silicon (M1/M2/M3/M4) |
+            | `RestroSuite-Mac-Intel.dmg` | Intel Mac |
+            | Versioned `*-mac-arm64.dmg` / `*-mac-x64.dmg` | Same builds |
+
+            Site downloads page: https://restrosuite.codearc.co.in/install
+
+            ### Install (unsigned)
+            1. Open the `.dmg` and drag **RestroSuite** to **Applications**
+            2. Right-click the app → **Open** → **Open** (one-time Gatekeeper allow)
+
+            Built from `${{ github.sha }}` on `${{ github.ref_name }}`.
+          files: |
+            desktop/dist/stable/*
+            desktop/dist/*.zip
+            desktop/dist/*.blockmap
+            desktop/dist/latest-mac.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Public CDN used by the website (same repo as Windows EXEs)
+      - name: Publish to restrosuite-downloads release
+        if: >
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+          || startsWith(github.ref, 'refs/tags/desktop-v')
+        env:
+          # Prefer dedicated token for the downloads repo; fall back to GITHUB_TOKEN if same org allows it
+          GH_TOKEN: ${{ secrets.DOWNLOADS_GH_TOKEN || secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          DOWNLOADS_REPO: csheoganj-del/restrosuite-downloads
+        run: |
+          set -e
+          TAG="v${VERSION}"
+          echo "Publishing Mac DMGs to ${DOWNLOADS_REPO} @ ${TAG}"
+          if ! gh release view "$TAG" --repo "$DOWNLOADS_REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$DOWNLOADS_REPO" \
+              --title "RestroSuite ${VERSION}" \
+              --notes "RestroSuite **${VERSION}** — macOS DMGs (plus any prior Windows/Android assets)."
+          fi
+          shopt -s nullglob
+          for f in dist/stable/*.dmg; do
+            echo "Upload $f"
+            gh release upload "$TAG" "$f" --repo "$DOWNLOADS_REPO" --clobber
+          done
+          if [ -f dist/latest-mac.yml ]; then
+            gh release upload "$TAG" dist/latest-mac.yml --repo "$DOWNLOADS_REPO" --clobber || true
+          fi
+          echo "Public URLs:"
+          echo "  https://github.com/${DOWNLOADS_REPO}/releases/download/${TAG}/RestroSuite-Mac-AppleSilicon.dmg"
+          echo "  https://github.com/${DOWNLOADS_REPO}/releases/download/${TAG}/RestroSuite-Mac-Intel.dmg"

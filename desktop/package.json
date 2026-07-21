@@ -3,7 +3,7 @@
   "productName": "RestroSuite Desktop",
   "version": "2.0.5",
   "private": true,
-  "description": "RestroSuite Windows desktop app -- offline-first restaurant POS. Closes to system tray; distinct PC-badged icon vs PWA.",
+  "description": "RestroSuite desktop app (Windows + macOS) -- offline-first restaurant POS. Closes to system tray; distinct PC-badged icon vs PWA.",
   "author": "RestroSuite",
   "main": "main.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "dist": "npm run sync && electron-builder --win",
     "dist:portable": "npm run sync && electron-builder --win portable",
     "dist:installer": "npm run sync && electron-builder --win nsis",
+    "dist:mac": "npm run sync && electron-builder --mac",
+    "dist:dmg": "npm run sync && electron-builder --mac dmg",
     "pack": "npm run sync && electron-builder --dir"
   },
   "dependencies": {
@@ -78,6 +80,46 @@
       ],
       "icon": "build/icon.ico",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "RestroSuite ${version}",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
