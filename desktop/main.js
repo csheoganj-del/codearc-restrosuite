@@ -33,7 +33,9 @@ function loadConfig() {
   return {};
 }
 const config = loadConfig();
-const PORT = Number(config.port) || 8001;
+/** Mutable: may advance if preferred port is busy (EADDRINUSE). */
+let PORT = Number(config.port) || 8001;
+const PREFERRED_PORT = PORT;
 const PROD_ORIGIN = config.productionOrigin || 'https://codearc-restrosuite.vercel.app';
 
 // Resolve the web-app root: packaged builds unpack it to resources/app-web,
@@ -62,6 +64,99 @@ if (!gotLock) {
   });
 }
 
+/**
+ * Windows "Start with Windows" via Electron's setLoginItemSettings writes
+ * electron.app.* Run keys that often omit quotes. Username paths with spaces
+ * (e.g. C:\Users\MASTER PC\...) become C:\Users\MASTER →
+ * "Unable to find Electron app at C:\Users\MASTER".
+ *
+ * We write a properly quoted HKCU\...\Run value ourselves and clear the
+ * broken electron.app.* keys Electron may have left behind.
+ */
+function setStartWithWindows(enabled) {
+  if (process.platform !== 'win32') {
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: !!enabled,
+        openAsHidden: true,
+        path: process.execPath,
+        args: app.isPackaged ? [] : ['.'],
+      });
+    } catch (e) {
+      console.warn('[main] openAtLogin failed:', e && e.message);
+    }
+    return;
+  }
+
+  const runKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+  const valueName = 'RestroSuiteDesktop';
+  const { execFileSync } = require('child_process');
+
+  try {
+    // Prefer clean quoted entry; never rely on electron.app.* for spaces-in-path.
+    if (enabled) {
+      const cmdLine = app.isPackaged
+        ? `"${process.execPath}"`
+        : `"${process.execPath}" "${path.resolve(__dirname)}"`;
+      // reg add requires extra quotes around the data when it contains quotes
+      execFileSync(
+        'reg',
+        ['add', runKey, '/v', valueName, '/t', 'REG_SZ', '/d', cmdLine, '/f'],
+        { windowsHide: true, stdio: 'ignore' }
+      );
+    } else {
+      try {
+        execFileSync('reg', ['delete', runKey, '/v', valueName, '/f'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        });
+      } catch (_) { /* value may not exist */ }
+    }
+  } catch (e) {
+    console.warn('[main] registry login item failed:', e && e.message);
+  }
+
+  // Disable Electron's own Run entry so it does not re-introduce unquoted paths.
+  try {
+    app.setLoginItemSettings({ openAtLogin: false });
+  } catch (_) {}
+
+  // Best-effort cleanup of broken keys from older builds / portable / dev runs.
+  for (const bad of [
+    'electron.app.RestroSuite',
+    'electron.app.Electron',
+    'electron.app.RestroSuite Desktop',
+  ]) {
+    try {
+      execFileSync('reg', ['delete', runKey, '/v', bad, '/f'], {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch (_) {}
+  }
+}
+
+function isStartWithWindowsEnabled() {
+  if (process.platform !== 'win32') {
+    try {
+      return !!app.getLoginItemSettings().openAtLogin;
+    } catch (_) {
+      return false;
+    }
+  }
+  try {
+    const { execFileSync } = require('child_process');
+    const out = execFileSync(
+      'reg',
+      ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', 'RestroSuiteDesktop'],
+      { windowsHide: true, encoding: 'utf8' }
+    );
+    return /RestroSuiteDesktop/i.test(out);
+  } catch (_) {
+    return false;
+  }
+}
+
 function startLocalServer() {
   return new Promise((resolve, reject) => {
     const root = resolveWebRoot();
@@ -85,10 +180,38 @@ function startLocalServer() {
         }
       },
     });
-    const srv = http.createServer(expressApp);
-    srv.on('error', reject);
-    // Bind to loopback only -- never exposed on the network.
-    srv.listen(PORT, '127.0.0.1', () => resolve(srv));
+
+    const maxAttempts = 20;
+    let attempt = 0;
+    let candidate = PREFERRED_PORT;
+
+    function tryListen() {
+      const srv = http.createServer(expressApp);
+      srv.once('error', (err) => {
+        try { srv.close(); } catch (_) {}
+        const code = err && err.code;
+        if ((code === 'EADDRINUSE' || code === 'EACCES') && attempt < maxAttempts - 1) {
+          attempt += 1;
+          candidate = PREFERRED_PORT + attempt;
+          console.warn(
+            `[main] port ${PORT} busy (${code}); trying ${candidate}`
+          );
+          tryListen();
+          return;
+        }
+        reject(err);
+      });
+      // Bind to loopback only -- never exposed on the network.
+      srv.listen(candidate, '127.0.0.1', () => {
+        PORT = candidate;
+        if (PORT !== PREFERRED_PORT) {
+          console.warn(`[main] listening on fallback port ${PORT} (preferred ${PREFERRED_PORT} was busy)`);
+        }
+        resolve(srv);
+      });
+    }
+
+    tryListen();
   });
 }
 
@@ -148,10 +271,18 @@ function installOriginRewrite() {
 }
 
 function resolveAppIcon() {
+  // Prefer REAL filesystem paths outside asar — brand plate/flame logo first.
+  // resources/tray/* is installed next to the EXE (not inside asar).
   const candidates = [
-    path.join(__dirname, 'build', 'icon.ico'),
-    path.join(__dirname, 'build', 'icon.png'),
+    path.join(process.resourcesPath || '', 'tray', 'tray.ico'),
+    path.join(process.resourcesPath || '', 'tray', 'icon.ico'),
+    path.join(process.resourcesPath || '', 'tray', 'tray.png'),
+    path.join(process.resourcesPath || '', 'tray', 'icon.png'),
     path.join(process.resourcesPath || '', 'build', 'icon.ico'),
+    path.join(__dirname, 'build', 'tray.ico'),
+    path.join(__dirname, 'build', 'icon.ico'),
+    path.join(__dirname, 'build', 'tray.png'),
+    path.join(__dirname, 'build', 'icon.png'),
   ];
   for (const p of candidates) {
     try {
@@ -159,6 +290,53 @@ function resolveAppIcon() {
     } catch (_) {}
   }
   return null;
+}
+
+/**
+ * Last-resort tray image only if brand files are missing.
+ * Prefer loading the real logo via resolveAppIcon / loadTrayImage.
+ */
+function solidTrayFallbackImage() {
+  // Tiny brand-colored square — never the letter "R" (logo is preferred above).
+  return nativeImage.createFromDataURL(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAFUlEQVR42mP4z8BQz0BFwEhVQ0YN' +
+      'GDVg1AAKAAD//wMA8v8D/eqMYc0AAAAASUVORK5CYII='
+  );
+}
+
+function trayDebugLog(msg) {
+  try {
+    const p = path.join(app.getPath('userData'), 'tray-debug.log');
+    fs.appendFileSync(p, new Date().toISOString() + ' ' + msg + '\n', 'utf8');
+  } catch (_) {}
+  try { console.log('[tray]', msg); } catch (_) {}
+}
+
+function loadTrayImage() {
+  const iconPath = resolveAppIcon();
+  let image = null;
+  if (iconPath) {
+    try {
+      image = nativeImage.createFromPath(iconPath);
+    } catch (e) {
+      console.warn('[tray] createFromPath failed', iconPath, e && e.message);
+    }
+  }
+  if (!image || image.isEmpty()) {
+    console.warn('[tray] icon empty/missing, using solid fallback. path=', iconPath);
+    image = solidTrayFallbackImage();
+  }
+  try {
+    // Windows tray is ~16–20px; oversized icons sometimes render blank.
+    if (image && !image.isEmpty()) {
+      const size = image.getSize();
+      if (size.width > 32 || size.height > 32) {
+        image = image.resize({ width: 16, height: 16, quality: 'best' });
+      }
+    }
+  } catch (_) {}
+  if (!image || image.isEmpty()) image = solidTrayFallbackImage();
+  return image;
 }
 
 function showMainWindow() {
@@ -199,23 +377,51 @@ function notifyStillRunning() {
 /** System tray / menu bar: close (X) hides; local server keeps running for silent POS. */
 function createTray() {
   if (tray) return;
+  // Windows: Tray(path-to-.ico) is far more reliable than Tray(NativeImage).
+  // NativeImage-from-PNG often ends up blank in the notification area.
   const iconPath = resolveAppIcon();
-  let image = null;
-  try {
-    if (iconPath) image = nativeImage.createFromPath(iconPath);
-  } catch (_) {}
-  if (!image || image.isEmpty()) {
-    // 16x16 orange fallback so tray still appears
-    image = nativeImage.createEmpty();
+  trayDebugLog('createTray start iconPath=' + iconPath + ' resourcesPath=' + (process.resourcesPath || ''));
+  let created = false;
+  if (iconPath && process.platform === 'win32') {
+    try {
+      tray = new Tray(iconPath);
+      created = true;
+      trayDebugLog('created from path ' + iconPath);
+    } catch (e) {
+      trayDebugLog('path create failed ' + (e && e.message));
+    }
+  }
+  if (!created) {
+    const image = loadTrayImage();
+    try {
+      tray = new Tray(image);
+      created = true;
+      trayDebugLog('created from NativeImage empty=' + image.isEmpty() + ' size=' + JSON.stringify(image.getSize()));
+    } catch (e) {
+      trayDebugLog('create failed ' + (e && e.message));
+      try {
+        tray = new Tray(solidTrayFallbackImage());
+        created = true;
+        trayDebugLog('created from solid fallback');
+      } catch (e2) {
+        trayDebugLog('fallback create failed ' + (e2 && e2.message));
+        return;
+      }
+    }
   }
   try {
-    tray = new Tray(image.isEmpty() ? nativeImage.createFromDataURL(
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAKElEQVQ4T2NkYGD4z0ABYBzVMKoBBg0cNQAGDRw1AAYNHDUABg0cNQAAh/sD/Wq8pQAAAABJRU5ErkJggg=='
-    ) : image);
+    // Keep brand logo (do NOT overwrite with letter/solid fallback).
+    const image = loadTrayImage();
+    if (image && !image.isEmpty()) {
+      tray.setImage(image);
+      trayDebugLog('setImage brand logo ok size=' + JSON.stringify(image.getSize()));
+    }
   } catch (e) {
-    console.warn('[tray] create failed', e && e.message);
-    return;
+    trayDebugLog('setImage failed ' + (e && e.message));
   }
+  try {
+    tray.setIgnoreDoubleClickEvents(false);
+  } catch (_) {}
   tray.setToolTip('RestroSuite Desktop — running in background');
   const loginLabel = process.platform === 'darwin'
     ? 'Open at Login'
@@ -235,15 +441,10 @@ function createTray() {
     {
       label: loginLabel,
       type: 'checkbox',
-      checked: !!app.getLoginItemSettings().openAtLogin,
+      checked: isStartWithWindowsEnabled(),
       click: (item) => {
         try {
-          app.setLoginItemSettings({
-            openAtLogin: item.checked,
-            openAsHidden: true,
-            path: process.execPath,
-            args: app.isPackaged ? [] : ['.'],
-          });
+          setStartWithWindows(!!item.checked);
         } catch (_) {}
       },
     },
@@ -266,6 +467,31 @@ function createTray() {
       showMainWindow();
     }
   });
+
+  // Windows 10 hides new icons under the ^ overflow — balloon + Notification + one dialog.
+  if (process.platform === 'win32') {
+    try {
+      setTimeout(() => {
+        if (!tray) return;
+        try {
+          tray.displayBalloon({
+            title: 'RestroSuite Desktop is in the tray',
+            content:
+              'Look near the clock. Click ^ (Show hidden icons) if you do not see the orange R icon. Right-click for menu.',
+          });
+        } catch (_) {}
+        try {
+          if (Notification.isSupported()) {
+            new Notification({
+              title: 'RestroSuite Desktop is running',
+              body: 'Tray icon should be near the clock (or under ^). Double-click it to open the app.',
+            }).show();
+          }
+        } catch (_) {}
+      }, 800);
+    } catch (_) {}
+  }
+  trayDebugLog('createTray finished ok');
 }
 
 function createWindow() {
@@ -473,6 +699,13 @@ function buildMenu() {
 
 app.whenReady().then(async () => {
   try {
+    // Windows: stable toast/tray identity (helps icons show under correct name)
+    try {
+      if (process.platform === 'win32') {
+        app.setAppUserModelId('com.restrosuite.desktop');
+      }
+    } catch (_) {}
+
     installOriginRewrite();
 
     try {
@@ -674,14 +907,13 @@ app.whenReady().then(async () => {
     createTray();
 
     // Open at login by default (Windows + macOS). User can toggle via tray / menu bar.
+    // On Windows we write a properly quoted Run key (space-safe for "MASTER PC" etc.).
     try {
-      if (!app.getLoginItemSettings().openAtLogin) {
-        app.setLoginItemSettings({
-          openAtLogin: true,
-          openAsHidden: true,
-          path: process.execPath,
-          args: app.isPackaged ? [] : ['.'],
-        });
+      if (!isStartWithWindowsEnabled()) {
+        setStartWithWindows(true);
+      } else if (process.platform === 'win32') {
+        // Re-assert quoted path and strip any broken electron.app.* keys.
+        setStartWithWindows(true);
       }
     } catch (e) {
       console.warn('[main] openAtLogin failed:', e && e.message);

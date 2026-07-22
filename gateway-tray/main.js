@@ -63,13 +63,20 @@ function findRepoRoot() {
 }
 
 function resolveIcon() {
+  // Solid green "W" badge (user preference) — high contrast in Windows tray.
   const list = [
+    path.join(process.resourcesPath || '', 'tray', 'tray.ico'),
+    path.join(process.resourcesPath || '', 'tray', 'tray.png'),
+    path.join(process.resourcesPath || '', 'tray', 'tray-green-solid.png'),
+    path.join(process.resourcesPath || '', 'tray', 'icon-gateway.png'),
+    path.join(process.resourcesPath || '', 'tray', 'tray-green.png'),
+    path.join(process.resourcesPath || '', 'build', 'tray.ico'),
+    path.join(process.resourcesPath || '', 'build', 'tray.png'),
+    path.join(process.resourcesPath || '', 'build', 'tray-green-solid.png'),
+    path.join(__dirname, 'build', 'tray.ico'),
+    path.join(__dirname, 'build', 'tray.png'),
+    path.join(__dirname, 'build', 'tray-green-solid.png'),
     path.join(__dirname, 'build', 'tray-green.png'),
-    path.join(__dirname, 'build', 'icon.png'),
-    path.join(__dirname, 'build', 'icon.ico'),
-    path.join(process.resourcesPath || '', 'build', 'tray-green.png'),
-    path.join(process.resourcesPath || '', 'build', 'icon.ico'),
-    path.join(process.resourcesPath || '', 'app.asar.unpacked', 'build', 'icon.ico'),
   ];
   for (const p of list) {
     try {
@@ -79,20 +86,108 @@ function resolveIcon() {
   return null;
 }
 
-/** Always-visible green “WA” style tray image (never empty/invisible). */
+/**
+ * Windows Run key with proper quotes. Electron's setLoginItemSettings often
+ * writes unquoted paths; usernames with spaces break as C:\Users\MASTER.
+ */
+function setStartWithWindows(enabled) {
+  if (process.platform !== 'win32') {
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: !!enabled,
+        openAsHidden: true,
+        path: process.execPath,
+        args: app.isPackaged ? [] : [path.resolve(__dirname)],
+      });
+    } catch (e) {
+      console.warn('[gateway-tray] openAtLogin failed', e && e.message);
+    }
+    return;
+  }
+
+  const runKey = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+  const valueName = 'RestroSuiteGateway';
+  const { execFileSync } = require('child_process');
+
+  try {
+    if (enabled) {
+      const cmdLine = app.isPackaged
+        ? `"${process.execPath}"`
+        : `"${process.execPath}" "${path.resolve(__dirname)}"`;
+      execFileSync(
+        'reg',
+        ['add', runKey, '/v', valueName, '/t', 'REG_SZ', '/d', cmdLine, '/f'],
+        { windowsHide: true, stdio: 'ignore' }
+      );
+    } else {
+      try {
+        execFileSync('reg', ['delete', runKey, '/v', valueName, '/f'], {
+          windowsHide: true,
+          stdio: 'ignore',
+        });
+      } catch (_) {}
+    }
+  } catch (e) {
+    console.warn('[gateway-tray] registry login item failed', e && e.message);
+  }
+
+  try {
+    app.setLoginItemSettings({ openAtLogin: false });
+  } catch (_) {}
+
+  for (const bad of [
+    'electron.app.RestroSuite Gateway',
+    'electron.app.Electron',
+    'electron.app.RestroSuite-Gateway',
+  ]) {
+    try {
+      execFileSync('reg', ['delete', runKey, '/v', bad, '/f'], {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch (_) {}
+  }
+}
+
+function isStartWithWindowsEnabled() {
+  if (process.platform !== 'win32') {
+    try {
+      return !!app.getLoginItemSettings().openAtLogin;
+    } catch (_) {
+      return false;
+    }
+  }
+  try {
+    const { execFileSync } = require('child_process');
+    const out = execFileSync(
+      'reg',
+      ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', 'RestroSuiteGateway'],
+      { windowsHide: true, encoding: 'utf8' }
+    );
+    return /RestroSuiteGateway/i.test(out);
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Always-visible green tray image (never empty/transparent). */
 function trayImage() {
   const iconPath = resolveIcon();
   if (iconPath) {
     try {
-      const img = nativeImage.createFromPath(iconPath);
+      let img = nativeImage.createFromPath(iconPath);
       if (img && !img.isEmpty()) {
-        return img.resize({ width: 16, height: 16 });
+        img = img.resize({ width: 16, height: 16, quality: 'best' });
+        if (img && !img.isEmpty()) return img;
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[gateway-tray] icon load failed', iconPath, e && e.message);
+    }
   }
-  // Solid green 16×16 PNG — easy to spot among other tray icons
+  // Last resort only if brand logo files are missing (not a letter badge).
   return nativeImage.createFromDataURL(
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGD4z0AEYBxVQFGgUQP+jxowatCoAaMGjBowasCoAaMGjBowasCoAQAJ6gD9bV9o4gAAAABJRU5ErkJggg=='
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAFUlEQVR42mP4z8BQz0BFwEhVQ0YN' +
+      'GDVg1AAKAAD//wMA8v8D/eqMYc0AAAAASUVORK5CYII='
   );
 }
 
@@ -320,7 +415,31 @@ function updateTrayTooltip() {
 
 function createTray() {
   if (tray) return;
-  tray = new Tray(trayImage());
+  // Windows: prefer Tray(path-to-.ico) — NativeImage-only trays often render blank.
+  const iconPath = resolveIcon();
+  let created = false;
+  if (iconPath && process.platform === 'win32') {
+    try {
+      tray = new Tray(iconPath);
+      created = true;
+      console.log('[gateway-tray] created from path', iconPath);
+    } catch (e) {
+      console.warn('[gateway-tray] path create failed', iconPath, e && e.message);
+    }
+  }
+  if (!created) {
+    try {
+      tray = new Tray(trayImage());
+      created = true;
+    } catch (e) {
+      console.warn('[gateway-tray] tray create failed', e && e.message);
+      return;
+    }
+  }
+  try {
+    const img = trayImage();
+    if (img && !img.isEmpty()) tray.setImage(img);
+  } catch (_) {}
   updateTrayTooltip();
 
   const menu = Menu.buildFromTemplate([
@@ -343,14 +462,9 @@ function createTray() {
     {
       label: 'Start with Windows',
       type: 'checkbox',
-      checked: !!app.getLoginItemSettings().openAtLogin,
+      checked: isStartWithWindowsEnabled(),
       click: (item) => {
-        app.setLoginItemSettings({
-          openAtLogin: item.checked,
-          openAsHidden: true,
-          path: process.execPath,
-          args: app.isPackaged ? [] : [path.resolve(__dirname)],
-        });
+        setStartWithWindows(!!item.checked);
       },
     },
     { type: 'separator' },
@@ -412,19 +526,18 @@ if (!gotLock) {
 }
 
 app.whenReady().then(async () => {
+  try {
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.restrosuite.gateway-tray');
+    }
+  } catch (_) {}
+
   repoRoot = findRepoRoot();
 
-  // Start with Windows by default (user can uncheck in tray)
+  // Start with Windows by default (user can uncheck in tray).
+  // Always re-assert a space-safe quoted Run key on Windows.
   try {
-    const login = app.getLoginItemSettings();
-    if (!login.openAtLogin) {
-      app.setLoginItemSettings({
-        openAtLogin: true,
-        openAsHidden: true,
-        path: process.execPath,
-        args: app.isPackaged ? [] : [path.resolve(__dirname)],
-      });
-    }
+    setStartWithWindows(true);
   } catch (e) {
     console.warn('[gateway-tray] login item failed', e && e.message);
   }

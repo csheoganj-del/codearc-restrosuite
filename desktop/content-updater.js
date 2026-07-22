@@ -55,9 +55,17 @@ function statePath() {
   return path.join(app.getPath('userData'), 'content-state.json');
 }
 
+/** Strip UTF-8 BOM / junk so JSON.parse never fails on PowerShell-written files. */
+function parseJsonFile(filePath) {
+  let raw = fs.readFileSync(filePath, 'utf8');
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+  raw = raw.replace(/^\uFEFF/, '').trim();
+  return JSON.parse(raw);
+}
+
 function readState() {
   try {
-    return JSON.parse(fs.readFileSync(statePath(), 'utf8'));
+    return parseJsonFile(statePath());
   } catch (_) {
     return {};
   }
@@ -66,7 +74,9 @@ function readState() {
 function writeState(obj) {
   try {
     fs.mkdirSync(path.dirname(statePath()), { recursive: true });
-    fs.writeFileSync(statePath(), JSON.stringify(obj, null, 2), 'utf8');
+    // Write without BOM (Node utf8 default). Explicit buffer avoids accidental BOM tools.
+    const body = JSON.stringify(obj, null, 2);
+    fs.writeFileSync(statePath(), body, { encoding: 'utf8' });
   } catch (e) {
     console.warn('[content-updater] state write failed', e && e.message);
   }
@@ -75,7 +85,15 @@ function writeState(obj) {
 function readBundledAppUpdate(webRoot) {
   try {
     const p = path.join(webRoot || '', 'app-update.json');
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+    if (fs.existsSync(p)) return parseJsonFile(p);
+  } catch (_) {}
+  return null;
+}
+
+function readOverlayAppUpdate() {
+  try {
+    const p = path.join(overlayDir(), 'app-update.json');
+    if (fs.existsSync(p)) return parseJsonFile(p);
   } catch (_) {}
   return null;
 }
@@ -83,6 +101,9 @@ function readBundledAppUpdate(webRoot) {
 function localContentVersion(webRoot) {
   const st = readState();
   if (st && st.version) return String(st.version);
+  // Overlay already applied (even if state file was corrupted / BOM-broken)
+  const overlay = readOverlayAppUpdate();
+  if (overlay && overlay.version) return String(overlay.version);
   const bundled = readBundledAppUpdate(webRoot);
   if (bundled && bundled.version) return String(bundled.version);
   return '0';

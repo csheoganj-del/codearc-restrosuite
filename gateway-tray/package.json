@@ -1,7 +1,7 @@
 {
   "name": "restrosuite-gateway-tray",
   "productName": "RestroSuite Gateway",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "System-tray controller for RestroSuite WhatsApp gateway + ngrok. Starts with Windows; close keeps it in tray.",
   "author": "RestroSuite",
@@ -30,7 +30,28 @@
       "status.html",
       "build/icon.ico",
       "build/icon.png",
+      "build/tray.ico",
+      "build/tray.png",
+      "build/tray-green-solid.png",
       "build/tray-green.png"
+    ],
+    "extraResources": [
+      {
+        "from": "build/tray.ico",
+        "to": "tray/tray.ico"
+      },
+      {
+        "from": "build/tray.png",
+        "to": "tray/tray.png"
+      },
+      {
+        "from": "build/tray-green-solid.png",
+        "to": "tray/tray-green-solid.png"
+      },
+      {
+        "from": "build/tray-green-solid.png",
+        "to": "tray/icon-gateway.png"
+      }
     ],
     "win": {
       "target": [
