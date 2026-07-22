@@ -17,6 +17,8 @@
   var loopTimer = null;
   var lastHit = '';
   var lastHitAt = 0;
+  var frameN = 0;
+  var autoActTimer = null;
 
   function toast(msg, icon) {
     if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon || 'fa-qrcode');
@@ -75,18 +77,50 @@
     try {
       var url;
       if (/^https?:\/\//i.test(text)) url = new URL(text);
-      else if (text.indexOf('?') >= 0 || text.indexOf('tenant=') >= 0 || text.indexOf('table=') >= 0) {
-        url = new URL(text, location.origin);
+      else if (
+        text.indexOf('?') >= 0 ||
+        text.indexOf('tenant=') >= 0 ||
+        text.indexOf('table=') >= 0 ||
+        text.indexOf('slug=') >= 0 ||
+        text.indexOf('tbl=') >= 0
+      ) {
+        url = new URL(text, location.origin || 'https://restrosuite.codearc.co.in');
       }
       if (url) {
-        tenant = url.searchParams.get('tenant') || url.searchParams.get('outlet') || '';
-        table = url.searchParams.get('table') || url.searchParams.get('t') || '';
-        token = url.searchParams.get('token') || url.searchParams.get('session') || '';
-        mode = url.searchParams.get('mode') || '';
-        // Path forms: /order/table/5 or /t/5
+        tenant =
+          url.searchParams.get('tenant') ||
+          url.searchParams.get('outlet') ||
+          url.searchParams.get('slug') ||
+          '';
+        // Prefer explicit table params — never treat bare "t=" as table when "tbl"/"table" exist
+        table =
+          url.searchParams.get('table') ||
+          url.searchParams.get('table_number') ||
+          url.searchParams.get('tableNumber') ||
+          url.searchParams.get('tbl') ||
+          url.searchParams.get('tableNo') ||
+          '';
+        // Only use short "t=" as table when it looks like a table id (digits), not a slug
         if (!table) {
-          var m = url.pathname.match(/(?:table|t)\/(\w+)/i);
-          if (m) table = m[1];
+          var tParam = url.searchParams.get('t') || '';
+          if (/^\d{1,4}[A-Za-z]?$/.test(tParam) || /^table/i.test(tParam)) table = tParam;
+          else if (!tenant && tParam) tenant = tParam;
+        }
+        token =
+          url.searchParams.get('token') ||
+          url.searchParams.get('session') ||
+          url.searchParams.get('session_token') ||
+          '';
+        mode = url.searchParams.get('mode') || '';
+        // Path forms: /order/table/5 , /t/5 , /qr-order.html already handled by query
+        if (!table) {
+          var m = url.pathname.match(/(?:table|t|tbl)\/([^/?#]+)/i);
+          if (m) table = decodeURIComponent(m[1]);
+        }
+        // Hash routes: #/table/5
+        if (!table && url.hash) {
+          var mh = url.hash.match(/(?:table|t|tbl)[/=]([^&/?#]+)/i);
+          if (mh) table = decodeURIComponent(mh[1]);
         }
       }
     } catch (_) {}
@@ -95,10 +129,15 @@
     if (!table && /^\d{1,4}[A-Za-z]?$/.test(text)) {
       table = text;
     }
-    // "Table 5" / "T-05"
+    // "Table 5" / "T-05" / "Table 01"
     if (!table) {
       var m2 = text.match(/(?:table|tbl|t)[\s#:.-]*([0-9]{1,4}[A-Za-z]?)/i);
       if (m2) table = m2[1];
+    }
+    // Last path segment if numeric: .../01
+    if (!table) {
+      var m3 = text.match(/\/(\d{1,4}[A-Za-z]?)(?:\?|#|$)/);
+      if (m3) table = m3[1];
     }
 
     if (!table) return null;
@@ -135,37 +174,142 @@
   }
 
   function ensureStyle() {
-    if (document.getElementById(STYLE_ID)) return;
+    // Always refresh styles so animation updates ship without hard reload issues
+    var old = document.getElementById(STYLE_ID);
+    if (old) old.remove();
     var s = document.createElement('style');
     s.id = STYLE_ID;
     var r = '#' + ROOT_ID;
     s.textContent = [
-      r + '{position:fixed;inset:0;z-index:2147483601;display:flex;align-items:flex-end;justify-content:center;background:rgba(12,10,9,.62);backdrop-filter:blur(4px);padding:12px;}',
-      r + ' .rs-scan-card{width:min(440px,100%);background:var(--panel,#fff);color:var(--text,#16151c);border-radius:20px 20px 14px 14px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;border:1px solid var(--stroke-2,rgba(0,0,0,.08));}',
+      '@keyframes rs-scan-line{0%{top:8%;opacity:.35}8%{opacity:1}50%{top:88%;opacity:1}58%{opacity:.35}100%{top:8%;opacity:.35}}',
+      '@keyframes rs-scan-pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.02)}}',
+      '@keyframes rs-scan-dot{0%,80%,100%{opacity:.25}40%{opacity:1}}',
+      '@keyframes rs-scan-glow{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.0)}50%{box-shadow:0 0 18px 2px rgba(37,211,102,.35)}}',
+      '@keyframes rs-scan-corners{0%,100%{border-color:rgba(37,211,102,.75)}50%{border-color:rgba(37,211,102,1)}}',
+      r +
+        '{position:fixed;inset:0;z-index:2147483601;display:flex;align-items:flex-end;justify-content:center;background:rgba(12,10,9,.62);backdrop-filter:blur(4px);padding:12px;}',
+      r +
+        ' .rs-scan-card{width:min(440px,100%);background:var(--panel,#fff);color:var(--text,#16151c);border-radius:20px 20px 14px 14px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;border:1px solid var(--stroke-2,rgba(0,0,0,.08));}',
       r + ' .rs-scan-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 8px;}',
       r + ' .rs-scan-head h3{margin:0;font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}',
-      r + ' .rs-scan-head h3 i{color:#FF4F00;}',
+      r + ' .rs-scan-head h3 i{color:#25D366;}',
       r + ' .rs-scan-x{border:0;background:var(--stroke-2,rgba(0,0,0,.06));width:34px;height:34px;border-radius:10px;cursor:pointer;}',
-      r + ' .rs-scan-sub{margin:0 16px 10px;font-size:12.5px;line-height:1.45;color:var(--text-soft,#6b6570);}',
-      r + ' .rs-scan-vid-wrap{position:relative;margin:0 16px;border-radius:14px;overflow:hidden;background:#0c0b0a;aspect-ratio:4/3;}',
+      r +
+        ' .rs-scan-sub{margin:0 16px 10px;font-size:12.5px;line-height:1.45;color:var(--text-soft,#6b6570);}',
+      r +
+        ' .rs-scan-vid-wrap{position:relative;margin:0 16px;border-radius:14px;overflow:hidden;background:#0c0b0a;aspect-ratio:4/3;}',
       r + ' .rs-scan-vid-wrap video,' + r + ' .rs-scan-vid-wrap canvas{width:100%;height:100%;object-fit:cover;display:block;}',
-      r + ' .rs-scan-frame{position:absolute;inset:18% 16%;border:2px solid rgba(255,79,0,.85);border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.28);pointer-events:none;}',
-      r + ' .rs-scan-status{padding:10px 16px;font-size:12.5px;font-weight:700;color:var(--text-soft,#6b6570);}',
+      /* Dim outside the viewfinder */
+      r +
+        ' .rs-scan-mask{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 52% 48% at 50% 50%,transparent 58%,rgba(0,0,0,.55) 59%)}',
+      /* WhatsApp-style square corners */
+      r +
+        ' .rs-scan-frame{position:absolute;inset:16% 14%;border:0;pointer-events:none;animation:rs-scan-corners 1.6s ease-in-out infinite;}',
+      r +
+        ' .rs-scan-frame:before,' +
+        r +
+        ' .rs-scan-frame:after,' +
+        r +
+        ' .rs-scan-frame i:before,' +
+        r +
+        ' .rs-scan-frame i:after{content:"";position:absolute;width:22px;height:22px;border-color:#25D366;border-style:solid;}',
+      r + ' .rs-scan-frame:before{top:0;left:0;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}',
+      r + ' .rs-scan-frame:after{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}',
+      r + ' .rs-scan-frame i{position:absolute;inset:0;pointer-events:none;}',
+      r + ' .rs-scan-frame i:before{bottom:0;left:0;top:auto;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}',
+      r + ' .rs-scan-frame i:after{bottom:0;right:0;top:auto;left:auto;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}',
+      /* Moving laser line */
+      r +
+        ' .rs-scan-laser{position:absolute;left:18%;right:18%;height:2px;border-radius:2px;pointer-events:none;background:linear-gradient(90deg,transparent,#25D366 20%,#fff 50%,#25D366 80%,transparent);box-shadow:0 0 12px 2px rgba(37,211,102,.85);animation:rs-scan-line 2.1s ease-in-out infinite;}',
+      r +
+        ' .rs-scan-laser:after{content:"";position:absolute;left:0;right:0;top:-14px;height:28px;background:linear-gradient(180deg,transparent,rgba(37,211,102,.22),transparent);}',
+      /* State: found */
+      r + ' .rs-scan-vid-wrap.is-found .rs-scan-laser{display:none;}',
+      r +
+        ' .rs-scan-vid-wrap.is-found .rs-scan-frame{animation:none;filter:none;}',
+      r +
+        ' .rs-scan-vid-wrap.is-found .rs-scan-frame:before,' +
+        r +
+        ' .rs-scan-vid-wrap.is-found .rs-scan-frame:after,' +
+        r +
+        ' .rs-scan-vid-wrap.is-found .rs-scan-frame i:before,' +
+        r +
+        ' .rs-scan-vid-wrap.is-found .rs-scan-frame i:after{border-color:#0F9F6E;}',
+      r + ' .rs-scan-vid-wrap.is-found{animation:rs-scan-glow 1s ease-in-out 2;}',
+      r + ' .rs-scan-vid-wrap.is-idle .rs-scan-laser{animation-play-state:paused;opacity:.2;}',
+      r +
+        ' .rs-scan-vid-wrap.is-zooming .rs-scan-laser{background:linear-gradient(90deg,transparent,#38bdf8 20%,#fff 50%,#38bdf8 80%,transparent);box-shadow:0 0 14px 2px rgba(56,189,248,.9);animation-duration:1.2s;}',
+      r +
+        ' .rs-scan-vid-wrap video{transition:transform .35s ease;transform-origin:center center;}',
+      r + ' .rs-scan-vid-wrap.is-zooming video{transform:scale(1.35);}',
+      r + ' .rs-scan-vid-wrap.is-found video{transform:scale(1.12);}',
+      /* Live status row with dots */
+      r +
+        ' .rs-scan-status{padding:10px 16px;font-size:13px;font-weight:800;color:var(--text-soft,#6b6570);display:flex;align-items:center;gap:10px;min-height:42px;}',
+      r +
+        ' .rs-scan-live{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(37,211,102,.12);color:#0F9F6E;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0;}',
+      r +
+        ' .rs-scan-live span{width:6px;height:6px;border-radius:50%;background:#25D366;animation:rs-scan-dot 1.2s ease-in-out infinite;}',
+      r + ' .rs-scan-live span:nth-child(2){animation-delay:.15s;}',
+      r + ' .rs-scan-live span:nth-child(3){animation-delay:.3s;}',
+      r + ' .rs-scan-status.is-found{color:#0F9F6E;}',
+      r + ' .rs-scan-status.is-found .rs-scan-live{background:rgba(15,159,110,.15);color:#0F9F6E;}',
+      r + ' .rs-scan-status.is-found .rs-scan-live span{background:#0F9F6E;animation:none;}',
+      r + ' .rs-scan-status.is-error{color:#b45309;}',
       r + ' .rs-scan-manual{display:flex;gap:8px;padding:0 16px 12px;}',
-      r + ' .rs-scan-manual input{flex:1;min-width:0;border:1px solid var(--stroke-2,rgba(0,0,0,.12));border-radius:10px;padding:10px 12px;font:inherit;}',
+      r +
+        ' .rs-scan-manual input{flex:1;min-width:0;border:1px solid var(--stroke-2,rgba(0,0,0,.12));border-radius:10px;padding:10px 12px;font:inherit;}',
       r + ' .rs-scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 14px;}',
       r + ' .rs-scan-actions .btn{width:100%;justify-content:center;}',
-      r + ' .rs-scan-hit{margin:0 16px 12px;padding:10px 12px;border-radius:12px;background:rgba(255,79,0,.08);border:1px solid rgba(255,79,0,.18);font-size:13px;font-weight:700;display:none;}',
+      r +
+        ' .rs-scan-hit{margin:0 16px 12px;padding:10px 12px;border-radius:12px;background:rgba(15,159,110,.1);border:1px solid rgba(15,159,110,.28);font-size:13px;font-weight:700;display:none;}',
       r + ' .rs-scan-hit.on{display:block;}',
       r + ' .rs-scan-foot{padding:0 16px 16px;font-size:11.5px;color:var(--text-mute,#8a8490);line-height:1.4;}',
+      r + ' .rs-scan-auto{font-size:11px;font-weight:600;color:#0F9F6E;margin-top:4px;}',
     ].join('\n');
     document.head.appendChild(s);
+  }
+
+  function setScanUiState(root, state, message) {
+    if (!root) return;
+    var wrap = root.querySelector('.rs-scan-vid-wrap');
+    var status = root.querySelector('[data-status]');
+    var live = root.querySelector('[data-live]');
+    var label = root.querySelector('[data-status-text]');
+    if (wrap) {
+      wrap.classList.toggle('is-found', state === 'found');
+      wrap.classList.toggle('is-idle', state === 'idle' || state === 'error');
+      wrap.classList.toggle('is-zooming', state === 'zooming');
+    }
+    if (status) {
+      status.classList.toggle('is-found', state === 'found');
+      status.classList.toggle('is-error', state === 'error');
+    }
+    if (label && message != null) label.textContent = message;
+    if (live) {
+      live.hidden = false;
+      if (state === 'scanning') {
+        live.innerHTML = '<span></span><span></span><span></span> Scanning';
+      } else if (state === 'zooming') {
+        live.innerHTML = '<span></span><span></span><span></span> Auto-zoom';
+      } else if (state === 'found') {
+        live.innerHTML = '<i class="fa-solid fa-check" style="font-size:10px"></i> Locked';
+      } else if (state === 'error') {
+        live.innerHTML = 'Paused';
+      } else {
+        live.innerHTML = '<span></span><span></span><span></span> Ready';
+      }
+    }
   }
 
   function stopCamera() {
     if (loopTimer) {
       clearTimeout(loopTimer);
       loopTimer = null;
+    }
+    if (autoActTimer) {
+      clearTimeout(autoActTimer);
+      autoActTimer = null;
     }
     if (streamRef) {
       try {
@@ -231,7 +375,6 @@
       '&table=' +
       encodeURIComponent(parsed.table) +
       '&mode=waiter';
-    // Staff session already in this origin — open same-tab so tenant_session_token is shared
     location.href = url;
   }
 
@@ -243,55 +386,117 @@
       '<i class="fa-solid fa-circle-check" style="color:#0F9F6E;margin-right:6px"></i>' +
       'Table <strong>' +
       esc(parsed.table) +
-      '</strong> · choose staff action below';
+      '</strong> detected' +
+      '<div class="rs-scan-auto">Opening POS in a moment… or tap a button below</div>';
     root._parsed = parsed;
   }
 
   async function handleDecoded(root, text) {
     var now = Date.now();
-    if (text === lastHit && now - lastHitAt < 1800) return;
+    if (text === lastHit && now - lastHitAt < 2200) return;
     lastHit = text;
     lastHitAt = now;
+
     var parsed = parseTableQrPayload(text);
     if (!parsed) {
-      root.querySelector('[data-status]').textContent = 'Not a table QR — try again or type table #';
+      setScanUiState(
+        root,
+        'scanning',
+        'Got a code but not a table QR — paste link or type table #'
+      );
+      // Still surface raw payload so staff can paste/debug
+      try {
+        var manual = root.querySelector('[data-manual]');
+        if (manual && text && text.length < 400) manual.value = text;
+      } catch (_) {}
       return;
     }
-    // Soft tenant mismatch warning
+
     var mySlug = currentTenantSlug();
-    if (parsed.tenant && mySlug && String(parsed.tenant).toLowerCase() !== String(mySlug).toLowerCase()) {
+    if (
+      parsed.tenant &&
+      mySlug &&
+      String(parsed.tenant).toLowerCase() !== String(mySlug).toLowerCase()
+    ) {
       toast('QR is for another outlet (' + parsed.tenant + ')', 'fa-triangle-exclamation');
     }
+
     showHit(root, parsed);
-    root.querySelector('[data-status]').textContent = 'Table ' + parsed.table + ' detected';
+    setScanUiState(root, 'found', 'Table ' + parsed.table + ' locked — opening POS…');
     try {
-      if (navigator.vibrate) navigator.vibrate(30);
+      if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
     } catch (_) {}
+
+    // Auto-open POS (Yono-style: detect → lock → act without extra taps)
+    if (autoActTimer) clearTimeout(autoActTimer);
+    autoActTimer = setTimeout(async function () {
+      if (!document.getElementById(ROOT_ID) || !root._parsed) return;
+      if (root._parsed.tableKey !== parsed.tableKey) return;
+      try {
+        closeScanner();
+        await openTableInPosFromScan(parsed, { seat: false });
+      } catch (e) {
+        console.warn('[StaffScan] auto open POS failed', e);
+        toast('Table detected — tap Open POS', 'fa-utensils');
+      }
+    }, 450);
   }
 
   function ensureJsQr() {
     return new Promise(function (resolve) {
       if (global.jsQR) return resolve(true);
-      var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-      s.async = true;
-      s.onload = function () { resolve(!!global.jsQR); };
-      s.onerror = function () { resolve(false); };
-      document.head.appendChild(s);
+      // Prefer local copy if present; else CDN
+      var sources = [
+        'assets/lib/jsQR.min.js',
+        'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js',
+        'https://unpkg.com/jsqr@1.4.0/dist/jsQR.min.js',
+      ];
+      var i = 0;
+      function tryNext() {
+        if (i >= sources.length) return resolve(false);
+        var s = document.createElement('script');
+        s.src = sources[i++];
+        s.async = true;
+        s.onload = function () {
+          resolve(!!global.jsQR);
+        };
+        s.onerror = function () {
+          tryNext();
+        };
+        document.head.appendChild(s);
+      }
+      tryNext();
     });
   }
 
   async function startCamera(root) {
     var video = root.querySelector('video');
-    var status = root.querySelector('[data-status]');
     if (!video) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      status.textContent = 'Camera not available — type table number below';
+      setScanUiState(root, 'error', 'Camera not available — type table number below');
       return;
     }
-    // Prefer rear camera; fall back to any camera (BlueStacks / desktop webcam)
+
+    // Prefer high-res rear camera (distance scanning like UPI apps)
     var attempts = [
-      { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          advanced: [{ focusMode: 'continuous' }, { zoom: 1.0 }],
+        },
+      },
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+      { audio: false, video: { facingMode: 'environment' } },
       { audio: false, video: { facingMode: 'user' } },
       { audio: false, video: true },
     ];
@@ -308,70 +513,221 @@
     }
     if (!opened) {
       console.warn('[StaffScan] camera', lastErr);
-      var msg = 'Camera blocked — allow camera permission, then try again. Or type table # below.';
+      var msg = 'Camera blocked — allow camera, then try again. Or type table # below.';
       if (lastErr && /NotAllowed|Permission/i.test(String(lastErr.name || lastErr.message || ''))) {
-        msg = 'Camera permission denied. Allow Camera for RestroSuite in system settings, then reopen Scan.';
+        msg =
+          'Camera permission denied. Allow Camera for this site, then reopen Scan. Or type table #.';
       } else if (lastErr && /NotFound|DevicesNotFound/i.test(String(lastErr.name || ''))) {
-        msg = 'No camera found on this device. Type table number below.';
+        msg = 'No camera found. Type table number below.';
       }
-      status.textContent = msg;
+      setScanUiState(root, 'error', msg);
       return;
     }
+
+    // Optional hardware zoom when supported (Android Chrome)
+    try {
+      var track = streamRef.getVideoTracks()[0];
+      var caps = track.getCapabilities && track.getCapabilities();
+      if (caps && caps.zoom) {
+        root._camTrack = track;
+        root._zoomCaps = caps.zoom;
+        // Start slightly zoomed if device allows (helps mid-distance QRs)
+        var z0 = Math.min(caps.zoom.max || 1, Math.max(caps.zoom.min || 1, 1.2));
+        if (caps.zoom.min != null && z0 >= caps.zoom.min) {
+          await track.applyConstraints({ advanced: [{ zoom: z0 }] });
+        }
+      }
+    } catch (_) {}
+
     try {
       video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
       video.setAttribute('autoplay', 'true');
       video.muted = true;
       video.srcObject = streamRef;
       await video.play();
-      status.textContent = 'Point at the table QR…';
+      setScanUiState(root, 'scanning', 'Point at table QR — works from a distance');
     } catch (e) {
       console.warn('[StaffScan] video play', e);
-      status.textContent = 'Camera opened but preview failed — type table # below';
+      setScanUiState(root, 'error', 'Camera opened but preview failed — type table # below');
       return;
     }
 
-    await ensureJsQr();
+    var hasJsQr = await ensureJsQr();
 
     var detector = null;
     try {
       if (global.BarcodeDetector) {
-        var formats = ['qr_code'];
-        if (typeof BarcodeDetector.getSupportedFormats === 'function') {
-          var supported = await BarcodeDetector.getSupportedFormats();
-          if (supported && supported.indexOf('qr_code') >= 0) formats = ['qr_code'];
-        }
-        detector = new BarcodeDetector({ formats: formats });
+        detector = new BarcodeDetector({ formats: ['qr_code'] });
       }
     } catch (_) {
       detector = null;
     }
-    if (!detector && !global.jsQR) {
-      status.textContent = 'Scanner library missing — type table # or paste QR link below';
+
+    if (!detector && !hasJsQr) {
+      setScanUiState(
+        root,
+        'error',
+        'Scanner library missing. Type table # or paste QR link below.'
+      );
     }
 
     var canvas = root.querySelector('canvas');
-    var ctx = canvas && canvas.getContext ? canvas.getContext('2d', { willReadFrequently: true }) : null;
+    var ctx =
+      canvas && canvas.getContext
+        ? canvas.getContext('2d', { willReadFrequently: true })
+        : null;
+
+    // Progressive digital zoom levels (center crop) — Yono/UPI style distance read
+    var zoomLevels = [1, 1.35, 1.75, 2.25, 2.8];
+    var zoomIdx = 0;
+    var missStreak = 0;
+
+    function runJsQrOnImageData(img) {
+      if (!global.jsQR || !img) return null;
+      try {
+        var code = global.jsQR(img.data, img.width, img.height, {
+          inversionAttempts: 'attemptBoth',
+        });
+        return code && code.data ? code.data : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    /**
+     * Multi-scale + center-crop decode (far-distance friendly).
+     * @param {number} digZoom 1 = full frame, >1 = crop center (digital zoom)
+     */
+    function decodeWithJsQrMulti(digZoom) {
+      if (!ctx || !global.jsQR || video.readyState < 2) return null;
+      var w = video.videoWidth || 0;
+      var h = video.videoHeight || 0;
+      if (w < 32 || h < 32) return null;
+
+      var z = Math.max(1, digZoom || 1);
+      var cropW = Math.floor(w / z);
+      var cropH = Math.floor(h / z);
+      var sx = Math.floor((w - cropW) / 2);
+      var sy = Math.floor((h - cropH) / 2);
+
+      // Target analysis width (balance speed vs detail)
+      var targets = z > 1.5 ? [640, 480] : [720, 540, 400];
+      for (var ti = 0; ti < targets.length; ti++) {
+        var maxW = targets[ti];
+        var scale = cropW > maxW ? maxW / cropW : 1;
+        var cw = Math.max(32, Math.floor(cropW * scale));
+        var ch = Math.max(32, Math.floor(cropH * scale));
+        canvas.width = cw;
+        canvas.height = ch;
+        ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
+        var img = ctx.getImageData(0, 0, cw, ch);
+        var hit = runJsQrOnImageData(img);
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    async function tryHardwareZoomStep() {
+      if (!root._camTrack || !root._zoomCaps) return false;
+      try {
+        var caps = root._zoomCaps;
+        var cur = (root._camTrack.getSettings && root._camTrack.getSettings().zoom) || 1;
+        var step = caps.step || 0.5;
+        var next = Math.min(caps.max || cur, cur + Math.max(step, 0.4));
+        if (next <= cur + 0.05) return false;
+        await root._camTrack.applyConstraints({ advanced: [{ zoom: next }] });
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
 
     async function tick() {
       if (!document.getElementById(ROOT_ID)) return;
+      if (root._parsed) {
+        loopTimer = setTimeout(tick, 400);
+        return;
+      }
+      frameN++;
       try {
+        var decoded = null;
+        var bbox = null;
+
+        // 1) Native BarcodeDetector (may also give bounding box for digital zoom)
         if (detector && video.readyState >= 2) {
-          var codes = await detector.detect(video);
-          if (codes && codes[0] && codes[0].rawValue) {
-            await handleDecoded(root, codes[0].rawValue);
+          try {
+            var codes = await detector.detect(video);
+            if (codes && codes[0]) {
+              if (codes[0].rawValue) decoded = codes[0].rawValue;
+              if (codes[0].boundingBox) bbox = codes[0].boundingBox;
+            }
+          } catch (_) {}
+        }
+
+        // 2) jsQR multi-scale at current digital zoom
+        if (!decoded && global.jsQR) {
+          decoded = decodeWithJsQrMulti(zoomLevels[zoomIdx] || 1);
+        }
+
+        // 3) If still nothing, cycle digital zoom (far → closer crop)
+        if (!decoded && global.jsQR && frameN % 3 === 0) {
+          missStreak++;
+          if (missStreak >= 2) {
+            zoomIdx = (zoomIdx + 1) % zoomLevels.length;
+            missStreak = 0;
+            var z = zoomLevels[zoomIdx];
+            if (z > 1.2) {
+              setScanUiState(
+                root,
+                'zooming',
+                'Auto-zoom ' + z.toFixed(1) + '× — hold steady…'
+              );
+              // Hardware zoom every few digital steps when available
+              if (zoomIdx % 2 === 0) await tryHardwareZoomStep();
+            } else {
+              setScanUiState(root, 'scanning', 'Scanning far & near…');
+            }
+            decoded = decodeWithJsQrMulti(z);
           }
-        } else if (ctx && video.readyState >= 2 && global.jsQR) {
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 480;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          var code = global.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-          if (code && code.data) await handleDecoded(root, code.data);
+        }
+
+        // 4) If detector gave a bbox without value, crop that region hard
+        if (!decoded && bbox && ctx && global.jsQR && video.readyState >= 2) {
+          try {
+            var vw = video.videoWidth || 1;
+            var vh = video.videoHeight || 1;
+            var bx = Math.max(0, Math.floor(bbox.x - bbox.width * 0.15));
+            var by = Math.max(0, Math.floor(bbox.y - bbox.height * 0.15));
+            var bw = Math.min(vw - bx, Math.floor(bbox.width * 1.3));
+            var bh = Math.min(vh - by, Math.floor(bbox.height * 1.3));
+            if (bw > 24 && bh > 24) {
+              var tw = Math.min(480, bw * 2);
+              var th = Math.min(480, bh * 2);
+              canvas.width = tw;
+              canvas.height = th;
+              ctx.drawImage(video, bx, by, bw, bh, 0, 0, tw, th);
+              decoded = runJsQrOnImageData(ctx.getImageData(0, 0, tw, th));
+            }
+          } catch (_) {}
+        }
+
+        if (decoded) {
+          zoomIdx = 0;
+          missStreak = 0;
+          await handleDecoded(root, decoded);
+        } else if (frameN % 15 === 0) {
+          var zLabel = zoomLevels[zoomIdx] > 1.05 ? ' · zoom ' + zoomLevels[zoomIdx].toFixed(1) + '×' : '';
+          setScanUiState(
+            root,
+            zoomLevels[zoomIdx] > 1.2 ? 'zooming' : 'scanning',
+            'Scanning' + zLabel + ' — no need to get close'
+          );
         }
       } catch (e) {
         /* ignore frame errors */
       }
-      loopTimer = setTimeout(tick, detector ? 220 : 380);
+      loopTimer = setTimeout(tick, 220);
     }
     tick();
   }
@@ -380,6 +736,9 @@
     opts = opts || {};
     ensureStyle();
     closeScanner();
+    lastHit = '';
+    lastHitAt = 0;
+    frameN = 0;
 
     var root = document.createElement('div');
     root.id = ROOT_ID;
@@ -388,13 +747,21 @@
     root.setAttribute('aria-label', 'Scan table QR');
     root.innerHTML =
       '<div class="rs-scan-card">' +
-      '<div class="rs-scan-head"><h3><i class="fa-solid fa-camera"></i> Staff table scan</h3>' +
+      '<div class="rs-scan-head"><h3><i class="fa-solid fa-qrcode"></i> Staff table scan</h3>' +
       '<button type="button" class="rs-scan-x" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>' +
-      '<p class="rs-scan-sub">Guests scan this same QR with their <b>phone camera</b> to order. ' +
-      'You must scan here so the system opens the <b>staff</b> workflow (POS / KOT).</p>' +
-      '<div class="rs-scan-vid-wrap"><video playsinline muted autoplay></video><canvas style="display:none"></canvas>' +
-      '<div class="rs-scan-frame" aria-hidden="true"></div></div>' +
-      '<div class="rs-scan-status" data-status>Starting camera…</div>' +
+      '<p class="rs-scan-sub">Like UPI apps: hold phone up — it <b>auto-zooms</b> and <b>locks</b> the table QR from a distance. ' +
+      'Same printed code guests use; staff scan opens POS.</p>' +
+      '<div class="rs-scan-vid-wrap">' +
+      '<video playsinline muted autoplay></video>' +
+      '<canvas style="display:none" aria-hidden="true"></canvas>' +
+      '<div class="rs-scan-mask" aria-hidden="true"></div>' +
+      '<div class="rs-scan-frame" aria-hidden="true"><i></i></div>' +
+      '<div class="rs-scan-laser" aria-hidden="true"></div>' +
+      '</div>' +
+      '<div class="rs-scan-status" data-status>' +
+      '<span class="rs-scan-live" data-live><span></span><span></span><span></span> Starting</span>' +
+      '<span data-status-text>Starting camera…</span>' +
+      '</div>' +
       '<div class="rs-scan-hit" data-hit></div>' +
       '<div class="rs-scan-manual">' +
       '<input type="text" data-manual inputmode="text" autocomplete="off" placeholder="Or type table # / paste QR link">' +
@@ -405,10 +772,12 @@
       '<button type="button" class="btn btn-ghost" data-act="kot"><i class="fa-solid fa-fire-burner"></i> Waiter KOT</button>' +
       '<button type="button" class="btn btn-ghost" data-act="hub"><i class="fa-solid fa-eye"></i> Guest preview</button>' +
       '</div>' +
-      '<p class="rs-scan-foot">Guest keeps full control after you take the order: track, add more, amend pending items, call service, pay.</p>' +
+      '<p class="rs-scan-foot">Green line = actively scanning. Blue “Auto-zoom” = hunting from far. ' +
+      'Fallback: type table number (e.g. 5) → Go → Open POS.</p>' +
       '</div>';
 
     document.body.appendChild(root);
+    setScanUiState(root, 'scanning', 'Starting camera…');
 
     root.querySelector('[data-close]').onclick = closeScanner;
     root.addEventListener('click', function (e) {
@@ -429,7 +798,7 @@
 
     root.querySelector('[data-manual-go]').onclick = function () {
       var p = requireParsed();
-      if (p) toast('Table ' + p.table + ' ready — pick an action', 'fa-qrcode');
+      if (p) toast('Table ' + p.table + ' ready — pick an action (or wait for auto POS)', 'fa-qrcode');
     };
     root.querySelector('[data-manual]').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
@@ -441,18 +810,30 @@
     root.querySelector('[data-act="pos"]').onclick = async function () {
       var p = requireParsed();
       if (!p) return;
+      if (autoActTimer) {
+        clearTimeout(autoActTimer);
+        autoActTimer = null;
+      }
       closeScanner();
       await openTableInPosFromScan(p, { seat: false });
     };
     root.querySelector('[data-act="seat"]').onclick = async function () {
       var p = requireParsed();
       if (!p) return;
+      if (autoActTimer) {
+        clearTimeout(autoActTimer);
+        autoActTimer = null;
+      }
       closeScanner();
       await openTableInPosFromScan(p, { seat: true });
     };
     root.querySelector('[data-act="kot"]').onclick = function () {
       var p = requireParsed();
       if (!p) return;
+      if (autoActTimer) {
+        clearTimeout(autoActTimer);
+        autoActTimer = null;
+      }
       closeScanner();
       openWaiterKot(p);
     };
@@ -481,6 +862,5 @@
     normTableKey: normTableKey,
   };
 
-  // Convenience global used by floor toolbar
   global.openStaffTableScanner = openScanner;
 })(typeof window !== 'undefined' ? window : globalThis);

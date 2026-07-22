@@ -596,9 +596,22 @@
                   prep_minutes:(o.prepMinutes!=null?num(o.prepMinutes):null), prep_started_at:o.prepStartedAt||null })
     },
     table_sessions: {
-      table:'doppio_table_sessions', pk:'id', clientId:false,
+      // UUID PK with DB default — leave id empty on insert so gen_random_uuid() runs.
+      // clientId:false + missing uuidPK used to send id:null and cloud insert failed silently.
+      table:'doppio_table_sessions', pk:'id', clientId:false, uuidPK:true,
       from: r => ({ id:r.id, tableNumber:r.table_number, token:r.session_token, status:r.status, createdAt:r.created_at, closedAt:r.closed_at, lastOrderAt:r.last_order_at }),
-      to: o => ({ id:o.id, table_number:o.tableNumber, session_token:o.token, status:o.status, created_at:o.createdAt, closed_at:o.closedAt, last_order_at:o.lastOrderAt })
+      to: o => {
+        const row = {
+          table_number: o.tableNumber,
+          session_token: o.token,
+          status: o.status,
+          created_at: o.createdAt,
+          closed_at: o.closedAt || null,
+          last_order_at: o.lastOrderAt || null,
+        };
+        if (o.id != null) row.id = o.id;
+        return row;
+      }
     },
     shifts: {
       table:'doppio_shifts', pk:'shift_id', clientId:true,

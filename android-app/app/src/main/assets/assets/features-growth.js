@@ -511,13 +511,21 @@
       if (!key) return false;
       try {
         const sessions = await RS_DB.list('table_sessions').catch(() => []);
-        let session = (sessions || []).find((s) => normTableKey(s.tableNumber) === key);
+        // Prefer non-closed session; fall back to any row (unique on tenant+table)
+        let session =
+          (sessions || []).find(
+            (s) => normTableKey(s.tableNumber) === key && s.status !== 'closed'
+          ) || (sessions || []).find((s) => normTableKey(s.tableNumber) === key);
         if (session && session.status === 'active') {
           if (options.toast) RS.toast('QR ordering already open for this table', 'fa-qrcode');
           return true;
         }
         if (session && session.status === 'paused') {
-          await RS_DB.put('table_sessions', session.id, { ...session, status: 'active' });
+          await RS_DB.put('table_sessions', session.id, {
+            ...session,
+            status: 'active',
+            closedAt: null,
+          });
           if (options.toast !== false) RS.toast('QR ordering resumed for Table ' + tableN, 'fa-qrcode');
           document.dispatchEvent(new Event('rs:tables-updated'));
           return true;
@@ -528,15 +536,25 @@
           tableNumber: key,
           token: randomToken,
           status: 'active',
-          createdAt: new Date().toISOString(),
+          createdAt: (session && session.createdAt) || new Date().toISOString(),
+          closedAt: null,
         };
+        // Re-open closed row by id, or insert new (uuid generated server-side)
         if (session && session.id) updatedSess.id = session.id;
-        const saved = await RS_DB.put('table_sessions', session && session.id, updatedSess);
+        const saved = await RS_DB.put(
+          'table_sessions',
+          session && session.id ? session.id : null,
+          updatedSess
+        );
+        if (!saved) {
+          console.warn('ensureTableQrSession: put returned empty for', key);
+          return false;
+        }
         if (options.toast !== false) {
           RS.toast('QR ordering open · guests can scan Table ' + tableN, 'fa-qrcode');
         }
         document.dispatchEvent(new Event('rs:tables-updated'));
-        return !!(saved || true);
+        return true;
       } catch (e) {
         console.warn('ensureTableQrSession failed', e);
         return false;
@@ -597,7 +615,6 @@
       }
       const isOpen = mode === 'open';
       const total = TABLES.length;
-      const verb = isOpen ? 'Open' : 'Close';
       const confirmMsg = isOpen
         ? 'Open QR ordering on all ' +
           total +
@@ -605,7 +622,15 @@
         : 'Close QR ordering on all ' +
           total +
           ' tables?\n\nGuests will not be able to place new QR orders until you open QR again.\n\nBills and seated tables stay as they are.';
-      if (!window.confirm(confirmMsg)) return;
+      // Electron: window.confirm can feel "stuck"; still use it but also log.
+      let proceeded = false;
+      try {
+        proceeded = !!window.confirm(confirmMsg);
+      } catch (e) {
+        console.warn('confirm failed', e);
+        proceeded = true; // if confirm throws, still try to open
+      }
+      if (!proceeded) return;
 
       const labelHtml = btn ? btn.innerHTML : '';
       if (btn) {
@@ -617,10 +642,11 @@
       let okN = 0;
       let failN = 0;
       const failedNames = [];
-      for (let i = 0; i < TABLES.length; i++) {
-        const t = TABLES[i];
-        const name = t.n || t.name || String(i + 1);
-        if (btn) {
+      // Snapshot names so renderFloor mid-loop cannot clear the list
+      const tableSnapshot = TABLES.map((t, i) => t.n || t.name || String(i + 1));
+      for (let i = 0; i < tableSnapshot.length; i++) {
+        const name = tableSnapshot[i];
+        if (btn && document.body.contains(btn)) {
           btn.innerHTML =
             '<i class="fa-solid fa-spinner fa-spin"></i> ' +
             (isOpen ? 'Opening' : 'Closing') +
@@ -634,7 +660,8 @@
           ok = isOpen
             ? await ensureTableQrSession(name, { toast: false })
             : await closeTableQrSession(name, { toast: false, silent: true });
-        } catch (_) {
+        } catch (err) {
+          console.warn('bulkTableQrSessions item failed', name, err);
           ok = false;
         }
         if (ok) okN++;
@@ -647,7 +674,11 @@
       try {
         document.dispatchEvent(new Event('rs:tables-updated'));
       } catch (_) {}
-      renderFloor();
+      try {
+        await renderFloor();
+      } catch (e) {
+        console.warn('renderFloor after bulk QR', e);
+      }
 
       if (failN === 0) {
         RS.toast(
@@ -656,6 +687,15 @@
             : 'QR closed on all ' + okN + ' tables',
           isOpen ? 'fa-qrcode' : 'fa-power-off'
         );
+        // Open all QR should also show the cards so staff can print / verify
+        if (isOpen && okN > 0) {
+          try {
+            await showAllTableQRs();
+          } catch (e) {
+            console.warn('showAllTableQRs after open-all', e);
+            RS.toast('Sessions open — use Print Table QRs to show codes', 'fa-print');
+          }
+        }
       } else {
         RS.toast(
           (isOpen ? 'Opened ' : 'Closed ') +
@@ -944,7 +984,8 @@
           RS_DB.list('pending_orders'),
           RS_DB.list('reservations').catch(() => []),
           RS_DB.list('drafts').catch(() => []),
-        ]).then(([rows, reservations, drafts]) => {
+          RS_DB.list('table_sessions').catch(() => []),
+        ]).then(([rows, reservations, drafts, tableSessions]) => {
           const _resToday = new Date().toISOString().slice(0, 10);
           const _resDigits = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
           const heldTableSet = new Set();
@@ -958,6 +999,15 @@
               window.__rsHeldOrderTables.forEach((x) => heldTableSet.add(String(x).toLowerCase()));
             }
           } catch (e) {}
+
+          // Active guest QR sessions (Open all QR) — show on floor even when free
+          const qrOpenKeys = new Set();
+          (tableSessions || []).forEach((s) => {
+            if (s && s.status === 'active') {
+              const k = normTableKey(s.tableNumber);
+              if (k) qrOpenKeys.add(k);
+            }
+          });
 
           TABLES.forEach((t) => {
             const activeOrders = collectActiveOrders(rows, t);
@@ -1047,6 +1097,8 @@
               t.itemCount = 0;
               t.orderStatus = null;
             }
+            // Guest QR ordering session open (independent of seating state)
+            t.qrOpen = qrOpenKeys.has(normTableKey(t.n || t.name));
             t.reservedInfo =
               t.state === 'free'
                 ? reservations.find(
@@ -1073,26 +1125,29 @@
       const dining = TABLES.filter((t) => t.state === 'occupied' || t.state === 'pending').length;
       const billed = TABLES.filter((t) => t.state === 'billed').length;
       const pendingQr = TABLES.filter((t) => t.state === 'pending').length;
+      const qrOpenN = TABLES.filter((t) => t.qrOpen).length;
       sec.innerHTML = `
         <div class="stat-row">
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-chair"></i></div><div><div class="sv">${free}</div><div class="sl">Free tables</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-utensils"></i></div><div><div class="sv">${dining}</div><div class="sl">Dining now</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-file-invoice"></i></div><div><div class="sv">${billed}</div><div class="sl">Awaiting payment</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-coins"></i></div><div><div class="sv">${rs(TABLES.reduce((a, t) => a + (t.amt || 0), 0))}</div><div class="sl">Open table value${pendingQr ? ' · ' + pendingQr + ' QR' : ''}</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-qrcode"></i></div><div><div class="sv">${qrOpenN}</div><div class="sl">QR open${pendingQr ? ' · ' + pendingQr + ' new order' : ''}</div></div></div>
         </div>
         <div class="toolbar-row"><div class="floor-legend">
           <span class="lg"><span class="sw" style="background:var(--green)"></span> Available</span>
           <span class="lg"><span class="sw" style="background:var(--orange)"></span> Dining</span>
           <span class="lg"><span class="sw" style="background:var(--amber)"></span> QR pending</span>
+          <span class="lg"><span class="sw" style="background:#0ea5e9"></span> QR open</span>
           <span class="lg"><span class="sw" style="background:#f59e0b"></span> Held</span>
           <span class="lg"><span class="sw" style="background:var(--violet-soft)"></span> Bill printed</span>
-        </div><div class="grow"></div><button class="btn btn-primary btn-sm" id="btn-staff-scan-table" style="margin-right:8px;" title="Staff only: scan table QR with the app camera (not guest phone camera)"><i class="fa-solid fa-camera"></i> Scan table</button><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
+        </div><div class="grow"></div><button class="btn btn-primary btn-sm" id="btn-staff-scan-table" style="margin-right:8px;" title="Staff only: scan table QR with the app camera (not guest phone camera)"><i class="fa-solid fa-camera"></i> Scan table</button><button class="btn btn-ghost btn-sm" id="btn-refresh-floor" style="margin-right:8px;" title="Refresh floor"><i class="fa-solid fa-rotate"></i></button><button class="btn btn-ghost btn-sm" id="btn-open-all-qr" style="margin-right:8px;" title="Open guest QR ordering on every table, then show QR cards"><i class="fa-solid fa-qrcode"></i> Open all QR</button><button class="btn btn-ghost btn-sm" id="btn-close-all-qr" style="margin-right:8px;" title="Close guest QR ordering on every table"><i class="fa-solid fa-power-off"></i> Close all QR</button><button class="btn btn-ghost btn-sm" id="btn-clear-all-tables" style="margin-right:8px;color:var(--red)" title="Free every dining, held, or billed table"><i class="fa-solid fa-broom"></i> Clear all open</button><button class="btn btn-ghost btn-sm" id="btn-manage-seating" style="margin-right:8px;"><i class="fa-solid fa-chair"></i> Edit Tables</button><button class="btn btn-ghost btn-sm" id="btn-print-floor-qrs" style="margin-right:8px;"><i class="fa-solid fa-print"></i> Print Table QRs</button><span class="pill" title="Live floor status"><i class="fa-solid fa-location-dot"></i> ${TABLES.length} tables</span></div>
         <div class="floor-grid">${TABLES.length ? TABLES.map(
           (t) => `
-          <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}">
+          <div class="table-card ${t.state}${t.state === 'pending' ? ' needs-attention' : ''}${t.qrOpen ? ' table-qr-open' : ''}${t.state === 'occupied' && t.since && /h\s/.test(String(t.since)) ? ' table-long' : ''}" data-n="${esc(t.n)}" role="button" tabindex="0" aria-label="Table ${esc(t.n)} · ${esc(stateTxt[t.state] || t.state)}${t.qrOpen ? ' · QR open' : ''}">
             <span class="tdot" style="background:${stateDot[t.state] || stateDot.free}"></span>
             ${t.state === 'held' ? '<span class="table-held-badge"><i class="fa-solid fa-pause"></i> Held</span>' : ''}
             ${t.state === 'pending' ? '<span class="table-held-badge table-qr-badge"><i class="fa-solid fa-qrcode"></i> New</span>' : ''}
+            ${t.qrOpen && t.state !== 'pending' ? '<span class="table-held-badge table-qr-badge" style="background:rgba(14,165,233,0.15);color:#0369a1;border-color:rgba(14,165,233,0.35)"><i class="fa-solid fa-qrcode"></i> QR on</span>' : ''}
             <div class="tnum2">Table ${esc(t.name || t.n)}</div><div class="tcap"><i class="fa-solid fa-user-group" style="font-size:10px"></i> ${esc(t.cap)} seats</div>
             <div class="tstate">${
               t.state === 'held'
@@ -1100,10 +1155,10 @@
                 : t.emptySeat
                   ? 'Seated'
                   : (stateTxt[t.state] || t.state)
-            }${(t.state === 'free' && t.reservedInfo) ? ` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time || '')}${t.reservedInfo.guestName ? ' · ' + esc(t.reservedInfo.guestName) : ''}</span>` : ''}${t.guest && String(t.guest).toLowerCase() !== 'guest' ? ` · ${esc(t.guest)}` : ''}</div>
+            }${t.qrOpen ? ' · <span style="color:#0369a1;font-weight:700">QR open</span>' : ''}${(t.state === 'free' && t.reservedInfo) ? ` · <span style="color:#b45309;font-weight:700">Reserved ${esc(t.reservedInfo.time || '')}${t.reservedInfo.guestName ? ' · ' + esc(t.reservedInfo.guestName) : ''}</span>` : ''}${t.guest && String(t.guest).toLowerCase() !== 'guest' ? ` · ${esc(t.guest)}` : ''}</div>
             ${
               t.state === 'free'
-                ? '<div class="tcap" style="margin-top:auto">Tap to seat</div>'
+                ? '<div class="tcap" style="margin-top:auto">' + (t.qrOpen ? 'Guest scan OK · tap to seat' : 'Tap to seat') + '</div>'
                 : t.state === 'held'
                   ? `<div class="tamt">${rs(t.amt || 0)}</div><div class="tcap">${t.itemCount ? t.itemCount + ' items · ' : ''}Resume hold</div>`
                   : t.emptySeat
