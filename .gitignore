@@ -16,9 +16,13 @@ app/build/
 !gateway-tray/build/**
 # Never commit Electron build output (huge); ship installer via downloads/
 gateway-tray/dist/
+desktop/dist/
 *.apk
 *.aar
 *.exe
+# Local plug-and-play builds (not the public site) — keep README only
+local-builds/*
+!local-builds/README.md
 # Public homepage download hub (stable names — must be deployable)
 !downloads/
 !downloads/**
@@ -29,6 +33,7 @@ gateway-tray/dist/
 !downloads/*.pdf
 !downloads/manifest.json
 !downloads/README.md
+
 dashboard-phase2-restore.zip
 local.properties
 .DS_Store

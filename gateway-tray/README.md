@@ -25,17 +25,30 @@ npm install
 npm start
 ```
 
-## Build EXE
+## Build EXE (local plug-and-play — not the public site)
+
+From repo root (recommended):
+
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-gateway-exe.ps1
+```
+
+Or from this folder:
 
 ```bat
 cd gateway-tray
 npm install
-npm run dist
+npm run dist:local
 ```
 
 Output:
 
-- `dist/RestroSuite-Gateway-1.0.0-x64.exe` (portable)
-- `dist/RestroSuite-Gateway Setup 1.0.0.exe` (installer)
+| File | Use |
+|------|-----|
+| `../local-builds/RestroSuite-Gateway-Portable.exe` | **Double-click** — no install |
+| `../local-builds/RestroSuite-Gateway-Setup.exe` | Optional installer |
+| `dist/RestroSuite-Gateway-*-portable.exe` | Builder output |
 
-Install once, enable “Start with Windows” (on by default).
+Tray icon: solid **green W**. Starts with Windows by default (toggle in tray menu).
+
+These EXEs are for local use only — they are **not** published on the website download page.
