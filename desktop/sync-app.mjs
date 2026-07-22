@@ -25,6 +25,9 @@ const ROOT_FILES = [
   'terms.html', 'refund-policy.html', '404.html',
   'config.js', 'env-config.js', 'pwa.js', 'service-worker.js', 'script.js',
   'manifest.webmanifest', 'robots.txt', 'sitemap.xml',
+  // Content updater compares this to production so fresh installs are not "You have: 0"
+  'app-update.json',
+  'app-content-manifest.json',
 ];
 
 // Whole directories to mirror.

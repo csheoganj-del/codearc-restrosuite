@@ -98,7 +98,70 @@ function readOverlayAppUpdate() {
   return null;
 }
 
+/**
+ * electron-builder / productName changes can move userData
+ * (e.g. "RestroSuite" → "RestroSuite Desktop"). Copy applied UI
+ * content so we don't re-prompt "You have: 0" after an upgrade.
+ */
+function migrateLegacyContent() {
+  try {
+    const cur = app.getPath('userData');
+    const hasState = fs.existsSync(statePath());
+    const hasOverlay = fs.existsSync(path.join(overlayDir(), 'app-update.json'));
+    if (hasState && hasOverlay) return false;
+
+    const home = path.dirname(cur);
+    const candidates = [
+      path.join(home, 'RestroSuite'),
+      path.join(home, 'RestroSuite Desktop'),
+      path.join(home, 'restrosuite-desktop'),
+      path.join(home, 'RestroSuiteDesktop'),
+    ].filter((p) => path.resolve(p) !== path.resolve(cur));
+
+    let moved = false;
+    for (const legacy of candidates) {
+      try {
+        if (!fs.existsSync(legacy)) continue;
+        const legState = path.join(legacy, 'content-state.json');
+        const legOverlay = path.join(legacy, 'web-overlay');
+        if (!fs.existsSync(legState) && !fs.existsSync(legOverlay)) continue;
+
+        if (!hasState && fs.existsSync(legState)) {
+          fs.mkdirSync(path.dirname(statePath()), { recursive: true });
+          fs.copyFileSync(legState, statePath());
+          moved = true;
+          console.log('[content-updater] migrated content-state from', legacy);
+        }
+        if (!hasOverlay && fs.existsSync(legOverlay)) {
+          copyDirRecursive(legOverlay, overlayDir());
+          moved = true;
+          console.log('[content-updater] migrated web-overlay from', legacy);
+        }
+        if (moved) break;
+      } catch (e) {
+        console.warn('[content-updater] legacy migrate skip', legacy, e && e.message);
+      }
+    }
+    return moved;
+  } catch (e) {
+    console.warn('[content-updater] migrateLegacyContent failed', e && e.message);
+    return false;
+  }
+}
+
+function copyDirRecursive(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const name of fs.readdirSync(src)) {
+    const s = path.join(src, name);
+    const d = path.join(dest, name);
+    const st = fs.statSync(s);
+    if (st.isDirectory()) copyDirRecursive(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
 function localContentVersion(webRoot) {
+  migrateLegacyContent();
   const st = readState();
   if (st && st.version) return String(st.version);
   // Overlay already applied (even if state file was corrupted / BOM-broken)
@@ -291,6 +354,7 @@ async function checkContentUpdate(opts) {
   _busy = true;
   _lastStatus = { status: 'checking' };
   try {
+    migrateLegacyContent();
     const origin = String(_getProductionOrigin() || 'https://restrosuite.codearc.co.in').replace(/\/+$/, '');
     const webRoot = options.webRoot || '';
     const localVer = localContentVersion(webRoot);
