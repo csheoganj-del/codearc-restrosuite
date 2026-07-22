@@ -295,7 +295,7 @@
       } else if (state === 'found') {
         live.innerHTML = '<i class="fa-solid fa-check" style="font-size:10px"></i> Locked';
       } else if (state === 'error') {
-        live.innerHTML = 'Paused';
+        live.innerHTML = 'Retry';
       } else {
         live.innerHTML = '<span></span><span></span><span></span> Ready';
       }
@@ -442,25 +442,54 @@
     }, 450);
   }
 
+  function isIOS() {
+    try {
+      var ua = navigator.userAgent || '';
+      return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isSecureCameraContext() {
+    try {
+      if (location.protocol === 'https:') return true;
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return true;
+    } catch (_) {}
+    return false;
+  }
+
   function ensureJsQr() {
     return new Promise(function (resolve) {
       if (global.jsQR) return resolve(true);
-      // Prefer local copy if present; else CDN
+      // Absolute-from-origin first (Safari caches / path quirks with relative)
+      var origin = '';
+      try {
+        origin = location.origin || '';
+      } catch (_) {}
       var sources = [
+        origin + '/assets/lib/jsQR.min.js',
         'assets/lib/jsQR.min.js',
+        '../assets/lib/jsQR.min.js',
         'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js',
         'https://unpkg.com/jsqr@1.4.0/dist/jsQR.min.js',
       ];
       var i = 0;
       function tryNext() {
-        if (i >= sources.length) return resolve(false);
+        if (i >= sources.length) {
+          console.warn('[StaffScan] jsQR failed to load from all sources');
+          return resolve(false);
+        }
+        var src = sources[i++];
         var s = document.createElement('script');
-        s.src = sources[i++];
+        s.src = src;
         s.async = true;
         s.onload = function () {
+          console.log('[StaffScan] jsQR loaded from', src);
           resolve(!!global.jsQR);
         };
         s.onerror = function () {
+          console.warn('[StaffScan] jsQR load fail', src);
           tryNext();
         };
         document.head.appendChild(s);
@@ -469,46 +498,97 @@
     });
   }
 
+  function waitForVideoReady(video, timeoutMs) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var t = setTimeout(function () {
+        if (done) return;
+        done = true;
+        resolve(video.videoWidth > 0 && video.videoHeight > 0);
+      }, timeoutMs || 4000);
+      function ok() {
+        if (done) return;
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          done = true;
+          clearTimeout(t);
+          resolve(true);
+        }
+      }
+      video.addEventListener('loadedmetadata', ok);
+      video.addEventListener('loadeddata', ok);
+      video.addEventListener('playing', ok);
+      // already ready?
+      ok();
+    });
+  }
+
   async function startCamera(root) {
     var video = root.querySelector('video');
     if (!video) return;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setScanUiState(root, 'error', 'Camera not available — type table number below');
+
+    // Safari only allows camera on HTTPS (Yono app is native — different rules)
+    if (!isSecureCameraContext()) {
+      setScanUiState(
+        root,
+        'error',
+        'Camera needs HTTPS. Open restrosuite.codearc.co.in (not http). Or type table #.'
+      );
       return;
     }
 
-    // Prefer high-res rear camera (distance scanning like UPI apps)
-    var attempts = [
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          advanced: [{ focusMode: 'continuous' }, { zoom: 1.0 }],
-        },
-      },
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      },
-      { audio: false, video: { facingMode: 'environment' } },
-      { audio: false, video: { facingMode: 'user' } },
-      { audio: false, video: true },
-    ];
+    var gum =
+      (navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+        ? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
+        : null) ||
+      navigator.webkitGetUserMedia ||
+      navigator.getUserMedia;
+
+    if (!gum && !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+      setScanUiState(root, 'error', 'Camera API missing — type table number below');
+      return;
+    }
+
+    var ios = isIOS();
+    // iPhone Safari: advanced constraints often FAIL the whole open (Yono is native so works).
+    // Use simplest constraints first on iOS.
+    var attempts = ios
+      ? [
+          { audio: false, video: { facingMode: 'environment' } },
+          { audio: false, video: true },
+          { audio: false, video: { facingMode: 'user' } },
+        ]
+      : [
+          {
+            audio: false,
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          },
+          { audio: false, video: { facingMode: 'environment' } },
+          { audio: false, video: { facingMode: 'user' } },
+          { audio: false, video: true },
+        ];
+
     var opened = false;
     var lastErr = null;
     for (var i = 0; i < attempts.length; i++) {
       try {
-        streamRef = await navigator.mediaDevices.getUserMedia(attempts[i]);
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          streamRef = await navigator.mediaDevices.getUserMedia(attempts[i]);
+        } else {
+          // Legacy callback API
+          streamRef = await new Promise(function (res, rej) {
+            gum.call(navigator, attempts[i], res, rej);
+          });
+        }
         opened = true;
+        console.log('[StaffScan] camera ok with constraints', attempts[i]);
         break;
       } catch (e) {
         lastErr = e;
+        console.warn('[StaffScan] camera try failed', attempts[i], e && (e.name || e.message));
       }
     }
     if (!opened) {
@@ -516,70 +596,122 @@
       var msg = 'Camera blocked — allow camera, then try again. Or type table # below.';
       if (lastErr && /NotAllowed|Permission/i.test(String(lastErr.name || lastErr.message || ''))) {
         msg =
-          'Camera permission denied. Allow Camera for this site, then reopen Scan. Or type table #.';
+          'Camera permission denied. Settings → Safari → Camera → Allow, then reopen Scan.';
       } else if (lastErr && /NotFound|DevicesNotFound/i.test(String(lastErr.name || ''))) {
         msg = 'No camera found. Type table number below.';
+      } else if (lastErr && /NotReadable|TrackStart|Abort/i.test(String(lastErr.name || ''))) {
+        msg = 'Camera busy (close other apps using camera), then try again.';
       }
       setScanUiState(root, 'error', msg);
       return;
     }
 
-    // Optional hardware zoom when supported (Android Chrome)
-    try {
-      var track = streamRef.getVideoTracks()[0];
-      var caps = track.getCapabilities && track.getCapabilities();
-      if (caps && caps.zoom) {
-        root._camTrack = track;
-        root._zoomCaps = caps.zoom;
-        // Start slightly zoomed if device allows (helps mid-distance QRs)
-        var z0 = Math.min(caps.zoom.max || 1, Math.max(caps.zoom.min || 1, 1.2));
-        if (caps.zoom.min != null && z0 >= caps.zoom.min) {
-          await track.applyConstraints({ advanced: [{ zoom: z0 }] });
+    // Optional hardware zoom — never required; skip soft-fail on iOS
+    if (!ios) {
+      try {
+        var track = streamRef.getVideoTracks()[0];
+        var caps = track.getCapabilities && track.getCapabilities();
+        if (caps && caps.zoom) {
+          root._camTrack = track;
+          root._zoomCaps = caps.zoom;
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     try {
       video.setAttribute('playsinline', 'true');
       video.setAttribute('webkit-playsinline', 'true');
       video.setAttribute('autoplay', 'true');
+      video.setAttribute('muted', 'true');
+      video.playsInline = true;
       video.muted = true;
-      video.srcObject = streamRef;
-      await video.play();
-      setScanUiState(root, 'scanning', 'Point at table QR — works from a distance');
+      video.autoplay = true;
+      // iOS: assign srcObject then play after metadata
+      if ('srcObject' in video) {
+        video.srcObject = streamRef;
+      } else {
+        video.src = URL.createObjectURL(streamRef);
+      }
+      var ready = await waitForVideoReady(video, 5000);
+      try {
+        await video.play();
+      } catch (playErr) {
+        // iOS sometimes needs a second play after metadata
+        console.warn('[StaffScan] play retry', playErr);
+        await new Promise(function (r) {
+          setTimeout(r, 200);
+        });
+        await video.play();
+      }
+      if (!ready) {
+        // Still try — some iOS builds report 0 size briefly
+        await new Promise(function (r) {
+          setTimeout(r, 300);
+        });
+      }
+      setScanUiState(
+        root,
+        'scanning',
+        ios
+          ? 'Scanning… fill green box with QR (Safari)'
+          : 'Point at table QR — works from a distance'
+      );
     } catch (e) {
       console.warn('[StaffScan] video play', e);
-      setScanUiState(root, 'error', 'Camera opened but preview failed — type table # below');
+      setScanUiState(root, 'error', 'Camera preview failed — type table # below');
       return;
     }
 
+    // Load decoder BEFORE loop (critical on Safari)
     var hasJsQr = await ensureJsQr();
-
-    var detector = null;
-    try {
-      if (global.BarcodeDetector) {
-        detector = new BarcodeDetector({ formats: ['qr_code'] });
-      }
-    } catch (_) {
-      detector = null;
-    }
-
-    if (!detector && !hasJsQr) {
+    if (!hasJsQr) {
       setScanUiState(
         root,
         'error',
-        'Scanner library missing. Type table # or paste QR link below.'
+        'QR decoder failed to load. Type table # (e.g. 5) and tap Go.'
       );
+      // Keep camera on for preview; manual still works
+    } else {
+      setScanUiState(root, 'scanning', 'Scanning… hold QR in the green box');
+    }
+
+    // BarcodeDetector is NOT on iPhone Safari — don't rely on it
+    var detector = null;
+    if (!ios) {
+      try {
+        if (global.BarcodeDetector) {
+          detector = new BarcodeDetector({ formats: ['qr_code'] });
+        }
+      } catch (_) {
+        detector = null;
+      }
     }
 
     var canvas = root.querySelector('canvas');
-    var ctx =
-      canvas && canvas.getContext
-        ? canvas.getContext('2d', { willReadFrequently: true })
-        : null;
+    // iOS Safari: display:none canvas can break drawImage — keep off-screen instead
+    if (canvas) {
+      canvas.style.cssText =
+        'position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+      canvas.removeAttribute('hidden');
+    }
+    var ctx = null;
+    if (canvas && canvas.getContext) {
+      try {
+        ctx = canvas.getContext('2d', { willReadFrequently: true });
+      } catch (_) {
+        ctx = null;
+      }
+      if (!ctx) {
+        try {
+          ctx = canvas.getContext('2d');
+        } catch (_) {
+          ctx = null;
+        }
+      }
+    }
 
-    // Progressive digital zoom levels (center crop) — Yono/UPI style distance read
-    var zoomLevels = [1, 1.35, 1.75, 2.25, 2.8];
+    // Fewer zoom steps on old iPhones (CPU) — still far + mid + close
+    var zoomLevels = ios ? [1, 1.5, 2.2] : [1, 1.35, 1.75, 2.25, 2.8];
     var zoomIdx = 0;
     var missStreak = 0;
 
@@ -595,14 +727,16 @@
       }
     }
 
-    /**
-     * Multi-scale + center-crop decode (far-distance friendly).
-     * @param {number} digZoom 1 = full frame, >1 = crop center (digital zoom)
-     */
     function decodeWithJsQrMulti(digZoom) {
-      if (!ctx || !global.jsQR || video.readyState < 2) return null;
+      if (!ctx || !global.jsQR) return null;
+      if (video.readyState < 2) return null;
       var w = video.videoWidth || 0;
       var h = video.videoHeight || 0;
+      // iOS: sometimes readyState is 4 but dimensions still 0 briefly
+      if (w < 16 || h < 16) {
+        w = video.clientWidth || 0;
+        h = video.clientHeight || 0;
+      }
       if (w < 32 || h < 32) return null;
 
       var z = Math.max(1, digZoom || 1);
@@ -611,125 +745,152 @@
       var sx = Math.floor((w - cropW) / 2);
       var sy = Math.floor((h - cropH) / 2);
 
-      // Target analysis width (balance speed vs detail)
-      var targets = z > 1.5 ? [640, 480] : [720, 540, 400];
+      // iPhone 6s: one target size is faster and more reliable than 3
+      var targets = ios ? [480] : z > 1.5 ? [640, 480] : [640, 480, 360];
       for (var ti = 0; ti < targets.length; ti++) {
         var maxW = targets[ti];
         var scale = cropW > maxW ? maxW / cropW : 1;
         var cw = Math.max(32, Math.floor(cropW * scale));
         var ch = Math.max(32, Math.floor(cropH * scale));
-        canvas.width = cw;
-        canvas.height = ch;
-        ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
-        var img = ctx.getImageData(0, 0, cw, ch);
-        var hit = runJsQrOnImageData(img);
-        if (hit) return hit;
+        try {
+          canvas.width = cw;
+          canvas.height = ch;
+          ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
+          var img = ctx.getImageData(0, 0, cw, ch);
+          var hit = runJsQrOnImageData(img);
+          if (hit) return hit;
+        } catch (drawErr) {
+          console.warn('[StaffScan] draw/decode', drawErr);
+        }
       }
       return null;
-    }
-
-    async function tryHardwareZoomStep() {
-      if (!root._camTrack || !root._zoomCaps) return false;
-      try {
-        var caps = root._zoomCaps;
-        var cur = (root._camTrack.getSettings && root._camTrack.getSettings().zoom) || 1;
-        var step = caps.step || 0.5;
-        var next = Math.min(caps.max || cur, cur + Math.max(step, 0.4));
-        if (next <= cur + 0.05) return false;
-        await root._camTrack.applyConstraints({ advanced: [{ zoom: next }] });
-        return true;
-      } catch (_) {
-        return false;
-      }
     }
 
     async function tick() {
       if (!document.getElementById(ROOT_ID)) return;
       if (root._parsed) {
-        loopTimer = setTimeout(tick, 400);
+        loopTimer = setTimeout(tick, 500);
         return;
       }
       frameN++;
       try {
         var decoded = null;
-        var bbox = null;
 
-        // 1) Native BarcodeDetector (may also give bounding box for digital zoom)
-        if (detector && video.readyState >= 2) {
+        // Skip BarcodeDetector on iOS — not available / not needed
+        if (detector && !ios && video.readyState >= 2) {
           try {
             var codes = await detector.detect(video);
-            if (codes && codes[0]) {
-              if (codes[0].rawValue) decoded = codes[0].rawValue;
-              if (codes[0].boundingBox) bbox = codes[0].boundingBox;
-            }
+            if (codes && codes[0] && codes[0].rawValue) decoded = codes[0].rawValue;
           } catch (_) {}
         }
 
-        // 2) jsQR multi-scale at current digital zoom
+        // Primary path: jsQR (works on Safari iOS when camera + canvas work)
         if (!decoded && global.jsQR) {
           decoded = decodeWithJsQrMulti(zoomLevels[zoomIdx] || 1);
         }
 
-        // 3) If still nothing, cycle digital zoom (far → closer crop)
-        if (!decoded && global.jsQR && frameN % 3 === 0) {
+        // Cycle digital zoom if missing
+        if (!decoded && global.jsQR && frameN % 2 === 0) {
           missStreak++;
           if (missStreak >= 2) {
             zoomIdx = (zoomIdx + 1) % zoomLevels.length;
             missStreak = 0;
             var z = zoomLevels[zoomIdx];
             if (z > 1.2) {
-              setScanUiState(
-                root,
-                'zooming',
-                'Auto-zoom ' + z.toFixed(1) + '× — hold steady…'
-              );
-              // Hardware zoom every few digital steps when available
-              if (zoomIdx % 2 === 0) await tryHardwareZoomStep();
-            } else {
-              setScanUiState(root, 'scanning', 'Scanning far & near…');
+              setScanUiState(root, 'zooming', 'Auto-zoom ' + z.toFixed(1) + '× — hold steady');
             }
             decoded = decodeWithJsQrMulti(z);
           }
-        }
-
-        // 4) If detector gave a bbox without value, crop that region hard
-        if (!decoded && bbox && ctx && global.jsQR && video.readyState >= 2) {
-          try {
-            var vw = video.videoWidth || 1;
-            var vh = video.videoHeight || 1;
-            var bx = Math.max(0, Math.floor(bbox.x - bbox.width * 0.15));
-            var by = Math.max(0, Math.floor(bbox.y - bbox.height * 0.15));
-            var bw = Math.min(vw - bx, Math.floor(bbox.width * 1.3));
-            var bh = Math.min(vh - by, Math.floor(bbox.height * 1.3));
-            if (bw > 24 && bh > 24) {
-              var tw = Math.min(480, bw * 2);
-              var th = Math.min(480, bh * 2);
-              canvas.width = tw;
-              canvas.height = th;
-              ctx.drawImage(video, bx, by, bw, bh, 0, 0, tw, th);
-              decoded = runJsQrOnImageData(ctx.getImageData(0, 0, tw, th));
-            }
-          } catch (_) {}
         }
 
         if (decoded) {
           zoomIdx = 0;
           missStreak = 0;
           await handleDecoded(root, decoded);
-        } else if (frameN % 15 === 0) {
-          var zLabel = zoomLevels[zoomIdx] > 1.05 ? ' · zoom ' + zoomLevels[zoomIdx].toFixed(1) + '×' : '';
+        } else if (frameN % 12 === 0) {
+          var zLabel =
+            zoomLevels[zoomIdx] > 1.05 ? ' · zoom ' + zoomLevels[zoomIdx].toFixed(1) + '×' : '';
+          var dim =
+            video.videoWidth > 0
+              ? ''
+              : ' · waiting for camera frame…';
           setScanUiState(
             root,
             zoomLevels[zoomIdx] > 1.2 ? 'zooming' : 'scanning',
-            'Scanning' + zLabel + ' — no need to get close'
+            (global.jsQR ? 'Scanning' : 'No decoder') + zLabel + dim
           );
         }
       } catch (e) {
-        /* ignore frame errors */
+        if (frameN % 30 === 0) console.warn('[StaffScan] tick', e);
       }
-      loopTimer = setTimeout(tick, 220);
+      // iOS: slightly slower loop keeps UI smooth on 6s-class CPUs
+      loopTimer = setTimeout(tick, ios ? 320 : 220);
     }
     tick();
+  }
+
+  /**
+   * Decode QR from a still photo (iOS Safari-reliable).
+   * Native UPI apps use the system camera kit; Safari's best equivalent is
+   * capture=environment → full photo → jsQR (live stream is flaky on old iOS).
+   */
+  function decodeQrFromFile(file) {
+    return new Promise(function (resolve) {
+      if (!file) return resolve(null);
+      ensureJsQr().then(function (ok) {
+        if (!ok || !global.jsQR) return resolve(null);
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var maxSide = 1400;
+            var iw = img.naturalWidth || img.width;
+            var ih = img.naturalHeight || img.height;
+            var scale = Math.min(1, maxSide / Math.max(iw, ih));
+            var cw = Math.max(32, Math.floor(iw * scale));
+            var ch = Math.max(32, Math.floor(ih * scale));
+            var c = document.createElement('canvas');
+            c.width = cw;
+            c.height = ch;
+            var cx = c.getContext('2d');
+            cx.drawImage(img, 0, 0, cw, ch);
+            // Try full image + center crops (photo may have QR small in frame)
+            var crops = [
+              [0, 0, cw, ch],
+              [cw * 0.15, ch * 0.15, cw * 0.7, ch * 0.7],
+              [cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5],
+            ];
+            for (var i = 0; i < crops.length; i++) {
+              var cr = crops[i];
+              var c2 = document.createElement('canvas');
+              var tw = Math.max(32, Math.floor(cr[2]));
+              var th = Math.max(32, Math.floor(cr[3]));
+              c2.width = Math.min(800, tw);
+              c2.height = Math.min(800, th);
+              var cx2 = c2.getContext('2d');
+              cx2.drawImage(c, cr[0], cr[1], cr[2], cr[3], 0, 0, c2.width, c2.height);
+              var data = cx2.getImageData(0, 0, c2.width, c2.height);
+              var code = global.jsQR(data.data, data.width, data.height, {
+                inversionAttempts: 'attemptBoth',
+              });
+              if (code && code.data) {
+                URL.revokeObjectURL(url);
+                return resolve(code.data);
+              }
+            }
+          } catch (e) {
+            console.warn('[StaffScan] photo decode', e);
+          }
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
+        img.src = url;
+      });
+    });
   }
 
   function openScanner(opts) {
@@ -740,6 +901,7 @@
     lastHitAt = 0;
     frameN = 0;
 
+    var ios = isIOS();
     var root = document.createElement('div');
     root.id = ROOT_ID;
     root.setAttribute('role', 'dialog');
@@ -749,22 +911,38 @@
       '<div class="rs-scan-card">' +
       '<div class="rs-scan-head"><h3><i class="fa-solid fa-qrcode"></i> Staff table scan</h3>' +
       '<button type="button" class="rs-scan-x" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>' +
-      '<p class="rs-scan-sub">Like UPI apps: hold phone up — it <b>auto-zooms</b> and <b>locks</b> the table QR from a distance. ' +
-      'Same printed code guests use; staff scan opens POS.</p>' +
-      '<div class="rs-scan-vid-wrap">' +
-      '<video playsinline muted autoplay></video>' +
-      '<canvas style="display:none" aria-hidden="true"></canvas>' +
+      '<p class="rs-scan-sub">' +
+      (ios
+        ? '<b>iPhone tip:</b> use <b>Snap QR photo</b> (most reliable on Safari). Live view may also work. Same QR guests scan with their Camera app.'
+        : 'Hold the printed table QR in the green box — auto-zoom + auto lock. Same QR guests use.') +
+      '</p>' +
+      // Photo capture — primary reliable path on iOS Safari
+      '<div style="padding:0 16px 10px;display:flex;flex-direction:column;gap:8px">' +
+      '<label class="btn btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;width:100%;box-sizing:border-box;padding:12px 14px;font-weight:800">' +
+      '<i class="fa-solid fa-camera"></i> Snap QR photo (recommended)' +
+      '<input type="file" accept="image/*" capture="environment" data-snap style="display:none">' +
+      '</label>' +
+      '<button type="button" class="btn btn-ghost" data-live-cam style="width:100%;justify-content:center">' +
+      '<i class="fa-solid fa-video"></i> ' +
+      (ios ? 'Try live camera scan' : 'Start live camera') +
+      '</button>' +
+      '</div>' +
+      '<div class="rs-scan-vid-wrap" data-vid-box style="display:none">' +
+      '<video playsinline webkit-playsinline muted autoplay></video>' +
+      '<canvas aria-hidden="true"></canvas>' +
       '<div class="rs-scan-mask" aria-hidden="true"></div>' +
       '<div class="rs-scan-frame" aria-hidden="true"><i></i></div>' +
       '<div class="rs-scan-laser" aria-hidden="true"></div>' +
       '</div>' +
       '<div class="rs-scan-status" data-status>' +
-      '<span class="rs-scan-live" data-live><span></span><span></span><span></span> Starting</span>' +
-      '<span data-status-text>Starting camera…</span>' +
+      '<span class="rs-scan-live" data-live><span></span><span></span><span></span> Ready</span>' +
+      '<span data-status-text>' +
+      (ios ? 'Tap “Snap QR photo” to open camera' : 'Starting…') +
+      '</span>' +
       '</div>' +
       '<div class="rs-scan-hit" data-hit></div>' +
       '<div class="rs-scan-manual">' +
-      '<input type="text" data-manual inputmode="text" autocomplete="off" placeholder="Or type table # / paste QR link">' +
+      '<input type="text" data-manual inputmode="numeric" autocomplete="off" placeholder="Or type table # (e.g. 5)">' +
       '<button type="button" class="btn btn-ghost" data-manual-go>Go</button></div>' +
       '<div class="rs-scan-actions">' +
       '<button type="button" class="btn btn-primary" data-act="pos"><i class="fa-solid fa-utensils"></i> Open POS</button>' +
@@ -772,17 +950,58 @@
       '<button type="button" class="btn btn-ghost" data-act="kot"><i class="fa-solid fa-fire-burner"></i> Waiter KOT</button>' +
       '<button type="button" class="btn btn-ghost" data-act="hub"><i class="fa-solid fa-eye"></i> Guest preview</button>' +
       '</div>' +
-      '<p class="rs-scan-foot">Green line = actively scanning. Blue “Auto-zoom” = hunting from far. ' +
-      'Fallback: type table number (e.g. 5) → Go → Open POS.</p>' +
+      '<p class="rs-scan-foot">Yono uses a native camera. On Safari, <b>Snap QR photo</b> is the reliable path. ' +
+      'Always works: type table number → Go → Open POS.</p>' +
       '</div>';
 
     document.body.appendChild(root);
-    setScanUiState(root, 'scanning', 'Starting camera…');
+    setScanUiState(root, 'idle', ios ? 'Tap “Snap QR photo” (best on iPhone)' : 'Ready');
 
     root.querySelector('[data-close]').onclick = closeScanner;
     root.addEventListener('click', function (e) {
       if (e.target === root) closeScanner();
     });
+
+    // --- Photo capture (iOS-reliable) ---
+    var snapInput = root.querySelector('[data-snap]');
+    if (snapInput) {
+      snapInput.addEventListener('change', async function () {
+        var file = snapInput.files && snapInput.files[0];
+        if (!file) return;
+        setScanUiState(root, 'scanning', 'Reading photo…');
+        var text = await decodeQrFromFile(file);
+        snapInput.value = '';
+        if (!text) {
+          setScanUiState(
+            root,
+            'error',
+            'No QR found in photo. Fill the frame with the code and retake, or type table #.'
+          );
+          toast('No QR in photo — retake closer or type table #', 'fa-circle-exclamation');
+          return;
+        }
+        await handleDecoded(root, text);
+      });
+    }
+
+    // --- Live camera (optional / secondary on iOS) ---
+    var liveBtn = root.querySelector('[data-live-cam]');
+    var vidBox = root.querySelector('[data-vid-box]');
+    if (liveBtn) {
+      liveBtn.onclick = function () {
+        if (vidBox) vidBox.style.display = '';
+        liveBtn.style.display = 'none';
+        setScanUiState(root, 'scanning', 'Starting live camera…');
+        startCamera(root);
+      };
+    }
+
+    // Desktop / non-iOS: auto-start live camera
+    if (!ios) {
+      if (vidBox) vidBox.style.display = '';
+      if (liveBtn) liveBtn.style.display = 'none';
+      startCamera(root);
+    }
 
     function requireParsed() {
       if (root._parsed) return root._parsed;
@@ -790,15 +1009,23 @@
       var p = parseTableQrPayload(manual);
       if (p) {
         showHit(root, p);
+        setScanUiState(root, 'found', 'Table ' + p.table + ' ready');
         return p;
       }
       toast('Scan a table QR or enter table number', 'fa-circle-exclamation');
       return null;
     }
 
-    root.querySelector('[data-manual-go]').onclick = function () {
+    root.querySelector('[data-manual-go]').onclick = async function () {
       var p = requireParsed();
-      if (p) toast('Table ' + p.table + ' ready — pick an action (or wait for auto POS)', 'fa-qrcode');
+      if (!p) return;
+      // On manual entry, open POS immediately (staff already typed the number)
+      if (autoActTimer) {
+        clearTimeout(autoActTimer);
+        autoActTimer = null;
+      }
+      closeScanner();
+      await openTableInPosFromScan(p, { seat: false });
     };
     root.querySelector('[data-manual]').addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
@@ -851,7 +1078,6 @@
       window.open(url, '_blank', 'noopener');
     };
 
-    startCamera(root);
     if (typeof opts.onOpen === 'function') opts.onOpen();
   }
 

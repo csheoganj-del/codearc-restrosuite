@@ -371,26 +371,52 @@
       return;
     }
 
+    // Prefer dedicated staff-table-scanner (iOS Snap-photo + auto-zoom + laser).
+    // product-10x used to ship its own broken live-only scanner (screenshot UI).
+    if (global.RSStaffTableScanner && typeof RSStaffTableScanner.open === 'function') {
+      try {
+        RSStaffTableScanner.open();
+        return;
+      } catch (e) {
+        console.warn('[rs10] RSStaffTableScanner.open failed', e);
+      }
+    }
+    if (typeof global.openStaffTableScanner === 'function') {
+      try {
+        global.openStaffTableScanner();
+        return;
+      } catch (_) {}
+    }
+
+    // Fallback modal if staff-table-scanner.js not loaded
     if (!global.RSModal) {
-      const url = window.prompt('Paste table QR link or table number');
+      const url = window.prompt('Table number or paste QR link');
       if (url) handleScannedTablePayload(url);
       return;
     }
 
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent || '');
     RSModal.open({
-      title: t('scan_table'),
-      sub: 'Point camera at table QR · same session as guest',
+      title: t('scan_table') || 'Scan table QR',
+      sub: isiOS
+        ? 'iPhone: use Snap QR photo (reliable). Or type table number.'
+        : 'Point camera at table QR · or type table number',
       icon: 'fa-qrcode',
       size: 'sm',
       body: `<div class="rs10-scan">
-        <div id="rs10-scan-video-wrap" class="rs10-scan-video-wrap">
-          <video id="rs10-scan-video" playsinline muted></video>
-          <canvas id="rs10-scan-canvas" hidden></canvas>
+        <label class="btn btn-primary" style="display:flex;width:100%;justify-content:center;gap:8px;margin-bottom:10px;cursor:pointer;box-sizing:border-box">
+          <i class="fa-solid fa-camera"></i> Snap QR photo
+          <input type="file" accept="image/*" capture="environment" id="rs10-scan-snap" style="display:none">
+        </label>
+        <div id="rs10-scan-video-wrap" class="rs10-scan-video-wrap" style="${isiOS ? 'display:none' : ''}">
+          <video id="rs10-scan-video" playsinline webkit-playsinline muted autoplay></video>
+          <canvas id="rs10-scan-canvas" style="position:absolute;left:-9999px;width:1px;height:1px"></canvas>
           <div class="rs10-scan-frame"></div>
         </div>
+        ${isiOS ? '<button type="button" class="btn btn-ghost btn-sm" id="rs10-scan-live" style="width:100%;margin-bottom:8px">Try live camera</button>' : ''}
         <p class="rs10-scan-hint">Or enter table number</p>
         <div class="rs10-scan-manual">
-          <input type="text" id="rs10-scan-table" class="form-input" placeholder="Table 12" inputmode="text">
+          <input type="text" id="rs10-scan-table" class="form-input" placeholder="e.g. 1 or 5" inputmode="numeric">
           <button type="button" class="btn btn-primary" id="rs10-scan-go">Open</button>
         </div>
         <p id="rs10-scan-status" class="rs10-scan-status"></p>
@@ -401,7 +427,10 @@
         let timer = null;
         const status = m.querySelector('#rs10-scan-status');
         const stop = () => {
-          if (timer) clearInterval(timer);
+          if (timer) {
+            clearInterval(timer);
+            timer = null;
+          }
           if (stream) stream.getTracks().forEach((tr) => tr.stop());
           stream = null;
         };
@@ -417,85 +446,169 @@
           handleScannedTablePayload(v);
         };
 
-        const video = m.querySelector('#rs10-scan-video');
-        const canvas = m.querySelector('#rs10-scan-canvas');
-        const startCam = async () => {
-          try {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-              if (status) status.textContent = 'Camera not available — type table number';
+        // Photo path (iOS-reliable)
+        const snap = m.querySelector('#rs10-scan-snap');
+        if (snap) {
+          snap.onchange = async () => {
+            const file = snap.files && snap.files[0];
+            if (!file) return;
+            if (status) status.textContent = 'Reading photo…';
+            const ensureJs = () =>
+              new Promise((resolve) => {
+                if (global.jsQR) return resolve(true);
+                const s = document.createElement('script');
+                s.src = 'assets/lib/jsQR.min.js';
+                s.onload = () => resolve(!!global.jsQR);
+                s.onerror = () => {
+                  const s2 = document.createElement('script');
+                  s2.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                  s2.onload = () => resolve(!!global.jsQR);
+                  s2.onerror = () => resolve(false);
+                  document.head.appendChild(s2);
+                };
+                document.head.appendChild(s);
+              });
+            const ok = await ensureJs();
+            if (!ok) {
+              if (status) status.textContent = 'Decoder missing — type table number';
               return;
             }
-            const tries = [
-              { video: { facingMode: { ideal: 'environment' } }, audio: false },
-              { video: { facingMode: 'user' }, audio: false },
-              { video: true, audio: false },
-            ];
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+              try {
+                const max = 1200;
+                const scale = Math.min(1, max / Math.max(img.width, img.height));
+                const c = document.createElement('canvas');
+                c.width = Math.max(32, Math.floor(img.width * scale));
+                c.height = Math.max(32, Math.floor(img.height * scale));
+                const cx = c.getContext('2d');
+                cx.drawImage(img, 0, 0, c.width, c.height);
+                const data = cx.getImageData(0, 0, c.width, c.height);
+                const code = global.jsQR(data.data, data.width, data.height, {
+                  inversionAttempts: 'attemptBoth',
+                });
+                URL.revokeObjectURL(url);
+                if (code && code.data) {
+                  stop();
+                  close();
+                  handleScannedTablePayload(code.data);
+                } else if (status) {
+                  status.textContent = 'No QR in photo — retake or type table #';
+                }
+              } catch (e) {
+                if (status) status.textContent = 'Could not read photo';
+              }
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(url);
+              if (status) status.textContent = 'Could not open photo';
+            };
+            img.src = url;
+            snap.value = '';
+          };
+        }
+
+        const video = m.querySelector('#rs10-scan-video');
+        const canvas = m.querySelector('#rs10-scan-canvas');
+        const wrap = m.querySelector('#rs10-scan-video-wrap');
+        const startCam = async () => {
+          if (wrap) wrap.style.display = '';
+          try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+              if (status) status.textContent = 'Camera not available — use Snap photo or type #';
+              return;
+            }
+            const tries = isiOS
+              ? [
+                  { video: { facingMode: 'environment' }, audio: false },
+                  { video: true, audio: false },
+                ]
+              : [
+                  { video: { facingMode: 'environment' }, audio: false },
+                  { video: { facingMode: 'user' }, audio: false },
+                  { video: true, audio: false },
+                ];
             let errLast = null;
             for (const c of tries) {
-              try { stream = await navigator.mediaDevices.getUserMedia(c); errLast = null; break; }
-              catch (e) { errLast = e; }
+              try {
+                stream = await navigator.mediaDevices.getUserMedia(c);
+                errLast = null;
+                break;
+              } catch (e) {
+                errLast = e;
+              }
             }
             if (!stream) {
-              if (status) status.textContent = 'Camera permission denied — enter table manually';
+              if (status) status.textContent = 'Camera denied — use Snap photo or type table #';
               console.warn('[rs10 scan]', errLast);
               return;
             }
             video.setAttribute('playsinline', 'true');
+            video.setAttribute('webkit-playsinline', 'true');
             video.muted = true;
             video.srcObject = stream;
             await video.play();
-            if (status) status.textContent = 'Scanning…';
+            if (status) status.textContent = 'Scanning… hold QR in the box';
 
-            // BarcodeDetector when available; else load jsQR
-            if (global.BarcodeDetector) {
-              const det = new BarcodeDetector({ formats: ['qr_code'] });
-              timer = setInterval(async () => {
+            const runJsQr = () => {
+              if (!global.jsQR || !canvas) {
+                if (status) status.textContent = 'Enter table # or use Snap photo';
+                return;
+              }
+              let ctx = null;
+              try {
+                ctx = canvas.getContext('2d', { willReadFrequently: true });
+              } catch (_) {
+                ctx = canvas.getContext('2d');
+              }
+              timer = setInterval(() => {
                 try {
-                  const codes = await det.detect(video);
-                  if (codes && codes[0] && codes[0].rawValue) {
+                  if (video.readyState < 2 || !video.videoWidth) return;
+                  const maxW = 480;
+                  const scale = video.videoWidth > maxW ? maxW / video.videoWidth : 1;
+                  canvas.width = Math.floor(video.videoWidth * scale);
+                  canvas.height = Math.floor(video.videoHeight * scale);
+                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  const code = global.jsQR(img.data, img.width, img.height, {
+                    inversionAttempts: 'attemptBoth',
+                  });
+                  if (code && code.data) {
                     stop();
                     close();
-                    handleScannedTablePayload(codes[0].rawValue);
+                    handleScannedTablePayload(code.data);
                   }
                 } catch (_) {}
-              }, 500);
-            } else {
-              const runJsQr = () => {
-                if (!global.jsQR || !canvas) {
-                  if (status) status.textContent = 'Enter table number below (scanner lib unavailable)';
-                  return;
-                }
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                timer = setInterval(() => {
-                  try {
-                    if (video.readyState < 2) return;
-                    canvas.width = video.videoWidth || 640;
-                    canvas.height = video.videoHeight || 480;
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = global.jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-                    if (code && code.data) {
-                      stop();
-                      close();
-                      handleScannedTablePayload(code.data);
-                    }
-                  } catch (_) {}
-                }, 400);
+              }, 350);
+            };
+
+            // Prefer jsQR always (BarcodeDetector missing on Safari)
+            if (global.jsQR) runJsQr();
+            else {
+              const s = document.createElement('script');
+              s.src = 'assets/lib/jsQR.min.js';
+              s.onload = runJsQr;
+              s.onerror = () => {
+                const s2 = document.createElement('script');
+                s2.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+                s2.onload = runJsQr;
+                s2.onerror = () => {
+                  if (status) status.textContent = 'Enter table # or Snap photo';
+                };
+                document.head.appendChild(s2);
               };
-              if (global.jsQR) runJsQr();
-              else {
-                const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-                s.onload = runJsQr;
-                s.onerror = () => { if (status) status.textContent = 'Enter table number below'; };
-                document.head.appendChild(s);
-              }
+              document.head.appendChild(s);
             }
           } catch (err) {
-            if (status) status.textContent = 'Camera permission denied — enter table manually';
+            if (status) status.textContent = 'Camera failed — use Snap photo or type table #';
           }
         };
-        startCam();
+
+        const liveBtn = m.querySelector('#rs10-scan-live');
+        if (liveBtn) liveBtn.onclick = () => startCam();
+        if (!isiOS) startCam();
+        else if (status) status.textContent = 'Tap Snap QR photo (best on iPhone)';
       },
     });
   }
@@ -504,24 +617,52 @@
   function handleScannedTablePayload(raw) {
     const text = String(raw || '').trim();
     if (!text) return;
+
+    // Prefer full floor/POS open from staff-table-scanner parse when available
+    if (global.RSStaffTableScanner && typeof RSStaffTableScanner.parse === 'function') {
+      const parsed = RSStaffTableScanner.parse(text);
+      if (parsed && global.RS && typeof RS.openTableInPos === 'function') {
+        const t =
+          (RS.TABLES || []).find(
+            (x) =>
+              String(RSStaffTableScanner.normTableKey(x.n || x.name)) ===
+              String(parsed.tableKey)
+          ) || { n: parsed.table, name: parsed.table, cap: 4, state: 'free' };
+        RS.openTableInPos(t, {
+          seat: false,
+          loadOrder: true,
+          openQrSession: true,
+          toast: 'Table ' + (t.n || parsed.table) + ' opened from scan',
+          icon: 'fa-qrcode',
+        });
+        return;
+      }
+    }
+
     let table = text;
-    let url = null;
     try {
-      if (/^https?:\/\//i.test(text) || text.includes('qr-order') || text.includes('table=')) {
-        url = new URL(text, location.origin);
+      if (/^https?:\/\//i.test(text) || text.includes('qr-order') || text.includes('table=') || text.includes('order.html')) {
+        const url = new URL(text, location.origin);
         table =
           url.searchParams.get('table') ||
+          url.searchParams.get('table_number') ||
+          url.searchParams.get('tbl') ||
           url.searchParams.get('t') ||
           url.searchParams.get('tableNumber') ||
           table;
+        // Don't treat slug as table when t= is a non-numeric slug
+        if (table && !/^\d/.test(table) && url.searchParams.get('tenant')) {
+          table =
+            url.searchParams.get('table') ||
+            url.searchParams.get('tbl') ||
+            table;
+        }
       }
     } catch (_) {}
 
-    // Normalize "Table 12" / "12"
-    const m = String(table).match(/(\d{1,3})/);
-    const tableLabel = m ? 'Table ' + m[1] : table;
+    const m = String(table).match(/(\d{1,4})/);
+    const tableLabel = m ? 'Table ' + parseInt(m[1], 10) : table;
 
-    // Set POS table + covers prompt + activate POS
     try {
       if (global.RS && RS.activateTab) RS.activateTab('pos-tab');
     } catch (_) {}
@@ -530,7 +671,11 @@
     if (sel) {
       let found = false;
       Array.from(sel.options).forEach((o) => {
-        if (o.value === tableLabel || o.textContent === tableLabel || o.value.includes(m && m[1])) {
+        if (
+          o.value === tableLabel ||
+          o.textContent.trim() === tableLabel ||
+          (m && (o.value === m[1] || o.value.includes(m[1])))
+        ) {
           sel.value = o.value;
           found = true;
         }
@@ -545,19 +690,6 @@
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // Guest count
-    const covers = document.getElementById('cart-covers');
-    if (covers && !Number(covers.value)) {
-      setTimeout(async () => {
-        const n = window.prompt(t('guests') + ' (covers)', '2');
-        if (n != null && covers) {
-          covers.value = String(Math.max(0, Math.min(99, Number(n) || 0)));
-          covers.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }, 200);
-    }
-
-    // Switch order type to dine-in if buttons exist
     document.querySelectorAll('.order-type-btn').forEach((b) => {
       if (/dine/i.test(b.getAttribute('aria-label') || b.title || b.textContent || '')) {
         b.click();
