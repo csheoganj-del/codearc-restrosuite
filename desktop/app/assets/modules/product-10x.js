@@ -1594,27 +1594,53 @@
     const bar = document.getElementById('pos-m-cart-bar');
     if (!bar || bar.dataset.rs10 === '1') return;
     bar.dataset.rs10 = '1';
-    bar.addEventListener('click', () => {
-      document.body.classList.add('rs10-cart-open');
+    bar.addEventListener('click', (e) => {
+      // Prefer canonical POS mobile cart open (locks body scroll, flex sheet)
+      if (global.RSPosUI && typeof RSPosUI.openMobilePOSCart === 'function') {
+        RSPosUI.openMobilePOSCart(e);
+        return;
+      }
+      if (global.RS && typeof RS.openMobilePOSCart === 'function') {
+        RS.openMobilePOSCart(e);
+        return;
+      }
+      document.body.classList.add('rs10-cart-open', 'pos-mobile-cart-open');
       const cart =
-        document.querySelector('.pos-cart-side, .pos-cart-sidebar, .pos-cart, #cart-panel') ||
-        document.querySelector('#pos-tab .cart-panel');
+        document.querySelector('#pos-tab .pos-cart') ||
+        document.querySelector('.pos-cart-side, .pos-cart-sidebar, .pos-cart, #cart-panel');
       if (cart) {
         cart.classList.add('active', 'rs10-cart-sheet');
-        cart.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        const items = cart.querySelector('#cart-items, .cart-items');
+        if (items) items.scrollTop = 0;
       }
     });
-    // Close on backdrop
-    document.addEventListener('click', (e) => {
-      if (!document.body.classList.contains('rs10-cart-open')) return;
-      const cart = document.querySelector('.rs10-cart-sheet');
-      if (!cart) return;
-      if (cart.contains(e.target) || (bar && bar.contains(e.target))) return;
-      if (e.target.closest && e.target.closest('.pos-item, .menu-card, button, a, input, select'))
-        return;
-      document.body.classList.remove('rs10-cart-open');
-      cart.classList.remove('rs10-cart-sheet');
-    });
+    // Close when tapping menu backdrop (not the cart sheet)
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (
+          !document.body.classList.contains('rs10-cart-open') &&
+          !document.body.classList.contains('pos-mobile-cart-open')
+        )
+          return;
+        const cart =
+          document.querySelector('#pos-tab .pos-cart.active, .rs10-cart-sheet') ||
+          document.querySelector('.pos-cart.active');
+        if (!cart) return;
+        if (cart.contains(e.target) || (bar && bar.contains(e.target))) return;
+        // Adding more menu items keeps cart open; only dismiss on empty chrome click
+        if (e.target.closest && e.target.closest('.pos-item, .menu-card, .pos-cat-btn')) return;
+        if (global.RSPosUI && typeof RSPosUI.closeMobilePOSCart === 'function') {
+          RSPosUI.closeMobilePOSCart(true);
+          return;
+        }
+        document.body.classList.remove('rs10-cart-open', 'pos-mobile-cart-open');
+        cart.classList.remove('rs10-cart-sheet', 'active');
+        const posLeft = document.querySelector('.pos-left');
+        if (posLeft) posLeft.classList.remove('hidden');
+      },
+      true
+    );
   }
 
   /* ───────────── Boot ───────────── */

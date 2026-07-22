@@ -487,10 +487,14 @@ function openMobilePOSCart(e){
   const cartBar = $('#pos-m-cart-bar');
   if (!posLeft || !posCart || !cartBar) return;
   posLeft.classList.add('hidden');
-  posCart.classList.add('active');
+  posCart.classList.add('active', 'rs10-cart-sheet');
   cartBar.classList.add('hidden');
-  const content = document.querySelector('.content');
-  if (content) content.scrollTo({ top: 0, behavior: 'smooth' });
+  // Lock page scroll so only the cart sheet scrolls (not menu behind)
+  document.body.classList.add('rs10-cart-open', 'pos-mobile-cart-open');
+  try {
+    const items = posCart.querySelector('#cart-items, .cart-items');
+    if (items) items.scrollTop = 0;
+  } catch (_) {}
 }
 function closeMobilePOSCart(showBar = true){
   const posLeft = $('.pos-left');
@@ -498,7 +502,8 @@ function closeMobilePOSCart(showBar = true){
   const cartBar = $('#pos-m-cart-bar');
   if (!posLeft || !posCart || !cartBar) return;
   posLeft.classList.remove('hidden');
-  posCart.classList.remove('active');
+  posCart.classList.remove('active', 'rs10-cart-sheet');
+  document.body.classList.remove('rs10-cart-open', 'pos-mobile-cart-open');
   if (showBar) updateMobileCartBar();
   else cartBar.classList.add('hidden');
 }
@@ -865,7 +870,160 @@ function renderCart(){
   } catch (e) {
     console.warn('[Cart Persistence Warning] Failed to persist active cart:', e);
   }
+
+  // Keep Floor table status in sync while cart has dine-in items
+  try {
+    scheduleFloorOccupancyFromCart();
+  } catch (_) {}
 }
+
+/** Debounced: cart + table selected → pending_orders so Floor shows Dining everywhere */
+let __floorOccTimer = null;
+let __floorOccId = null;
+function scheduleFloorOccupancyFromCart() {
+  if (__floorOccTimer) clearTimeout(__floorOccTimer);
+  __floorOccTimer = setTimeout(() => {
+    syncFloorOccupancyFromCart().catch((e) =>
+      console.warn('[floor occupancy]', e)
+    );
+  }, 500);
+}
+
+async function syncFloorOccupancyFromCart() {
+  if (!window.RS_DB || typeof RS_DB.put !== 'function') return;
+  let cust = {};
+  try {
+    cust = typeof getCustomer === 'function' ? getCustomer() : {};
+  } catch (_) {
+    cust = {};
+  }
+  const tableRaw = String(cust.table || '').trim();
+  if (!tableRaw || /walk-?in|take\s*away|takeaway/i.test(tableRaw)) {
+    // Cleared / walk-in: if we own a cart-driven ticket, mark it free by deleting empty or leave
+    return;
+  }
+  // Dine-in only (or table label implies dine-in)
+  let isDine = /table/i.test(tableRaw);
+  try {
+    const btn = document.querySelector('.order-type-btn.active');
+    const t = (btn && (btn.textContent || btn.getAttribute('aria-label') || '')) || '';
+    if (/dine/i.test(t)) isDine = true;
+    if (/take|deliver/i.test(t) && !/dine/i.test(t)) isDine = false;
+  } catch (_) {}
+  if (!isDine) return;
+
+  const items = (cart || []).map((c) => ({
+    id: c.id || c.name,
+    name: c.name,
+    qty: Number(c.qty) || 1,
+    price: Number(c.price) || 0,
+    notes: c.note || c.notes || '',
+    note: c.note || c.notes || '',
+  }));
+  if (!items.length) return;
+
+  let totals = { grand: 0, sub: 0, gst: 0, disc: 0 };
+  try {
+    totals = getTotals() || totals;
+  } catch (_) {}
+
+  const dig = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
+  const tableDig = dig(tableRaw);
+  const rows = await RS_DB.list('pending_orders').catch(() => []);
+  const active = (rows || []).filter((r) => {
+    const tn = String(r.tableNumber || r.table || '');
+    const same =
+      tn === tableRaw ||
+      tn.toLowerCase() === tableRaw.toLowerCase() ||
+      (Number.isFinite(tableDig) && dig(tn) === tableDig);
+    if (!same) return false;
+    const st = String(r.status || '');
+    return (
+      st === 'DineIn Active' ||
+      st === 'Accepted' ||
+      st === 'preparing' ||
+      st === 'Pending Review' ||
+      st === 'Billed' ||
+      st === 'Ready' ||
+      st === 'served' ||
+      r.source === 'floor_seat' ||
+      r.source === 'pos_cart'
+    );
+  });
+
+  // Prefer our cart-driven row, else any seat placeholder, else create
+  let row =
+    active.find((r) => r.source === 'pos_cart' || (r.id && String(r.id).indexOf('cart_') === 0)) ||
+    active.find((r) => r.source === 'floor_seat') ||
+    active[0] ||
+    null;
+
+  const covers = Math.max(0, Number(cust.covers != null ? cust.covers : 0) || 0);
+  if (row && row.id) {
+    const next = {
+      ...row,
+      tableNumber: tableRaw,
+      table: tableRaw,
+      items,
+      subtotal: totals.sub,
+      gst: totals.gst,
+      total: totals.grand,
+      customerName: cust.name || row.customerName || '',
+      customerPhone: cust.phone || row.customerPhone || '',
+      covers: covers || row.covers || 0,
+      pax: covers || row.pax || 0,
+      orderType: 'Dine-in',
+      // Keep kitchen status if already sent; otherwise show as active on floor
+      status:
+        row.status === 'Pending Review' ||
+        row.status === 'Accepted' ||
+        row.status === 'preparing' ||
+        row.status === 'Ready' ||
+        row.status === 'served' ||
+        row.status === 'Billed'
+          ? row.status
+          : 'DineIn Active',
+      source: row.source === 'waiter_pos' || row.source === 'qr' ? row.source : row.source || 'pos_cart',
+      dateTime: row.dateTime || new Date().toISOString(),
+    };
+    await RS_DB.put('pending_orders', row.id, next);
+    __floorOccId = row.id;
+  } else {
+    const id = 'cart_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const next = {
+      id,
+      orderId: id,
+      tableNumber: tableRaw,
+      table: tableRaw,
+      status: 'DineIn Active',
+      items,
+      subtotal: totals.sub,
+      gst: totals.gst,
+      total: totals.grand,
+      customerName: cust.name || '',
+      customerPhone: cust.phone || '',
+      covers,
+      pax: covers,
+      orderType: 'Dine-in',
+      paymentMethod: 'Cash',
+      dateTime: new Date().toISOString(),
+      priority: 'normal',
+      source: 'pos_cart',
+    };
+    await RS_DB.put('pending_orders', id, next);
+    __floorOccId = id;
+  }
+
+  try {
+    document.dispatchEvent(new Event('rs:tables-updated'));
+  } catch (_) {}
+  try {
+    if (window.RS_SYNC && typeof RS_SYNC.syncPendingOrders === 'function') {
+      RS_SYNC.syncPendingOrders({ forceCloud: true });
+    }
+  } catch (_) {}
+}
+
 function getTotals(){
   const settings = window.RS_SETTINGS || {};
   const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular', specified_premises: false };

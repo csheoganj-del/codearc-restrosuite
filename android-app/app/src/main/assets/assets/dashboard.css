@@ -2718,12 +2718,21 @@ body.rs-role-brandadmin #klc-mobile-setup {
   #pos-tab .pos-item .pname { font-size: 13.5px; line-height: 1.22; }
   #pos-tab .pos-item .pprice { font-size: 15px; }
   #pos-tab .stock-dot { font-size: 9.5px; padding: 2px 7px; }
-  #pos-tab .pos-cart { display: none; border-radius: var(--r-md); position: static; max-height: none; min-height: 0; margin-bottom: 0; overflow: visible; }
-  #pos-tab .pos-cart.active { display: flex !important; min-height: 0; max-height: none; margin-bottom: calc(96px + env(safe-area-inset-bottom)); overflow: visible; }
+  /* Mobile cart: sheet chrome is owned by product-10x.css (fixed bottom sheet).
+     Do NOT force position:static / overflow:visible — that made menu scroll
+     behind a cart that itself would not scroll. */
+  #pos-tab .pos-cart:not(.active):not(.rs10-cart-sheet) {
+    display: none;
+  }
   #pos-tab .pos-left.hidden { display: none !important; }
   #pos-tab .cart-head { padding: 12px; }
   #pos-tab .cart-table-sel { padding: 10px 12px; }
-  #pos-tab .cart-items { padding: 10px 12px; min-height: 96px; overflow: visible; }
+  #pos-tab .cart-items {
+    padding: 10px 12px;
+    min-height: 96px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   #pos-tab .cart-line { gap: 8px; padding: 8px; }
   #pos-tab .cart-line .cn { font-size: 12.5px; }
   #pos-tab .cart-foot { padding: 12px; }

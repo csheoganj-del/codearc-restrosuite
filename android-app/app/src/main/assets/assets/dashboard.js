@@ -1151,6 +1151,10 @@
         try { renderKDS(); } catch(e){}
         try { renderQR(); } catch(e){}
         document.dispatchEvent(new CustomEvent('rs:pending_orders_synced'));
+        // Floor / POS table grids listen for this — refresh after cloud pull
+        try {
+          document.dispatchEvent(new Event('rs:tables-updated'));
+        } catch (_) {}
         try { updateTabAttentionBlinking(); } catch(e){}
         try { applyPosOnlyModeUI(); } catch(e){}
       } catch(e) {
@@ -1521,7 +1525,13 @@
       const armPoll = () => {
         if (window.__rsPendingOrdersPollTimer) clearInterval(window.__rsPendingOrdersPollTimer);
         const activeId = document.querySelector('.tab-content.active')?.id || '';
-        const hot = activeId === 'qr-orders-tab' || activeId === 'kds-tab' || activeId === 'online-orders-tab';
+        // Floor + POS need live table occupancy (guest QR / other devices)
+        const hot =
+          activeId === 'qr-orders-tab' ||
+          activeId === 'kds-tab' ||
+          activeId === 'online-orders-tab' ||
+          activeId === 'floor-tab' ||
+          activeId === 'pos-tab';
         window.__rsPendingOrdersPollTimer = setInterval(pollPending, hot ? 4000 : 12000);
       };
       armPoll();
