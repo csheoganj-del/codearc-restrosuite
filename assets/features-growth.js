@@ -279,24 +279,29 @@
           (t.reservedInfo && (t.reservedInfo.guestName || t.reservedInfo.name)) ||
           '';
         const row = {
-          id,
           orderId: id,
           tableNumber: tableLabel,
           table: tableLabel,
           status: 'DineIn Active',
           items: [],
           total: 0,
+          subtotal: 0,
+          gst: 0,
           customerName: guest,
           customerPhone: '',
           covers: Number(options.covers || t.cap) || 0,
+          orderType: 'Dine-in',
+          paymentMethod: 'Cash',
           dateTime: new Date().toISOString(),
+          priority: 'normal',
           source: 'floor_seat',
         };
-        await RS_DB.put('pending_orders', id, row);
+        const saved = await RS_DB.put('pending_orders', id, row);
+        const out = saved && typeof saved === 'object' ? { ...row, ...saved, orderId: saved.orderId || id } : { ...row, id };
         try {
           document.dispatchEvent(new Event('rs:tables-updated'));
         } catch (_) {}
-        return row;
+        return out;
       } catch (e) {
         console.warn('ensureSeatedPendingOrder failed', e);
         return null;

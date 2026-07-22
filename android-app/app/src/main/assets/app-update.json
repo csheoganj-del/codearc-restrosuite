@@ -1,12 +1,12 @@
 {
-  "version": "v213-20260718-launch-10",
-  "date": "2026-07-18",
-  "title": "Launch pack: every-device install + health",
-  "summary": "Install guide for Windows/Android/iOS/browser, /status health, GitHub-hosted EXEs, production Supabase env on Vercel, Learning Center materials complete.",
+  "version": "v215-20260722-scan-cart-floor",
+  "date": "2026-07-22",
+  "title": "Scanner UI + cart scroll + live table status",
+  "summary": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table.",
   "highlights": [
-    "New /install page — Windows, Android, iPhone PWA, browser",
-    "New /status + /api/health launch checks",
-    "Large installers on public GitHub Releases (Vercel-safe)",
-    "SUPABASE env fixed on restrosuite-live production"
+    "Staff table scan: dark square viewfinder, Snap photo + live cam, less clutter",
+    "Mobile cart: fixed bottom sheet — cart lines scroll, menu stays put",
+    "Floor: table turns Dining when cart has items + table selected",
+    "Cloud occupancy uses real order ids (no broken cart_/seat_ PK hashes)"
   ]
 }

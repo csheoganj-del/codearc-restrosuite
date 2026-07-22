@@ -244,9 +244,11 @@ body.rs-desktop-app textarea {
     touch-action: none;
   }
 
-  #pos-tab .pos-cart,
-  .pos-cart-side,
-  .pos-cart-sidebar {
+  /* Highest-specificity mobile cart sheet — wins over dashboard.css */
+  body #pos-tab .pos-cart,
+  body .pos-cart-side,
+  body .pos-cart-sidebar,
+  body #pos-tab aside.pos-cart {
     position: fixed !important;
     left: 0 !important;
     right: 0 !important;
@@ -262,7 +264,7 @@ body.rs-desktop-app textarea {
     border-radius: 18px 18px 0 0 !important;
     box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.2) !important;
     background: var(--panel, #fff) !important;
-    display: none;
+    display: none !important;
     flex-direction: column !important;
     overflow: hidden !important; /* children scroll, not the sheet page */
     transform: translateY(110%);
@@ -273,40 +275,42 @@ body.rs-desktop-app textarea {
   /* Open states from product-10x sheet OR classic .active toggle */
   body.rs10-cart-open #pos-tab .pos-cart,
   body.pos-mobile-cart-open #pos-tab .pos-cart,
-  #pos-tab .pos-cart.active,
-  #pos-tab .pos-cart.rs10-cart-sheet,
-  .pos-cart-side.active,
-  .pos-cart-sidebar.active,
-  .pos-cart-side.rs10-cart-sheet,
-  .pos-cart-sidebar.rs10-cart-sheet {
+  body #pos-tab .pos-cart.active,
+  body #pos-tab .pos-cart.rs10-cart-sheet,
+  body .pos-cart-side.active,
+  body .pos-cart-sidebar.active,
+  body .pos-cart-side.rs10-cart-sheet,
+  body .pos-cart-sidebar.rs10-cart-sheet {
     display: flex !important;
     transform: translateY(0) !important;
   }
 
-  #pos-tab .pos-cart .cart-head,
-  #pos-tab .pos-cart .cart-head-symbols,
-  #pos-tab .pos-cart .cart-table-sel,
-  #pos-tab .pos-cart .cart-meta-row,
-  #pos-tab .pos-cart .cart-foot,
-  #pos-tab .pos-cart #cart-pay-zone,
-  #pos-tab .pos-cart #cart-more-opts {
+  body #pos-tab .pos-cart .cart-head,
+  body #pos-tab .pos-cart .cart-head-symbols,
+  body #pos-tab .pos-cart .cart-table-sel,
+  body #pos-tab .pos-cart .cart-meta-row,
+  body #pos-tab .pos-cart .cart-delivery-details,
+  body #pos-tab .pos-cart .cart-foot,
+  body #pos-tab .pos-cart #cart-pay-zone,
+  body #pos-tab .pos-cart #cart-more-opts {
     flex-shrink: 0 !important;
   }
 
   /* THIS is what must scroll — not the menu behind the sheet */
-  #pos-tab .pos-cart #cart-items,
-  #pos-tab .pos-cart .cart-items {
+  body #pos-tab .pos-cart #cart-items,
+  body #pos-tab .pos-cart .cart-items {
     flex: 1 1 auto !important;
-    min-height: 120px !important;
+    min-height: 140px !important;
     max-height: none !important;
+    height: auto !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
+    overscroll-behavior: contain !important;
+    touch-action: pan-y !important;
   }
 
-  #pos-tab .pos-cart .cart-foot {
+  body #pos-tab .pos-cart .cart-foot {
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
     background: var(--panel, #fff);
     border-top: 1px solid var(--stroke-2, rgba(0, 0, 0, 0.08));

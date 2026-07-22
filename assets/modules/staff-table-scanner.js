@@ -181,30 +181,32 @@
     s.id = STYLE_ID;
     var r = '#' + ROOT_ID;
     s.textContent = [
-      '@keyframes rs-scan-line{0%{top:8%;opacity:.35}8%{opacity:1}50%{top:88%;opacity:1}58%{opacity:.35}100%{top:8%;opacity:.35}}',
-      '@keyframes rs-scan-pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.02)}}',
+      '@keyframes rs-scan-line{0%{top:12%;opacity:.4}12%{opacity:1}50%{top:86%;opacity:1}62%{opacity:.4}100%{top:12%;opacity:.4}}',
       '@keyframes rs-scan-dot{0%,80%,100%{opacity:.25}40%{opacity:1}}',
-      '@keyframes rs-scan-glow{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.0)}50%{box-shadow:0 0 18px 2px rgba(37,211,102,.35)}}',
-      '@keyframes rs-scan-corners{0%,100%{border-color:rgba(37,211,102,.75)}50%{border-color:rgba(37,211,102,1)}}',
+      '@keyframes rs-scan-glow{0%,100%{box-shadow:inset 0 0 0 0 rgba(37,211,102,0)}50%{box-shadow:inset 0 0 0 3px rgba(37,211,102,.55)}}',
+      '@keyframes rs-scan-corners{0%,100%{opacity:.85}50%{opacity:1}}',
       r +
-        '{position:fixed;inset:0;z-index:2147483601;display:flex;align-items:flex-end;justify-content:center;background:rgba(12,10,9,.62);backdrop-filter:blur(4px);padding:12px;}',
+        '{position:fixed;inset:0;z-index:2147483601;display:flex;align-items:center;justify-content:center;background:rgba(8,7,10,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:16px;box-sizing:border-box;}',
       r +
-        ' .rs-scan-card{width:min(440px,100%);background:var(--panel,#fff);color:var(--text,#16151c);border-radius:20px 20px 14px 14px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden;border:1px solid var(--stroke-2,rgba(0,0,0,.08));}',
-      r + ' .rs-scan-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 8px;}',
-      r + ' .rs-scan-head h3{margin:0;font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px;}',
-      r + ' .rs-scan-head h3 i{color:#25D366;}',
-      r + ' .rs-scan-x{border:0;background:var(--stroke-2,rgba(0,0,0,.06));width:34px;height:34px;border-radius:10px;cursor:pointer;}',
+        ' .rs-scan-card{width:min(400px,100%);max-height:min(92dvh,720px);display:flex;flex-direction:column;background:#111114;color:#f4f2f0;border-radius:22px;box-shadow:0 28px 80px rgba(0,0,0,.55);overflow:hidden;border:1px solid rgba(255,255,255,.08);}',
       r +
-        ' .rs-scan-sub{margin:0 16px 10px;font-size:12.5px;line-height:1.45;color:var(--text-soft,#6b6570);}',
+        ' .rs-scan-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 10px;flex-shrink:0;}',
       r +
-        ' .rs-scan-vid-wrap{position:relative;margin:0 16px;border-radius:14px;overflow:hidden;background:#0c0b0a;aspect-ratio:4/3;}',
-      r + ' .rs-scan-vid-wrap video,' + r + ' .rs-scan-vid-wrap canvas{width:100%;height:100%;object-fit:cover;display:block;}',
-      /* Dim outside the viewfinder */
+        ' .rs-scan-head h3{margin:0;font-size:15px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;color:#fff;}',
+      r + ' .rs-scan-head h3 i{color:#25D366;font-size:15px;}',
       r +
-        ' .rs-scan-mask{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 52% 48% at 50% 50%,transparent 58%,rgba(0,0,0,.55) 59%)}',
-      /* WhatsApp-style square corners */
+        ' .rs-scan-x{border:0;background:rgba(255,255,255,.1);color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;display:grid;place-items:center;flex-shrink:0;}',
+      r + ' .rs-scan-x:hover{background:rgba(255,255,255,.16);}',
       r +
-        ' .rs-scan-frame{position:absolute;inset:16% 14%;border:0;pointer-events:none;animation:rs-scan-corners 1.6s ease-in-out infinite;}',
+        ' .rs-scan-vid-wrap{position:relative;margin:0 14px;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:1;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}',
+      r + ' .rs-scan-vid-wrap video{width:100%;height:100%;object-fit:cover;display:block;background:#000;}',
+      r + ' .rs-scan-vid-wrap canvas{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;}',
+      /* Soft vignette — NOT a solid oval hole */
+      r +
+        ' .rs-scan-mask{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 42%,rgba(0,0,0,.28) 68%,rgba(0,0,0,.5) 100%);}',
+      /* Square viewfinder corners (WhatsApp / UPI style) */
+      r +
+        ' .rs-scan-frame{position:absolute;inset:14%;border:0;pointer-events:none;animation:rs-scan-corners 1.8s ease-in-out infinite;}',
       r +
         ' .rs-scan-frame:before,' +
         r +
@@ -212,21 +214,22 @@
         r +
         ' .rs-scan-frame i:before,' +
         r +
-        ' .rs-scan-frame i:after{content:"";position:absolute;width:22px;height:22px;border-color:#25D366;border-style:solid;}',
-      r + ' .rs-scan-frame:before{top:0;left:0;border-width:3px 0 0 3px;border-radius:6px 0 0 0;}',
-      r + ' .rs-scan-frame:after{top:0;right:0;border-width:3px 3px 0 0;border-radius:0 6px 0 0;}',
+        ' .rs-scan-frame i:after{content:"";position:absolute;width:26px;height:26px;border-color:#25D366;border-style:solid;filter:drop-shadow(0 0 4px rgba(37,211,102,.5));}',
+      r + ' .rs-scan-frame:before{top:0;left:0;border-width:3.5px 0 0 3.5px;border-radius:8px 0 0 0;}',
+      r + ' .rs-scan-frame:after{top:0;right:0;border-width:3.5px 3.5px 0 0;border-radius:0 8px 0 0;}',
       r + ' .rs-scan-frame i{position:absolute;inset:0;pointer-events:none;}',
-      r + ' .rs-scan-frame i:before{bottom:0;left:0;top:auto;border-width:0 0 3px 3px;border-radius:0 0 0 6px;}',
-      r + ' .rs-scan-frame i:after{bottom:0;right:0;top:auto;left:auto;border-width:0 3px 3px 0;border-radius:0 0 6px 0;}',
-      /* Moving laser line */
+      r + ' .rs-scan-frame i:before{bottom:0;left:0;top:auto;border-width:0 0 3.5px 3.5px;border-radius:0 0 0 8px;}',
+      r + ' .rs-scan-frame i:after{bottom:0;right:0;top:auto;left:auto;border-width:0 3.5px 3.5px 0;border-radius:0 0 8px 0;}',
       r +
-        ' .rs-scan-laser{position:absolute;left:18%;right:18%;height:2px;border-radius:2px;pointer-events:none;background:linear-gradient(90deg,transparent,#25D366 20%,#fff 50%,#25D366 80%,transparent);box-shadow:0 0 12px 2px rgba(37,211,102,.85);animation:rs-scan-line 2.1s ease-in-out infinite;}',
+        ' .rs-scan-laser{position:absolute;left:18%;right:18%;height:2px;border-radius:2px;pointer-events:none;background:linear-gradient(90deg,transparent,#25D366 18%,#fff 50%,#25D366 82%,transparent);box-shadow:0 0 14px 3px rgba(37,211,102,.75);animation:rs-scan-line 2s ease-in-out infinite;}',
       r +
-        ' .rs-scan-laser:after{content:"";position:absolute;left:0;right:0;top:-14px;height:28px;background:linear-gradient(180deg,transparent,rgba(37,211,102,.22),transparent);}',
-      /* State: found */
+        ' .rs-scan-laser:after{content:"";position:absolute;left:0;right:0;top:-16px;height:32px;background:linear-gradient(180deg,transparent,rgba(37,211,102,.2),transparent);}',
+      /* Placeholder when camera off / loading */
+      r +
+        ' .rs-scan-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:linear-gradient(160deg,#1a1a1f 0%,#0c0c0e 100%);color:rgba(255,255,255,.55);font-size:13px;font-weight:600;text-align:center;padding:24px;z-index:1;}',
+      r + ' .rs-scan-placeholder i{font-size:36px;color:rgba(37,211,102,.55);margin-bottom:4px;}',
+      r + ' .rs-scan-vid-wrap.is-live .rs-scan-placeholder{display:none;}',
       r + ' .rs-scan-vid-wrap.is-found .rs-scan-laser{display:none;}',
-      r +
-        ' .rs-scan-vid-wrap.is-found .rs-scan-frame{animation:none;filter:none;}',
       r +
         ' .rs-scan-vid-wrap.is-found .rs-scan-frame:before,' +
         r +
@@ -234,38 +237,63 @@
         r +
         ' .rs-scan-vid-wrap.is-found .rs-scan-frame i:before,' +
         r +
-        ' .rs-scan-vid-wrap.is-found .rs-scan-frame i:after{border-color:#0F9F6E;}',
-      r + ' .rs-scan-vid-wrap.is-found{animation:rs-scan-glow 1s ease-in-out 2;}',
-      r + ' .rs-scan-vid-wrap.is-idle .rs-scan-laser{animation-play-state:paused;opacity:.2;}',
+        ' .rs-scan-vid-wrap.is-found .rs-scan-frame i:after{border-color:#34d399;}',
+      r + ' .rs-scan-vid-wrap.is-found{animation:rs-scan-glow .9s ease-in-out 2;}',
+      r + ' .rs-scan-vid-wrap.is-idle .rs-scan-laser{animation-play-state:paused;opacity:.15;}',
       r +
-        ' .rs-scan-vid-wrap.is-zooming .rs-scan-laser{background:linear-gradient(90deg,transparent,#38bdf8 20%,#fff 50%,#38bdf8 80%,transparent);box-shadow:0 0 14px 2px rgba(56,189,248,.9);animation-duration:1.2s;}',
-      r +
-        ' .rs-scan-vid-wrap video{transition:transform .35s ease;transform-origin:center center;}',
+        ' .rs-scan-vid-wrap.is-zooming .rs-scan-laser{background:linear-gradient(90deg,transparent,#38bdf8 18%,#fff 50%,#38bdf8 82%,transparent);box-shadow:0 0 14px 3px rgba(56,189,248,.8);animation-duration:1.15s;}',
+      r + ' .rs-scan-vid-wrap video{transition:transform .35s ease;transform-origin:center center;}',
       r + ' .rs-scan-vid-wrap.is-zooming video{transform:scale(1.35);}',
-      r + ' .rs-scan-vid-wrap.is-found video{transform:scale(1.12);}',
-      /* Live status row with dots */
+      r + ' .rs-scan-vid-wrap.is-found video{transform:scale(1.1);}',
+      /* Bottom sheet body */
+      r + ' .rs-scan-body{flex:1;min-height:0;overflow-y:auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;}',
       r +
-        ' .rs-scan-status{padding:10px 16px;font-size:13px;font-weight:800;color:var(--text-soft,#6b6570);display:flex;align-items:center;gap:10px;min-height:42px;}',
+        ' .rs-scan-status{font-size:13px;font-weight:700;color:rgba(255,255,255,.72);display:flex;align-items:center;gap:10px;min-height:28px;}',
       r +
-        ' .rs-scan-live{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(37,211,102,.12);color:#0F9F6E;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0;}',
+        ' .rs-scan-live{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:rgba(37,211,102,.14);color:#34d399;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0;}',
       r +
-        ' .rs-scan-live span{width:6px;height:6px;border-radius:50%;background:#25D366;animation:rs-scan-dot 1.2s ease-in-out infinite;}',
+        ' .rs-scan-live span{width:5px;height:5px;border-radius:50%;background:#25D366;animation:rs-scan-dot 1.2s ease-in-out infinite;}',
       r + ' .rs-scan-live span:nth-child(2){animation-delay:.15s;}',
       r + ' .rs-scan-live span:nth-child(3){animation-delay:.3s;}',
-      r + ' .rs-scan-status.is-found{color:#0F9F6E;}',
-      r + ' .rs-scan-status.is-found .rs-scan-live{background:rgba(15,159,110,.15);color:#0F9F6E;}',
-      r + ' .rs-scan-status.is-found .rs-scan-live span{background:#0F9F6E;animation:none;}',
-      r + ' .rs-scan-status.is-error{color:#b45309;}',
-      r + ' .rs-scan-manual{display:flex;gap:8px;padding:0 16px 12px;}',
+      r + ' .rs-scan-status.is-found{color:#34d399;}',
+      r + ' .rs-scan-status.is-error{color:#fbbf24;}',
       r +
-        ' .rs-scan-manual input{flex:1;min-width:0;border:1px solid var(--stroke-2,rgba(0,0,0,.12));border-radius:10px;padding:10px 12px;font:inherit;}',
-      r + ' .rs-scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 14px;}',
-      r + ' .rs-scan-actions .btn{width:100%;justify-content:center;}',
+        ' .rs-scan-cam-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
       r +
-        ' .rs-scan-hit{margin:0 16px 12px;padding:10px 12px;border-radius:12px;background:rgba(15,159,110,.1);border:1px solid rgba(15,159,110,.28);font-size:13px;font-weight:700;display:none;}',
+        ' .rs-scan-cam-row .btn-snap,' +
+        r +
+        ' .rs-scan-cam-row .btn-live{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;padding:12px 10px;border-radius:12px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;border:0;}',
+      r +
+        ' .rs-scan-cam-row .btn-snap{background:#25D366;color:#062816;}',
+      r + ' .rs-scan-cam-row .btn-snap:hover{filter:brightness(1.05);}',
+      r +
+        ' .rs-scan-cam-row .btn-live{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12);}',
+      r + ' .rs-scan-cam-row .btn-live:hover{background:rgba(255,255,255,.12);}',
+      r + ' .rs-scan-manual{display:flex;gap:8px;}',
+      r +
+        ' .rs-scan-manual input{flex:1;min-width:0;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;border-radius:12px;padding:11px 12px;font:inherit;font-size:14px;}',
+      r + ' .rs-scan-manual input::placeholder{color:rgba(255,255,255,.4);}',
+      r +
+        ' .rs-scan-manual .btn-go{border:0;background:rgba(255,255,255,.12);color:#fff;border-radius:12px;padding:0 16px;font-weight:800;cursor:pointer;flex-shrink:0;}',
+      r + ' .rs-scan-manual .btn-go:hover{background:rgba(255,255,255,.18);}',
+      r + ' .rs-scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+      r +
+        ' .rs-scan-actions button{width:100%;justify-content:center;border-radius:12px;padding:11px 8px;font-weight:700;font-size:12.5px;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#fff;display:inline-flex;align-items:center;gap:6px;}',
+      r +
+        ' .rs-scan-actions button[data-act="pos"]{background:#25D366;color:#062816;border-color:transparent;font-weight:800;}',
+      r +
+        ' .rs-scan-actions button:hover{filter:brightness(1.06);}',
+      r +
+        ' .rs-scan-hit{padding:12px;border-radius:14px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.35);font-size:13.5px;font-weight:700;color:#d1fae5;display:none;}',
       r + ' .rs-scan-hit.on{display:block;}',
-      r + ' .rs-scan-foot{padding:0 16px 16px;font-size:11.5px;color:var(--text-mute,#8a8490);line-height:1.4;}',
-      r + ' .rs-scan-auto{font-size:11px;font-weight:600;color:#0F9F6E;margin-top:4px;}',
+      r + ' .rs-scan-auto{font-size:11.5px;font-weight:600;color:#6ee7b7;margin-top:4px;}',
+      r +
+        ' .rs-scan-foot{margin:0;font-size:11px;color:rgba(255,255,255,.38);line-height:1.4;text-align:center;}',
+      '@media (max-height:640px){' +
+        r +
+        ' .rs-scan-vid-wrap{aspect-ratio:4/3;max-height:38dvh;}' +
+        r +
+        ' .rs-scan-cam-row{grid-template-columns:1fr;}}',
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -276,22 +304,34 @@
     var status = root.querySelector('[data-status]');
     var live = root.querySelector('[data-live]');
     var label = root.querySelector('[data-status-text]');
+    var phText = root.querySelector('[data-ph-text]');
     if (wrap) {
       wrap.classList.toggle('is-found', state === 'found');
       wrap.classList.toggle('is-idle', state === 'idle' || state === 'error');
       wrap.classList.toggle('is-zooming', state === 'zooming');
+      if (state === 'scanning' || state === 'zooming' || state === 'found') {
+        wrap.classList.add('is-live');
+      }
+      if (state === 'error' || state === 'idle') {
+        // keep is-live if video already playing
+        var v = wrap.querySelector('video');
+        if (!v || !v.srcObject || v.readyState < 2) wrap.classList.remove('is-live');
+      }
     }
     if (status) {
       status.classList.toggle('is-found', state === 'found');
       status.classList.toggle('is-error', state === 'error');
     }
     if (label && message != null) label.textContent = message;
+    if (phText && message && (state === 'error' || state === 'idle')) {
+      phText.textContent = message;
+    }
     if (live) {
       live.hidden = false;
       if (state === 'scanning') {
         live.innerHTML = '<span></span><span></span><span></span> Scanning';
       } else if (state === 'zooming') {
-        live.innerHTML = '<span></span><span></span><span></span> Auto-zoom';
+        live.innerHTML = '<span></span><span></span><span></span> Zoom';
       } else if (state === 'found') {
         live.innerHTML = '<i class="fa-solid fa-check" style="font-size:10px"></i> Locked';
       } else if (state === 'error') {
@@ -649,16 +689,16 @@
           setTimeout(r, 300);
         });
       }
+      var wrapOk = root.querySelector('.rs-scan-vid-wrap');
+      if (wrapOk) wrapOk.classList.add('is-live');
       setScanUiState(
         root,
         'scanning',
-        ios
-          ? 'Scanning… fill green box with QR (Safari)'
-          : 'Point at table QR — works from a distance'
+        ios ? 'Hold the table QR inside the green corners' : 'Point at table QR — auto-zoom + lock'
       );
     } catch (e) {
       console.warn('[StaffScan] video play', e);
-      setScanUiState(root, 'error', 'Camera preview failed — type table # below');
+      setScanUiState(root, 'error', 'Camera preview failed — use Snap photo or type table #');
       return;
     }
 
@@ -668,11 +708,11 @@
       setScanUiState(
         root,
         'error',
-        'QR decoder failed to load. Type table # (e.g. 5) and tap Go.'
+        'QR decoder failed to load. Snap a photo or type table #.'
       );
       // Keep camera on for preview; manual still works
     } else {
-      setScanUiState(root, 'scanning', 'Scanning… hold QR in the green box');
+      setScanUiState(root, 'scanning', 'Scanning… align QR in the green corners');
     }
 
     // BarcodeDetector is NOT on iPhone Safari — don't rely on it
@@ -909,53 +949,57 @@
     root.setAttribute('aria-label', 'Scan table QR');
     root.innerHTML =
       '<div class="rs-scan-card">' +
-      '<div class="rs-scan-head"><h3><i class="fa-solid fa-qrcode"></i> Staff table scan</h3>' +
-      '<button type="button" class="rs-scan-x" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>' +
-      '<p class="rs-scan-sub">' +
-      (ios
-        ? '<b>iPhone tip:</b> use <b>Snap QR photo</b> (most reliable on Safari). Live view may also work. Same QR guests scan with their Camera app.'
-        : 'Hold the printed table QR in the green box — auto-zoom + auto lock. Same QR guests use.') +
-      '</p>' +
-      // Photo capture — primary reliable path on iOS Safari
-      '<div style="padding:0 16px 10px;display:flex;flex-direction:column;gap:8px">' +
-      '<label class="btn btn-primary" style="display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;width:100%;box-sizing:border-box;padding:12px 14px;font-weight:800">' +
-      '<i class="fa-solid fa-camera"></i> Snap QR photo (recommended)' +
-      '<input type="file" accept="image/*" capture="environment" data-snap style="display:none">' +
-      '</label>' +
-      '<button type="button" class="btn btn-ghost" data-live-cam style="width:100%;justify-content:center">' +
-      '<i class="fa-solid fa-video"></i> ' +
-      (ios ? 'Try live camera scan' : 'Start live camera') +
-      '</button>' +
+      '<div class="rs-scan-head">' +
+      '<h3><i class="fa-solid fa-qrcode"></i> Scan table QR</h3>' +
+      '<button type="button" class="rs-scan-x" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>' +
       '</div>' +
-      '<div class="rs-scan-vid-wrap" data-vid-box style="display:none">' +
+      // Always-visible square viewfinder (no ugly empty oval)
+      '<div class="rs-scan-vid-wrap is-idle" data-vid-box>' +
       '<video playsinline webkit-playsinline muted autoplay></video>' +
       '<canvas aria-hidden="true"></canvas>' +
+      '<div class="rs-scan-placeholder" data-placeholder>' +
+      '<i class="fa-solid fa-camera"></i>' +
+      '<div data-ph-text>' +
+      (ios ? 'Snap a photo of the table QR' : 'Starting camera…') +
+      '</div>' +
+      '</div>' +
       '<div class="rs-scan-mask" aria-hidden="true"></div>' +
       '<div class="rs-scan-frame" aria-hidden="true"><i></i></div>' +
       '<div class="rs-scan-laser" aria-hidden="true"></div>' +
       '</div>' +
+      '<div class="rs-scan-body">' +
       '<div class="rs-scan-status" data-status>' +
       '<span class="rs-scan-live" data-live><span></span><span></span><span></span> Ready</span>' +
       '<span data-status-text>' +
-      (ios ? 'Tap “Snap QR photo” to open camera' : 'Starting…') +
+      (ios ? 'Snap photo or type table #' : 'Starting camera…') +
       '</span>' +
       '</div>' +
       '<div class="rs-scan-hit" data-hit></div>' +
-      '<div class="rs-scan-manual">' +
-      '<input type="text" data-manual inputmode="numeric" autocomplete="off" placeholder="Or type table # (e.g. 5)">' +
-      '<button type="button" class="btn btn-ghost" data-manual-go>Go</button></div>' +
-      '<div class="rs-scan-actions">' +
-      '<button type="button" class="btn btn-primary" data-act="pos"><i class="fa-solid fa-utensils"></i> Open POS</button>' +
-      '<button type="button" class="btn btn-ghost" data-act="seat"><i class="fa-solid fa-chair"></i> Seat + open QR</button>' +
-      '<button type="button" class="btn btn-ghost" data-act="kot"><i class="fa-solid fa-fire-burner"></i> Waiter KOT</button>' +
-      '<button type="button" class="btn btn-ghost" data-act="hub"><i class="fa-solid fa-eye"></i> Guest preview</button>' +
+      '<div class="rs-scan-cam-row">' +
+      '<label class="btn-snap">' +
+      '<i class="fa-solid fa-camera"></i> Snap photo' +
+      '<input type="file" accept="image/*" capture="environment" data-snap style="display:none">' +
+      '</label>' +
+      '<button type="button" class="btn-live" data-live-cam>' +
+      '<i class="fa-solid fa-video"></i> ' +
+      (ios ? 'Live scan' : 'Restart cam') +
+      '</button>' +
       '</div>' +
-      '<p class="rs-scan-foot">Yono uses a native camera. On Safari, <b>Snap QR photo</b> is the reliable path. ' +
-      'Always works: type table number → Go → Open POS.</p>' +
-      '</div>';
+      '<div class="rs-scan-manual">' +
+      '<input type="text" data-manual inputmode="numeric" autocomplete="off" placeholder="Type table # (e.g. 5)">' +
+      '<button type="button" class="btn-go" data-manual-go>Go</button>' +
+      '</div>' +
+      '<div class="rs-scan-actions">' +
+      '<button type="button" data-act="pos"><i class="fa-solid fa-utensils"></i> Open POS</button>' +
+      '<button type="button" data-act="seat"><i class="fa-solid fa-chair"></i> Seat + QR</button>' +
+      '<button type="button" data-act="kot"><i class="fa-solid fa-fire-burner"></i> Waiter KOT</button>' +
+      '<button type="button" data-act="hub"><i class="fa-solid fa-eye"></i> Guest view</button>' +
+      '</div>' +
+      '<p class="rs-scan-foot">Same QR guests scan. Type table # → Go always works.</p>' +
+      '</div></div>';
 
     document.body.appendChild(root);
-    setScanUiState(root, 'idle', ios ? 'Tap “Snap QR photo” (best on iPhone)' : 'Ready');
+    setScanUiState(root, 'idle', ios ? 'Snap photo of table QR, or type #' : 'Starting camera…');
 
     root.querySelector('[data-close]').onclick = closeScanner;
     root.addEventListener('click', function (e) {
@@ -975,7 +1019,7 @@
           setScanUiState(
             root,
             'error',
-            'No QR found in photo. Fill the frame with the code and retake, or type table #.'
+            'No QR in photo — move closer and retake, or type table #'
           );
           toast('No QR in photo — retake closer or type table #', 'fa-circle-exclamation');
           return;
@@ -984,22 +1028,20 @@
       });
     }
 
-    // --- Live camera (optional / secondary on iOS) ---
+    // --- Live camera ---
     var liveBtn = root.querySelector('[data-live-cam]');
-    var vidBox = root.querySelector('[data-vid-box]');
     if (liveBtn) {
       liveBtn.onclick = function () {
-        if (vidBox) vidBox.style.display = '';
-        liveBtn.style.display = 'none';
+        stopCamera();
         setScanUiState(root, 'scanning', 'Starting live camera…');
+        var ph = root.querySelector('[data-ph-text]');
+        if (ph) ph.textContent = 'Starting camera…';
         startCamera(root);
       };
     }
 
     // Desktop / non-iOS: auto-start live camera
     if (!ios) {
-      if (vidBox) vidBox.style.display = '';
-      if (liveBtn) liveBtn.style.display = 'none';
       startCamera(root);
     }
 

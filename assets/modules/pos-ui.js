@@ -897,20 +897,45 @@ async function syncFloorOccupancyFromCart() {
   } catch (_) {
     cust = {};
   }
-  const tableRaw = String(cust.table || '').trim();
+  // Prefer live select value (getCustomer can lag after seat-from-floor)
+  let tableRaw = '';
+  try {
+    const sel = document.getElementById('cart-table');
+    tableRaw = String((sel && sel.value) || cust.table || '').trim();
+  } catch (_) {
+    tableRaw = String(cust.table || '').trim();
+  }
   if (!tableRaw || /walk-?in|take\s*away|takeaway/i.test(tableRaw)) {
-    // Cleared / walk-in: if we own a cart-driven ticket, mark it free by deleting empty or leave
     return;
   }
-  // Dine-in only (or table label implies dine-in)
-  let isDine = /table/i.test(tableRaw);
+  // Any real table selection with cart items marks Dining on floor.
+  // (Default POS order-type is Takeaway — do not require staff to toggle Dine-in.)
+  const looksLikeTable =
+    /table/i.test(tableRaw) ||
+    /^\d{1,4}[A-Za-z]?$/.test(tableRaw) ||
+    /^t[\s.-]*\d+/i.test(tableRaw);
+  let isDine = looksLikeTable;
   try {
     const btn = document.querySelector('.order-type-btn.active');
-    const t = (btn && (btn.textContent || btn.getAttribute('aria-label') || '')) || '';
+    const t = (btn && (btn.textContent || btn.getAttribute('aria-label') || btn.title || '')) || '';
     if (/dine/i.test(t)) isDine = true;
-    if (/take|deliver/i.test(t) && !/dine/i.test(t)) isDine = false;
+    if (/deliver/i.test(t) && !/dine/i.test(t) && !looksLikeTable) isDine = false;
   } catch (_) {}
   if (!isDine) return;
+
+  // When a table is selected, force dine-in chrome so floor + cart stay consistent
+  try {
+    if (looksLikeTable) {
+      const cartEl = document.querySelector('.pos-cart');
+      if (cartEl) cartEl.classList.add('is-dinein');
+      const btns = document.querySelectorAll('.order-type-btn');
+      btns.forEach((b) => {
+        const lab = (b.textContent || b.getAttribute('aria-label') || b.title || '').toLowerCase();
+        if (lab.includes('dine')) b.classList.add('active');
+        else if (lab.includes('take') || lab.includes('deliv')) b.classList.remove('active');
+      });
+    }
+  } catch (_) {}
 
   const items = (cart || []).map((c) => ({
     id: c.id || c.name,
@@ -938,6 +963,7 @@ async function syncFloorOccupancyFromCart() {
       (Number.isFinite(tableDig) && dig(tn) === tableDig);
     if (!same) return false;
     const st = String(r.status || '');
+    const oid = String(r.orderId || r.id || '');
     return (
       st === 'DineIn Active' ||
       st === 'Accepted' ||
@@ -947,21 +973,39 @@ async function syncFloorOccupancyFromCart() {
       st === 'Ready' ||
       st === 'served' ||
       r.source === 'floor_seat' ||
-      r.source === 'pos_cart'
+      r.source === 'pos_cart' ||
+      oid.indexOf('cart_') === 0 ||
+      oid.indexOf('seat_') === 0
     );
   });
 
   // Prefer our cart-driven row, else any seat placeholder, else create
   let row =
-    active.find((r) => r.source === 'pos_cart' || (r.id && String(r.id).indexOf('cart_') === 0)) ||
-    active.find((r) => r.source === 'floor_seat') ||
+    active.find(
+      (r) =>
+        r.source === 'pos_cart' ||
+        String(r.orderId || '').indexOf('cart_') === 0 ||
+        String(r.id || '').indexOf('cart_') === 0
+    ) ||
+    active.find(
+      (r) =>
+        r.source === 'floor_seat' ||
+        String(r.orderId || '').indexOf('seat_') === 0
+    ) ||
     active[0] ||
     null;
 
   const covers = Math.max(0, Number(cust.covers != null ? cust.covers : 0) || 0);
-  if (row && row.id) {
+  const orderKey =
+    (row && (row.orderId || row.id)) ||
+    __floorOccId ||
+    'cart_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+
+  if (row && row.id != null) {
     const next = {
       ...row,
+      // Keep cloud bigint id when present; keep logical orderId for matching
+      orderId: row.orderId || orderKey,
       tableNumber: tableRaw,
       table: tableRaw,
       items,
@@ -986,13 +1030,17 @@ async function syncFloorOccupancyFromCart() {
       source: row.source === 'waiter_pos' || row.source === 'qr' ? row.source : row.source || 'pos_cart',
       dateTime: row.dateTime || new Date().toISOString(),
     };
-    await RS_DB.put('pending_orders', row.id, next);
-    __floorOccId = row.id;
+    try {
+      const saved = await RS_DB.put('pending_orders', row.id, next);
+      __floorOccId = (saved && saved.id != null ? saved.id : row.id);
+    } catch (e) {
+      console.warn('[floor occupancy] update failed', e);
+    }
   } else {
-    const id = 'cart_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const logicalId = String(orderKey);
     const next = {
-      id,
-      orderId: id,
+      // Do NOT set numeric-only id — let cloud identity allocate; dual-write uses orderId
+      orderId: logicalId,
       tableNumber: tableRaw,
       table: tableRaw,
       status: 'DineIn Active',
@@ -1010,8 +1058,13 @@ async function syncFloorOccupancyFromCart() {
       priority: 'normal',
       source: 'pos_cart',
     };
-    await RS_DB.put('pending_orders', id, next);
-    __floorOccId = id;
+    try {
+      // Pass logical id so local cache can key it; CLOUD path strips non-numeric PK
+      const saved = await RS_DB.put('pending_orders', logicalId, next);
+      __floorOccId = saved && saved.id != null ? saved.id : logicalId;
+    } catch (e) {
+      console.warn('[floor occupancy] create failed', e);
+    }
   }
 
   try {

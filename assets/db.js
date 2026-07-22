@@ -1148,10 +1148,22 @@
       // uuid PK tables: never send logical codes (RES-… / TKT-… / OFF-…) as id —
       // Postgres uuid columns reject them. Leave id empty so gen_random_uuid() runs.
       if (m.uuidPK && cleanId != null && !isUuid(cleanId)) cleanId = null;
-      const cleanObj = { ...obj, id: cleanId != null ? cleanId : obj.id };
+      // pending_orders uses bigint IDENTITY. Client strings (cart_… / seat_…) hash to
+      // synthetic numbers that fail or collide. Leave id empty and keep order_id.
+      const pendingLogical =
+        c === 'pending_orders' &&
+        id != null &&
+        !Number.isFinite(Number(id));
+      if (pendingLogical) cleanId = null;
+      const cleanObj = { ...obj, id: cleanId != null ? cleanId : (pendingLogical ? undefined : obj.id) };
       if (m.uuidPK && !isUuid(cleanObj.id)) delete cleanObj.id;
+      if (pendingLogical) delete cleanObj.id;
       const body = m.to(cleanObj);
       if (m.uuidPK && body && body[m.pk] != null && !isUuid(body[m.pk])) delete body[m.pk];
+      if (pendingLogical) {
+        delete body.id;
+        if (!body.order_id) body.order_id = String(obj.orderId || id);
+      }
 
       // Bills: upsert on (tenant_id, order_id) — multi-device safe, no hash PK races
       if (c === 'bills' && body.order_id) {
@@ -1187,12 +1199,41 @@
         }
         return { ...obj, ...cleanObj, id: cleanId };
       }
+      // pending_orders: if we already have this order_id in cloud, update by order_id
+      if (c === 'pending_orders' && body.order_id) {
+        try {
+          const existing = await API.select(m.table, {
+            filters: [{ operator: 'eq', column: 'order_id', value: body.order_id }],
+            limit: 1,
+          }).catch(() => null);
+          const ex = Array.isArray(existing) && existing[0] ? existing[0] : null;
+          if (ex && ex.id != null) {
+            const upd = { ...body };
+            delete upd.id;
+            try {
+              await API.update(m.table, upd, [{ operator: 'eq', column: 'id', value: ex.id }]);
+            } catch (err) {
+              if (!omitUnsupportedOptionalColumns(c, upd, err)) throw err;
+              await API.update(m.table, upd, [{ operator: 'eq', column: 'id', value: ex.id }]);
+            }
+            if (!known[c]) known[c] = new Set();
+            known[c].add(String(ex.id));
+            return { ...obj, id: ex.id, orderId: body.order_id };
+          }
+        } catch (e) {
+          console.warn('[RS_DB] pending_orders order_id lookup failed', e && e.message);
+        }
+      }
       // Only auto-generate a new ID if clientId mode AND the body doesn't already have one
       if(m.clientId && !body[m.pk]) { body[m.pk] = cleanId || newClientId(); }
       // uuidPK tables have a DB-side gen_random_uuid() default and a client-side
       // text id (e.g. "PO-123456") that can't live in a uuid column. Leave the id
       // off the insert so the database generates it; the human-readable code is
       // preserved in a dedicated column (po_number / ticket_number / etc.).
+      else if (c === 'pending_orders' || c === 'bills') {
+        // bigint identity — never force a client hash id on insert
+        if (body.id == null || pendingLogical) delete body.id;
+      }
       else if(!body[m.pk] && !m.uuidPK && c !== 'bills') { body[m.pk] = cleanId; }
       else if (c === 'bills' && body.id == null) { /* leave id for identity */ }
       else if(!body[m.pk] && !m.uuidPK) { body[m.pk] = cleanId; }
@@ -1204,7 +1245,7 @@
         } catch (err) {
           // Unique on order_id → update that row instead of hashing client id
           const msg = String(err && err.message || '');
-          if (c === 'bills' && body.order_id && /duplicate|unique|order_id/i.test(msg)) {
+          if ((c === 'bills' || c === 'pending_orders') && body.order_id && /duplicate|unique|order_id/i.test(msg)) {
             await API.update(m.table, body, [{ operator: 'eq', column: 'order_id', value: body.order_id }]);
             const rows = await API.select(m.table, {
               filters: [{ operator: 'eq', column: 'order_id', value: body.order_id }],
@@ -1213,8 +1254,8 @@
             const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
             const newId = row && row.id != null ? row.id : cleanId;
             if (!known[c]) known[c] = new Set();
-            known[c].add(String(newId));
-            return { ...obj, id: newId };
+            if (newId != null) known[c].add(String(newId));
+            return { ...obj, id: newId, orderId: body.order_id };
           }
           // Offers unique (tenant_id, code) → update existing code instead of failing
           if (c === 'offers' && body.code && /duplicate|unique|code/i.test(msg)) {
@@ -1408,11 +1449,32 @@
               // be resurrected from this device's local cache.
               const existing = LS.read(c);
               const cloudIds = new Set(res.map(r => String(r.id)));
+              const cloudOrderIds = new Set(
+                res.map((r) => String(r.orderId || r.order_id || '')).filter(Boolean)
+              );
               const queuedPutIds = queuedWriteIdsForCollection(c);
               const localOnly = existing.filter(r => {
                 if (!r || r.id == null) return false;
                 const id = String(cleanIdForCollection(c, r.id));
-                return !cloudIds.has(id) && queuedPutIds.has(id);
+                if (cloudIds.has(id)) return false;
+                if (queuedPutIds.has(id) || queuedPutIds.has(String(r.id))) return true;
+                // Keep recent cart/seat floor tickets so Dining doesn't flash back
+                // to Available while cloud insert is in flight or offline.
+                if (c === 'pending_orders') {
+                  const oid = String(r.orderId || r.id || '');
+                  if (cloudOrderIds.has(oid)) return false;
+                  const st = String(r.status || '');
+                  const isFloor =
+                    r.source === 'pos_cart' ||
+                    r.source === 'floor_seat' ||
+                    oid.indexOf('cart_') === 0 ||
+                    oid.indexOf('seat_') === 0 ||
+                    st === 'DineIn Active';
+                  if (!isFloor) return false;
+                  const ts = Date.parse(r.dateTime || r.createdAt || '') || 0;
+                  return !ts || Date.now() - ts < 15 * 60 * 1000;
+                }
+                return false;
               });
               const merged = [...res, ...localOnly];
               LS.write(c, merged);
