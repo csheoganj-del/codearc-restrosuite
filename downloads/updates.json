@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T09:41:58.576Z",
+  "generatedAt": "2026-07-24T09:45:33.303Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
@@ -14,27 +14,27 @@
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
     "latestMacYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest-mac.yml",
     "host": "github-releases",
-    "githubRelease": "v2.0.5",
+    "githubRelease": "v2.0.7",
     "nsis": {
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Setup.exe",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Setup.exe",
       "feedFile": "RestroSuite-2.0.7-x64.exe",
-      "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe",
+      "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-2.0.7-x64.exe",
       "size": 85516768,
       "sizeLabel": "81.6 MB"
     },
     "portable": {
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Portable.exe",
       "size": 85201962,
       "sizeLabel": "81.3 MB"
     },
     "mac": {
       "appleSilicon": {
-        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-AppleSilicon.dmg",
+        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Mac-AppleSilicon.dmg",
         "size": null,
         "sizeLabel": null
       },
       "intel": {
-        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Mac-Intel.dmg",
+        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Mac-Intel.dmg",
         "size": null,
         "sizeLabel": null
       }
@@ -43,7 +43,7 @@
   "android": {
     "versionName": "2.0.4",
     "versionCode": 5,
-    "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk",
+    "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Android.apk",
     "size": 13095416,
     "sizeLabel": "12.5 MB",
     "notes": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table."
