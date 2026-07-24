@@ -189,9 +189,48 @@
   var LS = (function () {
     try { return root.localStorage || null; } catch (e) { return null; }
   })();
-  function lsGet(k) { try { return LS ? LS.getItem(k) : null; } catch (e) { return null; } }
-  function lsSet(k, v) { try { if (LS) LS.setItem(k, v); } catch (e) {} }
-  function lsDel(k) { try { if (LS) LS.removeItem(k); } catch (e) {} }
+  var SS = (function () {
+    try { return root.sessionStorage || null; } catch (e) { return null; }
+  })();
+  // iPhone Safari (and some privacy modes) can throw or silently fail localStorage
+  // writes. Mirror critical keys into sessionStorage so a just-logged-in tab still
+  // works even when localStorage is flaky. Android WebView is fine with localStorage
+  // alone — which is why the same user can work on Android and fail on iPhone.
+  function isMobileSafariLike() {
+    try {
+      var ua = String((root.navigator && navigator.userAgent) || '');
+      var iOS = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var webkit = /WebKit/i.test(ua);
+      var notCriOSOther = !/Android/i.test(ua);
+      return iOS && webkit && notCriOSOther;
+    } catch (e) {
+      return false;
+    }
+  }
+  function lsGet(k) {
+    try {
+      var v = LS ? LS.getItem(k) : null;
+      if (v != null && v !== '') return v;
+    } catch (e) {}
+    try {
+      if (SS) {
+        var s = SS.getItem(k);
+        if (s != null && s !== '') return s;
+      }
+    } catch (e2) {}
+    return null;
+  }
+  function lsSet(k, v) {
+    var ok = false;
+    try { if (LS) { LS.setItem(k, v); ok = true; } } catch (e) {}
+    try { if (SS) { SS.setItem(k, v); ok = true; } } catch (e2) {}
+    return ok;
+  }
+  function lsDel(k) {
+    try { if (LS) LS.removeItem(k); } catch (e) {}
+    try { if (SS) SS.removeItem(k); } catch (e2) {}
+  }
 
   function getDeviceId() {
     var k = 'rs_license_device_id_v1';
@@ -228,6 +267,26 @@
   function wipeLease() {
     lsDel(CFG.STORE_LEASE_KEY);
     pushLeaseToNative('', Date.now());
+  }
+
+  /** Best-effort: rehydrate remember-me into sessionStorage (iPhone tab race). */
+  function ensureSessionHydrated() {
+    try {
+      var api = root.RS_API;
+      if (!api) return false;
+      if (typeof api.session === 'function') {
+        var s = api.session();
+        if (s && s.token) return true;
+      }
+      if (typeof api.resumeRememberedSession === 'function') {
+        api.resumeRememberedSession();
+      }
+      if (typeof api.session === 'function') {
+        var s2 = api.session();
+        return !!(s2 && s2.token);
+      }
+    } catch (e) {}
+    return false;
   }
 
   /* ------------------------------------------------------------------ *
@@ -269,16 +328,22 @@
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
+  // Last refresh outcome — shown on the lock screen so iPhone users aren't stuck
+  // with a generic message when the real issue is session timing / network.
+  var _lastRefreshMeta = { status: '', error: '', at: 0 };
+
   async function refresh() {
     var deviceId = getDeviceId();
     var api = root.RS_API;
     if (!api || typeof api.lease !== 'function') {
+      _lastRefreshMeta = { status: 'api_unavailable', error: '', at: Date.now() };
       return { ok: false, reason: 'api_unavailable' };
     }
     // Mobile Safari / new tabs often hydrate remember-me into sessionStorage
     // only when session() is first called — do that before lease.
-    try { if (typeof api.session === 'function') api.session(); } catch (e) {}
+    ensureSessionHydrated();
     if (!hasSessionToken()) {
+      _lastRefreshMeta = { status: 'unauthenticated', error: '', at: Date.now() };
       return { ok: false, status: 'unauthenticated' };
     }
     try {
@@ -289,14 +354,17 @@
       if (res && res.status === 'active' && res.lease) {
         storeLease(res.lease, Number(res.server_time || Date.now()));
         lsDel('rs_license_killed_v1');
+        _lastRefreshMeta = { status: 'active', error: '', at: Date.now() };
         return { ok: true, status: 'active' };
       }
       // Any authoritative "not active" answer is the kill switch.
       if (res && (res.status === 'expired' || res.status === 'revoked')) {
         wipeLease();
         lsSet('rs_license_killed_v1', '1');
+        _lastRefreshMeta = { status: res.status, error: '', at: Date.now() };
         return { ok: false, status: res.status, kill: true };
       }
+      _lastRefreshMeta = { status: (res && res.status) || 'unknown', error: '', at: Date.now() };
       return { ok: false, status: (res && res.status) || 'unknown' };
     } catch (err) {
       var s = err && err.status;
@@ -304,13 +372,20 @@
         // Server explicitly refused (expired / revoked) — kill switch.
         wipeLease();
         lsSet('rs_license_killed_v1', '1');
+        _lastRefreshMeta = { status: 'expired', error: String(err && err.message || ''), at: Date.now() };
         return { ok: false, status: 'expired', kill: true };
       }
       if (s === 401) {
         // Session problem, not a licence problem — let the auth layer handle it.
+        _lastRefreshMeta = { status: 'unauthenticated', error: String(err && err.message || ''), at: Date.now() };
         return { ok: false, status: 'unauthenticated' };
       }
       // Network error / offline — keep whatever lease we have.
+      _lastRefreshMeta = {
+        status: 'offline',
+        error: String(err && err.message || err || ''),
+        at: Date.now()
+      };
       return { ok: false, status: 'offline', offline: true, error: String(err && err.message || err || '') };
     }
   }
@@ -341,6 +416,40 @@
    *  Evaluate current device state (verify + decide), with side effects
    *  limited to HWM bump + firstSeen bootstrap.
    * ------------------------------------------------------------------ */
+  /**
+   * Normal Safari keeps localStorage forever; Private Safari starts clean.
+   * That is why the same account works in Private + Android but hard-locks in
+   * normal Safari: a stale/corrupt/expired lease string (or kill flag) blocks
+   * the soft path because `if (!stSoft.lease)` is false when junk is present.
+   *
+   * When online + signed-in, drop unusable local leases so we can mint a fresh
+   * one. Real subscription denials still come back as 402/403 kill from refresh.
+   */
+  async function discardUnusableStoredLease() {
+    var st = readState();
+    if (!st.lease) return { wiped: false, reason: 'empty' };
+    var verified = await verifyLeaseCore(st.lease);
+    if (!verified.ok || !verified.claims) {
+      wipeLease();
+      return { wiped: true, reason: 'invalid' };
+    }
+    var exp = Number(verified.claims.lease_expires_at || 0);
+    if (!exp || Date.now() > exp) {
+      wipeLease();
+      return { wiped: true, reason: 'expired' };
+    }
+    return { wiped: false, reason: 'ok', claims: verified.claims };
+  }
+
+  function isRecoverableLockReason(reason) {
+    return reason === 'no_lease' ||
+      reason === 'invalid_lease' ||
+      reason === 'lease_expired' ||
+      reason === 'lease_no_expiry' ||
+      reason === 'bootstrap_start' ||
+      reason === 'bootstrap_grace';
+  }
+
   async function evaluateNow() {
     var st = readState();
     var now = Date.now();
@@ -408,11 +517,31 @@
     if (btn) btn.addEventListener('click', async function () {
       btn.textContent = 'Checking…'; btn.disabled = true;
       try {
-        await refreshWithRetries(5, 600);
+        ensureSessionHydrated();
+        // Clear stale kill + junk lease (Private Safari has neither — that is why
+        // it works there). Server will re-kill if subscription is truly dead.
+        if (hasSessionToken()) lsDel('rs_license_killed_v1');
+        await discardUnusableStoredLease();
+        await refreshWithRetries(6, 500);
         var ev = await evaluateNow();
         if (ev.allow && !ev.locked) {
           el.remove();
           return;
+        }
+        // Still locked but recoverable + online → soft-allow POS while we keep trying
+        if (ev.locked && hasSessionToken() && isRecoverableLockReason(ev.reason) &&
+            lsGet('rs_license_killed_v1') !== '1' && navigator.onLine !== false) {
+          await discardUnusableStoredLease();
+          el.remove();
+          startPendingLeaseLoop();
+          return;
+        }
+        var detail = _lastRefreshMeta && _lastRefreshMeta.status
+          ? (' (last: ' + _lastRefreshMeta.status + ')')
+          : '';
+        var msgEl = document.getElementById('rs-license-lock-msg');
+        if (msgEl && detail) {
+          msgEl.textContent = (messages[ev.reason] || messages.no_lease) + detail;
         }
       } catch (e) {}
       btn.textContent = 'Retry now';
@@ -485,20 +614,31 @@
     _pendingLeaseTimer = setInterval(function () {
       var st = readState();
       if (st.lease) {
-        stopPendingLeaseLoop();
-        reassess();
+        // Only stop if the stored lease is actually valid — a stale junk lease
+        // (common on normal Safari, absent in Private) must not end the loop.
+        verifyLeaseCore(st.lease).then(function (v) {
+          if (v && v.ok && v.claims && Number(v.claims.lease_expires_at || 0) > Date.now()) {
+            stopPendingLeaseLoop();
+            reassess();
+          } else {
+            wipeLease();
+          }
+        }).catch(function () { wipeLease(); });
         return;
       }
-      if (++_pendingLeaseCount > 30) {
-        // ~90s of soft tries — if still no lease, show lock with Retry.
-        stopPendingLeaseLoop();
+      if (++_pendingLeaseCount > 60) {
+        // ~3 min of soft tries. Keep POS usable; show lock only as a nudge with Retry.
+        // Do NOT hard-brick signed-in users when normal Safari has stale storage.
         if (hasSessionToken() && lsGet('rs_license_killed_v1') !== '1') {
           showLockScreen('no_lease');
           startLockedRetryLoop();
         }
+        // Keep the pending timer going so a later successful refresh still unlocks.
+        _pendingLeaseCount = 40;
         return;
       }
       if (navigator.onLine === false) return;
+      ensureSessionHydrated();
       if (!hasSessionToken()) return;
       refreshWithRetries(2, 350).then(function (r) {
         if (r && r.ok) {
@@ -544,46 +684,52 @@
     } catch (e0) {}
 
     var online = !IS_BROWSER || (typeof navigator === 'undefined') || navigator.onLine !== false;
+    ensureSessionHydrated();
 
-    // Mobile / slow devices: wait briefly for session hydrate (remember-me blob
-    // → sessionStorage) before deciding there is no lease.
+    // Mobile / slow devices: wait for session hydrate (remember-me → sessionStorage).
+    // iPhone Safari needs longer than Android WebView after login navigation.
+    var waitTicks = isMobileSafariLike() ? 15 : 8;
     if (online && !hasSessionToken()) {
-      for (var w = 0; w < 8 && !hasSessionToken(); w++) {
+      for (var w = 0; w < waitTicks && !hasSessionToken(); w++) {
         await sleep(200);
-        try { if (root.RS_API && typeof RS_API.session === 'function') RS_API.session(); } catch (e1) {}
+        ensureSessionHydrated();
       }
     }
 
-    // Online + signed-in: several lease attempts (first fetch often fails on mobile).
-    if (online) {
+    // Online + signed-in: drop stale Safari localStorage junk, then mint a lease.
+    // Private browsing has empty storage so it never hit this path — and worked.
+    if (online && hasSessionToken()) {
       try {
-        await refreshWithRetries(hasSessionToken() ? 5 : 2, 500);
+        // Stale kill flag bricks normal Safari; server re-asserts on 402/403.
+        lsDel('rs_license_killed_v1');
+        await discardUnusableStoredLease();
+        await refreshWithRetries(isMobileSafariLike() ? 7 : 5, 500);
       } catch (e2) {}
+    } else if (online) {
+      try {
+        await refreshWithRetries(2, 500);
+      } catch (e3) {}
     }
 
     var ev = await evaluateNow();
 
-    // Soft path: online, logged in, not kill-switched, but lease not banked yet.
-    // Desktop often already has a lease in localStorage; mobile is a fresh device
-    // and must not hard-lock on first paint while lease is still fetching.
+    // Soft path: online + logged in + recoverable. Must run even when a JUNK
+    // lease string exists in localStorage (the Private-vs-normal Safari bug).
     if (ev.locked && online && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1' &&
-        (ev.reason === 'no_lease' || ev.reason === 'invalid_lease' || ev.reason === 'bootstrap_start' ||
-         ev.reason === 'bootstrap_grace')) {
-      var stSoft = readState();
-      if (!stSoft.lease) {
-        hideLockScreen();
-        if (!_started) { _started = true; startWatch(); }
-        startPendingLeaseLoop();
-        setTimeout(function () {
-          refreshWithRetries(6, 700).then(function (r) {
-            if (r && r.ok) {
-              stopPendingLeaseLoop();
-              reassess();
-            }
-          }).catch(function () {});
-        }, 400);
-        return true;
-      }
+        isRecoverableLockReason(ev.reason)) {
+      try { await discardUnusableStoredLease(); } catch (e4) {}
+      hideLockScreen();
+      if (!_started) { _started = true; startWatch(); }
+      startPendingLeaseLoop();
+      setTimeout(function () {
+        refreshWithRetries(8, 600).then(function (r) {
+          if (r && r.ok) {
+            stopPendingLeaseLoop();
+            reassess();
+          }
+        }).catch(function () {});
+      }, 300);
+      return true;
     }
 
     if (ev.locked) {
@@ -675,14 +821,13 @@
   async function reassess() {
     var ev = await evaluateNow();
     if (ev.locked) {
-      if (navigator.onLine !== false && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1') {
-        var st = readState();
-        if (!st.lease && (ev.reason === 'no_lease' || ev.reason === 'invalid_lease')) {
-          // Soft: keep POS usable while pending lease loop works.
-          if (_pendingLeaseTimer) return;
-          startPendingLeaseLoop();
-          return;
-        }
+      if (navigator.onLine !== false && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1' &&
+          isRecoverableLockReason(ev.reason)) {
+        try { await discardUnusableStoredLease(); } catch (e) {}
+        // Soft: keep POS usable while pending lease loop works.
+        if (!_pendingLeaseTimer) startPendingLeaseLoop();
+        hideLockScreen();
+        return;
       }
       showLockScreen(ev.reason);
     } else {

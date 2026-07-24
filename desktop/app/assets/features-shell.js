@@ -2220,12 +2220,17 @@
     const moreBtn = $('#mnav-more');
     if(moreBtn){
       const MORE = [
+        ['pos-tab','POS / Sell','cash-register'],
+        ['bills-tab','Bills','file-invoice-dollar'],
         ['floor-tab','Floor & Tables','chair'],
+        ['qr-orders-tab','QR Orders','qrcode'],
+        ['kds-tab','Kitchen Display','fire-burner'],
         ['aggregator-tab','Online Orders','bowl-rice'],
         ['tokens-tab','Token Display','bullhorn'],
         ['inventory-tab','Inventory','boxes-stacked'],
         ['editor-tab','Menu Editor','pen-to-square'],
         ['customers-tab','Customers','address-book'],
+        ['reports-tab','Reports','chart-line'],
         ['tax-tab','Tax & GST','file-invoice'],
         ['employees-tab','Employees','users'],
         ['analytics-tab','Advanced Analytics','chart-mixed'],

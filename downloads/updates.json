@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-07-21T10:18:30.590Z",
+  "generatedAt": "2026-07-24T09:41:58.576Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v214-20260720-ops-mode-live-update",
-    "title": "Kitchen modes + professional desktop live updates",
-    "summary": "Outlet operating modes (full ops / kitchen printer only / billing only). Desktop app can pull feature updates from the live site without waiting for a full EXE rebuild. Help → Check for Updates installs the new UI.",
+    "version": "v215-20260722-scan-cart-floor",
+    "title": "Scanner UI + cart scroll + live table status",
+    "summary": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
-    "version": "2.0.5",
+    "version": "2.0.7",
     "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
     "latestMacYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest-mac.yml",
@@ -17,15 +17,15 @@
     "githubRelease": "v2.0.5",
     "nsis": {
       "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Setup.exe",
-      "feedFile": "RestroSuite-2.0.5-x64.exe",
+      "feedFile": "RestroSuite-2.0.7-x64.exe",
       "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-2.0.5-x64.exe",
-      "size": 85191251,
-      "sizeLabel": "81.2 MB"
+      "size": 85516768,
+      "sizeLabel": "81.6 MB"
     },
     "portable": {
       "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Windows-Portable.exe",
-      "size": 84876516,
-      "sizeLabel": "80.9 MB"
+      "size": 85201962,
+      "sizeLabel": "81.3 MB"
     },
     "mac": {
       "appleSilicon": {
@@ -44,8 +44,8 @@
     "versionName": "2.0.4",
     "versionCode": 5,
     "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.5/RestroSuite-Android.apk",
-    "size": 12728998,
-    "sizeLabel": "12.1 MB",
-    "notes": "Outlet operating modes (full ops / kitchen printer only / billing only). Desktop app can pull feature updates from the live site without waiting for a full EXE rebuild. Help → Check for Updates installs the new UI."
+    "size": 13095416,
+    "sizeLabel": "12.5 MB",
+    "notes": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table."
   }
 }

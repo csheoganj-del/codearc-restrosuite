@@ -505,6 +505,122 @@ button.rs10-mcard:active { transform: scale(0.99); }
   color: var(--red, #ef4444) !important;
   min-width: 42px;
 }
+
+/* Bills mobile cards — icon action row + more menu (matches desktop toolbar) */
+.rs10-bill-cards {
+  overflow: visible;
+}
+.rs10-bill-card {
+  overflow: visible;
+  position: relative;
+}
+.rs10-bill-acts {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
+}
+.rs10-bill-more.is-open {
+  z-index: 20;
+}
+.rs10-bill-acts .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 6px !important;
+  font-size: 15px !important;
+}
+.rs10-bill-acts .btn i {
+  font-size: 15px;
+  pointer-events: none;
+}
+.rs10-bill-acts .btn .fa-whatsapp {
+  color: #25d366;
+}
+.rs10-bill-more {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+.rs10-bill-more > .btn {
+  min-width: 42px;
+  flex: none;
+}
+.rs10-bill-more-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 50;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke-2, #e5e7eb);
+  background: var(--panel-solid, var(--panel, #fff));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rs10-bill-more-menu[hidden] {
+  display: none !important;
+}
+.rs10-bill-more-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #1a1917);
+  padding: 11px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+.rs10-bill-more-item:hover,
+.rs10-bill-more-item:active {
+  background: var(--glass-2, rgba(0, 0, 0, 0.04));
+}
+.rs10-bill-more-item.danger {
+  color: #ef4444;
+}
+.rs10-bill-more-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rs10-bill-more-item i {
+  width: 16px;
+  text-align: center;
+  opacity: 0.9;
+}
+.rs10-bill-card .rs10-mcard-meta {
+  font-size: 12px;
+  font-weight: 600;
+}
+.rs10-bill-load-more {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  justify-content: center;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  border: 1px dashed var(--stroke-2, #e5e7eb) !important;
+}
+.rs10-inv-fefo {
+  color: var(--orange, #FF4F00) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+.rs10-inv-fefo i {
+  margin-right: 4px;
+  opacity: 0.85;
+}
 .rs10-inv-meter {
   height: 7px;
   border-radius: 99px;

@@ -27,6 +27,8 @@
 <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
 <meta name="theme-color" content="#FF4F00">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
+<!-- Native shells (Android offline / early inject): sets ENV_SUPABASE_* before config.js -->
+<script src="env-config.js"></script>
 <script src="config.js"></script>
 <script>
   // Ensure we read runtime config (window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__)
@@ -298,7 +300,7 @@
 
       <div class="story-feats">
         <div class="story-feat"><i class="fa-solid fa-shield-halved"></i> Role-controlled access for every staff member</div>
-        <div class="story-feat" id="feat-tax-receipt"><i class="fa-brands fa-whatsapp"></i> <span id="feat-tax-label">GST</span> receipts delivered to WhatsApp instantly</div>
+        <div class="story-feat" id="feat-tax-receipt"><i class="fa-brands fa-whatsapp"></i> Receipts delivered to WhatsApp instantly</div>
         <div class="story-feat"><i class="fa-solid fa-qrcode"></i> QR table ordering — no app download needed</div>
         <div class="story-feat"><i class="fa-solid fa-chart-line"></i> Live sales reports &amp; automatic daily close-out</div>
         <div class="story-feat"><i class="fa-solid fa-credit-card"></i> UPI · card · cash · wallet — every payment mode</div>
@@ -1164,7 +1166,7 @@
       // Manual offline open is intentional — allow dashboard even after a prior sign-out flag
       try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
       showOk(navigator.onLine ? 'Opening your dashboard...' : 'Opening offline dashboard...');
-      setTimeout(()=>location.href='dashboard',250);
+      setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),250);
     };
   }
   window.addEventListener('online', updateOfflineResume);
@@ -1231,7 +1233,7 @@
           }
         }
       }
-      setTimeout(function () { location.href = 'dashboard'; }, 280);
+      setTimeout(function () { location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'); }, 280);
     } catch (e) {
       updateOfflineResume();
     }
@@ -1284,7 +1286,7 @@
         }
         try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
         showOk('Offline mode — opening your saved dashboard…');
-        setTimeout(()=>location.href='dashboard',350);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),350);
       } else {
         showErr('Offline login needs a saved session. Connect to internet, sign in once with “Keep me signed in” checked, then you can open the app offline.');
         loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
@@ -1297,8 +1299,43 @@
       await waitForRuntimeConfig();
       if(window.RS_API && RS_API.configured){
         await RS_API.login({ slug, username:u, password:p, remember });
+        // Mint a licence lease BEFORE leaving login. Normal Safari often has a
+        // stale/corrupt lease in localStorage (Private Safari does not — and works).
+        // Banking a fresh lease here prevents the post-login "Reconnect" lock.
+        try {
+          if (typeof RS_API.lease === 'function') {
+            let deviceId = null;
+            try { deviceId = localStorage.getItem('rs_license_device_id_v1'); } catch (_) {}
+            if (!deviceId) {
+              try { deviceId = sessionStorage.getItem('rs_license_device_id_v1'); } catch (_) {}
+            }
+            if (!deviceId) {
+              deviceId = 'dev_' + (crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36)));
+              try { localStorage.setItem('rs_license_device_id_v1', deviceId); } catch (_) {}
+              try { sessionStorage.setItem('rs_license_device_id_v1', deviceId); } catch (_) {}
+            }
+            try { localStorage.removeItem('rs_license_killed_v1'); } catch (_) {}
+            try { sessionStorage.removeItem('rs_license_killed_v1'); } catch (_) {}
+            const leaseRes = await RS_API.lease(deviceId);
+            if (leaseRes && leaseRes.status === 'active' && leaseRes.lease) {
+              const leaseKey = 'rs_license_lease_v1';
+              const hwmKey = 'rs_license_hwm_v1';
+              const firstKey = 'rs_license_firstseen_v1';
+              const serverTime = String(leaseRes.server_time || Date.now());
+              try { localStorage.setItem(leaseKey, leaseRes.lease); } catch (_) {}
+              try { sessionStorage.setItem(leaseKey, leaseRes.lease); } catch (_) {}
+              try { localStorage.setItem(hwmKey, serverTime); } catch (_) {}
+              try { sessionStorage.setItem(hwmKey, serverTime); } catch (_) {}
+              try {
+                if (!localStorage.getItem(firstKey)) localStorage.setItem(firstKey, String(Date.now()));
+              } catch (_) {}
+            }
+          }
+        } catch (leaseErr) {
+          console.warn('[login] pre-dashboard lease mint failed (dashboard will retry):', leaseErr && leaseErr.message);
+        }
         showOk('Verified — opening your console…');
-        setTimeout(()=>location.href='dashboard',700);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
       } else {
         if(slug === 'superadmin'){
           throw new Error('Super-Admin is cloud-only. Please wait a moment and try again.');
@@ -1312,7 +1349,7 @@
           showOk('Demo mode — opening your console…');
           // Tab-scoped only — never write live tenant identity into shared localStorage.
           try{ sessionStorage.setItem('tenant_id', slug); sessionStorage.setItem('tenant_slug', slug); }catch(e){}
-          setTimeout(()=>location.href='dashboard',700);
+          setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
         } else {
           // Cloud not configured yet (slow /api/config or host missing env) — not the same as unknown outlet
           const cloudReady = !!(window.__SUPABASE_URL__ && window.__SUPABASE_ANON_KEY__);
@@ -1568,7 +1605,7 @@
           sessionStorage.setItem('tenant_slug', tenantId);
         } catch(e){}
         showOk('Outlet created! Redirecting to your new console…');
-        setTimeout(()=>location.href='dashboard',900);
+        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),900);
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;

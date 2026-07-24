@@ -1,8 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <!-- PWA -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
@@ -21,24 +22,25 @@
   <meta property="og:site_name" content="RestroSuite">
   <meta property="og:locale" content="en_IN">
   <meta property="og:url" content="https://restrosuite.codearc.co.in/">
-  <meta property="og:title" content="RestroSuite — Free Offline Restaurant POS">
-  <meta property="og:description" content="Bill offline. Send WhatsApp receipts. Kitchen display &amp; QR ordering. Free to start — no credit card.">
-  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=12">
-  <meta property="og:image:secure_url" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=12">
+  <meta property="og:title" content="RestroSuite — Offline-First Restaurant POS">
+  <meta property="og:description" content="Bill when Wi‑Fi dies. WhatsApp receipts, kitchen display &amp; QR ordering. Free to start for Indian restaurants.">
+  <meta property="og:image" content="https://restrosuite.codearc.co.in/assets/og-share.png">
+  <meta property="og:image:secure_url" content="https://restrosuite.codearc.co.in/assets/og-share.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="RestroSuite — The restaurant POS that never goes down. Offline billing, WhatsApp receipts, QR &amp; KDS.">
+  <meta property="og:image:alt" content="RestroSuite — Offline-first restaurant POS: billing, WhatsApp receipts, KDS and QR ordering.">
   <!-- Twitter / X large image card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="RestroSuite — Free Offline Restaurant POS">
-  <meta name="twitter:description" content="Bill offline. WhatsApp receipts. Kitchen display &amp; QR orders. Free to start — no card needed.">
-  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/restrosuite-social.png?v=12">
+  <meta name="twitter:title" content="RestroSuite — Offline-First Restaurant POS">
+  <meta name="twitter:description" content="Bill when Wi‑Fi dies. WhatsApp receipts, kitchen display &amp; QR ordering. Free to start.">
+  <meta name="twitter:image" content="https://restrosuite.codearc.co.in/assets/og-share.png">
   <meta name="twitter:image:alt" content="RestroSuite — Offline-first restaurant POS by CodeArc">
   <link rel="canonical" href="https://restrosuite.codearc.co.in/">
   <!-- Favicons — SVG preferred, PNG fallback -->
   <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=8">
   <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
+  <link rel="apple-touch-icon" href="assets/restrosuite-mark-512.png?v=8" sizes="512x512">
   <title>RestroSuite — Offline-First Restaurant POS &amp; Billing</title>
   <!-- Returning staff: skip marketing homepage when keep-me-signed-in session exists -->
   <script>
@@ -88,9 +90,10 @@
     "@type": "SoftwareApplication",
     "name": "RestroSuite",
     "applicationCategory": "BusinessApplication",
-    "operatingSystem": "Web, Android, Windows",
+    "operatingSystem": "Web, Android, Windows, macOS",
     "description": "Offline-first restaurant POS, billing, kitchen display, WhatsApp receipts, and QR table ordering by CodeArc Tech Labs.",
     "url": "https://restrosuite.codearc.co.in/",
+    "image": "https://restrosuite.codearc.co.in/assets/og-share.png",
     "offers": {
       "@type": "Offer",
       "price": "0",
@@ -115,66 +118,174 @@
     /* ===== SMOOTH SCROLL ===== */
     html { scroll-behavior: smooth; }
 
-    /* ===== DOWNLOADS HUB ===== */
-    .dl-section { padding-top: 28px; padding-bottom: 20px; }
+    /* ===== DOWNLOADS / INSTALL HUB (10/10) ===== */
+    .dl-section {
+      padding-top: 40px; padding-bottom: 48px;
+      background:
+        radial-gradient(900px 280px at 50% 0%, rgba(255,79,0,.07), transparent 70%),
+        transparent;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .dl-section .section-head { margin-bottom: 28px; }
+    .dl-path {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      max-width: 720px; margin: 0 auto 22px;
+    }
+    .dl-step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: 14px;
+      background: var(--panel-solid, var(--surface-solid));
+      border: 1px solid var(--stroke-2);
+      font-size: 13px; font-weight: 600; color: var(--text-soft);
+    }
+    .dl-step b {
+      width: 26px; height: 26px; border-radius: 8px; flex: none;
+      display: grid; place-items: center; font-size: 12px; font-weight: 800;
+      background: rgba(255,79,0,.12); color: var(--orange);
+    }
+    .dl-recommend {
+      display: none; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+      max-width: 920px; margin: 0 auto 20px; padding: 14px 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(255,79,0,.12), rgba(42,155,143,.08));
+      border: 1px solid rgba(255,79,0,.28);
+    }
+    .dl-recommend.is-on { display: flex; }
+    .dl-recommend .dl-rec-copy { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .dl-recommend .dl-rec-ic {
+      width: 42px; height: 42px; border-radius: 12px; flex: none;
+      display: grid; place-items: center; font-size: 18px;
+      background: #fff; color: var(--orange);
+      box-shadow: 0 6px 16px -8px rgba(0,0,0,.2);
+    }
+    .dl-recommend strong { display: block; font-size: 14.5px; letter-spacing: -.02em; }
+    .dl-recommend span { font-size: 12.5px; color: var(--text-soft); }
+    .dl-trust {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 10px;
+      margin: 0 auto 22px; max-width: 720px;
+    }
+    .dl-trust span {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12.5px; font-weight: 600; color: var(--text-soft);
+      padding: 6px 11px; border-radius: 999px;
+      background: var(--glass-2); border: 1px solid var(--stroke-2);
+    }
+    .dl-trust i { color: var(--green); font-size: 11px; }
     .dl-meta {
-      text-align: center; font-size: 13px; color: var(--text-mute); margin: -8px 0 22px;
+      text-align: center; font-size: 12.5px; color: var(--text-mute); margin: 0 0 18px;
     }
     .dl-meta b { color: var(--text-soft); font-weight: 700; }
-    .dl-subhead {
-      font-size: 15px; font-weight: 800; letter-spacing: -.01em; margin: 28px 0 14px; color: var(--text);
-    }
     .dl-grid {
       display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
     }
-    .dl-grid-guides { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .dl-card {
+      position: relative;
       background: var(--panel-solid, var(--surface-solid, #fff));
       border: 1px solid var(--stroke-2);
-      border-radius: 18px;
-      padding: 20px 18px 16px;
-      display: flex; flex-direction: column; gap: 10px;
+      border-radius: 20px;
+      padding: 22px 18px 16px;
+      display: flex; flex-direction: column; gap: 11px;
       box-shadow: var(--shadow-md, 0 12px 30px -18px rgba(0,0,0,.18));
       transition: border-color .2s, transform .2s, box-shadow .2s;
       min-height: 100%;
     }
-    .dl-card:hover { border-color: rgba(255,79,0,.35); transform: translateY(-2px); }
+    .dl-card:hover { border-color: rgba(255,79,0,.35); transform: translateY(-3px); box-shadow: 0 18px 40px -20px rgba(0,0,0,.22); }
+    .dl-card.is-recommended {
+      border-color: rgba(255,79,0,.45);
+      box-shadow: 0 0 0 1px rgba(255,79,0,.12), 0 18px 44px -18px rgba(255,79,0,.35);
+    }
     .dl-card.unavailable { opacity: .72; }
-    .dl-card-top { display: flex; align-items: flex-start; gap: 12px; }
+    .dl-badge {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+      padding: 4px 9px; border-radius: 999px;
+      background: var(--orange); color: #fff;
+    }
+    .dl-card-top { display: flex; align-items: flex-start; gap: 12px; padding-right: 72px; }
     .dl-ic {
-      width: 44px; height: 44px; border-radius: 12px; flex: none;
-      display: grid; place-items: center; font-size: 20px;
+      width: 48px; height: 48px; border-radius: 14px; flex: none;
+      display: grid; place-items: center; font-size: 22px;
       background: rgba(255,79,0,.1); color: var(--orange);
     }
-    .dl-ic.android { background: rgba(61,220,132,.12); color: #1fa463; }
-    .dl-ic.windows { background: rgba(0,120,215,.1); color: #0078d4; }
-    .dl-ic.web { background: rgba(42,155,143,.12); color: var(--teal, #2a9b8f); }
+    .dl-ic.android { background: rgba(61,220,132,.14); color: #1fa463; }
+    .dl-ic.windows { background: rgba(0,120,215,.12); color: #0078d4; }
+    .dl-ic.mac { background: rgba(0,0,0,.06); color: #111; }
+    .dl-ic.web { background: rgba(42,155,143,.14); color: var(--teal, #2a9b8f); }
     .dl-ic.pdf { background: rgba(239,68,68,.1); color: #dc2626; }
-    .dl-card h3 { font-size: 16px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 0; }
+    .dl-card h3 { font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; margin: 0; }
     .dl-card .platform {
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-      color: var(--text-mute); margin-top: 2px;
+      color: var(--text-mute); margin-top: 3px;
     }
-    .dl-card p { font-size: 13.5px; line-height: 1.45; color: var(--text-soft); margin: 0; flex: 1; }
+    .dl-card p { font-size: 13.5px; line-height: 1.5; color: var(--text-soft); margin: 0; flex: 1; }
     .dl-stats {
       display: flex; flex-wrap: wrap; gap: 8px 12px; font-size: 12px; color: var(--text-mute);
     }
-    .dl-stats span { display: inline-flex; align-items: center; gap: 5px; }
-    .dl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-    .dl-actions .btn { min-height: 40px; padding: 0 14px; font-size: 13.5px; border-radius: 11px; }
+    .dl-stats span {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px; border-radius: 999px; background: var(--glass-2); border: 1px solid var(--stroke);
+    }
+    .dl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+    .dl-actions .btn { min-height: 42px; padding: 0 15px; font-size: 13.5px; border-radius: 12px; font-weight: 700; }
+    .dl-actions .btn-ghost {
+      background: transparent; border: 1px solid var(--stroke-2); color: var(--text-soft);
+    }
+    .dl-actions .btn-ghost:hover { border-color: var(--stroke-hi); color: var(--text); }
     .dl-actions .btn[disabled], .dl-actions .btn.is-disabled {
       opacity: .5; pointer-events: none; cursor: not-allowed;
     }
+    .dl-tip {
+      font-size: 12px; line-height: 1.4; color: var(--text-mute); margin: 0;
+      padding-top: 2px;
+    }
+    .dl-tip i { color: var(--amber, #d97706); margin-right: 4px; }
+    .dl-guides {
+      margin-top: 22px; border-radius: 16px; border: 1px solid var(--stroke-2);
+      background: var(--panel-solid, var(--surface-solid));
+      overflow: hidden;
+    }
+    .dl-guides > summary {
+      list-style: none; cursor: pointer; user-select: none;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 16px 18px; font-size: 14.5px; font-weight: 800; color: var(--text);
+    }
+    .dl-guides > summary::-webkit-details-marker { display: none; }
+    .dl-guides > summary .dl-guides-meta {
+      font-size: 12.5px; font-weight: 600; color: var(--text-mute);
+    }
+    .dl-guides > summary .chev {
+      transition: transform .2s; color: var(--text-mute);
+    }
+    .dl-guides[open] > summary .chev { transform: rotate(180deg); }
+    .dl-guides-body { padding: 0 16px 16px; }
+    .dl-grid-guides { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .dl-grid-guides .dl-card { padding: 16px 14px 14px; border-radius: 14px; box-shadow: none; }
+    .dl-grid-guides .dl-card-top { padding-right: 0; }
+    .dl-grid-guides .dl-ic { width: 40px; height: 40px; font-size: 17px; border-radius: 11px; }
+    .dl-grid-guides h3 { font-size: 14.5px; }
+    .dl-grid-guides p { font-size: 12.5px; }
     .dl-foot {
-      text-align: center; margin-top: 22px; font-size: 13px; color: var(--text-mute); line-height: 1.5;
+      text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-mute); line-height: 1.55;
     }
     .dl-foot a { color: var(--orange); font-weight: 600; text-decoration: none; }
     .dl-foot a:hover { text-decoration: underline; }
+    .hero-secondary-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--text-mute);
+      text-decoration: none;
+    }
+    .hero-secondary-link:hover { color: var(--orange); }
     @media (max-width: 960px) {
+      .dl-path { grid-template-columns: 1fr; max-width: 420px; }
       .dl-grid, .dl-grid-guides { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 640px) {
       .dl-grid, .dl-grid-guides { grid-template-columns: 1fr; }
+      .dl-recommend { align-items: stretch; }
+      .dl-recommend .btn { width: 100%; justify-content: center; }
+      .dl-card-top { padding-right: 0; }
+      .dl-badge { position: static; align-self: flex-start; margin-bottom: 2px; }
     }
 
     /* ===== COMPAT SHIM — homepage → design tokens ===== */
@@ -745,7 +856,14 @@
 
     /* Logo strip */
     .logo-strip { padding: 16px 0 40px; }
-    .logo-strip .lbl { text-align: center; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 22px; }
+    .logo-strip .lbl { text-align: center; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 12px; }
+    .human-strip .human-strip-line {
+      text-align: center; max-width: 520px; margin: 0 auto;
+      font-size: 14.5px; line-height: 1.5; color: var(--text-dim);
+    }
+    .human-strip .human-strip-line a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .human-strip .human-strip-line a:hover { text-decoration: underline; }
+    .logo-strip .logo-row { display: none; }
     .logo-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 40px; opacity: .75; }
     .logo-row span { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--text-dim); letter-spacing: -.01em; }
 
@@ -1444,7 +1562,8 @@
       /* Footer */
       .footer-grid { grid-template-columns: 1fr; }
     }
-  </style>
+  
+    </style>
 </head>
 <body>
   <!-- ACCESSIBILITY: Skip navigation -->
@@ -1464,11 +1583,11 @@
       </a>
 
       <nav class="nav-links" aria-label="Main navigation">
-        <a href="#downloads">Downloads</a>
+        <a href="install">Install</a>
         <a href="#features">Features</a>
-        <a href="#demo">Live Demo</a>
-        <a href="#compare">Compare</a>
-        <a href="#testimonials">Testimonials</a>
+        <a href="#demo">Try a bill</a>
+        <a href="#pricing">Pricing</a>
+        <a href="login">Sign in</a>
       </nav>
 
       <div class="nav-cta-group">
@@ -1476,7 +1595,7 @@
           <i class="fa-solid fa-sun" aria-hidden="true"></i>
         </button>
         <a class="link-signin" href="login" id="nav-signin">Sign In</a>
-        <a class="btn btn-primary btn-sm" href="login?tab=register" id="nav-cta-signup">Sign Up Free</a>
+        <a class="btn btn-primary btn-sm" href="login?tab=register" id="nav-cta-signup">Create outlet</a>
         <!-- FIX: mobile hamburger button added to HTML -->
         <button class="mobile-menu-btn" id="mobile-menu-btn"
           aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
@@ -1488,15 +1607,15 @@
 
   <!-- FIX: Mobile navigation panel -->
   <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" hidden>
-    <a href="#downloads"    onclick="closeMobileNav()"><i class="fa-solid fa-download fa-fw" aria-hidden="true"></i>Downloads</a>
-    <a href="#features"     onclick="closeMobileNav()"><i class="fa-solid fa-bolt fa-fw" aria-hidden="true"></i>Features</a>
-    <a href="#demo"         onclick="closeMobileNav()"><i class="fa-solid fa-play fa-fw" aria-hidden="true"></i>Live Demo</a>
-    <a href="#compare"      onclick="closeMobileNav()"><i class="fa-solid fa-scale-balanced fa-fw" aria-hidden="true"></i>Compare</a>
-    <a href="#testimonials" onclick="closeMobileNav()"><i class="fa-solid fa-star fa-fw" aria-hidden="true"></i>Testimonials</a>
+    <a href="install"   onclick="closeMobileNav()"><i class="fa-solid fa-download fa-fw" aria-hidden="true"></i>Install</a>
+    <a href="#features" onclick="closeMobileNav()"><i class="fa-solid fa-list fa-fw" aria-hidden="true"></i>Features</a>
+    <a href="#demo"     onclick="closeMobileNav()"><i class="fa-solid fa-receipt fa-fw" aria-hidden="true"></i>Try a bill</a>
+    <a href="#pricing"  onclick="closeMobileNav()"><i class="fa-solid fa-tag fa-fw" aria-hidden="true"></i>Pricing</a>
+    <a href="login"     onclick="closeMobileNav()"><i class="fa-solid fa-right-to-bracket fa-fw" aria-hidden="true"></i>Sign in</a>
     <div class="mob-cta-row">
       <a class="btn btn-ghost btn-block" href="login" onclick="closeMobileNav()">Sign In</a>
       <a class="btn btn-primary btn-block" href="login?tab=register" onclick="closeMobileNav()">
-        <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free
+        Create free outlet
       </a>
     </div>
   </nav>
@@ -1508,25 +1627,25 @@
         <div class="hero-content">
           <div class="hero-flag">
             <span class="pill">CodeArc</span>
-            <span>Built for Indian restaurants — works offline, syncs when you reconnect</span>
+            <span>For cafes, tiffin counters &amp; small restaurants in India</span>
           </div>
-          <h1>Run the floor, kitchen, and bills from one <span class="grad">clear console</span>.</h1>
-          <p class="hero-sub">RestroSuite is an offline-first POS with kitchen display, WhatsApp receipts, and QR table ordering. Start free on the phone or laptop you already use — no hardware purchase required.</p>
+          <h1>Bill the table, fire the kitchen, send the receipt — even when Wi‑Fi dies.</h1>
+          <p class="hero-sub">RestroSuite is the POS we use for real service: counter billing, kitchen display, floor plan, and WhatsApp bills. Runs on the phone or PC you already own. Free while we are in launch.</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="login.html?tab=register" id="hero-cta-buy">
               Create free outlet
             </a>
-            <a class="btn btn-ghost btn-lg" href="#downloads">
-              <i class="fa-solid fa-download" aria-hidden="true"></i> Downloads
-            </a>
-            <a class="btn btn-ghost btn-lg" href="#demo">
-              See how it works
+            <a class="btn btn-ghost btn-lg" href="#downloads" id="hero-cta-install">
+              <i class="fa-solid fa-download" aria-hidden="true"></i> Download for your device
             </a>
           </div>
+          <a class="hero-secondary-link" href="#demo">
+            Try a sample bill first <i class="fa-solid fa-arrow-right" aria-hidden="true" style="font-size:11px"></i>
+          </a>
           <div class="hero-trust">
-            <div class="t-item" id="hero-stars-item"><i class="fa-solid fa-star" aria-hidden="true" style="color:var(--accent)"></i> <span id="hero-stars-label">Owner-approved reviews</span></div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Free to start</div>
+            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> No card to sign up</div>
             <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Offline billing</div>
+            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> WhatsApp receipts</div>
           </div>
         </div>
 
@@ -1553,8 +1672,8 @@
             <!-- POS · primary -->
             <article class="hc-card pos active" id="seg-pos">
               <div class="hc-top">
-                <span class="hc-title" id="pos-title">POS Cart · Table 7</span>
-                <span class="hc-meta">Host View</span>
+                <span class="hc-title" id="pos-title">Bill · Table 7</span>
+                <span class="hc-meta">Counter</span>
               </div>
               <div class="hc-body" id="pos-body">
                 <div class="hc-line"><span class="dot"></span><span class="nm">1× Masala Dosa</span><span class="am">₹160</span></div>
@@ -1568,8 +1687,8 @@
             <!-- Kitchen · filled ticket (never “queue empty” on first paint) -->
             <article class="hc-card kds" id="seg-kds">
               <div class="hc-top">
-                <span class="hc-title">Kitchen Display</span>
-                <span class="hc-meta" id="kds-order">Order #A-101</span>
+                <span class="hc-title">Kitchen</span>
+                <span class="hc-meta" id="kds-order">Order #101</span>
               </div>
               <div class="hc-body" id="kds-body">
                 <div class="k-row"><span>Table 7 · Rush<br><span style="font-weight:600;opacity:.85">Masala Dosa</span></span><span class="st">PREP</span></div>
@@ -1580,8 +1699,8 @@
             <!-- Floor · occupied table highlighted -->
             <article class="hc-card floor" id="seg-qr">
               <div class="hc-top">
-                <span class="hc-title">Floor Plan · Level 1</span>
-                <span class="hc-meta">Host View</span>
+                <span class="hc-title">Floor</span>
+                <span class="hc-meta">Tables</span>
               </div>
               <div class="hc-body" id="qr-body">
                 <div class="f-grid">
@@ -1632,117 +1751,176 @@
       </div>
     </section>
 
-    <!-- ===== LOGO STRIP ===== -->
-    <div class="logo-strip container">
-      <div class="lbl">Trusted by independent cafes, cloud kitchens &amp; franchises</div>
-      <div class="logo-row" aria-label="Partner restaurants">
-        <span>The Spice Bistro</span><span>Cafe Boho</span><span>Urban Tandoor</span>
-        <span>Brew &amp; Co</span><span>Masala House</span><span>Pixel Pizza</span>
-      </div>
+    <div class="logo-strip container human-strip">
+      <p class="human-strip-line">
+        Made in India by <b>CodeArc</b> · free during launch ·
+        <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
+      </p>
     </div>
 
-    <!-- ===== DOWNLOADS (static cards always visible; sizes refresh from manifest when available) ===== -->
+    <!-- ===== INSTALL HUB — device-aware apps first; guides collapsed ===== -->
     <section class="section dl-section" id="downloads" aria-labelledby="downloads-title">
       <div class="container">
         <div class="section-head">
-          <span class="eyebrow">Apps &amp; guides</span>
-          <h2 id="downloads-title">Download RestroSuite</h2>
-          <p>Get the Android app, Windows portable app, and full PDF guides. Links stay current when we publish a new build.</p>
+          <span class="eyebrow">Install</span>
+          <h2 id="downloads-title">Use what you already have</h2>
+          <p>Counter PC, kitchen tablet, or phone. Create an outlet, install (or open the browser), sign in, and bill.</p>
         </div>
-        <div class="dl-meta" id="dl-meta" aria-live="polite">Apps · PDFs · always free during launch</div>
 
-        <div class="dl-grid" id="dl-apps" role="list" aria-label="Apps">
-          <article class="dl-card" role="listitem" data-dl-id="android-apk">
+        <div class="dl-path" aria-label="How to start">
+          <div class="dl-step"><b>1</b> Create outlet</div>
+          <div class="dl-step"><b>2</b> Install or open web</div>
+          <div class="dl-step"><b>3</b> Sign in &amp; take orders</div>
+        </div>
+
+        <div class="dl-recommend" id="dl-recommend" aria-live="polite">
+          <div class="dl-rec-copy">
+            <div class="dl-rec-ic" id="dl-rec-ic"><i class="fa-solid fa-download" aria-hidden="true"></i></div>
+            <div>
+              <strong id="dl-rec-title">Suggested for this device</strong>
+              <span id="dl-rec-sub">Based on your browser — you can still pick another option below</span>
+            </div>
+          </div>
+          <a class="btn btn-primary" id="dl-rec-btn" href="#downloads">
+            <i class="fa-solid fa-download" aria-hidden="true"></i> <span id="dl-rec-btn-label">Download</span>
+          </a>
+        </div>
+
+        <div class="dl-meta" id="dl-meta" aria-live="polite">Launch period · free to use</div>
+
+        <div class="dl-grid" id="dl-apps" role="list" aria-label="Install options">
+          <article class="dl-card" role="listitem" data-dl-id="android-apk" data-dl-platform="android">
+            <span class="dl-badge" hidden data-dl-badge>Recommended</span>
             <div class="dl-card-top">
               <div class="dl-ic android"><i class="fa-brands fa-android" aria-hidden="true"></i></div>
-              <div><h3>RestroSuite for Android</h3><div class="platform">Android APK</div></div>
+              <div><h3>Android</h3><div class="platform">Kitchen tablet · counter phone</div></div>
             </div>
-            <p>Install on kitchen tablets and counter phones. Allow “Install unknown apps” for your browser if asked.</p>
+            <p>APK for kitchen tablet or counter phone. Works offline after first login.</p>
             <div class="dl-stats" data-dl-stats><span>APK</span></div>
             <div class="dl-actions">
-              <a class="btn btn-primary" href="downloads/RestroSuite-Android.apk" download data-dl-href>
+              <a class="btn btn-primary" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Android.apk" data-dl-href>
                 <i class="fa-solid fa-download" aria-hidden="true"></i> Download APK
               </a>
             </div>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> If Chrome blocks the file, tap <b>Download anyway</b>, then allow “Install unknown apps”.</p>
           </article>
 
-          <article class="dl-card" role="listitem" data-dl-id="windows-exe">
+          <article class="dl-card" role="listitem" data-dl-id="windows-exe" data-dl-platform="windows">
+            <span class="dl-badge" hidden data-dl-badge>Recommended</span>
             <div class="dl-card-top">
               <div class="dl-ic windows"><i class="fa-brands fa-windows" aria-hidden="true"></i></div>
-              <div><h3>RestroSuite for Windows</h3><div class="platform">Windows portable</div></div>
+              <div><h3>Windows</h3><div class="platform">Counter PC · desktop</div></div>
             </div>
-            <p>Portable .exe for counter PCs — no install wizard. Run and sign in with your Outlet ID.</p>
+            <p>App for the counter PC. Portable runs without install; Setup adds a Start Menu shortcut.</p>
             <div class="dl-stats" data-dl-stats><span>EXE</span></div>
             <div class="dl-actions">
-              <a class="btn btn-primary" href="downloads/RestroSuite-Windows-Portable.exe" download data-dl-href>
-                <i class="fa-solid fa-download" aria-hidden="true"></i> Download EXE
+              <a class="btn btn-primary" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe" data-dl-href data-dl-primary>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Portable EXE
+              </a>
+              <a class="btn btn-ghost" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe" data-dl-setup>
+                Setup installer
               </a>
             </div>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Windows may show a safety prompt — click <b>More info → Run anyway</b>.</p>
           </article>
 
-          <article class="dl-card" role="listitem" data-dl-id="web-pwa">
+          <article class="dl-card" role="listitem" data-dl-id="mac-dmg" data-dl-platform="mac">
+            <span class="dl-badge" hidden data-dl-badge>Recommended</span>
+            <div class="dl-card-top">
+              <div class="dl-ic mac"><i class="fa-brands fa-apple" aria-hidden="true"></i></div>
+              <div><h3>Mac</h3><div class="platform">Desktop · counter POS</div></div>
+            </div>
+            <p>Mac desktop app. Pick Apple Silicon (M1–M4) or Intel, open the DMG, drag to Applications.</p>
+            <div class="dl-stats" data-dl-stats><span>DMG</span></div>
+            <div class="dl-actions">
+              <a class="btn btn-primary" href="/downloads/RestroSuite-Mac-AppleSilicon.dmg" data-dl-mac-arm data-dl-href data-dl-primary>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon
+              </a>
+              <a class="btn btn-ghost" href="/downloads/RestroSuite-Mac-Intel.dmg" data-dl-mac-intel>
+                Intel DMG
+              </a>
+            </div>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> First open: <b>Right‑click the app → Open</b> (one-time Mac security prompt).</p>
+          </article>
+
+          <article class="dl-card" role="listitem" data-dl-id="web-pwa" data-dl-platform="web">
+            <span class="dl-badge" hidden data-dl-badge>Recommended</span>
             <div class="dl-card-top">
               <div class="dl-ic web"><i class="fa-solid fa-globe" aria-hidden="true"></i></div>
-              <div><h3>Use in browser (PWA)</h3><div class="platform">Web · any device</div></div>
+              <div><h3>Browser / iPhone</h3><div class="platform">Web app · any device</div></div>
             </div>
-            <p>Open the live web app now. On Chrome/Safari you can “Install” / Add to Home Screen for offline use.</p>
+            <p>Open in the browser — no install. On iPhone use Safari → Share → Add to Home Screen.</p>
             <div class="dl-stats" data-dl-stats><span>Online</span></div>
             <div class="dl-actions">
               <a class="btn btn-primary" href="login" data-dl-href>
-                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open app
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> Open web app
+              </a>
+              <a class="btn btn-ghost" href="login.html?tab=register">
+                Create outlet
               </a>
             </div>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> iPhone: Safari → Share → <b>Add to Home Screen</b>.</p>
           </article>
         </div>
 
-        <h3 class="dl-subhead">PDF guides</h3>
-        <div class="dl-grid dl-grid-guides" id="dl-guides" role="list" aria-label="PDF guides">
-          <article class="dl-card" role="listitem" data-dl-id="pdf-product">
-            <div class="dl-card-top">
-              <div class="dl-ic pdf"><i class="fa-solid fa-book-open" aria-hidden="true"></i></div>
-              <div><h3>Product features guide</h3><div class="platform">PDF brochure</div></div>
+        <details class="dl-guides" id="dl-guides-wrap">
+          <summary>
+            <span><i class="fa-solid fa-book-open" aria-hidden="true" style="color:var(--orange);margin-right:8px"></i>PDF guides for owners &amp; staff</span>
+            <span>
+              <span class="dl-guides-meta">3 guides · optional</span>
+              <i class="fa-solid fa-chevron-down chev" aria-hidden="true" style="margin-left:10px"></i>
+            </span>
+          </summary>
+          <div class="dl-guides-body">
+            <div class="dl-grid dl-grid-guides" id="dl-guides" role="list" aria-label="PDF guides">
+              <article class="dl-card" role="listitem" data-dl-id="pdf-product">
+                <div class="dl-card-top">
+                  <div class="dl-ic pdf"><i class="fa-solid fa-book-open" aria-hidden="true"></i></div>
+                  <div><h3>Product features</h3><div class="platform">Brochure</div></div>
+                </div>
+                <p>Every module for owners comparing tools.</p>
+                <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+                <div class="dl-actions">
+                  <a class="btn btn-primary" href="downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                    <i class="fa-solid fa-download" aria-hidden="true"></i> Download
+                  </a>
+                </div>
+              </article>
+              <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-desktop">
+                <div class="dl-card-top">
+                  <div class="dl-ic pdf"><i class="fa-solid fa-desktop" aria-hidden="true"></i></div>
+                  <div><h3>Desktop onboarding</h3><div class="platform">Screenshots</div></div>
+                </div>
+                <p>Tabs, buttons, and full desktop flows.</p>
+                <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+                <div class="dl-actions">
+                  <a class="btn btn-primary" href="downloads/RestroSuite-Complete-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                    <i class="fa-solid fa-download" aria-hidden="true"></i> Download
+                  </a>
+                </div>
+              </article>
+              <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-mobile">
+                <div class="dl-card-top">
+                  <div class="dl-ic pdf"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></div>
+                  <div><h3>Mobile onboarding</h3><div class="platform">Phone layout</div></div>
+                </div>
+                <p>Bottom nav, More menu, checkout bar.</p>
+                <div class="dl-stats" data-dl-stats><span>PDF</span></div>
+                <div class="dl-actions">
+                  <a class="btn btn-primary" href="downloads/RestroSuite-Mobile-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
+                    <i class="fa-solid fa-download" aria-hidden="true"></i> Download
+                  </a>
+                </div>
+              </article>
             </div>
-            <p>Full feature brochure — every client module for owners evaluating the product.</p>
-            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
-            <div class="dl-actions">
-              <a class="btn btn-primary" href="downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
-                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
-              </a>
-            </div>
-          </article>
-
-          <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-desktop">
-            <div class="dl-card-top">
-              <div class="dl-ic pdf"><i class="fa-solid fa-desktop" aria-hidden="true"></i></div>
-              <div><h3>Desktop / web onboarding</h3><div class="platform">PDF guide</div></div>
-            </div>
-            <p>Step-by-step with real screenshots: every tab, button, and flow on desktop.</p>
-            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
-            <div class="dl-actions">
-              <a class="btn btn-primary" href="downloads/RestroSuite-Complete-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
-                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
-              </a>
-            </div>
-          </article>
-
-          <article class="dl-card" role="listitem" data-dl-id="pdf-onboarding-mobile">
-            <div class="dl-card-top">
-              <div class="dl-ic pdf"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></div>
-              <div><h3>Mobile / Android onboarding</h3><div class="platform">PDF guide</div></div>
-            </div>
-            <p>Same depth for phone layout — bottom nav, More menu, checkout bar.</p>
-            <div class="dl-stats" data-dl-stats><span>PDF</span></div>
-            <div class="dl-actions">
-              <a class="btn btn-primary" href="downloads/RestroSuite-Mobile-Onboarding-Guide.pdf" target="_blank" rel="noopener" data-dl-href>
-                <i class="fa-solid fa-download" aria-hidden="true"></i> Download PDF
-              </a>
-            </div>
-          </article>
-        </div>
+          </div>
+        </details>
 
         <p class="dl-foot">
-          Support: <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
-          · Direct folder: <a href="downloads/">/downloads/</a>
+          Need help installing?
+          <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
+          · Prefer the browser?
+          <a href="login.html?tab=register">Create free outlet</a>
         </p>
       </div>
     </section>
@@ -1751,35 +1929,34 @@
     <section class="section" id="features">
       <div class="container">
         <div class="section-head">
-          <span class="eyebrow">Everything in one suite</span>
-          <h2>Built for the pace of a busy kitchen</h2>
-          <p>Four core engines that replace a stack of expensive, disconnected tools.</p>
+          <span class="eyebrow">What you get</span>
+          <h2>What actually runs a shift</h2>
+          <p>Counter, kitchen, floor, and guest bill — without juggling five apps.</p>
         </div>
         <div class="features-grid">
           <div class="feature-card glass">
-            <div class="feature-ic"><i class="fa-solid fa-rotate" aria-hidden="true"></i></div>
-            <h3>Offline-First Sync</h3>
-            <p>Bill, print and take KOTs with zero internet. Everything reconciles the moment you reconnect.</p>
-            <!-- FIX: proper anchor tag with href -->
-            <a href="#demo" class="learn">Learn more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            <div class="feature-ic"><i class="fa-solid fa-wifi" aria-hidden="true"></i></div>
+            <h3>Works offline</h3>
+            <p>Take orders and print KOTs when the line drops. Changes sync when the net comes back.</p>
+            <a href="#demo" class="learn">See a sample bill <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </div>
           <div class="feature-card glass t2">
             <div class="feature-ic"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
-            <h3>WhatsApp Receipts</h3>
-            <p>Send branded GST invoices to customers in 0.8 seconds — no paper, no third-party fees.</p>
-            <a href="#demo" class="learn">Learn more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            <h3>WhatsApp receipts</h3>
+            <p>Send the bill on WhatsApp from the same screen you settle on. Needs your outlet gateway online.</p>
+            <a href="#demo" class="learn">Try it below <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </div>
           <div class="feature-card glass">
             <div class="feature-ic"><i class="fa-solid fa-qrcode" aria-hidden="true"></i></div>
-            <h3>QR Table Ordering</h3>
-            <p>Guests scan, browse and order from their seat. Tickets land straight on your KDS.</p>
-            <a href="#demo" class="learn">Learn more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            <h3>QR table ordering</h3>
+            <p>Guest scans the table QR, orders from their phone. Ticket shows on kitchen display.</p>
+            <a href="login?tab=register" class="learn">Create outlet to set tables <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </div>
           <div class="feature-card glass t2">
             <div class="feature-ic"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i></div>
-            <h3>CRM Insights</h3>
-            <p>Know your regulars, run loyalty, and trigger win-back offers from automatic customer profiles.</p>
-            <a href="#demo" class="learn">Learn more <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            <h3>Reports &amp; staff</h3>
+            <p>Day sales, GST-friendly bills, roles for owner / cashier / kitchen — so not everyone has full access.</p>
+            <a href="login" class="learn">Sign in to the console <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </div>
         </div>
       </div>
@@ -1789,31 +1966,31 @@
     <section class="section" id="empathy">
       <div class="container">
         <div class="section-head">
-          <span class="eyebrow">The honest comparison</span>
-          <h2>Two ways to run your billing</h2>
-          <p>Legacy POS systems were built for desktops and big contracts. RestroSuite was built for you.</p>
+          <span class="eyebrow">Straight talk</span>
+          <h2>What most owners are stuck with</h2>
+          <p>Many tools need a constant internet line and a long contract. This one is built for a small team on a normal phone or PC.</p>
         </div>
         <div class="empathy-grid">
           <div class="empathy-col old glass">
-            <span class="empathy-tag"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> The old way</span>
-            <h3>Expensive, fragile, complex</h3>
+            <span class="empathy-tag"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Common setup</span>
+            <h3>Paid POS + fragile Wi‑Fi</h3>
             <ul class="empathy-list">
-              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> ₹3,000–₹7,000/month locked annual contracts</li>
-              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Sales drop the moment the Wi-Fi flickers</li>
-              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Days of onboarding and sales calls to set up</li>
-              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Paper receipts &amp; manual WhatsApp forwarding</li>
-              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Your data trapped in a competitor's cloud</li>
+              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Monthly fees in the thousands, often annual lock-in</li>
+              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Billing stalls when the router flakes</li>
+              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Long demos and training before day one</li>
+              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Paper slip, then someone types it into WhatsApp</li>
+              <li><i class="fa-solid fa-xmark" aria-hidden="true"></i> Hard to leave — data lives on their stack</li>
             </ul>
           </div>
           <div class="empathy-col new glass">
-            <span class="empathy-tag"><i class="fa-solid fa-bolt" aria-hidden="true"></i> The RestroSuite way</span>
-            <h3>Lightweight, resilient, zero-cost setup</h3>
+            <span class="empathy-tag"><i class="fa-solid fa-mug-hot" aria-hidden="true"></i> With RestroSuite</span>
+            <h3>Phone, PC, or tablet you already own</h3>
             <ul class="empathy-list">
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>100% free</b> to use — no credit card</li>
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>100% offline billing</b> — never miss a sale</li>
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>5-minute setup</b>, no installation needed</li>
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>Instant WhatsApp invoices</b>, built in &amp; free</li>
-              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>You own your data</b> — self-host option available</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>Free during launch</b> — no card to register</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>Offline billing</b> on the device; sync later</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>Same day start</b> — register, add menu, bill</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>WhatsApp bill</b> from the settle flow (gateway online)</li>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i> <b>Your outlet data</b> — export and support if you leave</li>
             </ul>
           </div>
         </div>
@@ -1824,9 +2001,9 @@
     <section class="section" id="demo">
       <div class="container">
         <div class="section-head">
-          <span class="eyebrow">Interactive sandbox</span>
-          <h2>Instant WhatsApp bills</h2>
-          <p>Enter guest <b>name + mobile</b> → add items → <b>Print &amp; Pay</b>. The receipt hits WhatsApp almost instantly — often under half a second. Same flow as live POS — no signup.</p>
+          <span class="eyebrow">Hands-on</span>
+          <h2>Try a sample bill (no signup)</h2>
+          <p>Enter guest <b>name + mobile</b>, tap menu items, then <b>Print &amp; Pay</b>. Practice here before you open a real outlet — nothing is charged.</p>
         </div>
         <div class="demo-grid rs-pos-sandbox">
           <div class="pos-menu-pane">
@@ -1839,7 +2016,7 @@
             </div>
             <p class="demo-foot-note">
               <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-              <span>Guest name and WhatsApp number must be filled before billing — same idea as live POS.</span>
+              <span>Guest name and WhatsApp number are required before you can settle the bill.</span>
             </p>
           </div>
 
@@ -1915,242 +2092,84 @@
       </div>
     </section>
 
-    <!-- ===== COMPARE TABLE ===== -->
-    <section class="section" id="compare">
-      <div class="container">
-        <div class="section-head">
-          <span class="eyebrow">Head-to-head comparison</span>
-          <h2>RestroSuite vs the competition</h2>
-          <p>Every major Indian restaurant POS charges thousands per month. RestroSuite gives you more — for free.</p>
-        </div>
-
-        <!-- Competitor pricing reality strip -->
-        <div class="comp-chips-row" style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-bottom:44px;">
-          <div class="comp-price-chip glass-2">
-            <span class="comp-name">Petpooja</span>
-            <span class="comp-cost">₹2,000 – ₹4,500<small>/mo</small></span>
-          </div>
-          <div class="comp-price-chip glass-2">
-            <span class="comp-name">UrbanPiper</span>
-            <span class="comp-cost">₹3,000 – ₹6,000<small>/mo</small></span>
-          </div>
-          <div class="comp-price-chip glass-2">
-            <span class="comp-name">Posist</span>
-            <span class="comp-cost">₹5,000 – ₹10,000<small>/mo</small></span>
-          </div>
-          <div class="comp-price-chip glass-2">
-            <span class="comp-name">Marg ERP</span>
-            <span class="comp-cost">₹3,500 – ₹7,000<small>/mo</small></span>
-          </div>
-          <div class="comp-price-chip highlight">
-            <span class="comp-name">RestroSuite</span>
-            <span class="comp-cost free-tag">FREE</span>
-          </div>
-        </div>
-
-        <div class="compare-wrap glass" style="max-width:1060px;">
-          <table class="compare-table" style="table-layout:fixed;">
-            <colgroup>
-              <col style="width:26%">
-              <col style="width:18%"><!-- RS -->
-              <col style="width:14%">
-              <col style="width:14%">
-              <col style="width:14%">
-              <col style="width:14%">
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Feature</th>
-                <th scope="col" class="us" style="font-size:13px;">RestroSuite</th>
-                <th scope="col" style="font-size:12px;color:var(--text-mute);">Petpooja</th>
-                <th scope="col" style="font-size:12px;color:var(--text-mute);">UrbanPiper</th>
-                <th scope="col" style="font-size:12px;color:var(--text-mute);">Posist</th>
-                <th scope="col" style="font-size:12px;color:var(--text-mute);">Marg ERP</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Monthly cost</td>
-                <td class="us-col" style="font-size:15px;font-weight:800;color:var(--accent);">₹0 Free</td>
-                <td class="other">₹2k–₹4.5k</td>
-                <td class="other">₹3k–₹6k</td>
-                <td class="other">₹5k–₹10k</td>
-                <td class="other">₹3.5k–₹7k</td>
-              </tr>
-              <tr>
-                <td>Contract type</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> No contract</td>
-                <td class="other">Annual lock-in</td>
-                <td class="other">Annual lock-in</td>
-                <td class="other">Annual lock-in</td>
-                <td class="other">Annual lock-in</td>
-              </tr>
-              <tr>
-                <td>Offline billing</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> 100% offline</td>
-                <td class="other">Partial</td>
-                <td class="other" style="color:var(--danger);">✗ No</td>
-                <td class="other" style="color:var(--danger);">✗ No</td>
-                <td class="other">Partial</td>
-              </tr>
-              <tr>
-                <td>WhatsApp receipts</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> Built-in, free</td>
-                <td class="other">Paid add-on</td>
-                <td class="other">Paid add-on</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
-              </tr>
-              <tr>
-                <td>QR table ordering</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> Included</td>
-                <td class="other">Paid add-on</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
-              </tr>
-              <tr>
-                <td>Kitchen display (KDS)</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> Included</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other">Paid add-on</td>
-              </tr>
-              <tr>
-                <td>CRM &amp; loyalty</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> Included</td>
-                <td class="other">Paid add-on</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other"><i class="fa-solid fa-check" aria-hidden="true" style="color:var(--success)"></i> Yes</td>
-                <td class="other" style="color:var(--danger);">✗ None</td>
-              </tr>
-              <tr>
-                <td>Setup time</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> 5 minutes</td>
-                <td class="other">1–2 days</td>
-                <td class="other">2–3 days</td>
-                <td class="other">1+ week</td>
-                <td class="other">1–2 days</td>
-              </tr>
-              <tr>
-                <td>Data ownership</td>
-                <td class="us-col"><i class="fa-solid fa-check" aria-hidden="true"></i> You own it</td>
-                <td class="other">Their cloud</td>
-                <td class="other">Their cloud</td>
-                <td class="other">Their cloud</td>
-                <td class="other">Their cloud</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p style="text-align:center;font-size:12px;color:var(--text-mute);margin-top:16px;">
-          Competitor pricing sourced from publicly available plans. Features as of 2026. <a href="mailto:support@codearc.co.in" style="color:var(--text-mute);text-decoration:underline;">Report an inaccuracy</a>
-        </p>
-      </div>
-    </section>
-
     <!-- ===== PRICING / FREE PLAN ===== -->
     <section class="section" id="pricing">
       <div class="container">
         <div class="section-head">
-          <span class="eyebrow">Simple pricing</span>
-          <h2>Completely free. No hidden cost.</h2>
-          <p>RestroSuite is free to use during our launch period. Get every feature — offline billing, WhatsApp receipts, QR ordering, CRM — at zero cost.</p>
+          <span class="eyebrow">Pricing</span>
+          <h2>Free during launch</h2>
+          <p>No card to register. Core POS, kitchen display, QR, and WhatsApp billing are included while we are in launch. If paid plans arrive later, we will tell active outlets first.</p>
         </div>
 
         <div class="free-banner glass" style="
-          max-width:740px;margin:0 auto;padding:48px 56px;
+          max-width:740px;margin:0 auto;padding:40px 40px;
           border-color:var(--accent-line);
-          box-shadow:0 0 80px -24px var(--accent-glow);
           position:relative;overflow:hidden;text-align:center;">
-          <div style="position:absolute;inset:0;background:radial-gradient(70% 80% at 50% 0%,var(--accent-soft),transparent 65%);pointer-events:none;"></div>
           <div style="position:relative;">
-            <div style="display:inline-flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:7px 18px;font-size:13px;font-weight:700;color:var(--accent);margin-bottom:22px;">
-              <i class="fa-solid fa-gift" aria-hidden="true"></i> Free during launch
+            <div style="display:inline-flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:7px 18px;font-size:13px;font-weight:700;color:var(--accent);margin-bottom:18px;">
+              Launch period
             </div>
-            <div style="font-family:var(--font-display);font-size:clamp(52px,7vw,80px);font-weight:800;letter-spacing:-.04em;color:var(--text);line-height:1;margin-bottom:6px;">&#8377;0</div>
-            <div style="font-size:16px;color:var(--text-mute);margin-bottom:30px;">per month &middot; every feature included</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left;margin-bottom:36px;max-width:480px;margin-left:auto;margin-right:auto;">
+            <div style="font-family:var(--font-display);font-size:clamp(48px,6vw,72px);font-weight:800;letter-spacing:-.04em;color:var(--text);line-height:1;margin-bottom:6px;">&#8377;0</div>
+            <div style="font-size:15px;color:var(--text-mute);margin-bottom:24px;">to start &middot; no credit card</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;margin-bottom:28px;max-width:480px;margin-left:auto;margin-right:auto;">
               <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Offline billing &amp; KOT</div>
-              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> WhatsApp receipts</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> WhatsApp receipts*</div>
               <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> QR table ordering</div>
-              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> CRM &amp; loyalty</div>
-              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Kitchen display (KDS)</div>
-              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Cloud backup &amp; sync</div>
-              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> GST billing &amp; reports</div>
-              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Unlimited menu items</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Staff roles</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Kitchen display</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Cloud sync when online</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> GST-style bills &amp; reports</div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-dim);"><i class="fa-solid fa-check" style="color:var(--accent)" aria-hidden="true"></i> Web, Windows, Mac, Android</div>
             </div>
             <a class="btn btn-primary btn-lg" href="login.html?tab=register" style="min-width:220px;">
-              <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free &mdash; Takes 5 min
+              Create free outlet
             </a>
-            <p style="font-size:12.5px;color:var(--text-mute);margin-top:14px;">No credit card &middot; No contract &middot; No catch</p>
+            <p style="font-size:12.5px;color:var(--text-mute);margin-top:14px;">*WhatsApp send needs the outlet gateway online. No card &middot; cancel anytime.</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ===== TESTIMONIALS ===== -->
-    <section class="section" id="testimonials">
+    <!-- ===== ABOUT / HUMAN NOTE (no fake reviews) ===== -->
+    <section class="section" id="about-codearc">
       <div class="container">
         <div class="section-head">
-          <span class="eyebrow">Verified customer proof</span>
-          <h2>Loved by restaurant owners</h2>
+          <span class="eyebrow">Who builds this</span>
+          <h2>CodeArc Tech Labs</h2>
+          <p>A small team in India. We build RestroSuite for real counters and kitchens — start free, bill the first table the same day.</p>
         </div>
-        <div class="testi-carousel glass" aria-label="Customer testimonials">
-          <div class="testi-track" id="testi-track" aria-live="polite" aria-atomic="true">
-            <div class="testi-card" role="group" aria-label="Testimonial 1 of 3">
-              <div class="testi-inner">
-                <div class="testi-stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-                <p class="testi-quote">"We lost &#8377;14,000 in wrong orders during last Diwali's rush. After switching to RestroSuite, order errors dropped to zero."</p>
-                <div class="testi-author">
-                  <div class="testi-avatar" aria-hidden="true">AM</div>
-                  <div class="testi-meta" style="text-align:left"><div class="n">Aarav Mehta</div><div class="r">Owner &middot; The Spice Bistro</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="testi-card" role="group" aria-label="Testimonial 2 of 3">
-              <div class="testi-inner">
-                <div class="testi-stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-                <p class="testi-quote">"I was paying &#8377;4,500 a month for old software that crashed whenever Wi-Fi dropped. RestroSuite works offline and it's free — I still can't believe it."</p>
-                <div class="testi-author">
-                  <div class="testi-avatar" aria-hidden="true">PS</div>
-                  <div class="testi-meta" style="text-align:left"><div class="n">Priya Sharma</div><div class="r">Founder &middot; Cafe Boho</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="testi-card" role="group" aria-label="Testimonial 3 of 3">
-              <div class="testi-inner">
-                <div class="testi-stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-                <p class="testi-quote">"Even when our area loses power and Wi-Fi, billing never stops. The WhatsApp receipts alone made my customers think we're a big chain."</p>
-                <div class="testi-author">
-                  <div class="testi-avatar" aria-hidden="true">RK</div>
-                  <div class="testi-meta" style="text-align:left"><div class="n">Rahul Kapoor</div><div class="r">Owner &middot; Urban Tandoor</div></div>
-                </div>
-              </div>
-            </div>
+        <div class="glass" style="max-width:720px;margin:0 auto;padding:28px 28px 24px;">
+          <p style="font-size:16px;line-height:1.55;color:var(--text);margin:0 0 16px;">
+            If it helps your floor, tell a neighbouring cafe. If something breaks, write to us and we will fix it.
+          </p>
+          <p style="font-size:14.5px;line-height:1.5;color:var(--text-dim);margin:0 0 20px;">
+            Support: <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
+          </p>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <a class="btn btn-primary" href="login?tab=register">Create free outlet</a>
+            <a class="btn btn-ghost" href="install">Install guide</a>
           </div>
-        </div>
-        <div class="testi-nav" role="group" aria-label="Testimonial navigation">
-          <button class="btn-icon" onclick="moveTesti(-1)" aria-label="Previous testimonial"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
-          <div class="testi-dots" id="testi-dots" role="tablist" aria-label="Testimonial slides"></div>
-          <button class="btn-icon" onclick="moveTesti(1)" aria-label="Next testimonial"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         </div>
       </div>
     </section>
+
+    <div id="testimonials" hidden aria-hidden="true">
+      <div id="testi-track"></div>
+      <div id="testi-dots"></div>
+    </div>
 
     <!-- ===== CTA BAND ===== -->
     <section class="section" id="share">
       <div class="container">
         <div class="cta-band glass">
-          <h2>Run your restaurant from your phone &mdash; for free</h2>
-          <p>Start free on the devices you already use. Set up in minutes — no credit card required.</p>
+          <h2>Ready when your next guest sits down</h2>
+          <p>Create an outlet, open on phone or desktop, and bill the first table. Free during launch — no card.</p>
           <div class="cta-actions">
             <a class="btn btn-primary btn-lg" href="login.html?tab=register">
-              <i class="fa-solid fa-bolt" aria-hidden="true"></i> Sign Up Free
+              Create free outlet
             </a>
             <a class="btn btn-ghost btn-lg"
-              href="https://api.whatsapp.com/send?text=%2ARestroSuite%2A%20%E2%80%94%20the%20restaurant%20POS%20that%20never%20goes%20down%0A%0A%E2%9C%85%20Works%20100%25%20offline%0A%E2%9C%85%20WhatsApp%20receipts%20built-in%0A%E2%9C%85%20Kitchen%20display%20%2B%20QR%20ordering%0A%E2%9C%85%20Free%20to%20start%20%E2%80%94%20no%20credit%20card%0A%0A%F0%9F%9A%80%20https%3A%2F%2Frestrosuite.codearc.co.in%2F"
+              href="https://api.whatsapp.com/send?text=RestroSuite%20%E2%80%94%20restaurant%20POS%20that%20bills%20offline%2C%20WhatsApp%20receipts%2C%20kitchen%20display.%20Free%20during%20launch.%0Ahttps%3A%2F%2Frestrosuite.codearc.co.in%2F"
               target="_blank" rel="noopener noreferrer" id="share-whatsapp">
               <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> Share on WhatsApp
             </a>
@@ -2169,40 +2188,28 @@
             <img class="brand-logo" src="assets/restrosuite-mark.png" alt="RestroSuite" width="38" height="38">
             <span class="brand-name"><span class="codearc">CodeArc</span>Restro<b>Suite</b></span>
           </a>
-          <p>The premium offline-first POS, billing &amp; CRM suite for modern restaurants. Built by CodeArc Labs.</p>
+          <p>Offline-first restaurant POS — billing, kitchen, floor, WhatsApp bills. Built by CodeArc Tech Labs, India.</p>
           <div class="footer-social">
-            <a class="btn-icon" href="https://twitter.com/restrosuite" aria-label="Follow on Twitter/X" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-x-twitter" aria-hidden="true"></i></a>
-            <a class="btn-icon" href="https://instagram.com/restrosuite" aria-label="Follow on Instagram" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-instagram" aria-hidden="true"></i></a>
-            <a class="btn-icon" href="https://linkedin.com/company/restrosuite" aria-label="LinkedIn" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-linkedin-in" aria-hidden="true"></i></a>
+            <a class="btn-icon" href="mailto:support@codearc.co.in" aria-label="Email support"><i class="fa-solid fa-envelope" aria-hidden="true"></i></a>
           </div>
         </div>
         <div class="footer-col">
           <h5>Product</h5>
-          <a href="#downloads">Downloads</a>
+          <a href="install">Install</a>
           <a href="#features">Features</a>
-          <a href="#demo">Live Demo</a>
-          <a href="#compare">Compare</a>
-          <a href="dashboard.html">Dashboard</a>
+          <a href="#demo">Try a bill</a>
+          <a href="#pricing">Pricing</a>
         </div>
         <div class="footer-col">
           <h5>Company</h5>
-          <a href="#testimonials">Testimonials</a>
           <a href="#about-codearc">About CodeArc</a>
-          <a href="mailto:support@codearc.co.in">Contact Support</a>
+          <a href="mailto:support@codearc.co.in">Support</a>
         </div>
         <div class="footer-col">
           <h5>Account</h5>
           <a href="login.html">Sign In</a>
-          <a href="login.html?tab=register">Register Outlet</a>
-          <a href="dashboard.html">Open Console</a>
+          <a href="login.html?tab=register">Create free outlet</a>
         </div>
-      </div>
-
-      <div id="about-codearc" style="border-top:1px solid var(--border);padding-top:30px;margin-bottom:30px;">
-        <p style="font-size:13.5px;color:var(--text-mute);max-width:680px;">
-          <strong style="color:var(--text-soft)">About CodeArc Tech Labs</strong> &mdash; We build practical software for India's food &amp; beverage industry. RestroSuite is our restaurant POS and operations console. For partnerships, email us at
-          <a href="mailto:support@codearc.co.in" style="color:var(--accent)">support@codearc.co.in</a>.
-        </p>
       </div>
 
       <div class="footer-bottom">
@@ -3397,73 +3404,320 @@
       } catch (e) {}
     })();
 
-    // ===== TESTIMONIALS CAROUSEL =====
+    // ===== TESTIMONIALS CAROUSEL (only if real approved reviews are injected) =====
     let testiIndex = 0;
     const testiTrack = document.getElementById('testi-track');
-    const testiCount = testiTrack.children.length;
     const dotsWrap   = document.getElementById('testi-dots');
-
-    for (let i = 0; i < testiCount; i++) {
-      const b = document.createElement('button');
-      b.setAttribute('aria-label', 'Go to testimonial ' + (i + 1));
-      b.setAttribute('role', 'tab');
-      b.onclick = () => { goTesti(i); resetTimer(); };
-      dotsWrap.appendChild(b);
-    }
+    let testiCount = testiTrack ? testiTrack.children.length : 0;
+    var testiTimer = null;
     function renderTesti() {
-      testiTrack.style.transform = `translateX(-${testiIndex * 100}%)`;
-      [...dotsWrap.children].forEach((d, i) => d.classList.toggle('active', i === testiIndex));
+      if (!testiTrack || !testiCount) return;
+      testiTrack.style.transform = 'translateX(-' + (testiIndex * 100) + '%)';
+      if (dotsWrap) {
+        [...dotsWrap.children].forEach(function (d, i) { d.classList.toggle('active', i === testiIndex); });
+      }
     }
-    function goTesti(i) { testiIndex = (i + testiCount) % testiCount; renderTesti(); }
+    function goTesti(i) {
+      if (!testiCount) return;
+      testiIndex = (i + testiCount) % testiCount;
+      renderTesti();
+    }
     function moveTesti(dir) { goTesti(testiIndex + dir); }
-    renderTesti();
-    var testiTimer = setInterval(function() { moveTesti(1); }, 6000);
-    function resetTimer() { clearInterval(testiTimer); testiTimer = setInterval(function() { moveTesti(1); }, 6000); }
-    testiTrack.addEventListener('pointerenter', function() { clearInterval(testiTimer); });
-    testiTrack.addEventListener('pointerleave', function() { resetTimer(); });
+    function resetTimer() {
+      if (testiTimer) clearInterval(testiTimer);
+      if (!testiCount) return;
+      testiTimer = setInterval(function () { moveTesti(1); }, 6000);
+    }
+    window.__rsRebuildTestiDots = function () {
+      testiCount = testiTrack ? testiTrack.children.length : 0;
+      if (!dotsWrap || !testiTrack || !testiCount) return;
+      dotsWrap.innerHTML = '';
+      for (var i = 0; i < testiCount; i++) {
+        var b = document.createElement('button');
+        b.setAttribute('aria-label', 'Go to review ' + (i + 1));
+        b.setAttribute('role', 'tab');
+        (function (idx) { b.onclick = function () { goTesti(idx); resetTimer(); }; })(i);
+        dotsWrap.appendChild(b);
+      }
+      var section = document.getElementById('testimonials');
+      if (section) {
+        section.hidden = false;
+        section.removeAttribute('aria-hidden');
+      }
+      goTesti(0);
+      resetTimer();
+    };
+    if (testiCount && dotsWrap) {
+      window.__rsRebuildTestiDots();
+      if (testiTrack) {
+        testiTrack.addEventListener('pointerenter', function () { if (testiTimer) clearInterval(testiTimer); });
+        testiTrack.addEventListener('pointerleave', function () { resetTimer(); });
+      }
+    }
+
+    // Soften compare FREE chip wording
+    try {
+      var freeChip = document.querySelector('.comp-price-chip.highlight .comp-cost');
+      if (freeChip) freeChip.textContent = 'Launch free';
+    } catch (e) {}
 
     // ===== INIT SANDBOX (must run after COUNTRY_CFG is defined) =====
     SIM_COUNTRY = detectCountry();
     renderSimMenu();
     onSandboxGuestInput();
 
-    // ===== DOWNLOADS HUB — cards are static HTML; manifest only refreshes size/date =====
+    // ===== INSTALL HUB — OS recommend + manifest sizes/URLs =====
     (function loadDownloadsHub() {
       var meta = document.getElementById('dl-meta');
+      var ua = navigator.userAgent || '';
+      var platform = 'web';
+      /** @type {'arm64'|'x64'|'unknown'} */
+      var macArch = 'unknown';
+      if (/Android/i.test(ua)) platform = 'android';
+      else if (/Windows/i.test(ua) || /Win64|Win32|WOW64/i.test(ua)) platform = 'windows';
+      else if (/iPhone|iPad|iPod/i.test(ua)) platform = 'ios';
+      else if (/Mac OS X|Macintosh/i.test(ua) && !('ontouchend' in document)) platform = 'mac';
+
       function fmtDate(iso) {
         if (!iso) return '';
         try {
           return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
         } catch (e) { return String(iso).slice(0, 10); }
       }
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      }
+
+      /** Detect Apple Silicon vs Intel (Safari reports MacIntel even on M1–M4). */
+      function detectMacArch() {
+        if (platform !== 'mac') return Promise.resolve('unknown');
+        function fromWebGL() {
+          try {
+            var c = document.createElement('canvas');
+            var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+            if (!gl) return 'unknown';
+            var ext = gl.getExtension('WEBGL_debug_renderer_info');
+            var renderer = ext
+              ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '')
+              : String(gl.getParameter(gl.RENDERER) || '');
+            if (/Apple\s*M\d|Apple\s*GPU/i.test(renderer) || (/Apple/i.test(renderer) && !/Intel|AMD|Radeon|NVIDIA/i.test(renderer))) {
+              return 'arm64';
+            }
+            if (/Intel|AMD|Radeon|NVIDIA|Iris|UHD|GeForce/i.test(renderer)) return 'x64';
+          } catch (e) {}
+          return 'unknown';
+        }
+        try {
+          if (navigator.userAgentData && typeof navigator.userAgentData.getHighEntropyValues === 'function') {
+            return navigator.userAgentData.getHighEntropyValues(['architecture', 'bitness'])
+              .then(function (hints) {
+                var arch = String((hints && hints.architecture) || '').toLowerCase();
+                if (arch === 'arm' || arch === 'arm64') return 'arm64';
+                if (arch === 'x86' || arch === 'x86_64' || arch === 'x64') return 'x64';
+                return fromWebGL();
+              })
+              .catch(function () { return fromWebGL(); });
+          }
+        } catch (e) {}
+        return Promise.resolve(fromWebGL());
+      }
+
+      function styleMacButtons() {
+        var armA = document.querySelector('[data-dl-mac-arm]');
+        var intelA = document.querySelector('[data-dl-mac-intel]');
+        if (!armA || !intelA) return;
+        armA.classList.remove('btn-ghost');
+        intelA.classList.remove('btn-ghost');
+        armA.classList.add('btn', 'btn-primary');
+        intelA.classList.add('btn');
+        if (macArch === 'x64') {
+          armA.classList.remove('btn-primary');
+          armA.classList.add('btn-ghost');
+          intelA.classList.add('btn-primary');
+          intelA.classList.remove('btn-ghost');
+          intelA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Intel · recommended';
+          armA.innerHTML = 'Apple Silicon';
+        } else if (macArch === 'arm64') {
+          intelA.classList.add('btn-ghost');
+          intelA.classList.remove('btn-primary');
+          armA.classList.add('btn-primary');
+          armA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon · recommended';
+          intelA.innerHTML = 'Intel DMG';
+        } else {
+          intelA.classList.add('btn-ghost');
+          armA.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Apple Silicon';
+          intelA.innerHTML = 'Intel DMG';
+        }
+        var tip = document.querySelector('[data-dl-id="mac-dmg"] .dl-tip');
+        if (tip && macArch === 'arm64') {
+          tip.innerHTML = '<i class="fa-solid fa-check-circle" aria-hidden="true"></i> Detected <b>Apple Silicon</b> on this Mac — use the highlighted DMG.';
+        } else if (tip && macArch === 'x64') {
+          tip.innerHTML = '<i class="fa-solid fa-check-circle" aria-hidden="true"></i> Detected <b>Intel</b> Mac — use the highlighted Intel DMG.';
+        }
+      }
+
+      function applyRecommend() {
+        var recPlat = platform === 'ios' ? 'web' : platform;
+        var map = {
+          android: {
+            id: 'android-apk',
+            title: 'You’re on Android — install the APK',
+            sub: 'Best for kitchen tablets and counter phones',
+            btn: 'Download Android APK',
+            icon: 'fa-brands fa-android',
+            color: '#1fa463'
+          },
+          windows: {
+            id: 'windows-exe',
+            title: 'You’re on Windows — install the desktop app',
+            sub: 'Portable EXE for the counter PC (Setup optional)',
+            btn: 'Download Windows app',
+            icon: 'fa-brands fa-windows',
+            color: '#0078d4'
+          },
+          mac: {
+            id: 'mac-dmg',
+            title: macArch === 'x64'
+              ? 'You’re on an Intel Mac — install the desktop app'
+              : macArch === 'arm64'
+                ? 'You’re on Apple Silicon — install the desktop app'
+                : 'You’re on a Mac — install the desktop app',
+            sub: macArch === 'x64'
+              ? 'We recommend the Intel DMG · drag to Applications'
+              : macArch === 'arm64'
+                ? 'We recommend the Apple Silicon (M1–M4) DMG · drag to Applications'
+                : 'Choose Apple Silicon or Intel · drag to Applications',
+            btn: macArch === 'x64' ? 'Download Intel DMG' : 'Download Apple Silicon DMG',
+            icon: 'fa-brands fa-apple',
+            color: '#111'
+          },
+          web: {
+            id: 'web-pwa',
+            title: platform === 'ios' ? 'You’re on iPhone — use the web app' : 'Open in browser on this device',
+            sub: platform === 'ios'
+              ? 'No App Store build yet — Safari → Share → Add to Home Screen'
+              : 'Works on any device · add to home screen for offline',
+            btn: 'Open web app',
+            icon: platform === 'ios' ? 'fa-brands fa-apple' : 'fa-solid fa-globe',
+            color: 'var(--teal, #2a9b8f)'
+          }
+        };
+        var rec = map[recPlat] || map.web;
+        document.querySelectorAll('.dl-card[data-dl-platform]').forEach(function (card) {
+          var isRec = card.getAttribute('data-dl-platform') === recPlat
+            || (recPlat === 'web' && card.getAttribute('data-dl-platform') === 'web');
+          card.classList.toggle('is-recommended', isRec);
+          var badge = card.querySelector('[data-dl-badge]');
+          if (badge) badge.hidden = !isRec;
+        });
+        styleMacButtons();
+        var wrap = document.getElementById('dl-recommend');
+        var card = document.querySelector('[data-dl-id="' + rec.id + '"]');
+        var hrefEl = null;
+        if (card) {
+          if (recPlat === 'mac' && macArch === 'x64') {
+            hrefEl = card.querySelector('[data-dl-mac-intel]') || card.querySelector('[data-dl-mac-arm]');
+          } else if (recPlat === 'mac') {
+            hrefEl = card.querySelector('[data-dl-mac-arm]') || card.querySelector('[data-dl-mac-intel]');
+          } else {
+            hrefEl = card.querySelector('[data-dl-href]');
+          }
+        }
+        if (wrap && hrefEl) {
+          wrap.classList.add('is-on');
+          var title = document.getElementById('dl-rec-title');
+          var sub = document.getElementById('dl-rec-sub');
+          var btn = document.getElementById('dl-rec-btn');
+          var btnLabel = document.getElementById('dl-rec-btn-label');
+          var ic = document.getElementById('dl-rec-ic');
+          if (title) title.textContent = rec.title;
+          if (sub) sub.textContent = rec.sub;
+          if (btn) btn.setAttribute('href', hrefEl.getAttribute('href') || '#');
+          if (btnLabel) btnLabel.textContent = rec.btn;
+          if (ic) {
+            ic.innerHTML = '<i class="' + rec.icon + '" aria-hidden="true"></i>';
+            ic.style.color = rec.color;
+          }
+        }
+        var heroInstall = document.getElementById('hero-cta-install');
+        if (heroInstall) {
+          heroInstall.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> '
+            + (recPlat === 'android' ? 'Install Android app'
+              : recPlat === 'windows' ? 'Install Windows app'
+              : recPlat === 'mac'
+                ? (macArch === 'x64' ? 'Install Intel Mac app' : 'Install Apple Silicon app')
+              : 'Install on your device');
+        }
+      }
+
+      detectMacArch().then(function (arch) {
+        macArch = arch || 'unknown';
+        applyRecommend();
+      });
+      applyRecommend();
+
       fetch('downloads/manifest.json?t=' + Date.now(), { cache: 'no-store' })
         .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
         .then(function (m) {
           var items = Array.isArray(m.items) ? m.items : [];
-          items.forEach(function (item) {
-            if (!item || !item.id) return;
-            var card = document.querySelector('[data-dl-id="' + item.id + '"]');
+          var byId = {};
+          items.forEach(function (item) { if (item && item.id) byId[item.id] = item; });
+
+          // Alias portable → windows-exe card primary
+          if (byId['windows-portable'] && !byId['windows-exe']) {
+            byId['windows-exe'] = byId['windows-portable'];
+          }
+
+          Object.keys(byId).forEach(function (id) {
+            var item = byId[id];
+            var card = document.querySelector('[data-dl-id="' + id + '"]');
             if (!card) return;
             var stats = card.querySelector('[data-dl-stats]');
             if (stats) {
+              // Public-facing only: clean version + size + date (hide internal build tags)
               var bits = [];
-              if (item.version) bits.push('v' + item.version);
-              if (item.sizeLabel) bits.push(item.sizeLabel);
+              var verRaw = item.version ? String(item.version).replace(/^v/i, '') : '';
+              if (verRaw && /^\d+\.\d+(\.\d+)?$/.test(verRaw)) {
+                bits.push('v' + verRaw);
+              }
+              if (item.sizeLabel && item.sizeLabel !== 'Online' && item.sizeLabel !== '—') {
+                bits.push(item.sizeLabel);
+              }
               if (item.updatedAt) bits.push(fmtDate(item.updatedAt));
-              if (bits.length) stats.innerHTML = bits.map(function (b) {
-                return '<span>' + String(b).replace(/</g, '&lt;') + '</span>';
-              }).join('');
+              if (!bits.length && (item.openInPlace || item.sizeLabel === 'Online')) {
+                bits.push('No install');
+              }
+              if (bits.length) {
+                stats.innerHTML = bits.map(function (b) {
+                  return '<span>' + esc(b) + '</span>';
+                }).join('');
+              }
             }
             var a = card.querySelector('[data-dl-href]');
             if (a && item.url && item.available !== false) a.setAttribute('href', item.url);
           });
+
+          var setup = byId['windows-setup'];
+          var setupA = document.querySelector('[data-dl-setup]');
+          if (setup && setupA && setup.url) setupA.setAttribute('href', setup.url);
+
+          var macCombined = byId['mac-dmg'] || {};
+          var macArm = byId['mac-arm64'];
+          var macIntel = byId['mac-x64'];
+          var armUrl = (macArm && macArm.url) || macCombined.arm64Url || null;
+          var intelUrl = (macIntel && macIntel.url) || macCombined.x64Url || null;
+          var macArmA = document.querySelector('[data-dl-mac-arm]');
+          var macIntelA = document.querySelector('[data-dl-mac-intel]');
+          if (macArmA && armUrl) macArmA.setAttribute('href', armUrl);
+          if (macIntelA && intelUrl) macIntelA.setAttribute('href', intelUrl);
+
           if (meta) {
-            meta.innerHTML = 'Latest package set · <b>' + String(m.appVersion || '—').replace(/</g, '&lt;') + '</b>'
-              + (m.generatedAt ? ' · refreshed ' + fmtDate(m.generatedAt) : '');
+            meta.innerHTML = 'Free during launch · Windows, Mac, Android &amp; browser';
           }
+          applyRecommend();
         })
         .catch(function () {
-          /* keep static buttons — no blank screen */
+          /* static buttons remain usable */
         });
     })();
 

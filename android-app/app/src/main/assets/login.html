@@ -300,7 +300,7 @@
 
       <div class="story-feats">
         <div class="story-feat"><i class="fa-solid fa-shield-halved"></i> Role-controlled access for every staff member</div>
-        <div class="story-feat" id="feat-tax-receipt"><i class="fa-brands fa-whatsapp"></i> <span id="feat-tax-label">GST</span> receipts delivered to WhatsApp instantly</div>
+        <div class="story-feat" id="feat-tax-receipt"><i class="fa-brands fa-whatsapp"></i> Receipts delivered to WhatsApp instantly</div>
         <div class="story-feat"><i class="fa-solid fa-qrcode"></i> QR table ordering — no app download needed</div>
         <div class="story-feat"><i class="fa-solid fa-chart-line"></i> Live sales reports &amp; automatic daily close-out</div>
         <div class="story-feat"><i class="fa-solid fa-credit-card"></i> UPI · card · cash · wallet — every payment mode</div>
@@ -1299,6 +1299,41 @@
       await waitForRuntimeConfig();
       if(window.RS_API && RS_API.configured){
         await RS_API.login({ slug, username:u, password:p, remember });
+        // Mint a licence lease BEFORE leaving login. Normal Safari often has a
+        // stale/corrupt lease in localStorage (Private Safari does not — and works).
+        // Banking a fresh lease here prevents the post-login "Reconnect" lock.
+        try {
+          if (typeof RS_API.lease === 'function') {
+            let deviceId = null;
+            try { deviceId = localStorage.getItem('rs_license_device_id_v1'); } catch (_) {}
+            if (!deviceId) {
+              try { deviceId = sessionStorage.getItem('rs_license_device_id_v1'); } catch (_) {}
+            }
+            if (!deviceId) {
+              deviceId = 'dev_' + (crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36)));
+              try { localStorage.setItem('rs_license_device_id_v1', deviceId); } catch (_) {}
+              try { sessionStorage.setItem('rs_license_device_id_v1', deviceId); } catch (_) {}
+            }
+            try { localStorage.removeItem('rs_license_killed_v1'); } catch (_) {}
+            try { sessionStorage.removeItem('rs_license_killed_v1'); } catch (_) {}
+            const leaseRes = await RS_API.lease(deviceId);
+            if (leaseRes && leaseRes.status === 'active' && leaseRes.lease) {
+              const leaseKey = 'rs_license_lease_v1';
+              const hwmKey = 'rs_license_hwm_v1';
+              const firstKey = 'rs_license_firstseen_v1';
+              const serverTime = String(leaseRes.server_time || Date.now());
+              try { localStorage.setItem(leaseKey, leaseRes.lease); } catch (_) {}
+              try { sessionStorage.setItem(leaseKey, leaseRes.lease); } catch (_) {}
+              try { localStorage.setItem(hwmKey, serverTime); } catch (_) {}
+              try { sessionStorage.setItem(hwmKey, serverTime); } catch (_) {}
+              try {
+                if (!localStorage.getItem(firstKey)) localStorage.setItem(firstKey, String(Date.now()));
+              } catch (_) {}
+            }
+          }
+        } catch (leaseErr) {
+          console.warn('[login] pre-dashboard lease mint failed (dashboard will retry):', leaseErr && leaseErr.message);
+        }
         showOk('Verified — opening your console…');
         setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),700);
       } else {

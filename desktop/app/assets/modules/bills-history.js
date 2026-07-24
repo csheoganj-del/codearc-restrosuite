@@ -113,7 +113,14 @@
     }
     if (global.RS && typeof RS.activateTab === 'function') await RS.activateTab('pos-tab');
     await new Promise((r) => setTimeout(r, 100));
-    if (global.RS && typeof RS.setCart === 'function') RS.setCart(items);
+
+    // Prevent showMenuGridForTable from wiping this cart when #cart-table changes
+    if (typeof global.RS_PRESERVE_CART_LOAD === 'function') {
+      global.RS_PRESERVE_CART_LOAD(2000);
+    } else {
+      global.__rsPreserveCartUntil = Date.now() + 2000;
+    }
+
     const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
     const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
     if (nameEl && b.customerName) {
@@ -138,19 +145,28 @@
       tableSelect.value = opt.value;
       tableSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    if (b.tipAmount && global.RS && typeof RS.setTip === 'function') {
-      RS.setTip(b.tipAmount);
-    }
-    if (b.deliveryCharge) {
-      const dc = document.getElementById('delivery-charge');
-      if (dc) {
-        dc.value = b.deliveryCharge;
-        dc.dispatchEvent(new Event('input', { bubbles: true }));
+    // Apply cart after table hydrate so async showMenuGridForTable cannot clear it
+    const applyCart = () => {
+      if (global.RS && typeof RS.setCart === 'function') RS.setCart(items);
+      if (b.tipAmount && global.RS && typeof RS.setTip === 'function') {
+        try {
+          RS.setTip(b.tipAmount);
+        } catch (_) {}
       }
-    }
-    try {
-      if (global.RS && typeof RS.renderCart === 'function') RS.renderCart();
-    } catch (_) {}
+      if (b.deliveryCharge) {
+        const dc = document.getElementById('delivery-charge');
+        if (dc) {
+          dc.value = b.deliveryCharge;
+          dc.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      try {
+        if (global.RS && typeof RS.renderCart === 'function') RS.renderCart();
+      } catch (_) {}
+    };
+    applyCart();
+    await new Promise((r) => setTimeout(r, 350));
+    applyCart();
     toast(
       'Rebill loaded · ' + (b.no || '') + (b.status === 'refunded' ? ' (voided original)' : ' — void first if correcting a paid bill'),
       'fa-rotate'
@@ -308,7 +324,8 @@
   async function markBillRefunded(b) {
     if (!b || b.status === 'refunded') return;
 
-    if (global.RSPinModal) {
+    // Always gate with Admin PIN when modal is available (setup on first use if unset)
+    if (global.RSPinModal && typeof RSPinModal.request === 'function') {
       const ok = await RSPinModal.request(`Void / Refund ${b.no || b.id || 'bill'}`);
       if (!ok) return;
     }
@@ -331,7 +348,19 @@
           : b.shiftId || '';
     } catch (_) {}
 
+    // Upsert into local store so server-only hits (_fromServer) persist as voided
     const BILLS = getBills();
+    const voidKey = String(b.no || b.orderId || b.id || '');
+    const localIdx = BILLS.findIndex(
+      (x) =>
+        x === b ||
+        String(x.no || '') === voidKey ||
+        String(x.orderId || '') === voidKey ||
+        String(x.id || '') === voidKey
+    );
+    if (localIdx === -1) BILLS.unshift(b);
+    else BILLS[localIdx] = Object.assign({}, BILLS[localIdx], b);
+
     let cloudMarked = false;
     try {
       if (global.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
@@ -405,7 +434,8 @@
 
   async function deleteBill(b) {
     if (!b) return;
-    if (global.RSPinModal) {
+    // Always gate with Admin PIN when modal is available (setup on first use if unset)
+    if (global.RSPinModal && typeof RSPinModal.request === 'function') {
       const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
       if (!ok) return;
     }
@@ -413,7 +443,14 @@
     if (!confirmed) return;
 
     const BILLS = getBills();
-    const idx = BILLS.findIndex((x) => x === b || x.no === b.no);
+    const billKey = String(b.no || b.orderId || b.id || '');
+    const idx = BILLS.findIndex(
+      (x) =>
+        x === b ||
+        String(x.no || '') === billKey ||
+        String(x.orderId || '') === billKey ||
+        String(x.id || '') === billKey
+    );
     if (idx !== -1) BILLS.splice(idx, 1);
 
     // Only on DELETE — refund does NOT restore stock (food was served)
@@ -442,13 +479,31 @@
 
     try {
       if (global.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      // CRITICAL: filters must be an array of {operator,column,value}.
+      // Object filters become [] server-side and would delete ALL tenant bills.
       if (global.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
-        await RS_API.data({
-          table: 'doppio_bills',
-          operation: 'delete',
-          filters: { bill_no: b.no || b.id },
-          returning: false,
-        }).catch((e) => console.warn('Cloud delete', e));
+        const billFilters = Number.isFinite(Number(b.id))
+          ? [{ operator: 'eq', column: 'id', value: Number(b.id) }]
+          : [
+              {
+                operator: 'eq',
+                column: 'order_id',
+                value: String(b.no || b.orderId || b.id || ''),
+              },
+            ];
+        const hasTarget = billFilters.some(
+          (f) => f && f.value !== '' && f.value != null && !(typeof f.value === 'number' && !Number.isFinite(f.value))
+        );
+        if (!hasTarget) {
+          console.warn('[BillsHistory] Refusing cloud delete without bill id/order_id');
+        } else {
+          await RS_API.data({
+            table: 'doppio_bills',
+            operation: 'delete',
+            filters: billFilters,
+            returning: false,
+          }).catch((e) => console.warn('Cloud delete', e));
+        }
       }
     } catch (e) {
       console.warn('Bill delete sync failed', e);
@@ -1684,6 +1739,10 @@
         if (!ev.target.closest('.bills-more')) closeAllBillMoreMenus();
       });
     }
+    // Notify mobile card layer (product-10x) without thrashing on unrelated DOM
+    try {
+      document.dispatchEvent(new CustomEvent('rs:render-bills', { detail: { count: filtered.length } }));
+    } catch (_) {}
   }
 
   function renderBills() {
@@ -1883,6 +1942,7 @@
   const api = {
     receiptPayloadFromBill,
     showBillReceipt,
+    printBillThermal,
     shareBillReceipt,
     rebillToPos,
     markBillRefunded,

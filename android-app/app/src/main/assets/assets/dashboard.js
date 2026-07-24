@@ -2169,7 +2169,8 @@
   const ROLE_TAB_MAP = {
     manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab',
                  'inventory-tab','editor-tab','customers-tab','reports-tab',
-                 'analytics-tab','employees-tab', 'growth-hub-tab'],
+                 'analytics-tab','employees-tab', 'growth-hub-tab',
+                 'aggregator-tab', 'tax-tab', 'online-orders-tab'],
     cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
     waiter:    ['pos-tab','floor-tab','kds-tab'],
     captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],

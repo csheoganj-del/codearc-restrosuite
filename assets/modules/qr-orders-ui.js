@@ -342,6 +342,28 @@
       attempts += 1;
     }
 
+    // Block showMenuGridForTable from clearing/replacing this cart on table change
+    if (typeof window.RS_PRESERVE_CART_LOAD === 'function') {
+      window.RS_PRESERVE_CART_LOAD(2000);
+    } else {
+      window.__rsPreserveCartUntil = Date.now() + 2000;
+    }
+
+    const applyCart = () => {
+      if (window.RS && typeof RS.setCart === 'function') {
+        RS.setCart(items);
+      } else if (window.RS && Array.isArray(RS.cart)) {
+        RS.cart.length = 0;
+        items.forEach((it) => RS.cart.push(it));
+      }
+      try {
+        if (window.RS && typeof RS.renderCart === 'function') RS.renderCart();
+      } catch (e) {}
+      try {
+        if (typeof window.saveActiveCart === 'function') window.saveActiveCart();
+      } catch (e) {}
+    };
+
     const tableSelect =
       document.getElementById('cart-table') ||
       document.getElementById('pos-table-select') ||
@@ -368,13 +390,6 @@
       tableSelect.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    // Prefer the public cart API; fall back to direct cart mutation used by POS.
-    if (window.RS && typeof RS.setCart === 'function') {
-      RS.setCart(items);
-    } else if (window.RS && Array.isArray(RS.cart)) {
-      RS.cart.length = 0;
-      items.forEach((it) => RS.cart.push(it));
-    }
     if (window.RS && typeof RS.setTable === 'function') {
       try {
         RS.setTable(tableName);
@@ -390,12 +405,10 @@
       phoneEl.value = order.customerPhone;
       phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    try {
-      if (window.RS && typeof RS.renderCart === 'function') RS.renderCart();
-    } catch (e) {}
-    try {
-      if (typeof window.saveActiveCart === 'function') window.saveActiveCart();
-    } catch (e) {}
+    // Apply after table hydrate; re-apply once async showMenuGridForTable may have finished
+    applyCart();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    applyCart();
     toast(`Loaded ${tableName} in POS`, 'fa-receipt');
   }
 

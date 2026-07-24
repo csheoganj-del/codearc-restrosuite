@@ -4431,11 +4431,20 @@
         }
       }
 
+      // When rebill / QR "Bill" loads a cart, table change must not wipe it
+      window.RS_PRESERVE_CART_LOAD = function (ms) {
+        window.__rsPreserveCartUntil = Date.now() + (Number(ms) > 0 ? Number(ms) : 2000);
+      };
+      function shouldPreserveExternalCart() {
+        return Date.now() < Number(window.__rsPreserveCartUntil || 0);
+      }
+
       // Show Menu categories/items for a selected table and load existing draft/order
       async function showMenuGridForTable(tableName) {
         const posCats = document.getElementById('pos-cats');
         const posGrid = document.getElementById('pos-grid');
         const posTableView = document.getElementById('pos-table-grid-view');
+        const preserveCart = shouldPreserveExternalCart();
         
         if (posTableView) posTableView.style.display = 'none';
         if (posCats) posCats.style.display = 'flex';
@@ -4455,12 +4464,35 @@
           
           const pendingRows = window.RS_DB ? await window.RS_DB.list('pending_orders').catch(() => []) : [];
           const drafts = window.RS_DB ? await window.RS_DB.list('drafts').catch(() => []) : [];
+
+          const normTable = (v) =>
+            String(v == null ? '' : v)
+              .replace(/^table\s+/i, '')
+              .trim()
+              .toLowerCase();
+          const want = normTable(tableName);
           
-          const activeOrder = pendingRows.find(r => 
-            (r.tableNumber === tableName || r.tableNumber === tableName.replace('Table ', '') || r.tableNumber === `0${parseInt(tableName.replace('Table ', ''))}`) &&
-            (r.status === 'DineIn Active' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review' || r.status === 'served' || r.status === 'Ready' || r.status === 'Billed')
+          const activeOrder = pendingRows.find(r => {
+            const t = normTable(r.tableNumber || r.table || r.table_name);
+            const match =
+              t === want ||
+              r.tableNumber === tableName ||
+              r.tableNumber === tableName.replace(/^Table\s+/i, '') ||
+              r.tableNumber === `0${parseInt(tableName.replace(/^Table\s+/i, ''), 10)}`;
+            if (!match) return false;
+            return (
+              r.status === 'DineIn Active' ||
+              r.status === 'Accepted' ||
+              r.status === 'preparing' ||
+              r.status === 'Pending Review' ||
+              r.status === 'served' ||
+              r.status === 'Ready' ||
+              r.status === 'Billed'
+            );
+          });
+          const activeDraft = drafts.find(
+            (d) => d.draftName === tableName || normTable(d.draftName) === want
           );
-          const activeDraft = drafts.find(d => d.draftName === tableName);
           
           let statusText = 'Available';
           let dotColor = 'var(--green)';
@@ -4468,24 +4500,38 @@
           if (activeOrder) {
             statusText = activeOrder.status === 'Billed' ? `Bill printed (₹${activeOrder.total})` : `Dining (₹${activeOrder.total})`;
             dotColor = activeOrder.status === 'Billed' ? 'var(--violet-soft)' : 'var(--orange)';
-            window.RS.setCart(activeOrder.items);
-            syncCustomerFromOrder(activeOrder);
-            syncDeliveryFieldsFromDraft(null);
+            // Do not overwrite a cart that rebill/QR just loaded
+            if (!preserveCart) {
+              window.RS.setCart(activeOrder.items);
+              syncCustomerFromOrder(activeOrder);
+              syncDeliveryFieldsFromDraft(null);
+            }
           } else if (activeDraft) {
             statusText = `Draft saved (₹${activeDraft.total})`;
             dotColor = 'var(--orange)';
-            window.RS.setCart(activeDraft.items);
-            syncCustomerFromOrder(activeDraft);
-            syncDeliveryFieldsFromDraft(activeDraft);
+            if (!preserveCart) {
+              window.RS.setCart(activeDraft.items);
+              syncCustomerFromOrder(activeDraft);
+              syncDeliveryFieldsFromDraft(activeDraft);
+            }
           } else {
-            window.RS.clearCart();
-            syncDeliveryFieldsFromDraft(null);
-            if (nameInput) nameInput.value = '';
-            if (phoneInput) phoneInput.value = '';
-            const tempOpt = sel.querySelector('option[data-temp="true"]');
-            if (tempOpt) tempOpt.remove();
-            sel.value = '';
-            sel.dispatchEvent(new Event('change'));
+            if (!preserveCart) {
+              window.RS.clearCart();
+              syncDeliveryFieldsFromDraft(null);
+              if (nameInput) nameInput.value = '';
+              if (phoneInput) phoneInput.value = '';
+              const tempOpt = sel.querySelector('option[data-temp="true"]');
+              if (tempOpt) tempOpt.remove();
+              // Keep selected table when an external cart load is in progress;
+              // only reset when this is a normal empty table open.
+              if (!shouldPreserveExternalCart()) {
+                sel.value = '';
+                sel.dispatchEvent(new Event('change'));
+              }
+            } else {
+              statusText = 'Loaded in POS';
+              dotColor = 'var(--orange)';
+            }
           }
           
           bannerText.innerText = `Table: ${tableName} · ${statusText}`;

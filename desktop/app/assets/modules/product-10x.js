@@ -1239,9 +1239,30 @@
       const cards = ensureCardsHost(wrap, 'rs10-bill-cards');
       if (!isMobileCards()) {
         cards.innerHTML = '';
+        delete cards.dataset.rsBillSig;
         return;
       }
-      const rows = Array.from(body.querySelectorAll('tr')).filter((tr) => tr.querySelectorAll('td').length >= 3).slice(0, 60);
+      const allRows = Array.from(body.querySelectorAll('tr')).filter(
+        (tr) => tr.querySelectorAll('td').length >= 3 && !tr.classList.contains('bills-empty-row')
+      );
+      // Paginate instead of hard-capping (old slice(0,60) hid bills 61+)
+      const pageSize = 40;
+      let shown = Number(cards.dataset.rsBillShown || pageSize);
+      if (!Number.isFinite(shown) || shown < pageSize) shown = pageSize;
+      if (shown > allRows.length) shown = allRows.length || pageSize;
+      const rows = allRows.slice(0, shown);
+      const sig =
+        allRows.length +
+        '|' +
+        rows
+          .map((tr) => tr.getAttribute('data-bill-no') || (tr.cells[0] && tr.cells[0].textContent) || '')
+          .join(',') +
+        '|s' +
+        shown;
+      // Skip rebuild if same data (keeps ⋯ menu open, reduces flicker)
+      if (cards.dataset.rsBillSig === sig && cards.querySelector('.rs10-bill-card')) return;
+      cards.dataset.rsBillSig = sig;
+      cards.dataset.rsBillShown = String(shown);
       if (!rows.length) {
         cards.innerHTML = '<div class="rs10-empty-card">No bills yet</div>';
         return;
@@ -1249,25 +1270,202 @@
       cards.innerHTML = rows
         .map((tr, idx) => {
           const cells = tr.querySelectorAll('td');
+          // Desktop columns: no | time | table | customer | items | pay | amount | status | actions
           const no = (cells[0] && cells[0].textContent) || '';
-          const cust = (cells[1] && cells[1].textContent) || '';
-          const amt = (cells[cells.length - 2] && cells[cells.length - 2].textContent) || '';
-          const pay = (cells[3] && cells[3].textContent) || '';
-          return `<button type="button" class="rs10-mcard rs10-bill-card" data-i="${idx}">
-            <div class="rs10-mcard-top"><b>${esc(no.trim())}</b><span class="rs10-mcard-price">${esc(amt.trim())}</span></div>
-            <div class="rs10-mcard-sub">${esc(cust.trim())}${pay ? ' · ' + esc(pay.trim()) : ''}</div>
-          </button>`;
+          const time = (cells[1] && cells[1].textContent) || '';
+          const table = (cells[2] && cells[2].textContent) || '';
+          const cust = (cells[3] && cells[3].textContent) || '';
+          const items = (cells[4] && cells[4].textContent) || '';
+          const pay = (cells[5] && cells[5].textContent) || '';
+          const amt = (cells[6] && cells[6].textContent) || '';
+          const status = (cells[7] && cells[7].textContent) || '';
+          const refunded = /refunded|voided|void/i.test(status);
+          const subBits = [time.trim(), table.trim() && table.trim() !== '-' ? 'T' + table.trim() : '', cust.trim()]
+            .filter(Boolean)
+            .join(' · ');
+          const metaBits = [pay.trim(), items.trim() ? items.trim() + ' items' : '', status.trim()]
+            .filter(Boolean)
+            .join(' · ');
+          return `<article class="rs10-mcard rs10-bill-card" data-i="${idx}" data-bill-no="${esc((tr.getAttribute('data-bill-no') || no).trim())}">
+            <div class="rs10-mcard-top">
+              <div class="rs10-mcard-title">
+                <div>
+                  <b>${esc(no.trim())}</b>
+                  <div class="rs10-mcard-sub">${esc(subBits)}</div>
+                </div>
+              </div>
+              <span class="rs10-mcard-price">${esc(amt.trim())}</span>
+            </div>
+            <div class="rs10-mcard-meta">${esc(metaBits)}</div>
+            <div class="rs10-mcard-acts rs10-bill-acts" role="toolbar" aria-label="Bill actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-card-print title="Reprint preview" aria-label="Reprint"><i class="fa-solid fa-print"></i></button>
+              <button type="button" class="btn btn-ghost btn-sm" data-card-thermal title="Thermal print" aria-label="Thermal print"><i class="fa-solid fa-receipt"></i></button>
+              <button type="button" class="btn btn-ghost btn-sm" data-card-rebill title="Rebill / load into POS" aria-label="Rebill"><i class="fa-solid fa-rotate"></i></button>
+              <button type="button" class="btn btn-ghost btn-sm" data-card-wa title="Share on WhatsApp" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>
+              <div class="rs10-bill-more">
+                <button type="button" class="btn btn-ghost btn-sm" data-card-more title="More actions" aria-label="More actions" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button>
+                <div class="rs10-bill-more-menu" hidden role="menu">
+                  <button type="button" class="rs10-bill-more-item" data-card-refund role="menuitem" ${refunded ? 'disabled' : ''}><i class="fa-solid fa-ban"></i> Void / refund</button>
+                  <button type="button" class="rs10-bill-more-item danger" data-card-delete role="menuitem"><i class="fa-solid fa-trash-can"></i> Delete bill</button>
+                </div>
+              </div>
+            </div>
+          </article>`;
         })
         .join('');
-      cards.querySelectorAll('[data-i]').forEach((btn) => {
-        btn.onclick = () => {
-          const tr = rows[+btn.getAttribute('data-i')];
-          if (!tr) return;
-          const clickable = tr.querySelector('button.go, button.icon-act, a, [data-open]');
-          if (clickable) clickable.click();
-          else tr.click();
+
+      const closeCardMoreMenus = (except) => {
+        cards.querySelectorAll('.rs10-bill-more-menu').forEach((menu) => {
+          if (except && menu === except) return;
+          menu.hidden = true;
+        });
+        cards.querySelectorAll('.rs10-bill-more.is-open').forEach((wrapEl) => {
+          if (except && wrapEl.contains(except)) return;
+          wrapEl.classList.remove('is-open');
+          const mb = wrapEl.querySelector('[data-card-more]');
+          if (mb) mb.setAttribute('aria-expanded', 'false');
+        });
+      };
+
+      cards.querySelectorAll('.rs10-bill-card').forEach((card) => {
+        const tr = rows[+card.getAttribute('data-i')];
+        if (!tr) return;
+
+        /** Prefer RSBillsHistory APIs; fall back to clicking the (hidden) table row actions. */
+        const resolveBill = () => {
+          const no = String(card.getAttribute('data-bill-no') || tr.getAttribute('data-bill-no') || '').trim();
+          const match = (b) => {
+            if (!b) return false;
+            const keys = [b.no, b.orderId, b.id].map((x) => String(x == null ? '' : x).trim()).filter(Boolean);
+            return keys.includes(no);
+          };
+          try {
+            const BH = global.RSBillsHistory;
+            if (BH && typeof BH.getFilteredBills === 'function') {
+              const hit = (BH.getFilteredBills() || []).find(match);
+              if (hit) return hit;
+            }
+            if (global.RS && Array.isArray(RS.BILLS)) {
+              const hit = RS.BILLS.find(match);
+              if (hit) return hit;
+            }
+            // Last resort: row index into filtered list (same order as paintBillsTable)
+            if (BH && typeof BH.getFilteredBills === 'function') {
+              const list = BH.getFilteredBills() || [];
+              const i = +card.getAttribute('data-i');
+              if (Number.isFinite(i) && list[i]) return list[i];
+            }
+          } catch (_) {}
+          return null;
         };
+
+        const fireRow = (sel) => {
+          const src = tr.querySelector(sel);
+          if (!src || src.disabled) return false;
+          // Ensure parent more-menu is temporarily interactive for refund/delete
+          const menu = src.closest('.bills-more-menu');
+          const wasHidden = menu && menu.hidden;
+          if (menu && wasHidden) menu.hidden = false;
+          try {
+            src.click();
+          } finally {
+            if (menu && wasHidden) menu.hidden = true;
+          }
+          return true;
+        };
+
+        const wire = (cardSel, action) => {
+          const btn = card.querySelector(cardSel);
+          if (!btn) return;
+          btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeCardMoreMenus();
+            const BH = global.RSBillsHistory;
+            const bill = resolveBill();
+            try {
+              if (action === 'print' && BH && typeof BH.showBillReceipt === 'function' && bill) {
+                return BH.showBillReceipt(bill);
+              }
+              if (action === 'thermal' && BH && typeof BH.printBillThermal === 'function' && bill) {
+                return BH.printBillThermal(bill);
+              }
+              if (action === 'rebill' && BH && typeof BH.rebillToPos === 'function' && bill) {
+                return BH.rebillToPos(bill);
+              }
+              if (action === 'wa' && BH && typeof BH.shareBillReceipt === 'function' && bill) {
+                return BH.shareBillReceipt(bill);
+              }
+              if (action === 'refund' && BH && typeof BH.markBillRefunded === 'function' && bill) {
+                return BH.markBillRefunded(bill);
+              }
+              if (action === 'delete' && BH && typeof BH.deleteBill === 'function' && bill) {
+                return BH.deleteBill(bill);
+              }
+            } catch (err) {
+              console.warn('[RS10] bill card action failed', action, err);
+            }
+            // Fallbacks via table row buttons (includes thermal print)
+            const selMap = {
+              print: 'button.go, button.icon-act.go',
+              thermal: 'button.thermal-act',
+              rebill: 'button.rebill-act',
+              wa: 'button.wa-act',
+              refund: 'button.refund-act, .bills-more-item.refund-act',
+              delete: 'button.del-act, .bills-more-item.del-act',
+            };
+            fireRow(selMap[action] || '');
+          };
+        };
+        wire('[data-card-print]', 'print');
+        wire('[data-card-thermal]', 'thermal');
+        wire('[data-card-rebill]', 'rebill');
+        wire('[data-card-wa]', 'wa');
+        wire('[data-card-refund]', 'refund');
+        wire('[data-card-delete]', 'delete');
+
+        const moreBtn = card.querySelector('[data-card-more]');
+        const moreMenu = card.querySelector('.rs10-bill-more-menu');
+        const moreWrap = card.querySelector('.rs10-bill-more');
+        if (moreBtn && moreMenu && moreWrap) {
+          moreBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const willOpen = moreMenu.hidden;
+            closeCardMoreMenus();
+            if (willOpen) {
+              moreMenu.hidden = false;
+              moreWrap.classList.add('is-open');
+              moreBtn.setAttribute('aria-expanded', 'true');
+            }
+          };
+        }
       });
+
+      // Load more when table has more rows than currently shown cards
+      if (allRows.length > rows.length) {
+        const more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'btn btn-ghost rs10-bill-load-more';
+        more.innerHTML = `<i class="fa-solid fa-chevron-down"></i> Show more bills (${allRows.length - rows.length} left)`;
+        more.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cards.dataset.rsBillShown = String(Math.min(allRows.length, shown + pageSize));
+          delete cards.dataset.rsBillSig;
+          enhanceBills();
+        };
+        cards.appendChild(more);
+      }
+
+      if (!cards._rsBillMoreDocBound) {
+        cards._rsBillMoreDocBound = true;
+        document.addEventListener('click', (ev) => {
+          if (!ev.target.closest || !ev.target.closest('.rs10-bill-more')) {
+            closeCardMoreMenus();
+          }
+        });
+      }
     };
 
     /** Menu editor — full card with veg badge, price, stock, toggle + actions */
@@ -1419,6 +1617,13 @@
               <span><i class="fa-solid fa-box"></i> ${esc(stockTxt.trim())}</span>
               <span>Min ${esc(minTxt.trim())}</span>
             </div>
+            ${(() => {
+              const fefo = tr.querySelector('.inv-fefo-line, [data-fefo], .fefo-line');
+              const fefoTxt = fefo ? fefo.textContent.trim() : '';
+              return fefoTxt
+                ? `<div class="rs10-mcard-sub rs10-inv-fefo"><i class="fa-solid fa-clock"></i> ${esc(fefoTxt)}</div>`
+                : '';
+            })()}
             ${costTxt ? `<button type="button" class="rs10-inv-cost" data-card-cost>${esc(costTxt)}</button>` : ''}
             <div class="rs10-mcard-acts">
               <button type="button" class="btn btn-ghost btn-sm" data-card-batches><i class="fa-solid fa-layer-group"></i> Batches</button>
@@ -1452,6 +1657,7 @@
       if (!isMobileCards()) {
         document.querySelectorAll('[data-rs10-mobile-cards]').forEach((el) => {
           el.innerHTML = '';
+          delete el.dataset.rsBillSig;
         });
         return;
       }
@@ -1459,11 +1665,31 @@
       enhanceEditor();
       enhanceInv();
     };
+    // Observe only data hosts — body-wide observer was thrashing cards mid-tap
+    const watchTargets = [
+      document.getElementById('bills-table-body'),
+      document.getElementById('editor-list'),
+      document.getElementById('inv-table-body'),
+    ].filter(Boolean);
     const obs = new MutationObserver(() => {
       clearTimeout(run._t);
-      run._t = setTimeout(run, 100);
+      run._t = setTimeout(run, 180);
     });
-    obs.observe(document.body, { childList: true, subtree: true });
+    if (watchTargets.length) {
+      watchTargets.forEach((el) => obs.observe(el, { childList: true, subtree: true }));
+    } else {
+      // Fallback until tables mount
+      obs.observe(document.body, { childList: true, subtree: false });
+      setTimeout(() => {
+        try {
+          obs.disconnect();
+        } catch (_) {}
+        ['bills-table-body', 'editor-list', 'inv-table-body'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) obs.observe(el, { childList: true, subtree: true });
+        });
+      }, 2000);
+    }
     window.addEventListener('resize', () => {
       clearTimeout(run._r);
       run._r = setTimeout(run, 200);
@@ -1471,6 +1697,7 @@
     setTimeout(run, 400);
     document.addEventListener('rs:render-inventory', () => setTimeout(run, 80));
     document.addEventListener('rs:tab-change', () => setTimeout(run, 80));
+    document.addEventListener('rs:render-bills', () => setTimeout(run, 80));
   }
 
   /* ───────────── Settings mobile: ensure all sub-tabs work + labels ───────────── */
@@ -1665,22 +1892,8 @@
     installTaxRateTools();
     installPrintCapabilityHint();
 
-    // More menu items for online orders + settings
-    const moreHost = document.querySelector('#mnav-more-panel, .mnav-more-body') || null;
-    if (moreHost && !moreHost.querySelector('[data-tab="aggregator-tab"]')) {
-      const b = document.createElement('button');
-      b.className = 'mnav-more-btn';
-      b.setAttribute('data-tab', 'aggregator-tab');
-      b.innerHTML = '<i class="fa-solid fa-motorcycle"></i><span data-i18n="online_orders">Online Orders</span>';
-      moreHost.appendChild(b);
-    }
-    if (moreHost && !moreHost.querySelector('[data-tab="settings-tab"]')) {
-      const b = document.createElement('button');
-      b.className = 'mnav-more-btn';
-      b.setAttribute('data-tab', 'settings-tab');
-      b.innerHTML = '<i class="fa-solid fa-gear"></i><span data-i18n="settings">Settings</span>';
-      moreHost.appendChild(b);
-    }
+    // Note: mobile More sheet is built by features-shell (RSModal MORE list).
+    // Do not inject into non-existent #mnav-more-panel hosts.
 
     console.info('[RS10] product-10x layer ready');
   }
