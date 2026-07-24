@@ -160,16 +160,80 @@ function copyDirRecursive(src, dest) {
   }
 }
 
+/** Rank app-update versions like v215-20260722-slug → 215 (higher = newer). */
+function versionRank(v) {
+  const m = String(v || '').match(/v(\d+)/i);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * Prefer the newest of: content-state, web-overlay, packaged EXE.
+ * Old bug: state always won, so reinstalling a newer EXE still reported
+ * "You have: v214" and kept nagging while serving a stale overlay.
+ */
 function localContentVersion(webRoot) {
   migrateLegacyContent();
+  maybePromoteBundledOverStale(webRoot);
+  const candidates = [];
   const st = readState();
-  if (st && st.version) return String(st.version);
-  // Overlay already applied (even if state file was corrupted / BOM-broken)
+  if (st && st.version) candidates.push(String(st.version));
   const overlay = readOverlayAppUpdate();
-  if (overlay && overlay.version) return String(overlay.version);
+  if (overlay && overlay.version) candidates.push(String(overlay.version));
   const bundled = readBundledAppUpdate(webRoot);
-  if (bundled && bundled.version) return String(bundled.version);
-  return '0';
+  if (bundled && bundled.version) candidates.push(String(bundled.version));
+  if (!candidates.length) return '0';
+  candidates.sort((a, b) => versionRank(b) - versionRank(a) || String(b).localeCompare(String(a)));
+  return candidates[0];
+}
+
+/**
+ * When a fresh EXE ships a higher app-update version than the leftover
+ * userData overlay, drop the stale overlay so packaged files win and
+ * the "Update available" dialog stops incorrectly claiming an old UI.
+ */
+function maybePromoteBundledOverStale(webRoot) {
+  try {
+    const bundled = readBundledAppUpdate(webRoot);
+    if (!bundled || !bundled.version) return;
+    const bVer = String(bundled.version);
+    const bRank = versionRank(bVer);
+    if (!bRank) return;
+
+    const st = readState();
+    const ov = readOverlayAppUpdate();
+    const stRank = versionRank(st && st.version);
+    const ovRank = versionRank(ov && ov.version);
+
+    if (bRank > stRank || bRank > ovRank) {
+      // Remove outdated overlay so server serves the new EXE bundle
+      if (ovRank && bRank > ovRank) {
+        try {
+          const dir = overlayDir();
+          if (fs.existsSync(dir)) {
+            fs.rmSync(dir, { recursive: true, force: true });
+            console.log('[content-updater] removed stale web-overlay', ov && ov.version, '<', bVer);
+          }
+        } catch (e) {
+          console.warn('[content-updater] could not clear stale overlay', e && e.message);
+        }
+      }
+      // Align state with the EXE so silent checks stop prompting for content
+      // the installer already includes.
+      if (bRank > stRank) {
+        writeState({
+          origin: (st && st.origin) || '',
+          title: bundled.title || 'Packaged with installer',
+          version: bVer,
+          fileCount: st && st.fileCount,
+          appliedAt: new Date().toISOString(),
+          source: 'bundled-exe',
+        });
+        console.log('[content-updater] promoted content-state to bundled', bVer);
+      }
+    }
+  } catch (e) {
+    console.warn('[content-updater] maybePromoteBundledOverStale failed', e && e.message);
+  }
 }
 
 function fetchBuffer(url, timeoutMs) {
@@ -522,6 +586,11 @@ function start(opts) {
   _onApplied = (opts && opts.onApplied) || null;
   const webRoot = (opts && opts.webRoot) || '';
 
+  // Fix stale userData left by older installs before first check
+  try {
+    maybePromoteBundledOverStale(webRoot);
+  } catch (_) {}
+
   // Content updates work in packaged AND dev — always useful when online
   setTimeout(() => {
     checkContentUpdate({ silent: true, webRoot }).catch(() => {});
@@ -542,7 +611,20 @@ function getStatus() {
 function getOverlayDir() {
   const d = overlayDir();
   try {
-    if (fs.existsSync(d)) return d;
+    if (!fs.existsSync(d)) return null;
+    // Never serve an overlay older than the packaged EXE content version.
+    const ov = readOverlayAppUpdate();
+    // webRoot not always known here — compare against any content-state that
+    // was promoted from the EXE, and against remote-applied versions only.
+    // If overlay app-update is missing, still allow overlay (legacy).
+    if (ov && ov.version) {
+      const st = readState();
+      // If state says we are on bundled-exe and ranks higher, overlay is stale
+      if (st && st.source === 'bundled-exe' && versionRank(st.version) > versionRank(ov.version)) {
+        return null;
+      }
+    }
+    return d;
   } catch (_) {}
   return null;
 }
