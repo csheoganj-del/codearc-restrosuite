@@ -1,11 +1,7 @@
 # ---------------------------------------------------------------------------
 # Vercel Hobby / free-tier deploy limit workaround
-# (same pattern as 2026-07-17 "force redeploy" when huge EXEs blocked push)
-# ---------------------------------------------------------------------------
 # Ship the static web app + small download assets only.
-# Multi‑80MB Windows installers blow past hobby upload size; keep them on
-# GitHub (repo / Releases) and link from the site instead of embedding every
-# historical desktop/*.exe in the Vercel deployment.
+# Large installers live on GitHub Releases — do not upload to Vercel.
 # ---------------------------------------------------------------------------
 
 # Local build trees
@@ -14,10 +10,13 @@ node_modules
 android-app/build
 android-app/.tmp-gradle-build
 android-app/dist
+android-app
 desktop/dist
 desktop/node_modules
 desktop/app
+desktop
 scratch
+scratch-*
 codearc-restrosuite
 codearc-restrosuite-1
 backups
@@ -25,13 +24,20 @@ backups
 test-results
 uploads
 gateway-hf
+gateway-tray
+local-builds
+publish-static
 
 # Oversized binaries — DO NOT upload to Vercel hobby
 downloads/**/*.exe
 downloads/**/*.exe.blockmap
+downloads/**/*.dmg
+downloads/**/*.zip
 downloads/desktop/**
 *.exe
+*.dmg
 *.blockmap
+*.apk
 
-# Optional heavy APK can stay (~12MB). Uncomment if deploy still fails:
-# downloads/*.apk
+# Heavy PDF guides can stay under ~11MB each; if deploy still fails, ignore:
+# downloads/*.pdf
