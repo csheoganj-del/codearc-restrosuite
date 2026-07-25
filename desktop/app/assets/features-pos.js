@@ -1463,7 +1463,52 @@
         const change = Math.max(0, totalPaid - totals.grand);
         return { method, received: totalPaid, change, valid: totals.count > 0 && totalPaid >= totals.grand };
       }
+      if (method === 'Cash') {
+        const receivedInput = document.getElementById('inline-cash-received');
+        const received = receivedInput ? (Number(receivedInput.value) || 0) : totals.grand;
+        // Empty input treated as full amount at settle time; partial typed amount must cover total
+        if (receivedInput && receivedInput.value !== '' && received < totals.grand) {
+          return {
+            method,
+            received,
+            change: 0,
+            valid: false,
+            reason: 'Cash received is less than total — enter full amount (or Exact), then Print & Pay',
+          };
+        }
+      }
       return { method, received: totals.grand, change: 0, valid: totals.count > 0 };
+    }
+
+    /**
+     * Keep Print & Pay clickable when blocked so we can explain why.
+     * aria-disabled + .is-blocked style (never silent disabled HTML button).
+     */
+    function setCheckoutGate(ok, reason) {
+      const checkoutBtn = document.getElementById('btn-checkout');
+      if (!checkoutBtn) return;
+      // Always leave HTML disabled=false so click handlers run and can toast
+      checkoutBtn.disabled = false;
+      if (ok) {
+        checkoutBtn.removeAttribute('aria-disabled');
+        checkoutBtn.classList.remove('is-blocked');
+        delete checkoutBtn.dataset.blockReason;
+        checkoutBtn.title = 'Print bill and take payment';
+      } else {
+        checkoutBtn.setAttribute('aria-disabled', 'true');
+        checkoutBtn.classList.add('is-blocked');
+        const msg = reason || 'Cannot Print & Pay yet';
+        checkoutBtn.dataset.blockReason = msg;
+        checkoutBtn.title = msg;
+      }
+    }
+
+    function explainCheckoutBlock() {
+      const checkoutBtn = document.getElementById('btn-checkout');
+      const msg =
+        (checkoutBtn && checkoutBtn.dataset.blockReason) ||
+        'Cannot Print & Pay yet — check cart and payment';
+      RS.toast(msg, 'fa-circle-exclamation');
     }
     function resetPayment(){
       paymentState.method = 'UPI';
@@ -1496,11 +1541,17 @@
       changeEl.textContent = RS.rs(change);
 
       if (checkoutBtn) {
-        if (paymentState.method === 'Cash' && received < totals.grand) {
-          checkoutBtn.disabled = true;
+        if (totals.count < 1) {
+          setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+        } else if (paymentState.method === 'Cash' && received < totals.grand) {
+          // Keep clickable so we can explain — never silently dead
+          setCheckoutGate(
+            false,
+            'Cash received is less than total — enter full amount (or Exact), then Print & Pay'
+          );
           receivedInput.style.borderColor = 'var(--orange)';
         } else {
-          checkoutBtn.disabled = totals.count < 1;
+          setCheckoutGate(true, '');
           receivedInput.style.borderColor = '';
         }
       }
@@ -1531,32 +1582,32 @@
       if (remaining === 0 || Math.abs(remaining) < 0.005) {
         statusText.textContent = 'Balanced!';
         statusText.style.color = '#25d366';
-        if (checkoutBtn) {
-          checkoutBtn.disabled = totals.count < 1;
-        }
+        if (totals.count < 1) setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+        else setCheckoutGate(true, '');
         [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
       } else if (remaining > 0) {
         statusText.textContent = `Remaining: ${money(remaining)}`;
         statusText.style.color = 'var(--orange)';
-        if (checkoutBtn) {
-          checkoutBtn.disabled = true;
-        }
+        setCheckoutGate(
+          false,
+          `Split still needs ${money(remaining)} more — fill cash/UPI/card/due to match total`
+        );
         [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
       } else {
         const overpaid = totalPaid - totals.grand;
         if (cash >= overpaid) {
           statusText.textContent = `Change Due: ${money(overpaid)}`;
           statusText.style.color = '#25d366';
-          if (checkoutBtn) {
-            checkoutBtn.disabled = totals.count < 1;
-          }
+          if (totals.count < 1) setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+          else setCheckoutGate(true, '');
           [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
         } else {
           statusText.textContent = `Overpaid by ${money(overpaid)}`;
           statusText.style.color = 'var(--red)';
-          if (checkoutBtn) {
-            checkoutBtn.disabled = true;
-          }
+          setCheckoutGate(
+            false,
+            'Split overpaid without enough cash for change — add cash leg or reduce other methods'
+          );
           [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = 'var(--red)');
         }
       }
@@ -2028,7 +2079,11 @@
       if(!checkoutBtn) return;
       document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.classList.toggle('active', btn.dataset.payMethod === paymentState.method));
       if(note) note.textContent = paymentState.method;
-      checkoutBtn.disabled = totals.count < 1;
+      if (totals.count < 1) {
+        setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+      } else {
+        setCheckoutGate(true, '');
+      }
 
       // Inline tenders: show cash/split panels in the cart foot (never floating side tabs)
       if (paymentState.method === 'Cash') {
@@ -2194,15 +2249,124 @@
     // Hard debounce — industry POS never double-finalizes payment
     let checkoutInFlight = false;
 
+    function confirmKotMissing() {
+      return new Promise((resolve) => {
+        // Prefer in-app modal: window.confirm is flaky / invisible in some Electron builds
+        if (window.RSModal && typeof RSModal.open === 'function') {
+          RSModal.open({
+            title: 'KOT not sent',
+            sub: 'Kitchen has not received this order yet',
+            icon: 'fa-fire',
+            size: 'sm',
+            body: '<p style="margin:0;font-size:13.5px;line-height:1.5;color:var(--text-soft)">Send KOT first for dine-in, or continue billing now if kitchen already knows.</p>',
+            foot:
+              '<button type="button" class="btn btn-ghost" style="flex:1" data-kot-cancel>Cancel</button>' +
+              '<button type="button" class="btn btn-primary" style="flex:1.3" data-kot-ok>Continue billing</button>',
+            onMount(modal, close) {
+              const cancel = modal.querySelector('[data-kot-cancel]');
+              const ok = modal.querySelector('[data-kot-ok]');
+              if (cancel) {
+                cancel.onclick = () => {
+                  close();
+                  resolve(false);
+                };
+              }
+              if (ok) {
+                ok.onclick = () => {
+                  close();
+                  resolve(true);
+                };
+              }
+            },
+          });
+          return;
+        }
+        try {
+          resolve(!!window.confirm('KOT not sent. Continue billing?'));
+        } catch (_) {
+          resolve(true);
+        }
+      });
+    }
+
     async function checkout(){
       if (checkoutInFlight) {
         return RS.toast('Checkout already in progress…', 'fa-spinner');
       }
-      const totals = RS.getTotals();
-      const cust = RS.getCustomer();
-      if(!totals.count) return RS.toast('Cart is empty','fa-circle-exclamation');
+      // Dismiss invisible tour shield if still covering the cart (Print & Pay dead-click fix)
+      try {
+        const ov = document.getElementById('onboarding-overlay');
+        if (ov && ov.style.display !== 'none' && !ov.classList.contains('is-visible')) {
+          ov.style.display = 'none';
+          ov.style.pointerEvents = 'none';
+          const bd = document.getElementById('onboarding-backdrop');
+          if (bd) bd.style.pointerEvents = 'none';
+        }
+      } catch (_) {}
+
+      // Explain soft-blocked button (empty cart / short cash / unbalanced split)
+      try {
+        const gateBtn = document.getElementById('btn-checkout');
+        if (gateBtn && gateBtn.getAttribute('aria-disabled') === 'true') {
+          return explainCheckoutBlock();
+        }
+      } catch (_) {}
+
+      // Shift required — clear modal + toast (never silent)
+      try {
+        const needShift =
+          window.RSOps &&
+          typeof RSOps.getOpenShift === 'function' &&
+          !RSOps.getOpenShift();
+        const isSuper =
+          document.documentElement.classList.contains('rs-role-superadmin');
+        if (needShift && !isSuper) {
+          if (typeof RSOps.promptRequireOpenShift === 'function') {
+            await RSOps.promptRequireOpenShift({
+              action: 'Print & Pay',
+              reason:
+                'A shift must be open before billing. This keeps cash float, bill list, and Z-report correct for this counter.',
+            });
+          } else {
+            RS.toast(
+              'Open a shift first (orange Shift button), then Print & Pay',
+              'fa-unlock'
+            );
+            document.getElementById('rs-shift-open')?.click();
+          }
+          return;
+        }
+      } catch (shiftErr) {
+        console.warn('[checkout] shift gate', shiftErr);
+        return RS.toast(
+          'Open a shift first (orange Shift button), then Print & Pay',
+          'fa-unlock'
+        );
+      }
+
+      let totals;
+      let cust;
+      try {
+        totals = RS.getTotals();
+        cust = RS.getCustomer();
+      } catch (err) {
+        console.error('[checkout] totals/customer failed', err);
+        return RS.toast('Checkout failed to read cart — refresh and try again', 'fa-circle-exclamation');
+      }
+      if(!totals || !totals.count) {
+        setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+        return RS.toast('Cart is empty — add items before Print & Pay', 'fa-circle-exclamation');
+      }
       const payment = getPaymentDetails();
-      if(!payment.valid) return RS.toast('Cart is empty','fa-circle-exclamation');
+      if(!payment.valid) {
+        const why =
+          payment.reason ||
+          (payment.method === 'Split'
+            ? 'Split amounts must cover the total before Print & Pay'
+            : 'Cannot take payment — check cart totals');
+        setCheckoutGate(false, why);
+        return RS.toast(why, 'fa-circle-exclamation');
+      }
 
       // Manager PIN: credit / due tenders
       try {
@@ -2226,7 +2390,12 @@
         const warnKot = window.RSOpsMode
           ? RSOpsMode.shouldWarnKotOnCheckout()
           : !(window.RS_SETTINGS && RS_SETTINGS.set_pos_only_mode);
-        if (warnKot && isDineIn() && !isKotSent() && !window.confirm('KOT not sent. Continue billing?')) return;
+        if (warnKot && isDineIn() && !isKotSent()) {
+          const proceed = await confirmKotMissing();
+          if (!proceed) {
+            return RS.toast('Billing cancelled — send KOT or confirm to continue', 'fa-fire');
+          }
+        }
 
         checkoutInFlight = true;
         const checkoutBtn = document.getElementById('btn-checkout');
@@ -2552,9 +2721,10 @@
             delete checkoutBtn.dataset.wasBusy;
             try {
               const t = RS.getTotals && RS.getTotals();
-              checkoutBtn.disabled = !(t && t.count > 0);
+              if (t && t.count > 0) setCheckoutGate(true, '');
+              else setCheckoutGate(false, 'Add items to the cart before Print & Pay');
             } catch (_) {
-              checkoutBtn.disabled = false;
+              setCheckoutGate(true, '');
             }
           }
         }
@@ -2739,22 +2909,37 @@
         if (card > 0) tenders.push({ method: 'Card', amount: card });
         if (due > 0) tenders.push({ method: 'Due', amount: due });
 
-        await finalizeBill('Split', totalPaid, changeAmount, tenders);
-        return;
-      }
-
-      if (payment.method === 'Cash') {
-        const receivedInput = document.getElementById('inline-cash-received');
-        const cashReceived = receivedInput ? (Number(receivedInput.value) || totals.grand) : totals.grand;
-        const changeAmount = Math.max(0, cashReceived - totals.grand);
-        if (cashReceived < totals.grand) {
-          return RS.toast('Insufficient cash received', 'fa-circle-exclamation');
+        try {
+          await finalizeBill('Split', totalPaid, changeAmount, tenders);
+        } catch (err) {
+          console.error('[checkout] split failed', err);
+          checkoutInFlight = false;
+          RS.toast('Checkout failed: ' + (err && err.message ? err.message : 'try again'), 'fa-circle-exclamation');
         }
-        await finalizeBill('Cash', cashReceived, changeAmount);
         return;
       }
 
-      await finalizeBill(payment.method, totals.grand, 0);
+      try {
+        if (payment.method === 'Cash') {
+          const receivedInput = document.getElementById('inline-cash-received');
+          const cashReceived = receivedInput ? (Number(receivedInput.value) || totals.grand) : totals.grand;
+          const changeAmount = Math.max(0, cashReceived - totals.grand);
+          if (cashReceived < totals.grand) {
+            return RS.toast('Insufficient cash received', 'fa-circle-exclamation');
+          }
+          await finalizeBill('Cash', cashReceived, changeAmount);
+          return;
+        }
+
+        await finalizeBill(payment.method, totals.grand, 0);
+      } catch (err) {
+        console.error('[checkout] failed', err);
+        checkoutInFlight = false;
+        const checkoutBtn = document.getElementById('btn-checkout');
+        if (checkoutBtn) delete checkoutBtn.dataset.wasBusy;
+        setCheckoutGate(true, '');
+        RS.toast('Checkout failed: ' + (err && err.message ? err.message : 'try again'), 'fa-circle-exclamation');
+      }
     }
 
     /* ---------------- KOT (mode-aware: full / kitchen printer / billing) ---------------- */
@@ -3033,10 +3218,21 @@
       document.documentElement.dataset.rsPosActionsBound = '1';
       document.addEventListener('click', async e => {
         const btn = e.target.closest('#btn-checkout, #btn-kot, #btn-clear-cart');
-        if (!btn || btn.disabled) return;
+        if (!btn) return;
+        // aria-disabled pattern: still receive click so we can explain the block
+        if (btn.disabled) {
+          if (btn.id === 'btn-checkout') {
+            e.preventDefault();
+            return explainCheckoutBlock();
+          }
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
-        if (btn.id === 'btn-checkout') return checkout();
+        if (btn.id === 'btn-checkout') {
+          if (btn.getAttribute('aria-disabled') === 'true') return explainCheckoutBlock();
+          return checkout();
+        }
         if (btn.id === 'btn-kot') return kot();
         if (btn.id === 'btn-clear-cart') {
           const totals = RS.getTotals();
@@ -3218,8 +3414,34 @@
 
     async function holdCurrent(){
       const totals = RS.getTotals();
-      if(!totals.count) return RS.toast('Nothing to hold','fa-circle-exclamation');
-      
+      if(!totals.count) return RS.toast('Nothing to hold — add items first, then Hold', 'fa-circle-exclamation');
+
+      // Same shift discipline as billing: park orders only under an open shift
+      try {
+        const needShift =
+          window.RSOps &&
+          typeof RSOps.getOpenShift === 'function' &&
+          !RSOps.getOpenShift();
+        const isSuper =
+          document.documentElement.classList.contains('rs-role-superadmin');
+        if (needShift && !isSuper) {
+          if (typeof RSOps.promptRequireOpenShift === 'function') {
+            await RSOps.promptRequireOpenShift({
+              action: 'Hold order',
+              reason:
+                'Open a shift before holding orders so parked tickets stay on this counter’s shift log.',
+            });
+          } else {
+            RS.toast('Open a shift first (orange Shift button), then Hold', 'fa-unlock');
+            document.getElementById('rs-shift-open')?.click();
+          }
+          return;
+        }
+      } catch (shiftErr) {
+        console.warn('[hold] shift gate', shiftErr);
+        return RS.toast('Open a shift first, then Hold', 'fa-unlock');
+      }
+
       const cust = RS.getCustomer();
       const id = Date.now();
       const draftId = RS.nextLogicalNo ? RS.nextLogicalNo('D') : ('D-' + String(id).slice(-6));
@@ -3455,21 +3677,21 @@
     document.addEventListener('click', async (e) => {
       if (e.target.closest('#btn-hold-current')) {
         const key = getCurrentOrderTypeKey();
-        if (RS.getCart && RS.getCart().length) holdCurrent();
+        if (RS.getCart && RS.getCart().length) await holdCurrent();
         else openDrafts(key);
         return;
       }
       // Legacy type buttons (hidden) — keep working if re-enabled
       if (e.target.closest('#btn-hold-takeaway')) {
-        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) holdCurrent();
+        if (getCurrentOrderTypeKey() === 'takeaway' && RS.getCart().length) await holdCurrent();
         else openDrafts('takeaway');
       }
       if (e.target.closest('#btn-hold-dinein')) {
-        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) holdCurrent();
+        if (getCurrentOrderTypeKey() === 'dinein' && RS.getCart().length) await holdCurrent();
         else openDrafts('dinein');
       }
       if (e.target.closest('#btn-hold-delivery')) {
-        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) holdCurrent();
+        if (getCurrentOrderTypeKey() === 'delivery' && RS.getCart().length) await holdCurrent();
         else openDrafts('delivery');
       }
 

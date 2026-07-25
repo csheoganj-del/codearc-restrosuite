@@ -685,10 +685,105 @@
       console.warn('[Shift] cash move save failed', e);
     }
   }
+  /**
+   * Hard gate + clear UI when shift is closed.
+   * Returns true if a shift is open; false after notifying (and optional Open shift CTA).
+   */
+  function promptRequireOpenShift(opts) {
+    if (getOpenShift()) return Promise.resolve(true);
+    try {
+      if (document.documentElement.classList.contains('rs-role-superadmin')) {
+        return Promise.resolve(true);
+      }
+    } catch (_) {}
+
+    const action = (opts && opts.action) || 'billing';
+    const reason =
+      (opts && opts.reason) ||
+      'Open a shift first so bills, cash, and the Z-report stay accurate for this counter.';
+
+    toast('Shift is closed — open a shift to continue ' + action, 'fa-unlock');
+
+    const triggerOpen = () => {
+      const btn =
+        document.getElementById('rs-shift-open') ||
+        document.getElementById('rs-cart-shift-hint');
+      if (btn) {
+        btn.click();
+        return;
+      }
+      // Fallback: open float prompt directly
+      if (global.RS10 && typeof RS10.promptDenomination === 'function') {
+        Promise.resolve(
+          RS10.promptDenomination({
+            title: (global.RS10.t && RS10.t('shift_open')) || 'Open shift',
+            sub: (global.RS10.t && RS10.t('shift_float')) || 'Opening cash (notes & coins)',
+            initial: 0,
+          })
+        ).then((result) => {
+          if (!result) return;
+          openShift(result.total).then((shift) => {
+            if (shift) {
+              shift.openingDenom = result.counts;
+              shift.openingNote = result.note;
+            }
+          });
+        });
+        return;
+      }
+      const f = window.prompt('Opening cash float (drawer start amount)', '0');
+      if (f !== null) openShift(Number(f) || 0);
+    };
+
+    if (global.RSModal && typeof RSModal.open === 'function') {
+      return new Promise((resolve) => {
+        RSModal.open({
+          title: 'Shift is closed',
+          sub: 'Required before ' + action,
+          icon: 'fa-cash-register',
+          size: 'sm',
+          body:
+            '<p style="margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--text-soft)">' +
+            esc(reason) +
+            '</p>' +
+            '<p style="margin:0;font-size:12.5px;line-height:1.45;color:var(--text-mute)">' +
+            'Tap <b>Open shift</b>, set your opening float, then try again.</p>',
+          foot:
+            '<button type="button" class="btn btn-ghost" style="flex:1" data-shift-cancel>Not now</button>' +
+            '<button type="button" class="btn btn-primary" style="flex:1.4" data-shift-open>' +
+            '<i class="fa-solid fa-unlock"></i> Open shift</button>',
+          onMount(modal, close) {
+            const cancel = modal.querySelector('[data-shift-cancel]');
+            const openBtn = modal.querySelector('[data-shift-open]');
+            if (cancel) {
+              cancel.onclick = () => {
+                close();
+                resolve(false);
+              };
+            }
+            if (openBtn) {
+              openBtn.onclick = () => {
+                close();
+                resolve(false);
+                setTimeout(triggerOpen, 80);
+              };
+            }
+          },
+        });
+      });
+    }
+
+    triggerOpen();
+    return Promise.resolve(false);
+  }
+
   async function addCashMovement(type, amount, reason) {
     const shift = getOpenShift();
     if (!shift) {
-      toast('Open a shift first', 'fa-circle-exclamation');
+      await promptRequireOpenShift({
+        action: 'cash drawer moves',
+        reason: 'Pay-in, pay-out, and safe drop need an open shift so cash stays balanced.',
+      });
       return false;
     }
     const t = String(type || '').toLowerCase();
@@ -763,7 +858,10 @@
   function openCashMovementModal() {
     const shift = getOpenShift();
     if (!shift) {
-      toast('Open a shift first', 'fa-circle-exclamation');
+      promptRequireOpenShift({
+        action: 'cash drawer',
+        reason: 'Open a shift first to record pay-in, pay-out, or safe drop on this counter.',
+      });
       return;
     }
     if (!global.RSModal) {
@@ -1111,7 +1209,10 @@
 
   async function closeShift() {
     const shift = getOpenShift();
-    if (!shift) return toast('No open shift', 'fa-circle-exclamation');
+    if (!shift) {
+      toast('No open shift to close — open a shift first from the orange Shift button', 'fa-circle-exclamation');
+      return;
+    }
     if (global.RSPinModal && RSPinModal.isConfigured()) {
       const ok = await RSPinModal.request('Close shift · Z-report');
       if (!ok) return;
@@ -1688,24 +1789,14 @@
       };
   }
 
-  /** Soft nudge: open shift before first checkout of the session */
+  /**
+   * Soft entry toast only — hard gate + modal lives in Print & Pay (features-pos).
+   * Keeps one clear place that explains "why billing will not proceed".
+   */
   function installShiftNudge() {
     if (document.documentElement.dataset.rsShiftNudge === '1') return;
     document.documentElement.dataset.rsShiftNudge = '1';
-    document.addEventListener(
-      'click',
-      (e) => {
-        const btn = e.target && e.target.closest && e.target.closest('#btn-checkout');
-        if (!btn) return;
-        if (getOpenShift()) return;
-        try {
-          if (sessionStorage.getItem('rs_shift_nudge_done') === '1') return;
-          sessionStorage.setItem('rs_shift_nudge_done', '1');
-        } catch (_) {}
-        toast('Tip: open a shift for cash Z-report · use Day pack anytime', 'fa-cash-register');
-      },
-      true
-    );
+    // no capture-phase silent tip; checkout shows Shift is closed modal
   }
 
   function maybePromptOpenShift() {
@@ -1715,10 +1806,13 @@
       const pos = document.getElementById('pos-tab');
       if (!pos || !pos.classList.contains('active')) return;
       sessionStorage.setItem('rs_shift_prompted', '1');
-      // Non-blocking: only toast, not a hard modal
+      // Soft reminder on first POS open — Print & Pay still hard-gates with a modal
       setTimeout(() => {
         if (!getOpenShift()) {
-          toast('Open a shift to track cash float & Z-report', 'fa-unlock');
+          toast(
+            'Shift is closed — open Shift before Print & Pay (float + Z-report)',
+            'fa-unlock'
+          );
         }
       }, 1200);
     } catch (_) {}
@@ -1907,6 +2001,19 @@
   }
 
   async function openCashDrawer() {
+    try {
+      if (
+        !getOpenShift() &&
+        !document.documentElement.classList.contains('rs-role-superadmin')
+      ) {
+        await promptRequireOpenShift({
+          action: 'open cash drawer',
+          reason:
+            'Open a shift before kicking the cash drawer so cash activity stays on this counter’s shift.',
+        });
+        return { ok: false, error: 'shift_closed' };
+      }
+    } catch (_) {}
     try {
       if (global.RSPrintBridge && typeof RSPrintBridge.openCashDrawer === 'function') {
         const res = await RSPrintBridge.openCashDrawer({});
@@ -2211,6 +2318,7 @@
       openShift,
       closeShift,
       getOpenShift,
+      promptRequireOpenShift,
       summarizeShift,
       addCashMovement,
       openCashMovementModal,

@@ -1648,7 +1648,8 @@
   </div>
 
   <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:100000;pointer-events:none;">
-    <div id="onboarding-backdrop" style="position:absolute;inset:0;pointer-events:auto;"></div>
+    <!-- Backdrop only receives clicks while tour is open (.is-visible). Inline auto here used to block Print & Pay when opacity:0. -->
+    <div id="onboarding-backdrop" style="position:absolute;inset:0;pointer-events:none;"></div>
     <div id="onboarding-spotlight"></div>
     <aside id="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">

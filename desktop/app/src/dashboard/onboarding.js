@@ -932,16 +932,38 @@
     }, 100);
   }
 
+  function openTourOverlay() {
+    const overlay = document.getElementById('onboarding-overlay');
+    if (!overlay) return null;
+    const backdrop = document.getElementById('onboarding-backdrop');
+    document.body.classList.add('onboarding-active');
+    overlay.style.display = 'block';
+    overlay.style.pointerEvents = 'auto';
+    if (backdrop) backdrop.style.pointerEvents = 'auto';
+    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+    return overlay;
+  }
+
+  function closeTourOverlayImmediate() {
+    const overlay = document.getElementById('onboarding-overlay');
+    const backdrop = document.getElementById('onboarding-backdrop');
+    if (backdrop) backdrop.style.pointerEvents = 'none';
+    if (overlay) {
+      overlay.classList.remove('is-visible');
+      // Drop hit-testing immediately so Print & Pay is never covered by an invisible shield
+      overlay.style.pointerEvents = 'none';
+      overlay.style.display = 'none';
+    }
+    document.body.classList.remove('onboarding-active');
+    document.querySelector('.sidebar')?.classList.remove('reveal');
+  }
+
   function startTour() {
     steps = [WELCOME_STEP, ...enabledFeatures()];
     if (steps.length < 2) return;
     currentStep = 0;
     closeGuide();
-    const overlay = document.getElementById('onboarding-overlay');
-    if (!overlay) return;
-    document.body.classList.add('onboarding-active');
-    overlay.style.display = 'block';
-    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+    if (!openTourOverlay()) return;
     goToStep(0);
   }
 
@@ -949,11 +971,7 @@
     steps = DUES_TOUR_STEPS;
     currentStep = 0;
     closeGuide();
-    const overlay = document.getElementById('onboarding-overlay');
-    if (!overlay) return;
-    document.body.classList.add('onboarding-active');
-    overlay.style.display = 'block';
-    requestAnimationFrame(() => overlay.classList.add('is-visible'));
+    if (!openTourOverlay()) return;
     goToStep(0);
   }
 
@@ -968,13 +986,7 @@
     } catch (error) {
       console.warn('[Onboarding] Tour completion could not be stored:', error);
     }
-    const overlay = document.getElementById('onboarding-overlay');
-    if (overlay) {
-      overlay.classList.remove('is-visible');
-      setTimeout(() => { overlay.style.display = 'none'; }, 250);
-    }
-    document.body.classList.remove('onboarding-active');
-    document.querySelector('.sidebar')?.classList.remove('reveal');
+    closeTourOverlayImmediate();
   }
 
   function openUpdateHistoryModal() {

@@ -1412,6 +1412,14 @@ body > .dropdown-menu.is-portaled .dropdown-item.active {
   position: relative; z-index: 6; pointer-events: auto !important;
   flex-shrink: 0;
 }
+/* Soft-blocked (empty cart / short cash / split) — still clickable to show why */
+.cart-actions #btn-checkout.is-blocked,
+.cart-actions #btn-checkout[aria-disabled="true"] {
+  opacity: 0.55;
+  filter: grayscale(0.15);
+  box-shadow: none;
+  cursor: not-allowed;
+}
 .cart-actions-final {
   flex-shrink: 0;
   position: relative;
@@ -2958,10 +2966,20 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 #onboarding-overlay {
   opacity: 0;
   transition: opacity 0.25s ease;
+  /* Critical: never let an invisible overlay steal POS clicks.
+     Children with pointer-events:auto would still receive events if the
+     parent only set pointer-events:none in inline HTML — force off until open. */
+  pointer-events: none !important;
 }
 
 #onboarding-overlay.is-visible {
   opacity: 1;
+  pointer-events: auto !important;
+}
+
+#onboarding-overlay:not(.is-visible) #onboarding-backdrop,
+#onboarding-overlay:not(.is-visible) #onboarding-card {
+  pointer-events: none !important;
 }
 
 /* Spotlight ring overlay */

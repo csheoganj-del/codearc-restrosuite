@@ -324,14 +324,49 @@
   async function markBillRefunded(b) {
     if (!b || b.status === 'refunded') return;
 
+    // Shift required so voids land on the open Z-report (same discipline as Print & Pay)
+    try {
+      const needShift =
+        global.RSOps &&
+        typeof RSOps.getOpenShift === 'function' &&
+        !RSOps.getOpenShift();
+      const isSuper =
+        document.documentElement.classList.contains('rs-role-superadmin');
+      if (needShift && !isSuper) {
+        if (typeof RSOps.promptRequireOpenShift === 'function') {
+          await RSOps.promptRequireOpenShift({
+            action: 'void / refund',
+            reason:
+              'Open a shift before voiding or refunding so the refund is tied to this counter’s Z-report.',
+          });
+        } else {
+          toast(
+            'Open a shift first (orange Shift button), then void / refund',
+            'fa-unlock'
+          );
+        }
+        return;
+      }
+    } catch (shiftErr) {
+      console.warn('[refund] shift gate', shiftErr);
+      toast('Open a shift first, then void / refund', 'fa-unlock');
+      return;
+    }
+
     // Always gate with Admin PIN when modal is available (setup on first use if unset)
     if (global.RSPinModal && typeof RSPinModal.request === 'function') {
       const ok = await RSPinModal.request(`Void / Refund ${b.no || b.id || 'bill'}`);
-      if (!ok) return;
+      if (!ok) {
+        toast('Void / refund cancelled — manager PIN required', 'fa-lock');
+        return;
+      }
     }
 
     const reason = await showRefundModal(b);
-    if (reason === null) return;
+    if (reason === null) {
+      toast('Void / refund cancelled', 'fa-circle-info');
+      return;
+    }
 
     b.status = 'refunded';
     b.refundReason = reason || 'POS void/refund';
@@ -437,10 +472,16 @@
     // Always gate with Admin PIN when modal is available (setup on first use if unset)
     if (global.RSPinModal && typeof RSPinModal.request === 'function') {
       const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
-      if (!ok) return;
+      if (!ok) {
+        toast('Delete cancelled — manager PIN required', 'fa-lock');
+        return;
+      }
     }
     const confirmed = await showDeleteConfirm(b);
-    if (!confirmed) return;
+    if (!confirmed) {
+      toast('Delete cancelled', 'fa-circle-info');
+      return;
+    }
 
     const BILLS = getBills();
     const billKey = String(b.no || b.orderId || b.id || '');
