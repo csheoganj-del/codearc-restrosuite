@@ -1,12 +1,14 @@
 {
-  "version": "v215-20260722-scan-cart-floor",
-  "date": "2026-07-22",
-  "title": "Scanner UI + cart scroll + live table status",
-  "summary": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table.",
+  "version": "v216-20260725-shift-ux-guide",
+  "date": "2026-07-25",
+  "title": "Shift-first billing + clear action guides",
+  "summary": "Print and Pay, Hold, refunds, and cash drawer now require an open shift and explain why when blocked. After this update, staff see a short guide of what changed.",
   "highlights": [
-    "Staff table scan: dark square viewfinder, Snap photo + live cam, less clutter",
-    "Mobile cart: fixed bottom sheet — cart lines scroll, menu stays put",
-    "Floor: table turns Dining when cart has items + table selected",
-    "Cloud occupancy uses real order ids (no broken cart_/seat_ PK hashes)"
-  ]
+    "Open shift first: Print and Pay shows a clear modal when shift is closed (Open shift CTA)",
+    "Hold and Void/Refund use the same shift gate so Z-report stays accurate",
+    "Cash drawer and pay-in/pay-out also prompt to open shift instead of failing silently",
+    "Print and Pay explains empty cart, short cash, and unbalanced split - no dead button",
+    "After update install: Whats New + optional 4-step tour of shift and billing UX"
+  ],
+  "tour": "shift-ux"
 }

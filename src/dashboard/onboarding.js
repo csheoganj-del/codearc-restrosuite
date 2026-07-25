@@ -165,6 +165,20 @@
 
   const UPDATES_HISTORY = [
     {
+      version: "v216-20260725-shift-ux-guide",
+      date: "2026-07-25",
+      title: "Shift-first billing + clear action guides",
+      summary: "Print & Pay, Hold, refunds, and cash drawer require an open shift and explain why when blocked. After install, a short guide shows what changed.",
+      highlights: [
+        "Open shift first: Print & Pay shows a clear modal when shift is closed (Open shift CTA).",
+        "Hold and Void/Refund use the same shift gate so the Z-report stays accurate.",
+        "Cash drawer and pay-in/pay-out prompt to open shift instead of failing silently.",
+        "Print & Pay explains empty cart, short cash, and unbalanced split — no dead button.",
+        "After this update: What's New opens automatically with an optional guided tour."
+      ],
+      tour: "shift-ux"
+    },
+    {
       version: "v36-20260708",
       date: "2026-07-08",
       title: "Logical Numbering & Update Reliability Fix",
@@ -234,6 +248,50 @@
         "Multi-station kitchen routing."
       ]
     }
+  ];
+
+  /** Post-update UX tour for v216 shift-first billing */
+  const SHIFT_UX_TOUR_STEPS = [
+    {
+      tabId: 'pos-tab',
+      label: 'Open shift first',
+      icon: 'fa-unlock',
+      subtitle: 'Required before billing',
+      description:
+        'Tap the orange Shift button (or the yellow Open shift to bill strip) and set opening float. Print & Pay, Hold, refunds, and cash drawer need an open shift so cash and Z-report stay correct.',
+      firstAction: 'Open a shift with your float, then continue this tour.',
+      targetSelector: '#rs-shift-open, #rs-cart-shift-hint, #rs-topbar-shift, .rs-shift-compact',
+    },
+    {
+      tabId: 'pos-tab',
+      label: 'Print & Pay',
+      icon: 'fa-print',
+      subtitle: 'Clear reasons when blocked',
+      description:
+        'If Print & Pay cannot run, RestroSuite now tells you why: shift closed, empty cart, cash less than total, or split not balanced — never a silent dead button.',
+      firstAction: 'Add items with shift open, then use Print & Pay.',
+      targetSelector: '#btn-checkout',
+    },
+    {
+      tabId: 'pos-tab',
+      label: 'Hold order',
+      icon: 'fa-pause',
+      subtitle: 'Park cart under a shift',
+      description:
+        'Hold also requires an open shift. If shift is closed you get the same Open shift modal. Resume held orders still works from the Hold list anytime.',
+      firstAction: 'With items in cart and shift open, tap Hold to park the order.',
+      targetSelector: '#btn-hold-current',
+    },
+    {
+      tabId: 'bills-tab',
+      label: 'Void / Refund',
+      icon: 'fa-rotate-left',
+      subtitle: 'Tied to this shift',
+      description:
+        'Voiding a bill needs an open shift so the refund is on this counter’s Z-report. You are prompted to open shift if closed, then manager PIN as before.',
+      firstAction: 'Open Bills → bill menu → Void / Refund after opening a shift.',
+      targetSelector: '[data-tab="bills-tab"], .sidebar-link[data-tab="bills-tab"], #nav-bills',
+    },
   ];
 
   const DUES_TOUR_STEPS = [
@@ -967,8 +1025,23 @@
     goToStep(0);
   }
 
+  function resolveUpdateTourSteps() {
+    // Prefer latest release tour flag from history / app-update feed
+    const head = UPDATES_HISTORY[0] || {};
+    const tourKey = String(head.tour || '').toLowerCase();
+    if (tourKey === 'shift-ux' || String(head.version || '').indexOf('shift-ux') >= 0) {
+      return SHIFT_UX_TOUR_STEPS;
+    }
+    if (tourKey === 'dues' || String(head.version || '').indexOf('dues') >= 0) {
+      return DUES_TOUR_STEPS;
+    }
+    // Default UX tour for modern releases with UI changes
+    return SHIFT_UX_TOUR_STEPS.length ? SHIFT_UX_TOUR_STEPS : DUES_TOUR_STEPS;
+  }
+
   function startUpdateTour() {
-    steps = DUES_TOUR_STEPS;
+    steps = resolveUpdateTourSteps();
+    if (!steps || !steps.length) return;
     currentStep = 0;
     closeGuide();
     if (!openTourOverlay()) return;
@@ -978,7 +1051,11 @@
   function endTour() {
     try {
       const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
-      if (steps === DUES_TOUR_STEPS) {
+      const isUpdateTour =
+        steps === DUES_TOUR_STEPS ||
+        steps === SHIFT_UX_TOUR_STEPS ||
+        (Array.isArray(steps) && steps[0] && steps[0].label === 'Open shift first');
+      if (isUpdateTour) {
         localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
       } else {
         localStorage.setItem(tourStorageKey(), '1');
@@ -1026,9 +1103,16 @@
                 ${(up.highlights || []).map(h => `<li style="margin-bottom:2px">${h}</li>`).join('')}
               </ul>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">
-                ${up.version === '2026.06.20-onboarding' || up.version === '2026.06.19-dues' ? `
-                  <button type="button" class="btn btn-sm btn-primary" id="start-dues-tour-btn"><i class="fa-solid fa-compass"></i> Feature tour</button>
-                ` : ''}
+                ${
+                  up.tour === 'shift-ux' ||
+                  up.version === 'v216-20260725-shift-ux-guide' ||
+                  up.version === '2026.06.20-onboarding' ||
+                  up.version === '2026.06.19-dues'
+                    ? `
+                  <button type="button" class="btn btn-sm btn-primary start-update-tour-btn" data-tour="${String(up.tour || 'shift-ux').replace(/"/g, '')}"><i class="fa-solid fa-compass"></i> Feature tour</button>
+                `
+                    : ''
+                }
                 ${!isActive ? `
                   <button type="button" class="btn btn-sm btn-ghost rollback-btn" data-rollback-version="${up.version}" style="border:1px solid var(--stroke-2);color:var(--text-soft);">
                     <i class="fa-solid fa-clock-rotate-left"></i> Rollback
@@ -1054,8 +1138,7 @@
           }
           close();
         };
-        const tourBtn = modal.querySelector('#start-dues-tour-btn');
-        if (tourBtn) {
+        modal.querySelectorAll('.start-update-tour-btn, #start-dues-tour-btn').forEach((tourBtn) => {
           tourBtn.onclick = () => {
             if (justUpdated) {
               sessionStorage.removeItem('rs_update_applied_at');
@@ -1063,7 +1146,7 @@
             close();
             startUpdateTour();
           };
-        }
+        });
         const startAppliedTour = modal.querySelector('#modal-start-applied-tour');
         if (startAppliedTour) {
           startAppliedTour.onclick = () => {
@@ -1301,9 +1384,34 @@
           date: latestRelease.date || new Date().toLocaleDateString('en-CA'),
           title: latestRelease.title || "Custom Update",
           summary: latestRelease.summary || "This update contains hotfixes and stability improvements.",
-          highlights: latestRelease.highlights || ["System stability and codebase security updates."]
+          highlights: latestRelease.highlights || ["System stability and codebase security updates."],
+          tour: latestRelease.tour || '',
         });
+      } else if (latestRelease.tour) {
+        // Keep tour key from live feed on matching history row
+        const row = UPDATES_HISTORY.find((u) => u.version === latestRelease.version);
+        if (row && !row.tour) row.tour = latestRelease.tour;
       }
+
+      // Desktop content reload (?rs_content=) or web Save & Update sets this so we can show guide
+      try {
+        const params = new URLSearchParams(location.search || '');
+        if (params.has('rs_content') || params.get('rs_just_updated') === '1') {
+          sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+        }
+      } catch (_) {}
+
+      // Version bump detection (works for desktop content overlay + web deploy without reinstall)
+      try {
+        const seenKey = 'restrosuite_last_seen_update_version';
+        const prev = localStorage.getItem(seenKey) || '';
+        const next = String(latestRelease.version || '');
+        if (next && prev && prev !== next) {
+          sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
+          sessionStorage.setItem('rs_update_show_guide', '1');
+        }
+        if (next) localStorage.setItem(seenKey, next);
+      } catch (_) {}
     }
 
     // What's New button click listener is now bound directly inside injectGuide()
@@ -1323,17 +1431,33 @@
       } catch (error) { /* profile prompt is best-effort, never block the tour */ }
 
       try {
-        // After an update: quiet badge only — never auto-open a blocking modal.
-        // Staff can open "What's New" from Help when ready.
-        if (sessionStorage.getItem('rs_update_applied_at')) {
-          sessionStorage.removeItem('rs_update_applied_at');
-          const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || '';
+        // After UI/UX update: auto-open What's New with Start Tour (not silent badge only)
+        const justUpdated =
+          sessionStorage.getItem('rs_update_applied_at') ||
+          sessionStorage.getItem('rs_update_show_guide') === '1';
+        if (justUpdated) {
+          try { sessionStorage.removeItem('rs_update_show_guide'); } catch (_) {}
+          const currentVer =
+            window.__RESTROSUITE_ASSET_VERSION__ ||
+            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+            '';
           if (currentVer) {
-            try { localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'badge'); } catch (_) {}
+            try {
+              localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'pending');
+            } catch (_) {}
           }
           if (typeof window.RS !== 'undefined' && typeof window.RS.toast === 'function') {
-            window.RS.toast('RestroSuite updated. Open Help → What\'s New anytime.', 'fa-circle-check');
+            window.RS.toast('RestroSuite updated — review what changed', 'fa-wand-magic-sparkles');
           }
+          // Keep rs_update_applied_at so the modal shows "was updated" + Start Tour
+          setTimeout(() => {
+            try {
+              openUpdateHistoryModal();
+            } catch (e) {
+              console.warn('[Onboarding] post-update guide failed', e);
+            }
+          }, 400);
+          return;
         }
         if (!localStorage.getItem(tourStorageKey())) startTour();
       } catch (error) {

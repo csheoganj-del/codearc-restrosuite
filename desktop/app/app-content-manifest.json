@@ -1,9 +1,9 @@
 {
-  "version": "v214-20260720-ops-mode-live-update",
-  "title": "Kitchen modes + professional desktop live updates",
-  "generatedAt": "2026-07-20T14:09:29.407Z",
+  "version": "v216-20260725-shift-ux-guide",
+  "title": "Shift-first billing + clear action guides",
+  "generatedAt": "2026-07-25T07:27:55.547Z",
   "baseUrl": "https://restrosuite.codearc.co.in",
-  "fileCount": 122,
+  "fileCount": 123,
   "files": [
     "api/config.js",
     "api/health.js",
@@ -28,6 +28,7 @@
     "assets/hero-floor.png",
     "assets/hero-kds.png",
     "assets/hero-pos.png",
+    "assets/lib/jsQR.min.js",
     "assets/lib/jspdf.umd.min.js",
     "assets/license-config.js",
     "assets/license-guard.js",
