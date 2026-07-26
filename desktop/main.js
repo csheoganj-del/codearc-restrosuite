@@ -615,22 +615,21 @@ async function runFullUpdateCheck() {
     console.warn('[main] content check failed', e && e.message);
   }
 
-  // Feature update already handled the user-facing result — don't also run
-  // the EXE shell check (broken/missing latest.yml used to show a scary HTML
-  // parse error after a successful content update).
-  if (
-    contentResult &&
-    (contentResult.status === 'applied' ||
-      contentResult.status === 'current' ||
-      contentResult.status === 'dismissed')
-  ) {
+  // After a feature update was just installed, skip shell dialogs so the user
+  // only sees "reload". Still check the EXE shell when features are already
+  // current so 2.0.7 → 2.0.8 installers can still auto-update.
+  if (contentResult && contentResult.status === 'applied') {
     return { content: contentResult, shell: { status: 'skipped' } };
   }
 
-  // 2) App shell (packaged only) — quiet unless content check failed/skipped
+  // 2) App shell (packaged only)
   let shellResult = { status: 'skipped' };
   try {
-    shellResult = await autoUpdater.checkNow();
+    // When UI is already current, avoid a second "features up to date" style
+    // spam if the shell check finds nothing — shell path handles its own UX.
+    shellResult = await autoUpdater.checkNow({
+      quietIfCurrent: contentResult && contentResult.status === 'current',
+    });
   } catch (e) {
     console.warn('[main] shell check failed', e && e.message);
   }
@@ -694,10 +693,20 @@ function buildMenu() {
             });
           },
         },
-        {
-          label: 'Open Data Backend Status',
-          click() { if (mainWindow) mainWindow.webContents.openDevTools({ mode: 'detach' }); },
-        },
+        // Dev-only: misnamed legacy entry that opened DevTools. Hidden in production EXE.
+        ...(!app.isPackaged || process.env.RS_ALLOW_DEVTOOLS === '1'
+          ? [{
+              label: 'Toggle Developer Tools',
+              accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+              click() {
+                try {
+                  if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.toggleDevTools();
+                  }
+                } catch (_) {}
+              },
+            }]
+          : []),
       ],
     },
   ];

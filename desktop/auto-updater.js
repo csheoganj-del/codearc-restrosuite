@@ -401,8 +401,10 @@ function start(opts) {
 /**
  * Menu / IPC: user-initiated shell check.
  * Feature/UI updates are handled by content-updater (live site) separately.
+ * @param {{ quietIfCurrent?: boolean }} [opts]
  */
-async function checkNow() {
+async function checkNow(opts) {
+  const options = opts || {};
   if (!app.isPackaged) {
     return { status: 'dev', version: app.getVersion() };
   }
@@ -411,7 +413,9 @@ async function checkNow() {
   }
   if (typeof start._shellCheck === 'function') {
     const r = await start._shellCheck(false);
-    if (r && r.status === 'checked') {
+    // If a newer shell is downloading, update-downloaded will prompt restart.
+    // Only show the "already checked" info when features weren't just confirmed current.
+    if (r && r.status === 'checked' && !options.quietIfCurrent) {
       await dialog.showMessageBox(parentWindow(), {
         type: 'info',
         title: 'App shell update',
