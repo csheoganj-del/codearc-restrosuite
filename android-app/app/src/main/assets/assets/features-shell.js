@@ -8,30 +8,330 @@
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
     const safe = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
-    /* ===================== GLOBAL SEARCH ===================== */
-    const searchWrap = $('.tb-search'), searchInput = searchWrap && searchWrap.querySelector('input');
-    if(searchInput){
-      const box = document.createElement('div'); box.className='search-results'; searchWrap.appendChild(box);
-      const PAGES = [['pos-tab','Point of Sale','cash-register'],['floor-tab','Floor & Tables','chair'],['aggregator-tab','Online Orders','bowl-rice'],['kds-tab','Kitchen Display','fire-burner'],['bills-tab','Bills','file-invoice-dollar'],['inventory-tab','Inventory','boxes-stacked'],['editor-tab','Menu Editor','pen-to-square'],['customers-tab','Customers','address-book'],['reports-tab','Reports','chart-line'],['employees-tab','Employees','users'],['growth-hub-tab','Growth Hub','rocket'],['settings-tab','Settings','gear']];
-      function run(q){
-        const t = q.trim().toLowerCase();
-        if(!t){ box.classList.remove('show'); return; }
-        const menu = RS.MENU.filter(m=>m.name.toLowerCase().includes(t)).slice(0,4);
-        const bills = (RS.BILLS||[]).filter(b=>b.no.toLowerCase().includes(t)||String(b.table).toLowerCase().includes(t)).slice(0,3);
-        const team = (RS.EMPLOYEES||[]).filter(e=>e.name.toLowerCase().includes(t)).slice(0,3);
-        const pages = PAGES.filter(p=>p[1].toLowerCase().includes(t)).slice(0,4);
-        let html='';
-        if(menu.length){ html+='<div class="sr-group">Menu items</div>'+menu.map(m=>`<div class="sr-item" data-go="pos-tab"><span class="si-ic"><i class="fa-solid fa-utensils"></i></span><div><div class="si-t">${m.name}</div><div class="si-s">${m.cat}</div></div><span class="si-meta">${rs(m.price)}</span></div>`).join(''); }
-        if(bills.length){ html+='<div class="sr-group">Bills</div>'+bills.map(b=>`<div class="sr-item" data-go="bills-tab"><span class="si-ic"><i class="fa-solid fa-receipt"></i></span><div><div class="si-t">${b.no}</div><div class="si-s">${b.table} · ${b.pay}</div></div><span class="si-meta">${rs(b.amount)}</span></div>`).join(''); }
-        if(team.length){ html+='<div class="sr-group">Team</div>'+team.map(e=>`<div class="sr-item" data-go="employees-tab"><span class="si-ic"><i class="fa-solid fa-user"></i></span><div><div class="si-t">${e.name}</div><div class="si-s">${e.role}</div></div></div>`).join(''); }
-        if(pages.length){ html+='<div class="sr-group">Go to</div>'+pages.map(p=>`<div class="sr-item" data-go="${p[0]}"><span class="si-ic"><i class="fa-solid fa-${p[2]}"></i></span><div><div class="si-t">${p[1]}</div></div><span class="si-meta">Open</span></div>`).join(''); }
-        box.innerHTML = html || '<div class="sr-empty">No results for "'+q+'"</div>';
-        box.classList.add('show');
-        $$('.sr-item',box).forEach(el=> el.onclick=()=>{ RS.activateTab(el.dataset.go); box.classList.remove('show'); searchInput.value=''; });
+    /* ===================== GLOBAL SEARCH (pages · settings · menu · bills) ===================== */
+    const searchWrap = $('.tb-search');
+    const searchInput = searchWrap && searchWrap.querySelector('input');
+    if (searchInput) {
+      searchInput.placeholder = 'Search settings, menu, bills…';
+      searchInput.setAttribute('aria-label', 'Search anything — settings, menu, pages, bills');
+      searchInput.title = 'Search anything (Ctrl+K)';
+      searchWrap.classList.add('tb-search-global');
+      searchWrap.style.position = 'relative';
+
+      const box = document.createElement('div');
+      box.className = 'search-results';
+      box.setAttribute('role', 'listbox');
+      box.setAttribute('aria-label', 'Search results');
+      searchWrap.appendChild(box);
+
+      const PAGES = [
+        ['pos-tab', 'Point of Sale', 'cash-register', 'billing cart pay'],
+        ['floor-tab', 'Floor & Tables', 'chair', 'dine-in tables'],
+        ['qr-orders-tab', 'QR Orders', 'qrcode', 'table order guest'],
+        ['aggregator-tab', 'Online Orders', 'bowl-rice', 'swiggy zomato delivery'],
+        ['kds-tab', 'Kitchen Display', 'fire-burner', 'kot cook'],
+        ['bills-tab', 'Bills', 'file-invoice-dollar', 'history refund'],
+        ['inventory-tab', 'Inventory', 'boxes-stacked', 'stock'],
+        ['editor-tab', 'Menu Editor', 'pen-to-square', 'items prices'],
+        ['customers-tab', 'Customers', 'address-book', 'crm'],
+        ['reports-tab', 'Reports', 'chart-line', 'sales gstr'],
+        ['employees-tab', 'Employees', 'users', 'staff login payroll'],
+        ['growth-hub-tab', 'Growth Hub', 'rocket', 'offers campaigns'],
+        ['settings-tab', 'Settings', 'gear', 'preferences'],
+        ['tax-tab', 'Tax & GST', 'percent', 'tax invoice'],
+      ];
+
+      // Settings jump targets: section + searchable keywords
+      const SETTINGS = [
+        { sec: 'profile', title: 'Outlet profile', sub: 'Name, address, phone, country', kw: 'profile outlet name address phone email gstin cuisine wifi qr' },
+        { sec: 'tax', title: 'Taxes & pricing', sub: 'GST, tax, round-off, loyalty, promo', kw: 'tax gst calculate taxes service charge round-off hsn inclusive happy hour loyalty promo coupon' },
+        { sec: 'printer', title: 'Printers & KOT', sub: 'Billing only, shift, print, drawer', kw: 'printer kot receipt thermal shift require open shift auto-print cash drawer paper billing only kitchen' },
+        { sec: 'gateway', title: 'WhatsApp', sub: 'Link number, send bill, alerts', kw: 'whatsapp gateway send bill after payment order ready promotional messages' },
+        { sec: 'payments', title: 'Payments', sub: 'UPI / card settlement', kw: 'razorpay stripe upi payments bank' },
+        { sec: 'security', title: 'Security & PIN', sub: 'Admin PIN, pin gates', kw: 'pin security lock idle' },
+        { sec: 'team', title: 'Team & roles', sub: 'Staff permissions, refunds PIN', kw: 'team cashier edit prices require pin refunds lock reports staff' },
+        { sec: 'plan', title: 'Plan & billing', sub: 'Subscription plan', kw: 'plan upgrade subscription' },
+        { sec: 'danger', title: 'Danger zone', sub: 'Reset outlet data', kw: 'danger reset wipe delete data' },
+        // Direct feature shortcuts → open correct settings pane
+        { sec: 'printer', title: 'Require open shift', sub: 'Settings · Printers', kw: 'shift open float z-report', icon: 'fa-unlock' },
+        { sec: 'printer', title: 'Operating mode / Billing only', sub: 'Settings · Printers', kw: 'billing only kitchen printer full ops', icon: 'fa-sliders' },
+        { sec: 'printer', title: 'Auto-print receipt', sub: 'Settings · Printers', kw: 'auto print receipt thermal', icon: 'fa-print' },
+        { sec: 'printer', title: 'Auto-print KOT', sub: 'Settings · Printers', kw: 'auto print kot kitchen', icon: 'fa-receipt' },
+        { sec: 'tax', title: 'Calculate taxes / GST', sub: 'Settings · Taxes', kw: 'tax gst calculate', icon: 'fa-percent' },
+        { sec: 'tax', title: 'Loyalty program', sub: 'Settings · Taxes', kw: 'loyalty points', icon: 'fa-star' },
+        { sec: 'tax', title: 'POS promo codes', sub: 'Settings · Taxes', kw: 'promo coupon offer code', icon: 'fa-tag' },
+        { sec: 'gateway', title: 'Send bill after payment', sub: 'Settings · WhatsApp', kw: 'whatsapp auto bill send', icon: 'fa-whatsapp' },
+        { sec: 'team', title: 'Require PIN for refunds', sub: 'Settings · Team', kw: 'pin refund void', icon: 'fa-key' },
+        { sec: 'team', title: 'Cashier can edit prices', sub: 'Settings · Team', kw: 'price edit cashier override', icon: 'fa-indian-rupee-sign' },
+        { sec: 'team', title: 'Lock reports for staff', sub: 'Settings · Team', kw: 'lock reports staff', icon: 'fa-lock' },
+      ];
+
+      function openSettingsSection(sec) {
+        window.__rsOpenSettingsSection = sec || 'profile';
+        return Promise.resolve(RS.activateTab('settings-tab')).then(() => {
+          let tries = 0;
+          const go = () => {
+            const b = document.querySelector('.set-nav button[data-s="' + sec + '"]');
+            if (b) {
+              b.click();
+              return;
+            }
+            if (++tries < 25) setTimeout(go, 70);
+          };
+          setTimeout(go, 50);
+        });
       }
-      searchInput.addEventListener('input', e=>run(e.target.value));
-      searchInput.addEventListener('focus', e=>{ if(e.target.value) run(e.target.value); });
-      document.addEventListener('click', e=>{ if(!searchWrap.contains(e.target)) box.classList.remove('show'); });
+      window.RS_openSettingsSection = openSettingsSection;
+      if (RS) RS.openSettingsSection = openSettingsSection;
+
+      function match(hay, t) {
+        return String(hay || '').toLowerCase().includes(t);
+      }
+
+      let activeIdx = -1;
+      function items() {
+        return $$('.sr-item', box);
+      }
+      function setActive(i) {
+        const list = items();
+        list.forEach((el, n) => el.classList.toggle('sel', n === i));
+        activeIdx = i;
+        if (list[i]) list[i].scrollIntoView({ block: 'nearest' });
+      }
+      function runPick(el) {
+        if (!el) return;
+        const kind = el.dataset.kind || 'tab';
+        const go = el.dataset.go || '';
+        const sec = el.dataset.sec || '';
+        const q = el.dataset.q || '';
+        box.classList.remove('show');
+        searchInput.value = '';
+        activeIdx = -1;
+        if (kind === 'settings' || sec) {
+          openSettingsSection(sec || 'profile');
+          if (RS.toast) RS.toast('Opening ' + (el.querySelector('.si-t')?.textContent || 'Settings'), 'fa-gear');
+          return;
+        }
+        if (kind === 'menu') {
+          RS.activateTab('pos-tab');
+          setTimeout(() => {
+            const posIn = document.getElementById('pos-search-input');
+            if (posIn) {
+              posIn.value = q || '';
+              posIn.dispatchEvent(new Event('input', { bubbles: true }));
+              posIn.focus();
+            }
+          }, 120);
+          return;
+        }
+        if (go) RS.activateTab(go);
+      }
+
+      function run(q) {
+        const t = q.trim().toLowerCase();
+        if (!t) {
+          box.classList.remove('show');
+          box.innerHTML = '';
+          activeIdx = -1;
+          return;
+        }
+
+        const menu = (RS.MENU || [])
+          .filter((m) => match(m.name, t) || match(m.cat, t) || match(m.code, t) || match(m.itemCode, t))
+          .slice(0, 5);
+        const bills = (RS.BILLS || [])
+          .filter(
+            (b) =>
+              match(b.no, t) ||
+              match(b.table, t) ||
+              match(b.customerName, t) ||
+              match(b.customerPhone, t)
+          )
+          .slice(0, 4);
+        const inv = (RS.INVENTORY || [])
+          .filter((i) => match(i.name, t) || match(i.cat, t))
+          .slice(0, 3);
+        const team = (RS.EMPLOYEES || [])
+          .filter((e) => match(e.name, t) || match(e.role, t) || match(e.email, t))
+          .slice(0, 3);
+        const cust = (RS.CUSTOMERS || [])
+          .filter((c) => match(c.name, t) || match(c.phone, t))
+          .slice(0, 3);
+        const pages = PAGES.filter(
+          (p) => match(p[1], t) || match(p[3], t) || match(p[0], t)
+        ).slice(0, 6);
+        const settingsHits = SETTINGS.filter(
+          (s) => match(s.title, t) || match(s.sub, t) || match(s.kw, t)
+        ).slice(0, 8);
+
+        let html = '';
+        if (settingsHits.length) {
+          html +=
+            '<div class="sr-group">Settings</div>' +
+            settingsHits
+              .map(
+                (s) =>
+                  `<div class="sr-item" role="option" data-kind="settings" data-sec="${safe(s.sec)}">` +
+                  `<span class="si-ic"><i class="fa-solid ${s.icon || 'fa-gear'}"></i></span>` +
+                  `<div><div class="si-t">${safe(s.title)}</div><div class="si-s">${safe(s.sub)}</div></div>` +
+                  `<span class="si-meta">Settings</span></div>`
+              )
+              .join('');
+        }
+        if (pages.length) {
+          html +=
+            '<div class="sr-group">Go to</div>' +
+            pages
+              .map(
+                (p) =>
+                  `<div class="sr-item" role="option" data-kind="tab" data-go="${p[0]}">` +
+                  `<span class="si-ic"><i class="fa-solid fa-${p[2]}"></i></span>` +
+                  `<div><div class="si-t">${safe(p[1])}</div></div>` +
+                  `<span class="si-meta">Open</span></div>`
+              )
+              .join('');
+        }
+        if (menu.length) {
+          html +=
+            '<div class="sr-group">Menu</div>' +
+            menu
+              .map(
+                (m) =>
+                  `<div class="sr-item" role="option" data-kind="menu" data-go="pos-tab" data-q="${safe(m.name)}">` +
+                  `<span class="si-ic"><i class="fa-solid fa-utensils"></i></span>` +
+                  `<div><div class="si-t">${safe(m.name)}</div><div class="si-s">${safe(m.cat || '')}</div></div>` +
+                  `<span class="si-meta">${rs(m.price)}</span></div>`
+              )
+              .join('');
+        }
+        if (bills.length) {
+          html +=
+            '<div class="sr-group">Bills</div>' +
+            bills
+              .map(
+                (b) =>
+                  `<div class="sr-item" role="option" data-kind="tab" data-go="bills-tab">` +
+                  `<span class="si-ic"><i class="fa-solid fa-receipt"></i></span>` +
+                  `<div><div class="si-t">${safe(b.no)}</div><div class="si-s">${safe(b.table || '')} · ${safe(b.pay || '')}</div></div>` +
+                  `<span class="si-meta">${rs(b.amount != null ? b.amount : b.total)}</span></div>`
+              )
+              .join('');
+        }
+        if (inv.length) {
+          html +=
+            '<div class="sr-group">Inventory</div>' +
+            inv
+              .map(
+                (i) =>
+                  `<div class="sr-item" role="option" data-kind="tab" data-go="inventory-tab">` +
+                  `<span class="si-ic"><i class="fa-solid fa-boxes-stacked"></i></span>` +
+                  `<div><div class="si-t">${safe(i.name)}</div><div class="si-s">${safe(i.cat || '')} · stock ${safe(i.stock)}</div></div></div>`
+              )
+              .join('');
+        }
+        if (team.length) {
+          html +=
+            '<div class="sr-group">Team</div>' +
+            team
+              .map(
+                (e) =>
+                  `<div class="sr-item" role="option" data-kind="tab" data-go="employees-tab">` +
+                  `<span class="si-ic"><i class="fa-solid fa-user"></i></span>` +
+                  `<div><div class="si-t">${safe(e.name)}</div><div class="si-s">${safe(e.role || '')}</div></div></div>`
+              )
+              .join('');
+        }
+        if (cust.length) {
+          html +=
+            '<div class="sr-group">Customers</div>' +
+            cust
+              .map(
+                (c) =>
+                  `<div class="sr-item" role="option" data-kind="tab" data-go="customers-tab">` +
+                  `<span class="si-ic"><i class="fa-solid fa-address-book"></i></span>` +
+                  `<div><div class="si-t">${safe(c.name)}</div><div class="si-s">${safe(c.phone || '')}</div></div></div>`
+              )
+              .join('');
+        }
+
+        if (!html) {
+          html =
+            '<div class="sr-empty" style="padding:18px 16px;text-align:center;color:var(--text-mute);font-size:13px">' +
+            'No results for <b>' +
+            safe(q) +
+            '</b><br><span style="font-size:12px">Try “shift”, “tax”, “printer”, “whatsapp”, or a menu name</span></div>';
+        } else {
+          html +=
+            '<div class="sr-group" style="border-top:1px solid var(--stroke-2);margin-top:4px">Tip</div>' +
+            '<div style="padding:6px 16px 12px;font-size:11.5px;color:var(--text-mute)">↑↓ navigate · Enter open · Esc close · <kbd style="font-size:10px;padding:1px 5px;border:1px solid var(--stroke-2);border-radius:4px">Ctrl</kbd>+<kbd style="font-size:10px;padding:1px 5px;border:1px solid var(--stroke-2);border-radius:4px">K</kbd> focus search</div>';
+        }
+
+        box.innerHTML = html;
+        box.classList.add('show');
+        activeIdx = -1;
+        $$('.sr-item', box).forEach((el) => {
+          el.onclick = () => runPick(el);
+        });
+      }
+
+      searchInput.addEventListener('input', (e) => run(e.target.value));
+      searchInput.addEventListener('focus', (e) => {
+        if (e.target.value) run(e.target.value);
+        else {
+          box.innerHTML =
+            '<div class="sr-group">Quick</div>' +
+            [
+              ['printer', 'Require open shift', 'fa-unlock'],
+              ['tax', 'Taxes & GST', 'fa-percent'],
+              ['gateway', 'WhatsApp', 'fa-whatsapp'],
+              ['printer', 'Printers & billing mode', 'fa-print'],
+            ]
+              .map(
+                ([sec, title, ic]) =>
+                  `<div class="sr-item" data-kind="settings" data-sec="${sec}"><span class="si-ic"><i class="fa-solid ${ic}"></i></span><div><div class="si-t">${title}</div><div class="si-s">Settings</div></div><span class="si-meta">Open</span></div>`
+              )
+              .join('');
+          box.classList.add('show');
+          $$('.sr-item', box).forEach((el) => {
+            el.onclick = () => runPick(el);
+          });
+        }
+      });
+      searchInput.addEventListener('keydown', (e) => {
+        const list = items();
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (!list.length) return;
+          setActive(activeIdx < list.length - 1 ? activeIdx + 1 : 0);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!list.length) return;
+          setActive(activeIdx > 0 ? activeIdx - 1 : list.length - 1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (activeIdx >= 0 && list[activeIdx]) runPick(list[activeIdx]);
+          else if (list[0]) runPick(list[0]);
+        } else if (e.key === 'Escape') {
+          box.classList.remove('show');
+          searchInput.blur();
+        }
+      });
+      document.addEventListener('click', (e) => {
+        if (!searchWrap.contains(e.target)) box.classList.remove('show');
+      });
+      // Ctrl+K / Cmd+K — focus global search from anywhere
+      document.addEventListener('keydown', (e) => {
+        const isK = (e.key || '').toLowerCase() === 'k';
+        if ((e.ctrlKey || e.metaKey) && isK) {
+          const tag = (e.target && e.target.tagName) || '';
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) {
+            if (e.target === searchInput) return;
+          }
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+      });
     }
 
     /* ===================== NOTIFICATIONS ===================== */

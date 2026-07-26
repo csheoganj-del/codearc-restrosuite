@@ -5074,19 +5074,42 @@ textarea:focus-visible,
   }
 }
 
-/* Highly compact search bar */
-.tb-search {
-  width: 150px !important;
+/* Global search — wide enough to find settings / menu / bills */
+.tb-search,
+.tb-search-global {
+  width: min(220px, 28vw) !important;
+  min-width: 140px !important;
   padding: 6px 12px !important;
   border-radius: var(--r-md) !important;
   gap: 8px !important;
+  position: relative !important;
 }
-.tb-search:focus-within {
-  width: 200px !important;
+.tb-search:focus-within,
+.tb-search-global:focus-within {
+  width: min(340px, 42vw) !important;
   border-color: var(--orange) !important;
+  z-index: 3600;
 }
 .tb-search input {
   font-size: 13px !important;
+  min-width: 0 !important;
+}
+/* Keep global search visible on medium screens (was hidden under 1100px) */
+@media (max-width: 1100px) {
+  .tb-search.tb-search-global,
+  .tb-search-global {
+    display: flex !important;
+    width: min(160px, 22vw) !important;
+  }
+  .tb-search-global:focus-within {
+    width: min(260px, 48vw) !important;
+  }
+}
+.tb-search .search-results {
+  min-width: min(360px, 92vw);
+  width: max(100%, 300px);
+  right: 0;
+  left: auto;
 }
 
 /* General design for circular icon status badges (except Clock) */
