@@ -83,7 +83,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v218-20260726-tax-shift-toggles';
+    var builtin = 'v219-20260726-cart-tax-sync';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -661,10 +661,9 @@
               <div class="cart-foot">
               <!-- Plain Sub / Tax / Total  -  readable at a glance -->
               <div class="totals-compact totals-readable">
-                <div class="totals-meta">
-                  <span title="Subtotal">Sub <b id="t-sub">â‚¹0</b></span>
-                  <span id="t-disc-wrap" style="color:var(--orange);display:none" title="Discount">Disc <b id="t-disc">â‚¹0</b></span>
-                  <span title="Tax">Tax <b id="t-gst">â‚¹0</b></span>
+                <div class="totals-meta" id="cart-totals-meta">
+                  <span title="Subtotal">Sub <b id="t-sub">₹0</b></span>
+                  <!-- Tax/GST line is injected by POS only when Settings → Calculate taxes is ON -->
                 </div>
                 <div class="totals-grand">
                   <span class="totals-grand-lbl">Total</span>

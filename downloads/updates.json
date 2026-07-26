@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-26T14:34:00.299Z",
+  "generatedAt": "2026-07-26T14:41:00.994Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v218-20260726-tax-shift-toggles",
-    "title": "Live update v218-20260726-tax-shift-toggles",
+    "version": "v219-20260726-cart-tax-sync",
+    "title": "Live update v219-20260726-cart-tax-sync",
     "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },

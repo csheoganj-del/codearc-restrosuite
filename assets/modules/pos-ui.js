@@ -792,17 +792,23 @@ function renderCart(){
     metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty">Pts <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
   }
   
-  // Hide Tax/GST cart line when Calculate taxes is OFF (was always showing ₹0 GST)
+  // Hide Tax/GST cart line when Calculate taxes is OFF (simple café default).
+  // Never show a permanent "GST ₹0" when the setting is off — that confused
+  // desktop vs web when both showed the same version chip.
+  const rawTaxFlag = settings.set_calculate_taxes;
   const taxesOn =
-    typeof global.RS_featureOn === 'function'
-      ? global.RS_featureOn('set_calculate_taxes', settings, false)
-      : settings.set_calculate_taxes === true || settings.set_calculate_taxes === 'true';
+    rawTaxFlag === false || rawTaxFlag === 'false' || rawTaxFlag === 0 || rawTaxFlag === '0'
+      ? false
+      : typeof global.RS_featureOn === 'function'
+        ? global.RS_featureOn('set_calculate_taxes', settings, false)
+        : rawTaxFlag === true || rawTaxFlag === 'true' || rawTaxFlag === 1 || rawTaxFlag === '1';
   if (taxesOn) {
     if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
       metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
-    } else if (Number(totals.gst) > 0 || taxesOn) {
+    } else if (count > 0 || Number(totals.gst) > 0) {
+      // Only show tax line when cart has items (avoid empty-cart "GST ₹0")
       const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
-      metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+      metaHTML += `<span id="t-gst-wrap" title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
     }
   }
 

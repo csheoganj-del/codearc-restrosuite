@@ -119,7 +119,7 @@
       if (typeof global.RS_applyOpsModeUI === 'function') global.RS_applyOpsModeUI();
       else if (global.RSOpsMode && typeof global.RSOpsMode.applyUi === 'function') global.RSOpsMode.applyUi();
     } catch (_) {}
-    // POS / cart / tax labels
+    // POS / cart / tax labels + shift bar (must re-paint when toggles flip)
     try {
       if (global.RS) {
         if (typeof global.RS.loadReceiptProfile === 'function') global.RS.loadReceiptProfile(global.RS_SETTINGS);
@@ -130,6 +130,11 @@
         if (typeof global.RS.renderPOS === 'function') global.RS.renderPOS();
         if (typeof global.RS.renderCart === 'function') global.RS.renderCart();
       }
+    } catch (_) {}
+    try {
+      // Shift Z/lock chrome depends on set_require_open_shift
+      if (global.RSOps && typeof global.RSOps.paintShiftBar === 'function') global.RSOps.paintShiftBar();
+      else if (global.RSOps && typeof global.RSOps.refresh === 'function') global.RSOps.refresh();
     } catch (_) {}
     // Staff tab locks (reports etc.)
     try {
