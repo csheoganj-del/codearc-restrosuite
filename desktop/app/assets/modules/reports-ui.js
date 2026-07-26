@@ -26,12 +26,26 @@
   async function renderReports(period) {
     const BILLS = (global.RS && Array.isArray(RS.BILLS) ? RS.BILLS : []) || [];
     const MENU = (global.RS && RS.MENU) || [];
+    const tabEl = document.getElementById('reports-tab');
 
   period = period || 'Last 30 days';
   const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
   const now = Date.now();
   const cutoff = now - days * 86400000;
   const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+
+  // Instant report shape while first hydrate/summary resolves (not when truly empty after hydrate)
+  try {
+    if (
+      tabEl &&
+      global.RSSkel &&
+      RSSkel.reportsDash &&
+      RSSkel.shouldShow &&
+      RSSkel.shouldShow(!!(BILLS && BILLS.length))
+    ) {
+      RSSkel.paint(tabEl, RSSkel.reportsDash({ stats: 4 }));
+    }
+  } catch (_) {}
 
   // Wave 2: prefer server aggregate (full history, not capped client list)
   let serverSummary = null;
@@ -346,4 +360,10 @@
   }
   if (global.RS) attach();
   document.addEventListener('rs:ready', attach);
+  document.addEventListener('rs:hydrated', () => {
+    try {
+      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      renderReports();
+    } catch (_) {}
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

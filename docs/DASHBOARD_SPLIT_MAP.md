@@ -39,9 +39,17 @@ Extraction strategy: **IIFE modules + thin delegates**. Major UI domains are spl
 3. Load modules before `dashboard.js`.
 4. Never break `window.RS` public API used by `features-*`.
 
-## Boot order
+## Boot order (single-path — each activity once)
 
 ```
-doppio-api → db → print-bridge → escpos → modules (tax → pos → …)
-→ saas-core → dashboard → features-pos → critical.bundle → shell
+static essentials (db, saas-core, settings, non-critical modules)
+→ country-currency → dashboard.js
+→ critical.bundle  (pos-ui, print, receipt, bills, inventory UI, KDS, QR,
+                    tax-helpers, competitive-ops, wa-queue, …)  [ONCE]
+→ features-pos.js  [ONCE]
+→ features-shell.js
+→ product-10x / staff-efficiency / onboarding
 ```
+
+Do **not** also `<script src>` files that live inside `critical.bundle`.
+Rebuild bundle after source changes: `npm run build:critical`.

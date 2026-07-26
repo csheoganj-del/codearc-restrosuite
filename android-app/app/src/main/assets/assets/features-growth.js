@@ -984,7 +984,19 @@
       TABLES = await loadTablesList();
       
       if (window.RS_DB) {
-        sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
+        // Instant floor shape while orders/drafts load (no hung "Loading tables...")
+        try {
+          if (window.RSSkel && RSSkel.floorTiles) {
+            RSSkel.paint(
+              sec,
+              RSSkel.floorTiles({ count: Math.max(6, (TABLES && TABLES.length) || 8) })
+            );
+          } else {
+            sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
+          }
+        } catch (_) {
+          sec.innerHTML = '<div class="sr-empty">Loading tables...</div>';
+        }
         Promise.all([
           RS_DB.list('pending_orders'),
           RS_DB.list('reservations').catch(() => []),
@@ -4026,7 +4038,15 @@
       const sec = $('#customers-tab');
       if (!sec) return;
       if (window.RS_DB) {
-        sec.innerHTML = '<div class="sr-empty"><div class="spin" style="margin:0 auto 10px"></div>Loading customers…</div>';
+        try {
+          if (window.RSSkel && RSSkel.cards) {
+            RSSkel.paint(sec, RSSkel.cards({ count: 6 }));
+          } else {
+            sec.innerHTML = '<div class="sr-empty"><div class="spin" style="margin:0 auto 10px"></div>Loading customers…</div>';
+          }
+        } catch (_) {
+          sec.innerHTML = '<div class="sr-empty"><div class="spin" style="margin:0 auto 10px"></div>Loading customers…</div>';
+        }
         RS_DB.list('customers')
           .then((rows) => {
             CUSTOMERS.length = 0;

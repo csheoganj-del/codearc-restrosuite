@@ -416,11 +416,11 @@ html.rs-native-app .rs-station-group {
 .tb-search-compact {
   display: flex; align-items: center; gap: 8px; padding: 7px 12px;
   border-radius: var(--r-pill); background: var(--glass); border: 1px solid var(--stroke-2);
-  width: 148px; transition: var(--t); flex: none;
+  width: 240px; transition: var(--t); flex: none;
 }
 .tb-search:focus-within,
 .tb-search-compact:focus-within {
-  border-color: var(--orange); width: 200px;
+  border-color: var(--orange); width: 320px;
 }
 .tb-search i { color: var(--text-mute); font-size: 12px; }
 .tb-search input {
@@ -522,8 +522,18 @@ html.rs-native-app .rs-station-group {
 @media (max-width: 860px){ .tb-pill.txt{display:none;} }
 
 .content { flex: 1; padding: clamp(16px,2.4vw,28px); position: relative; min-width: 0; }
-.tab-content { display: none; min-width: 0; }
-.tab-content.active { display: block; }
+.tab-content {
+  display: none;
+  min-width: 0;
+  /* Skip layout/paint for hidden tabs — big win when switching (floor/inventory DOM) */
+  content-visibility: hidden;
+  contain: layout style paint;
+}
+.tab-content.active {
+  display: block;
+  content-visibility: visible;
+  contain: none;
+}
 
 /* generic panel */
 .panel { border-radius: var(--r-lg); background: var(--panel); border: 1px solid var(--stroke);  min-width: 0; }
@@ -5074,24 +5084,24 @@ textarea:focus-visible,
   }
 }
 
-/* Global search — wide enough to find settings / menu / bills */
+/* Global search — primary discoverability control (settings / menu / bills) */
 .tb-search,
 .tb-search-global {
-  width: min(220px, 28vw) !important;
-  min-width: 140px !important;
-  padding: 6px 12px !important;
+  width: min(260px, 32vw) !important;
+  min-width: 180px !important;
+  padding: 7px 14px !important;
   border-radius: var(--r-md) !important;
-  gap: 8px !important;
+  gap: 9px !important;
   position: relative !important;
 }
 .tb-search:focus-within,
 .tb-search-global:focus-within {
-  width: min(340px, 42vw) !important;
+  width: min(360px, 48vw) !important;
   border-color: var(--orange) !important;
   z-index: 3600;
 }
 .tb-search input {
-  font-size: 13px !important;
+  font-size: 13.5px !important;
   min-width: 0 !important;
 }
 /* Keep global search visible on medium screens (was hidden under 1100px) */
@@ -5099,15 +5109,16 @@ textarea:focus-visible,
   .tb-search.tb-search-global,
   .tb-search-global {
     display: flex !important;
-    width: min(160px, 22vw) !important;
+    width: min(200px, 28vw) !important;
+    min-width: 140px !important;
   }
   .tb-search-global:focus-within {
-    width: min(260px, 48vw) !important;
+    width: min(300px, 52vw) !important;
   }
 }
 .tb-search .search-results {
-  min-width: min(360px, 92vw);
-  width: max(100%, 300px);
+  min-width: min(380px, 92vw);
+  width: max(100%, 320px);
   right: 0;
   left: auto;
 }

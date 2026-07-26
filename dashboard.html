@@ -1689,31 +1689,24 @@
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
 <script src="assets/db.js?v=20260618-realdata"></script>
-<script src="assets/print-bridge.js"></script>
-<script src="assets/escpos-encoder.js"></script>
+<!-- Shared skeleton loading language (before critical.bundle paints Bills/KDS) -->
+<link rel="stylesheet" href="assets/modules/rs-skel.css">
+<script src="assets/modules/rs-skel.js"></script>
+<!-- Single-path boot: POS/print/bills/KDS/QR/inventory UI modules load ONCE via
+     assets/dist/critical.bundle.js (see async boot below). Do not also tag them here. -->
 <script src="assets/modules/settings-defaults.js"></script>
 <script src="assets/modules/ops-mode.js"></script>
 <script src="assets/modules/view-mode.js"></script>
-<script src="assets/modules/bill-identity.js"></script>
 <script src="assets/modules/recipe-units.js"></script>
-<script src="assets/modules/inventory-ledger.js"></script>
 <script src="assets/modules/inventory-batches.js"></script>
 <script src="assets/modules/kitchen-link-coach.js"></script>
 <script src="assets/modules/xlsx-lite.js"></script>
-<script src="assets/modules/bills-history.js"></script>
-<script src="assets/modules/inventory-ui.js"></script>
-<script src="assets/modules/reports-ui.js"></script>
-<script src="assets/modules/gateway-monitor.js"></script>
 <script src="assets/modules/super-admin.js"></script>
-<script src="assets/modules/kds-ui.js"></script>
-<script src="assets/modules/qr-orders-ui.js"></script>
 <script src="assets/lib/jsQR.min.js"></script>
 <script src="assets/modules/staff-table-scanner.js"></script>
 <script src="assets/modules/employees-ui.js"></script>
-<script src="assets/modules/tax-helpers.js"></script>
 <script src="assets/modules/tax-country-pack.js"></script>
 <script src="assets/modules/shared-order-amend.js"></script>
-<script src="assets/modules/staff-efficiency.js"></script>
 <script src="assets/modules/progress-ops.js"></script>
 <script src="assets/modules/report-pdf.js"></script>
 <script src="assets/modules/menu-intelligence.js"></script>
@@ -1721,7 +1714,6 @@
 <script src="assets/modules/hr-extended.js"></script>
 <script src="assets/modules/commission.js"></script>
 <script src="assets/modules/security-shield.js"></script>
-<script src="assets/modules/pos-ui.js"></script>
 <script src="assets/modules/growth-hub-shell.js"></script>
 <script src="assets/modules/demo-script.js"></script>
 <script src="assets/saas-core.js"></script>
@@ -1923,19 +1915,38 @@
       }, Promise.resolve());
     }
 
-    // Wave 4: load order matters  -  dashboard/pos first, then receipt+ops bundle, then shell.
+    // Single-path boot (each activity once):
+    // pre → critical.bundle (or unbundled fallback) → features-pos → shell
+    // Bundle owns: pos-ui, print, receipt, bills, inventory UI, KDS, QR, tax-helpers, competitive-ops, wa-queue
     var pre = [
       'assets/country-currency-data.js',
-      'assets/dashboard.js',
+      'assets/dashboard.js'
+    ];
+    var criticalOnce = [
+      'assets/escpos-encoder.js',
+      'assets/modules/bill-identity.js',
+      'assets/modules/inventory-ledger.js',
+      'assets/modules/bills-history.js',
+      'assets/modules/inventory-ui.js',
+      'assets/modules/reports-ui.js',
+      'assets/modules/gateway-monitor.js',
+      'assets/modules/kds-ui.js',
+      'assets/modules/qr-orders-ui.js',
+      'assets/modules/tax-helpers.js',
+      'assets/modules/pos-ui.js',
+      'assets/print-bridge.js',
+      'assets/receipt.js',
+      'assets/modules/wa-send-queue.js',
+      'assets/competitive-ops.js'
+    ];
+    var afterCritical = [
       'assets/features-pos.js'
     ];
     var post = [
       'assets/features-shell.js'
     ];
-    var unbundledMid = [
-      'assets/receipt.js',
-      'assets/competitive-ops.js'
-    ];
+    // Legacy alias if anything still references unbundledMid
+    var unbundledMid = criticalOnce;
 
     // Secondary modules  -  loaded on first tab that needs them (or idle preload)
     var TAB_MODULES = {
@@ -1959,14 +1970,16 @@
     };
 
     function preloadRest() {
+      // Priority order: modules that freeze first tab-open if cold-loaded mid-click
       var rest = [
-        'assets/features-editor.js',
-        'assets/features-manage.js',
-        'assets/features-growth.js',
-        'assets/features-extra.js'
+        'assets/features-growth.js',  // floor, customers, hub (large)
+        'assets/features-manage.js',  // inventory extras / employees
+        'assets/features-editor.js',  // menu editor
+        'assets/features-extra.js'    // reports analytics tokens
       ];
       rest.forEach(function(src, i) {
-        setTimeout(function() { loadScript(src).catch(function(){}); }, 800 + i * 400);
+        // Start sooner so first-of-day tab switches don't pay full download/parse cost
+        setTimeout(function() { loadScript(src).catch(function(){}); }, 200 + i * 350);
       });
     }
 
@@ -2028,20 +2041,15 @@
 
     loadSeq(pre)
       .then(function() {
+        // One load of critical POS/print/bills stack (fresh bundle from build:critical)
         return loadScript('assets/dist/critical.bundle.js').catch(function() {
-          return loadSeq(unbundledMid);
+          console.warn('[boot] critical.bundle missing — loading modules once unbundled');
+          return loadSeq(criticalOnce);
         });
       })
       .then(function() {
-        // Always overlay latest sources so stale critical.bundle cannot win.
-        // print-bridge MUST reload after critical.bundle — the bundle still embeds an
-        // older RSPrintBridge that uses window.prompt (broken in Electron).
-        // competitive-ops: station bar + thermal helpers.
-        return loadSeq([
-          'assets/receipt.js',
-          'assets/print-bridge.js',
-          'assets/competitive-ops.js'
-        ]).catch(function() {});
+        // Checkout / payment / receipt modal — once, after pos-ui exists
+        return loadSeq(afterCritical);
       })
       .then(function() { return loadSeq(post); })
       .then(function() {
@@ -2053,11 +2061,13 @@
         return loadScript('assets/modules/product-10x.js').catch(function() {});
       })
       .then(function() {
+        // Once only (removed from static tags)
         return loadScript('assets/modules/staff-efficiency.js').catch(function() {});
       })
       .then(function() {
-        if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 5000 });
-        else setTimeout(preloadRest, 2500);
+        // Preload heavy tab modules quickly after shell (was 2.5s — too late for first-open freezes)
+        if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 1200 });
+        else setTimeout(preloadRest, 600);
       })
       .catch(function(e) {
         console.error('[boot] critical scripts failed', e);

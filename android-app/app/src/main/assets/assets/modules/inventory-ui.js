@@ -662,6 +662,21 @@
     const cls = stockCls();
     const Batches = global.RSInventoryBatches;
 
+    // Pre-hydrate empty stock → skeleton table (not a false empty store)
+    try {
+      if (
+        global.RSSkel &&
+        RSSkel.shouldShow &&
+        RSSkel.shouldShow(INVENTORY && INVENTORY.length > 0)
+      ) {
+        const invBody = $('#inv-table-body');
+        if (invBody && RSSkel.dataTable) {
+          RSSkel.paint(invBody, RSSkel.dataTable({ rows: 8, cols: 6 }));
+        }
+        return;
+      }
+    } catch (_) {}
+
     // Ensure batches loaded then re-paint once (near-expiry banner / FEFO labels)
     if (Batches && typeof Batches.loadBatches === 'function' && !renderInventory._batchWarm) {
       renderInventory._batchWarm = true;
@@ -762,6 +777,10 @@
       const catFilter = ($('#inv-cat-filter')?.value || 'All').toLowerCase();
       const statusFilter = ($('#inv-status-filter')?.value || 'All').toLowerCase();
       const q = (($('#inv-stock-search') && $('#inv-stock-search').value) || '').toLowerCase().trim();
+
+      try {
+        if (global.RSSkel && RSSkel.clear) RSSkel.clear(invBody);
+      } catch (_) {}
 
       let filtered = INVENTORY;
       if (catFilter !== 'all') {
@@ -2266,4 +2285,10 @@
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);
+  document.addEventListener('rs:hydrated', () => {
+    try {
+      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      renderInventory();
+    } catch (_) {}
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -187,10 +187,28 @@
       );
 
     if (!KDS.length) {
+      // Pre-hydrate: skeleton tickets (not a false "kitchen empty")
+      try {
+        if (
+          window.RSSkel &&
+          typeof RSSkel.shouldShow === 'function' &&
+          RSSkel.shouldShow(false) &&
+          RSSkel.kdsCards
+        ) {
+          RSSkel.paint(grid, RSSkel.kdsCards({ count: 3 }));
+          return;
+        }
+      } catch (_) {}
+      try {
+        if (window.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+      } catch (_) {}
       grid.innerHTML = emptyKdsHtml('empty');
       bindEmptyActions(grid);
       return;
     }
+    try {
+      if (window.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+    } catch (_) {}
 
     // Oldest first (kitchen priority)
     const ordered = KDS.map((o, i) => ({ o, i }))
@@ -384,4 +402,10 @@
   }
   if (global.RS) attach();
   document.addEventListener('rs:ready', attach);
+  document.addEventListener('rs:hydrated', () => {
+    try {
+      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      renderKDS();
+    } catch (_) {}
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

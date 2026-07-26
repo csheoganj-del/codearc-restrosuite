@@ -480,6 +480,21 @@
 
     if (!QR_ORDERS.length) {
       grid.classList.remove('is-list');
+      // Pre-hydrate: skeleton cards (not a false "no orders")
+      try {
+        if (
+          global.RSSkel &&
+          RSSkel.shouldShow &&
+          RSSkel.shouldShow(false) &&
+          RSSkel.qrCards
+        ) {
+          RSSkel.paint(grid, RSSkel.qrCards({ count: 4 }));
+          return;
+        }
+      } catch (_) {}
+      try {
+        if (global.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+      } catch (_) {}
       grid.innerHTML = emptyQrHtml();
       const floorBtn = grid.querySelector('[data-qr-goto-floor]');
       if (floorBtn)
@@ -495,6 +510,9 @@
         };
       return;
     }
+    try {
+      if (global.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+    } catch (_) {}
 
     // Pending first, then oldest within status
     const sortedIdx = QR_ORDERS.map((o, i) => ({ o, i })).sort((a, b) => {
@@ -778,4 +796,10 @@
   }
   if (global.RS) attach();
   document.addEventListener('rs:ready', attach);
+  document.addEventListener('rs:hydrated', () => {
+    try {
+      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      renderQR();
+    } catch (_) {}
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

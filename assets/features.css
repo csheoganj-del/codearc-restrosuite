@@ -6,15 +6,208 @@
 /* ---------------- MODAL SYSTEM ---------------- */
 .rs-overlay {
   position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: rgba(6,6,10,0.62); opacity: 0; pointer-events: none; transition: opacity .28s var(--ease);
+  padding: 24px; background: rgba(6,6,10,0.62); opacity: 0; pointer-events: none;
+  transition: opacity .2s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
 }
 .rs-overlay.show { opacity: 1; pointer-events: auto; }
 .rs-modal {
   width: 100%; background: var(--panel-solid); border: 1px solid var(--stroke-2); border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; overflow: hidden;
-  opacity: 0; transition: opacity .2s ease; position: relative;
+  opacity: 0;
+  transform: translateY(14px) scale(0.96);
+  transition:
+    opacity .18s cubic-bezier(0.22, 1, 0.36, 1),
+    transform .22s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  will-change: opacity, transform;
 }
-.rs-overlay.show .rs-modal { opacity: 1; }
+.rs-overlay.show .rs-modal {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+/* ---- Settle shell: one card (skeleton with real lines → morph receipt) ---- */
+.rs-overlay.rc-settle-shell,
+.rs-overlay.rc-settle-overlay {
+  background: rgba(6, 6, 10, 0.48);
+  transition: opacity 90ms ease-out;
+}
+.rc-settle-shell .rc-settle-modal {
+  max-width: 420px;
+}
+/* Skeleton stage (same card body before morph) */
+.rc-skel-paper {
+  background: #fbfaf7;
+  border: 1px solid rgba(120, 100, 70, 0.14);
+  border-radius: 12px;
+  padding: 16px 14px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+.rc-skel-outlet {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-mute, #6b6960);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.rc-skel-bar {
+  display: block;
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.1) 40%,
+    rgba(0, 0, 0, 0.06) 80%
+  );
+  background-size: 200% 100%;
+  animation: rc-skel-shimmer 1.05s ease-in-out infinite;
+}
+.rc-skel-bar.w20 { width: 20%; }
+.rc-skel-bar.w50 { width: 50%; }
+.rc-skel-bar.w65 { width: 65%; }
+.rc-skel-bar.w80 { width: 80%; }
+.rc-skel-hr {
+  height: 0;
+  border: 0;
+  border-top: 1px dashed rgba(120, 100, 70, 0.22);
+  margin: 10px 0;
+}
+.rc-skel-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+.rc-skel-item .rc-skel-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text, #16151c);
+  opacity: 0.55;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-skel-item .rc-skel-name em {
+  font-style: normal;
+  font-weight: 700;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+.rc-skel-item .rc-skel-price {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text, #16151c);
+  opacity: 0.5;
+  flex: none;
+}
+.rc-skel-more {
+  font-size: 11.5px;
+  color: var(--text-mute);
+  justify-content: center;
+  opacity: 0.7;
+}
+.rc-skel-line.total { margin-top: 6px; }
+.rc-skel-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+.rc-skel-total {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--text, #16151c);
+  letter-spacing: -0.02em;
+  min-width: 3.5em;
+  text-align: right;
+}
+.rc-skel-progress {
+  margin: 14px 0 0;
+  height: 3px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+.rc-skel-progress > span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: 99px;
+  background: var(--orange, #ff4f00);
+  animation: rc-skel-bar 0.9s ease-in-out infinite;
+}
+.rc-skel-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-mute, #6b6960);
+}
+.rc-skel-hint i { color: var(--orange); margin-right: 4px; }
+@keyframes rc-skel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@keyframes rc-skel-bar {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+/* Morph pulse when skeleton body swaps to real receipt */
+.rc-settle-modal.rc-settle-morph {
+  animation: rc-settle-morph 0.18s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes rc-settle-morph {
+  0% { transform: scale(0.985); }
+  55% { transform: scale(1.012); }
+  100% { transform: scale(1); }
+}
+.rc-settle-overlay.rc-settle-live .rc-settle-modal .receipt-paper {
+  animation: rc-receipt-in 0.16s ease-out;
+}
+@keyframes rc-receipt-in {
+  from { opacity: 0.55; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+/* Error on same card */
+.mh-ic.mh-ic-err {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+.rc-settle-err {
+  text-align: center;
+  padding: 12px 8px 4px;
+}
+.rc-settle-err p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+.cart-actions #btn-checkout.is-settling {
+  opacity: 0.95;
+  pointer-events: none;
+  cursor: wait;
+  gap: 8px;
+}
+/* Fast open (fallback if no shell) */
+.rs-overlay.rs-overlay-fast .rs-modal,
+.rs-overlay.rc-settle-overlay .rc-settle-modal {
+  transform: translateY(8px) scale(0.985);
+  opacity: 0;
+  transition:
+    opacity 100ms ease-out,
+    transform 130ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.rs-overlay.rs-overlay-fast.show .rs-modal,
+.rs-overlay.rc-settle-overlay.show .rc-settle-modal {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
 .rs-modal.sm { max-width: 460px; } .rs-modal.md { max-width: 680px; } .rs-modal.lg { max-width: 940px; } .rs-modal.xl { max-width: 1100px; }
 .rs-mhead { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--stroke); flex: none; }
 .rs-mhead-text { min-width: 0; flex: 1; }
@@ -93,6 +286,19 @@
   max-height: min(92dvh, 760px) !important;
   height: auto;
   overflow: hidden !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rs-overlay, .rs-modal,
+  .rs-overlay.rs-overlay-fast .rs-modal,
+  .rs-overlay.rc-settle-overlay .rc-settle-modal,
+  .rc-skel-bar,
+  .rc-skel-progress > span,
+  .rc-settle-modal.rc-settle-morph,
+  .rc-settle-overlay.rc-settle-live .rc-settle-modal .receipt-paper {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
 }
 .rc-settle-modal .rs-mbody,
 .rc-settle-modal .rc-settle-body {

@@ -302,9 +302,40 @@
     ban.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--orange)"></i> Happy Hour · ${pct}% off menu until ${esc(end)}`;
   }
 
-let activeCat='All', cart=[], discountPct=0, tipAmount=0, loyaltyRedeem=0, loyaltyPointsUsed=0;
+/* Singleton cart store — safety if this file is ever evaluated twice.
+   Boot is single-path (critical.bundle only); store still protects HMR/dev reloads. */
+const _pos = (global.__rsPosStore = global.__rsPosStore || {
+  activeCat: 'All',
+  cart: [],
+  discountPct: 0,
+  tipAmount: 0,
+  loyaltyRedeem: 0,
+  loyaltyPointsUsed: 0,
+  activePromo: { code: '', pct: 0, fixed: 0, title: '', offerId: null },
+  cartActionsDelegated: false,
+});
+let activeCat = _pos.activeCat;
+/** Always the shared array reference (reassigned only via replaceCart). */
+let cart = _pos.cart;
+let discountPct = _pos.discountPct;
+let tipAmount = _pos.tipAmount;
+let loyaltyRedeem = _pos.loyaltyRedeem;
+let loyaltyPointsUsed = _pos.loyaltyPointsUsed;
 /** @type {{ code: string, pct: number, fixed: number, title: string, offerId: string|null }} */
-let activePromo = { code: '', pct: 0, fixed: 0, title: '', offerId: null };
+let activePromo = _pos.activePromo || { code: '', pct: 0, fixed: 0, title: '', offerId: null };
+function replaceCart(next) {
+  const arr = Array.isArray(next) ? next : [];
+  _pos.cart = arr;
+  cart = _pos.cart;
+}
+function syncPosScalars() {
+  _pos.activeCat = activeCat;
+  _pos.discountPct = discountPct;
+  _pos.tipAmount = tipAmount;
+  _pos.loyaltyRedeem = loyaltyRedeem;
+  _pos.loyaltyPointsUsed = loyaltyPointsUsed;
+  _pos.activePromo = activePromo;
+}
 const renderPOS = () => {
   paintHappyHourBanner();
   const grid = $('#pos-grid');
@@ -540,6 +571,7 @@ function bindMobileCartBar(){
   });
 }
 function addToCart(id, opts){
+  cart = _pos.cart;
   opts = opts || {};
   const m=getMenu().find(x=>String(x.id)===String(id));
   if (!m) return;
@@ -616,14 +648,16 @@ function addToCart(id, opts){
   );
 }
 function changeQty(id,d){
+  cart = _pos.cart;
   // Prefer line matching data-line-key if present via event — fallback first match by id
   const line = cart.find((c) => String(c.id) === String(id));
   if (!line) return;
   line.qty += d;
-  if (line.qty <= 0) cart = cart.filter((c) => c !== line);
+  if (line.qty <= 0) replaceCart(cart.filter((c) => c !== line));
   renderCart();
 }
 function setLinePortion(lineKey, portion) {
+  cart = _pos.cart;
   const p = Number(portion);
   if (!(p > 0)) return;
   const line =
@@ -722,6 +756,7 @@ function openLineNoteEditor(id) {
   });
 }
 function renderCart(){
+  cart = _pos.cart;
   const wrap=$('#cart-items'); const count=cart.reduce((a,c)=>a+c.qty,0);
   const countEl = $('#cart-count');
   // Symbol chrome: show count number only (title has "items")
@@ -807,7 +842,7 @@ function renderCart(){
       const line = lk ? cart.find((c) => cartLineKey(c) === lk) : cart.find((c) => String(c.id) === String(b.dataset.id));
       if (!line) return;
       line.qty += +b.dataset.d;
-      if (line.qty <= 0) cart = cart.filter((c) => c !== line);
+      if (line.qty <= 0) replaceCart(cart.filter((c) => c !== line));
       renderCart();
     }));
     $$('#cart-items .cart-p-btn').forEach((b) =>
@@ -881,6 +916,23 @@ function renderCart(){
   }
 
   try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
+  // Never leave Print & Pay stuck grey when cart has lines (stale empty-cart gate)
+  try {
+    const checkoutBtn = document.getElementById('btn-checkout');
+    if (checkoutBtn && cart.length > 0) {
+      checkoutBtn.disabled = false;
+      const reason = checkoutBtn.dataset.blockReason || '';
+      if (
+        checkoutBtn.getAttribute('aria-disabled') === 'true' &&
+        (!reason || /add items|cart is empty|empty cart/i.test(reason))
+      ) {
+        checkoutBtn.removeAttribute('aria-disabled');
+        checkoutBtn.classList.remove('is-blocked');
+        delete checkoutBtn.dataset.blockReason;
+        checkoutBtn.title = 'Print bill and take payment';
+      }
+    }
+  } catch (_) {}
   wireCartActions();
   try { updatePosCartChrome(cart.length === 0); } catch (e) {}
 
@@ -1127,6 +1179,8 @@ async function syncFloorOccupancyFromCart() {
 }
 
 function getTotals(){
+  // Always read shared cart (double-load safety)
+  cart = _pos.cart;
   const settings = window.RS_SETTINGS || {};
   const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular', specified_premises: false };
   const country = taxProfile.country;
@@ -1378,7 +1432,9 @@ function getPromo() {
   return { ...activePromo };
 }
 function clearCart(){
-  cart=[]; discountPct=0; tipAmount=0; loyaltyRedeem=0; loyaltyPointsUsed=0;
+  replaceCart([]);
+  discountPct=0; tipAmount=0; loyaltyRedeem=0; loyaltyPointsUsed=0;
+  syncPosScalars();
   clearPromo();
   setCovers(0);
   const d=$('#disc-input'); if(d) d.value='';
@@ -1454,16 +1510,22 @@ function runCheckoutAction(){
   // RSPOS module not loaded -- do not silently show false success
   return toast('Checkout module not ready -- please refresh', 'fa-circle-exclamation');
 }
-let cartActionsDelegated = false;
 function ensureCartActionDelegation(){
-  if (cartActionsDelegated) return;
-  cartActionsDelegated = true;
+  // Shared flag — avoid double document listeners when pos-ui loads twice
+  if (_pos.cartActionsDelegated) return;
+  _pos.cartActionsDelegated = true;
   document.addEventListener('click', e => {
     const btn = e.target.closest('#btn-kot, #btn-checkout');
     if (!btn) return;
     e.preventDefault();
+    // Soft-blocked (empty cart / cash short): prefer features-pos checkout which explains why
+    if (btn.id === 'btn-checkout') {
+      if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+        if (window.RSPOS && typeof window.RSPOS.checkout === 'function') return window.RSPOS.checkout();
+      }
+      return runCheckoutAction();
+    }
     if (btn.id === 'btn-kot') return runKotAction();
-    runCheckoutAction();
   });
 }
 function wireCartActions(){
@@ -1556,7 +1618,7 @@ function initPOS(){
     const savedTabCart = localStorage.getItem('rs_tab_cart_' + initialTabKey);
     if (savedTabCart) {
       const tabData = JSON.parse(savedTabCart);
-      cart = tabData.items || [];
+      replaceCart(tabData.items || []);
       // Also load delivery-specific fields if applicable
       const da = document.getElementById('delivery-address');
       const dc = document.getElementById('delivery-charge');
@@ -1568,7 +1630,7 @@ function initPOS(){
       // Fall back to the old active cart key if no tab-specific cart exists
       const savedCart = localStorage.getItem('rs_active_cart');
       if (savedCart) {
-        cart = JSON.parse(savedCart);
+        try { replaceCart(JSON.parse(savedCart)); } catch (_) { replaceCart([]); }
       }
     }
     const savedDiscount = localStorage.getItem('rs_active_cart_discount');
@@ -1637,7 +1699,7 @@ function initPOS(){
   })();
   // Expose cart helpers for menu-intelligence custom lines
   function setCart(next) {
-    cart = Array.isArray(next) ? next : cart;
+    if (Array.isArray(next)) replaceCart(next);
     renderCart();
   }
   function addCustomLine(line) {
@@ -1695,13 +1757,13 @@ function initPOS(){
         const savedNewTabCart = localStorage.getItem('rs_tab_cart_' + newTabKey);
         if (savedNewTabCart) {
           const newTabData = JSON.parse(savedNewTabCart);
-          cart = newTabData.items || [];
+          replaceCart(newTabData.items || []);
           // Load delivery fields if applicable
           if (da) da.value = newTabData.deliveryAddress || '';
           if (dc) dc.value = newTabData.deliveryCharge || '';
           if (dr) dr.value = newTabData.deliveryRider || '';
         } else {
-          cart = []; // If no saved cart for new tab, start fresh!
+          replaceCart([]); // If no saved cart for new tab, start fresh!
           // Clear delivery fields too
           if (da) da.value = '';
           if (dc) dc.value = '';
@@ -1877,17 +1939,19 @@ function initPOS(){
     return cart.map((c) => ({ ...c }));
   }
   function setCart(items) {
-    cart = (items || []).map((c) => ({ ...c }));
+    replaceCart((items || []).map((c) => ({ ...c })));
     renderCart();
   }
   function setDiscountPct(n) {
     discountPct = Number(n) || 0;
+    syncPosScalars();
   }
   function getDiscountPct() {
     return discountPct;
   }
   function setTip(n) {
     tipAmount = Math.max(0, Number(n) || 0);
+    syncPosScalars();
     const tipInput = document.getElementById('tip-input');
     if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
   }
@@ -1897,6 +1961,7 @@ function initPOS(){
   function setLoyaltyRedeem(currencyAmount, pointsUsed) {
     loyaltyRedeem = Math.max(0, Number(currencyAmount) || 0);
     loyaltyPointsUsed = Math.max(0, Number(pointsUsed) || 0);
+    syncPosScalars();
     try {
       renderCart();
     } catch (_) {}

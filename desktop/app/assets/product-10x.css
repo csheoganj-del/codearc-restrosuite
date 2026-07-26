@@ -59,7 +59,11 @@ body.rs-desktop-app textarea {
 }
 .tb-right .tb-search-compact {
   min-width: 0;
-  max-width: 140px;
+  max-width: 200px;
+}
+.tb-right .tb-search-global,
+.tb-right .tb-search.tb-search-global {
+  max-width: none;
 }
 .tb-right .clock-pill,
 .tb-right .tb-version {

@@ -22,6 +22,80 @@
       else setTimeout(run, 0);
     };
   }
+
+  /** Yield so the browser can paint click feedback before heavy work. */
+  function yieldToMain(ms) {
+    const delay = ms == null ? 0 : ms;
+    return new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => setTimeout(resolve, delay));
+      } else {
+        setTimeout(resolve, delay);
+      }
+    });
+  }
+
+  /**
+   * Instant skeleton on first open of a heavy tab (before module load / full render).
+   * Makes tab switches feel responsive instead of a 2–3s frozen cursor.
+   */
+  function showInstantTabSkeleton(tabId) {
+    try {
+      if (!window.RSSkel) return;
+      if (rendered[tabId]) return; // already painted real content once
+      const sk = window.RSSkel;
+      if (tabId === 'bills-tab') {
+        const body = document.getElementById('bills-table-body');
+        if (body && (!body.children.length || body.classList.contains('rs-skel-host'))) {
+          if (sk.billsTable) sk.paint(body, sk.billsTable({ rows: 7 }));
+        }
+      } else if (tabId === 'kds-tab') {
+        const grid = document.getElementById('kds-grid');
+        if (grid && (!grid.children.length || grid.classList.contains('rs-skel-host'))) {
+          if (sk.kdsCards) sk.paint(grid, sk.kdsCards({ count: 3 }));
+        }
+      } else if (tabId === 'qr-orders-tab') {
+        const grid = document.getElementById('qr-grid');
+        if (grid && (!grid.children.length || grid.classList.contains('rs-skel-host'))) {
+          if (sk.qrCards) sk.paint(grid, sk.qrCards({ count: 4 }));
+        }
+      } else if (tabId === 'floor-tab') {
+        const sec = document.getElementById('floor-tab');
+        if (sec && sk.floorTiles) {
+          // Floor rebuilds whole section — only if still empty/loading
+          const empty =
+            !sec.querySelector('.floor-grid, .table-tile, .floor-card, .rs-floor') ||
+            sec.classList.contains('rs-skel-host') ||
+            /Loading tables/i.test(sec.textContent || '');
+          if (empty || !sec.querySelector('[data-table], .tbl-card, .floor-tile')) {
+            sk.paint(sec, sk.floorTiles({ count: 8 }));
+          }
+        }
+      } else if (tabId === 'inventory-tab') {
+        const body = document.getElementById('inv-table-body');
+        if (body && (!body.children.length || body.classList.contains('rs-skel-host'))) {
+          if (sk.dataTable) sk.paint(body, sk.dataTable({ rows: 8, cols: 6 }));
+        }
+      } else if (tabId === 'editor-tab') {
+        const body = document.getElementById('editor-list');
+        if (body && (!body.children.length || body.classList.contains('rs-skel-host'))) {
+          if (sk.dataTable) sk.paint(body, sk.dataTable({ rows: 8, cols: 6 }));
+        }
+      } else if (tabId === 'reports-tab' || tabId === 'analytics-tab') {
+        const sec = document.getElementById(tabId);
+        if (sec && sk.reportsDash && (!sec.querySelector('.stat-card, .report-grid') || sec.classList.contains('rs-skel-host'))) {
+          sk.paint(sec, sk.reportsDash({ stats: 4 }));
+        }
+      } else if (tabId === 'customers-tab') {
+        const sec = document.getElementById('customers-tab');
+        if (sec && sk.cards && (sec.classList.contains('rs-skel-host') || /Loading customers/i.test(sec.textContent || '') || !sec.querySelector('.data-table, .cust-card, .crm-'))) {
+          sk.paint(sec, sk.cards({ count: 6 }));
+        }
+      }
+    } catch (e) {
+      console.warn('[tab skel]', e);
+    }
+  }
   
   // Self-Healing Boot Recovery
   (function () {
@@ -222,6 +296,7 @@
     'chain-dashboard-tab':['Chain Dashboard','Consolidated reporting, catalog & logistics']
   };
   const rendered = {};
+  let activateGen = 0;
   function renderRegisteredTab(tabId) {
     if (!renderers[tabId]) return;
     if (tabId === 'growth-hub-tab' && renderers[tabId] !== renderGrowthHub) {
@@ -234,6 +309,7 @@
   }
 
   async function activateTab(id){
+    const myGen = ++activateGen;
     const sess = window.RS_API ? RS_API.session() : null;
     const roleRaw = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase().trim();
     const isSuper = roleRaw === 'superadmin' || roleRaw === 'super_admin';
@@ -270,30 +346,54 @@
       }
     }
 
-    // Wave 2: ensure lazy feature modules for this tab are loaded first
+    // ── 1) Paint tab switch FIRST (sync) so the click never freezes the cursor ──
+    $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
+    $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+    $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+    document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+    const meta = titles[id]; if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
+    try {
+      const content = $('.content');
+      if (content) content.scrollTop = 0;
+    } catch (e) {}
+    // Instant skeleton on first open of heavy tabs (visible before module/render work)
+    try { showInstantTabSkeleton(id); } catch (e) {}
+    try{ history.replaceState(null,'','#'+id); }catch(e){}
+    try { localStorage.setItem('rs_active_tab', id); } catch(e){}
+
+    // ── 2) Yield so the browser paints the new tab + skeleton ──
+    await yieldToMain(0);
+    if (myGen !== activateGen) return; // user already clicked another tab
+
+    // Mobile cart bar / attention badges (deferred — not needed for click feedback)
+    try { updateMobileCartBar(); } catch(e){}
+    try { updateTabAttentionBlinking(); } catch(e){}
+
+    // ── 3) Lazy-load feature modules (floor/growth/etc.) AFTER paint ──
     try {
       if (window.RS_ensureTabModules) await window.RS_ensureTabModules(id);
     } catch (e) {
       console.warn('[activateTab] module load failed', e);
     }
+    if (myGen !== activateGen) return;
 
-    $$('.tab-content').forEach(t=>t.classList.toggle('active', t.id===id));
-    $$('.sidebar-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
-    $$('.mnav-link').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
-    // Mobile POS checkout bar only belongs to the POS tab
-    try {
-      updateMobileCartBar();
-    } catch(e){}
-    document.querySelectorAll('.more-sheet-link[data-tab]').forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
-    try { updateTabAttentionBlinking(); } catch(e){}
-    const meta = titles[id]; if(meta){ $('#page-title').textContent = meta[0]; $('#page-sub').textContent = meta[1]; }
-    $('.content').scrollTop = 0; window.scrollTo(0,0);
-    if(!rendered[id] && renderers[id]){ renderRegisteredTab(id); rendered[id]=true; }
-    else if(rendered[id] && id === 'gateway-monitor-tab') { if(typeof startSaaSGatewayPolling === 'function') startSaaSGatewayPolling(); }
-    if(id !== 'gateway-monitor-tab') { if(typeof stopSaaSGatewayPolling === 'function') stopSaaSGatewayPolling(); }
-    try{ history.replaceState(null,'','#'+id); }catch(e){}
-    // Save active tab to localStorage
-    try { localStorage.setItem('rs_active_tab', id); } catch(e){}
+    // ── 4) First full render on next frame(s) so main thread stays interactive ──
+    if (!rendered[id] && renderers[id]) {
+      await yieldToMain(0);
+      if (myGen !== activateGen) return;
+      try {
+        renderRegisteredTab(id);
+        rendered[id] = true;
+      } catch (e) {
+        console.warn('[activateTab] render failed for ' + id, e);
+      }
+    } else if (rendered[id] && id === 'gateway-monitor-tab') {
+      if (typeof startSaaSGatewayPolling === 'function') startSaaSGatewayPolling();
+    }
+    if (id !== 'gateway-monitor-tab') {
+      if (typeof stopSaaSGatewayPolling === 'function') stopSaaSGatewayPolling();
+    }
+    if (myGen !== activateGen) return;
     try {
       document.dispatchEvent(new CustomEvent('rs:tab-change', { detail: { tab: id } }));
     } catch (e) {}
@@ -2128,6 +2228,10 @@
       setupSupabaseRealtime();
       setupTenantDataRealtime();
     }catch(e){ console.warn('sync pending orders/realtime failed', e); }
+    try {
+      if (window.RSSkel && typeof RSSkel.markHydrated === 'function') RSSkel.markHydrated();
+      document.documentElement.dataset.rsHydrated = '1';
+    } catch (_) {}
     document.dispatchEvent(new CustomEvent('rs:hydrated'));
     if(window.RS_SAAS) RS_SAAS.applyToUI();
   }

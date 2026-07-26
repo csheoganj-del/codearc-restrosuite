@@ -372,6 +372,23 @@
     function renderList(){
       const body = $('#editor-list'); if(!body) return;
 
+      // Pre-hydrate empty menu → skeleton rows
+      try {
+        const menuLen = Array.isArray(RS.MENU) ? RS.MENU.length : 0;
+        if (
+          window.RSSkel &&
+          RSSkel.shouldShow &&
+          RSSkel.shouldShow(menuLen > 0) &&
+          RSSkel.dataTable
+        ) {
+          RSSkel.paint(body, RSSkel.dataTable({ rows: 8, cols: 6 }));
+          return;
+        }
+      } catch (_) {}
+      try {
+        if (window.RSSkel && RSSkel.clear) RSSkel.clear(body);
+      } catch (_) {}
+
       // Coach banner ABOVE the 2-column grid — never inside report-grid
       // (inserting into the grid stole the right column and hid the menu list)
       try {
@@ -564,6 +581,12 @@
     }
 
     RS.addRenderer('editor-tab', ()=>{ buildForm(); renderList(); });
+    document.addEventListener('rs:hydrated', () => {
+      try {
+        if (window.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+        renderList();
+      } catch (_) {}
+    });
   }
   if(window.RS) boot(); else document.addEventListener('rs:ready', boot, { once:true });
 })();

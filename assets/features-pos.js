@@ -4,6 +4,11 @@
    ============================================================ */
 (function(){
   'use strict';
+  // Single-activity guard — never double-bind checkout/payment if script is loaded twice
+  if (typeof window !== 'undefined' && window.__rsFeaturesPosBooted) {
+    return;
+  }
+  if (typeof window !== 'undefined') window.__rsFeaturesPosBooted = true;
   const ready = ()=> !!window.RS;
   function boot(){
     const RS = window.RS;
@@ -178,27 +183,359 @@
     loadReceiptProfile();
     document.addEventListener('rs:hydrated', loadReceiptProfile);
 
+    /* ---------------- settle shell (one card: skeleton → receipt → error) ---------------- */
+    function prefersReducedMotion() {
+      try {
+        return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    /**
+     * Single settle surface opened on Print & Pay.
+     * Morphs in-place to real receipt (or error) — no second modal flash.
+     */
+    function openSettleShell(checkoutBtn, totalsHint) {
+      const root = (typeof RS.getModalRoot === 'function' && RS.getModalRoot()) || document.body;
+      const openedAt = Date.now();
+      const MIN_MS = prefersReducedMotion() ? 0 : 160;
+      let ov = null;
+      let modal = null;
+      let handedOff = false;
+      let closed = false;
+      let btnRestore = null;
+      let escHandler = null;
+
+      const money =
+        totalsHint && totalsHint.grand != null && typeof rs === 'function'
+          ? rs(totalsHint.grand)
+          : totalsHint && totalsHint.grand != null
+            ? '₹' + Number(totalsHint.grand)
+            : '—';
+
+      // Real cart lines (soft) — not empty shimmer bars
+      const items = Array.isArray(totalsHint && totalsHint.items) ? totalsHint.items : [];
+      let linesHtml = '';
+      if (items.length) {
+        items.slice(0, 6).forEach(function (it) {
+          const nm = esc((it && it.name) || 'Item');
+          const q = Number(it && it.qty) || 1;
+          const lineTotal =
+            typeof rs === 'function'
+              ? rs((Number(it.price) || 0) * q)
+              : '₹' + ((Number(it.price) || 0) * q);
+          linesHtml +=
+            '<div class="rc-skel-line rc-skel-item">' +
+            '<span class="rc-skel-name">' + nm + ' <em>×' + q + '</em></span>' +
+            '<span class="rc-skel-price">' + lineTotal + '</span></div>';
+        });
+        if (items.length > 6) {
+          linesHtml +=
+            '<div class="rc-skel-line rc-skel-more">+' + (items.length - 6) + ' more…</div>';
+        }
+      } else {
+        const n = Math.min(5, Math.max(2, Number(totalsHint && totalsHint.count) || 3));
+        for (let i = 0; i < n; i++) {
+          linesHtml +=
+            '<div class="rc-skel-line"><span class="rc-skel-bar w' +
+            (50 + (i % 3) * 15) +
+            '"></span><span class="rc-skel-bar w20"></span></div>';
+        }
+      }
+
+      try {
+        if (checkoutBtn) {
+          btnRestore = { html: checkoutBtn.innerHTML, title: checkoutBtn.title || '' };
+          checkoutBtn.classList.add('is-settling');
+          checkoutBtn.disabled = true;
+          checkoutBtn.setAttribute('aria-busy', 'true');
+          checkoutBtn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Settling…';
+          checkoutBtn.title = 'Sealing bill…';
+        }
+      } catch (_) {}
+
+      try {
+        ov = document.createElement('div');
+        ov.className = 'rs-overlay rc-settle-overlay rc-settle-shell';
+        ov.setAttribute('role', 'dialog');
+        ov.setAttribute('aria-modal', 'true');
+        ov.setAttribute('aria-label', 'Settling bill');
+        ov.innerHTML =
+          '<div class="rs-modal sm rc-settle-modal" id="rc-settle-shell-modal">' +
+          '<div class="rs-mhead" id="rc-settle-head">' +
+          '<div class="mh-ic mh-ic-sync" id="rc-settle-ic"><i class="fa-solid fa-spinner fa-spin"></i></div>' +
+          '<div class="rs-mhead-text"><h3 id="rc-settle-title">Settling bill</h3>' +
+          '<div class="sub" id="rc-settle-sub">Sealing · preparing receipt</div></div>' +
+          '<button type="button" class="rs-mclose" aria-label="Close" hidden><i class="fa-solid fa-xmark"></i></button>' +
+          '</div>' +
+          '<div class="rs-mbody rc-settle-body" id="rc-settle-body">' +
+          '<div class="rc-skel-paper" id="rc-settle-stage">' +
+          '<div class="rc-skel-outlet">Receipt preview</div>' +
+          '<div class="rc-skel-hr"></div>' +
+          linesHtml +
+          '<div class="rc-skel-hr"></div>' +
+          '<div class="rc-skel-line total"><span class="rc-skel-label">Total</span>' +
+          '<span class="rc-skel-total">' + money + '</span></div>' +
+          '<div class="rc-skel-progress" aria-hidden="true"><span></span></div>' +
+          '<p class="rc-skel-hint"><i class="fa-solid fa-bolt"></i> Sealing bill…</p>' +
+          '</div></div>' +
+          '<div class="rs-mfoot" id="rc-settle-foot" hidden></div>' +
+          '</div>';
+        root.appendChild(ov);
+        modal = ov.querySelector('.rs-modal');
+        void ov.offsetWidth;
+        requestAnimationFrame(function () {
+          if (ov) ov.classList.add('show');
+        });
+      } catch (e) {
+        console.warn('[settle shell]', e);
+      }
+
+      function restoreButton() {
+        try {
+          if (checkoutBtn && btnRestore) {
+            checkoutBtn.innerHTML = btnRestore.html;
+            checkoutBtn.title = btnRestore.title || 'Print bill and take payment';
+            checkoutBtn.removeAttribute('aria-busy');
+            checkoutBtn.classList.remove('is-settling');
+            checkoutBtn.disabled = false;
+          }
+        } catch (_) {}
+      }
+
+      function hardRemove() {
+        if (escHandler) {
+          try { document.removeEventListener('keydown', escHandler); } catch (_) {}
+          escHandler = null;
+        }
+        try {
+          if (ov) {
+            ov.classList.remove('show');
+            const el = ov;
+            ov = null;
+            modal = null;
+            setTimeout(function () {
+              try { el.remove(); } catch (e) {}
+            }, prefersReducedMotion() ? 0 : 140);
+          }
+        } catch (_) {}
+      }
+
+      const api = {
+        openedAt: openedAt,
+        waitMin: function () {
+          const left = MIN_MS - (Date.now() - openedAt);
+          if (left <= 0) return Promise.resolve();
+          return new Promise(function (r) { setTimeout(r, left); });
+        },
+        restoreButton: restoreButton,
+        /** Morph same card into final Bill settled receipt */
+        morphReceipt: function (parts) {
+          if (!ov || !modal || closed) return null;
+          handedOff = true;
+          restoreButton();
+          window.__rsSettleModalOpen = true;
+          try {
+            ov.classList.add('rc-settle-live');
+            ov.setAttribute('aria-label', 'Bill settled');
+            const head = ov.querySelector('#rc-settle-head');
+            const body = ov.querySelector('#rc-settle-body');
+            const foot = ov.querySelector('#rc-settle-foot');
+            const title = ov.querySelector('#rc-settle-title');
+            const sub = ov.querySelector('#rc-settle-sub');
+            const ic = ov.querySelector('#rc-settle-ic');
+            const xBtn = ov.querySelector('.rs-mclose');
+            if (title) title.textContent = parts.title || 'Bill settled';
+            if (sub) sub.innerHTML = parts.sub || '';
+            if (ic) {
+              ic.className = 'mh-ic ' + (parts.iconClass || 'mh-ic-ok');
+              ic.id = parts.iconId || 'rc-settle-ic';
+              ic.innerHTML = '<i class="fa-solid ' + (parts.icon || 'fa-circle-check') + '"></i>';
+            }
+            if (body) {
+              body.className = 'rs-mbody rc-settle-body';
+              body.innerHTML = parts.body || '';
+            }
+            if (foot) {
+              foot.hidden = false;
+              foot.innerHTML = parts.foot || '';
+            }
+            if (xBtn) xBtn.hidden = false;
+            // brief morph pulse
+            modal.classList.add('rc-settle-morph');
+            requestAnimationFrame(function () {
+              requestAnimationFrame(function () {
+                if (modal) modal.classList.remove('rc-settle-morph');
+              });
+            });
+          } catch (e) {
+            console.warn('[settle morph]', e);
+          }
+
+          const close = function () {
+            if (closed) return;
+            closed = true;
+            window.__rsSettleModalOpen = false;
+            hardRemove();
+          };
+
+          if (escHandler) document.removeEventListener('keydown', escHandler);
+          escHandler = function (e) {
+            if (e.key === 'Escape') {
+              if (parts.onEscape) parts.onEscape(close);
+              else close();
+            }
+          };
+          document.addEventListener('keydown', escHandler);
+
+          // backdrop click
+          ov.onclick = function (e) {
+            if (e.target === ov) {
+              if (parts.onBackdrop) parts.onBackdrop(close);
+              else close();
+            }
+          };
+
+          if (typeof parts.onMount === 'function') {
+            parts.onMount(modal, close);
+          }
+          return { el: ov, modal: modal, close: close };
+        },
+        setError: function (message, handlers) {
+          handlers = handlers || {};
+          if (!ov || !modal) return;
+          restoreButton();
+          try {
+            const title = ov.querySelector('#rc-settle-title');
+            const sub = ov.querySelector('#rc-settle-sub');
+            const ic = ov.querySelector('#rc-settle-ic');
+            const body = ov.querySelector('#rc-settle-body');
+            const foot = ov.querySelector('#rc-settle-foot');
+            const xBtn = ov.querySelector('.rs-mclose');
+            if (title) title.textContent = 'Couldn’t settle';
+            if (sub) sub.textContent = 'Bill was not closed';
+            if (ic) {
+              ic.className = 'mh-ic mh-ic-err';
+              ic.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
+            }
+            if (body) {
+              body.innerHTML =
+                '<div class="rc-settle-err">' +
+                '<p>' + esc(message || 'Something went wrong. Try again.') + '</p>' +
+                '</div>';
+            }
+            if (foot) {
+              foot.hidden = false;
+              foot.innerHTML =
+                '<button type="button" class="btn btn-ghost" id="rc-settle-err-close" style="flex:1">Close</button>' +
+                (handlers.onRetry
+                  ? '<button type="button" class="btn btn-primary" id="rc-settle-err-retry" style="flex:1.2"><i class="fa-solid fa-rotate"></i> Retry</button>'
+                  : '');
+            }
+            if (xBtn) {
+              xBtn.hidden = false;
+              xBtn.onclick = function () {
+                if (handlers.onClose) handlers.onClose();
+                api.forceClose();
+              };
+            }
+            const c = foot && foot.querySelector('#rc-settle-err-close');
+            if (c) {
+              c.onclick = function () {
+                if (handlers.onClose) handlers.onClose();
+                api.forceClose();
+              };
+            }
+            const r = foot && foot.querySelector('#rc-settle-err-retry');
+            if (r && handlers.onRetry) {
+              r.onclick = function () {
+                api.forceClose();
+                handlers.onRetry();
+              };
+            }
+            ov.classList.add('rc-settle-error');
+          } catch (e) {
+            console.warn('[settle error ui]', e);
+          }
+        },
+        forceClose: function () {
+          if (closed) return;
+          closed = true;
+          handedOff = false;
+          window.__rsSettleModalOpen = false;
+          restoreButton();
+          hardRemove();
+        },
+        /** Cleanup only if we never handed off to receipt */
+        cleanupIfNeeded: function () {
+          if (handedOff) {
+            restoreButton();
+            return;
+          }
+          api.forceClose();
+        },
+        get handedOff() { return handedOff; },
+        get el() { return ov; },
+        get modalEl() { return modal; },
+      };
+      return api;
+    }
+
     /* ---------------- shared modal helper ---------------- */
     window.RSModal = window.RSModal || {
       open(opts){
         const root = RS.getModalRoot();
         const ov = document.createElement('div');
-        ov.className = 'rs-overlay';
+        const ovExtra = opts.overlayClass ? ' ' + opts.overlayClass : '';
+        const fast = !!opts.fast;
+        ov.className = 'rs-overlay' + ovExtra + (fast ? ' rs-overlay-fast' : '');
         const icCls = ['mh-ic', opts.iconClass || ''].filter(Boolean).join(' ');
-        const head = opts.title!=null ? `<div class="rs-mhead">${opts.icon?`<div class="${icCls}"${opts.iconId?` id="${opts.iconId}"`:''}><i class="fa-solid ${opts.icon}"></i></div>`:''}<div class="rs-mhead-text"><h3>${opts.title}</h3>${opts.sub?`<div class="sub">${opts.sub}</div>`:''}</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>` : '';
-        const body = opts.bare ? (opts.body||'') : `<div class="rs-mbody ${opts.bodyClass||''}">${opts.body||''}</div>`;
-        const foot = opts.foot ? `<div class="rs-mfoot">${opts.foot}</div>` : '';
-        ov.innerHTML = `<div class="rs-modal ${opts.size||'md'} ${opts.modalClass||''}">${head}${body}${foot}</div>`;
+        const head = opts.title!=null
+          ? ('<div class="rs-mhead">' +
+              (opts.icon
+                ? '<div class="' + icCls + '"' + (opts.iconId ? ' id="' + opts.iconId + '"' : '') +
+                  '><i class="fa-solid ' + opts.icon + '"></i></div>'
+                : '') +
+              '<div class="rs-mhead-text"><h3>' + opts.title + '</h3>' +
+              (opts.sub ? '<div class="sub">' + opts.sub + '</div>' : '') +
+              '</div><button class="rs-mclose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>')
+          : '';
+        const body = opts.bare
+          ? (opts.body || '')
+          : '<div class="rs-mbody ' + (opts.bodyClass || '') + '">' + (opts.body || '') + '</div>';
+        const foot = opts.foot ? '<div class="rs-mfoot">' + opts.foot + '</div>' : '';
+        ov.innerHTML =
+          '<div class="rs-modal ' + (opts.size || 'md') + ' ' + (opts.modalClass || '') + '">' +
+          head + body + foot + '</div>';
         root.appendChild(ov);
-        const close = ()=>{ ov.classList.remove('show'); setTimeout(()=>ov.remove(),300); document.removeEventListener('keydown', esc); };
-        const esc = e=>{ if(e.key==='Escape') close(); };
-        ov.querySelector('.rs-mclose')?.addEventListener('click', close);
-        ov.addEventListener('click', e=>{ if(e.target===ov && opts.dismissable!==false) close(); });
+        void ov.offsetWidth;
+        const closeMs = fast ? 100 : 220;
+        const close = () => {
+          ov.classList.remove('show');
+          setTimeout(() => {
+            try { ov.remove(); } catch (_) {}
+          }, closeMs);
+          document.removeEventListener('keydown', esc);
+        };
+        const esc = (e) => {
+          if (e.key === 'Escape') close();
+        };
+        const closeBtn = ov.querySelector('.rs-mclose');
+        if (closeBtn) closeBtn.addEventListener('click', close);
+        ov.addEventListener('click', (e) => {
+          if (e.target === ov && opts.dismissable !== false) close();
+        });
         document.addEventListener('keydown', esc);
-        setTimeout(()=> {
-          ov.classList.add('show');
-        }, 20);
-        if(opts.onMount) opts.onMount(ov.querySelector('.rs-modal'), close);
+        if (fast) {
+          requestAnimationFrame(() => { ov.classList.add('show'); });
+        } else {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => { ov.classList.add('show'); });
+          });
+        }
+        if (opts.onMount) opts.onMount(ov.querySelector('.rs-modal'), close);
         return { el: ov, modal: ov.querySelector('.rs-modal'), close };
       }
     };
@@ -1199,8 +1536,10 @@
       }
     }
 
-    async function showReceipt(bill) {
-      // Open modal immediately — never await QR/PDF (both freeze main-thread scroll)
+    async function showReceipt(bill, showOpts) {
+      // Open immediately — never await QR/PDF. Prefer morph into settle shell if present.
+      showOpts = showOpts || {};
+      const settleShell = showOpts.shell || null;
       const gwReady = window.__rsGatewayReady === true
         || window.__rsGatewayLastStatus === 'ready'
         || window.__rsPlatformReady === true
@@ -1209,202 +1548,228 @@
       const st0 = bill.syncStatus || 'synced';
       const pending0 = isBillSyncPending(st0);
       let liveQr = null;
-      let printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, null)}</div>`;
+      let printHtml = '<div style="max-width:300px;margin:0 auto">' + receiptHTML(bill, null) + '</div>';
       window.__rsSettleModalOpen = true;
 
-      // Only nag to link when platform central line is also unavailable
-      const connectBanner = !gwReady
-        ? `<div id="rc-wa-cta" class="rc-wa-banner">
-            <i class="fa-brands fa-whatsapp"></i>
-            <div class="rc-wa-banner-text">
-              <b>Connect WhatsApp</b> for automatic PDF send. Green icon below opens manual chat backup.
-              <span class="rc-wa-banner-link"> Open Gateway -&gt;</span>
-            </div>
-          </div>`
-        : (window.__rsWaSendMode === 'platform'
-          ? `<div id="rc-wa-cta" class="rc-wa-banner" style="opacity:.92">
-            <i class="fa-brands fa-whatsapp"></i>
-            <div class="rc-wa-banner-text">
-              <b>Bills send from platform WhatsApp</b> (central number). Optional: link your restaurant number in Settings for branded sends.
-            </div>
-          </div>`
-          : '');
+      const settleWaSettings = window.RS_SETTINGS || {};
+      const autoSendOn =
+        (typeof window.RS_featureOn === 'function' &&
+          (window.RS_featureOn('set_send_bill_after_payment', settleWaSettings, false) ||
+            window.RS_featureOn('set_auto_send_receipts', settleWaSettings, false))) ||
+        settleWaSettings.set_send_bill_after_payment === true ||
+        settleWaSettings.set_send_bill_after_payment === 'true' ||
+        settleWaSettings.set_auto_send_receipts === true ||
+        settleWaSettings.set_auto_send_receipts === 'true';
+      let connectBanner = '';
+      if (autoSendOn) {
+        if (!gwReady) {
+          connectBanner = '<div id="rc-wa-cta" class="rc-wa-banner">' +
+            '<i class="fa-brands fa-whatsapp"></i>' +
+            '<div class="rc-wa-banner-text">' +
+            '<b>Connect WhatsApp</b> for automatic PDF send. Green icon below opens manual chat backup.' +
+            '<span class="rc-wa-banner-link"> Open Gateway -&gt;</span>' +
+            '</div></div>';
+        } else if (window.__rsWaSendMode === 'platform') {
+          connectBanner = '<div id="rc-wa-cta" class="rc-wa-banner" style="opacity:.92">' +
+            '<i class="fa-brands fa-whatsapp"></i>' +
+            '<div class="rc-wa-banner-text">' +
+            '<b>Bills send from platform WhatsApp</b> (central number). Optional: link your restaurant number in Settings for branded sends.' +
+            '</div></div>';
+        }
+      }
 
-      const settle = RSModal.open({
-        title: 'Bill settled',
-        sub: `<span class="rc-bill-meta">${esc(bill.no || '')} | ${rs(bill.grand)}</span>${billSyncChipHtml(st0)}`,
-        icon: 'fa-circle-check',
-        iconClass: pending0 ? 'mh-ic-sync' : 'mh-ic-ok',
-        iconId: 'rc-settle-ic',
-        size: 'sm',
-        modalClass: 'rc-settle-modal',
-        bodyClass: 'rc-settle-body',
-        body: `${connectBanner}<div class="receipt-paper" id="rc-paper">${receiptHTML(bill, null)}</div>`,
-        foot: `<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">
-              <button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">
-                <i class="fa-brands fa-whatsapp"></i>
-              </button>
-              <button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print receipt (thermal when available, otherwise browser)" aria-label="Print">
-                <i class="fa-solid fa-print"></i>
-              </button>
-              <button type="button" class="rc-icon-btn rc-new" id="rc-new" title="New order" aria-label="New order">
-                <i class="fa-solid fa-plus"></i>
-              </button>
-            </div>`,
-        onMount(modal, close) {
-          let syncTimer = null;
-          let closed = false;
-          const mbody = modal.querySelector('.rs-mbody');
-          if (mbody) {
-            mbody.style.overflowY = 'auto';
-            mbody.style.webkitOverflowScrolling = 'touch';
-            mbody.style.touchAction = 'pan-y';
-            mbody.style.overscrollBehavior = 'contain';
+      function wireSettle(modal, close) {
+        let syncTimer = null;
+        let closed = false;
+        const mbody = modal.querySelector('.rs-mbody');
+        if (mbody) {
+          mbody.style.overflowY = 'auto';
+          mbody.style.webkitOverflowScrolling = 'touch';
+          mbody.style.touchAction = 'pan-y';
+          mbody.style.overscrollBehavior = 'contain';
+        }
+
+        const finishSettle = (opts) => {
+          if (closed) return;
+          closed = true;
+          window.__rsSettleModalOpen = false;
+          try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+          syncTimer = null;
+          try { close(); } catch (_) {}
+          const goPos = !opts || opts.goPos !== false;
+          if (goPos) {
+            try { if (window.RS && typeof RS.clearCart === 'function') RS.clearCart(); } catch (_) {}
+            try { if (window.RS && typeof RS.activateTab === 'function') RS.activateTab('pos-tab'); } catch (_) {}
+            try { if (window.RS && typeof RS.toast === 'function') RS.toast('Ready for new order', 'fa-plus'); } catch (_) {}
           }
+        };
 
-          const finishSettle = (opts) => {
-            if (closed) return;
-            closed = true;
-            window.__rsSettleModalOpen = false;
+        const printBtn = modal.querySelector('#rc-print');
+        if (printBtn) {
+          printBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
+              RSOps.printBillThermal(bill);
+            } else {
+              RSPrint(printHtml, 'Receipt ' + bill.no);
+            }
+          };
+        }
+        const waEl = modal.querySelector('#rc-wa');
+        if (waEl) {
+          waEl.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openManualWhatsAppBill(bill);
+          };
+        }
+        const cta = modal.querySelector('#rc-wa-cta');
+        if (cta) {
+          cta.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
+          };
+        }
+        const newBtn = modal.querySelector('#rc-new');
+        if (newBtn) {
+          newBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            finishSettle({ goPos: true });
+          };
+        }
+        const xBtn = modal.querySelector('.rs-mclose');
+        if (xBtn) {
+          xBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            finishSettle({ goPos: false });
+          };
+        }
+
+        const injectQr = (qr) => {
+          if (!qr || !modal.isConnected || closed) return;
+          liveQr = qr;
+          printHtml = '<div style="max-width:300px;margin:0 auto">' + receiptHTML(bill, qr) + '</div>';
+          const paper = modal.querySelector('#rc-paper');
+          if (!paper || paper.querySelector('.rcp-qr-wrap')) return;
+          const y = mbody ? mbody.scrollTop : 0;
+          const block =
+            (window.RSReceiptEngine && typeof RSReceiptEngine.qrBlockHtml === 'function')
+              ? RSReceiptEngine.qrBlockHtml(qr)
+              : (
+                '<table class="rcp-qr-wrap" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:14px 0 0;border-collapse:collapse;border-top:1px dashed #8a877c;table-layout:fixed;">' +
+                '<tr><td align="center" style="width:100%;text-align:center;padding-top:12px;">' +
+                '<img src="' + qr + '" width="110" height="110" alt="Digital bill QR" crossorigin="anonymous" style="display:block;margin:0 auto;width:110px;height:110px;float:none;" />' +
+                '<div class="rcp-qr-label" style="display:block;width:100%;text-align:center;font-size:10px;color:#6b6960;margin-top:6px;">Scan to view digital bill</div>' +
+                '</td></tr></table>'
+              );
+          const footEl = paper.querySelector('.rcp-foot');
+          const holder = document.createElement('div');
+          holder.innerHTML = block.trim();
+          const node = holder.firstElementChild;
+          if (node) {
+            if (footEl) paper.insertBefore(node, footEl);
+            else paper.appendChild(node);
+          }
+          if (mbody) mbody.scrollTop = y;
+        };
+        setTimeout(() => {
+          if (!modal.isConnected || closed) return;
+          generateReceiptQrDataUri(bill).then(injectQr).catch(() => {});
+        }, 600);
+
+        paintBillSettledSync(modal, st0);
+        let ticks = 0;
+        syncTimer = setInterval(() => {
+          ticks += 1;
+          if (closed || ticks > 40 || !modal.isConnected) {
             try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
             syncTimer = null;
+            return;
+          }
+          let st = bill.syncStatus || 'synced';
+          try {
+            if (window.RS && Array.isArray(RS.BILLS)) {
+              const hit = RS.BILLS.find((b) => b && (b.no === bill.no || b.id === bill.id || b.orderId === bill.no));
+              if (hit && hit.syncStatus) st = hit.syncStatus;
+            }
+          } catch (_) {}
+          if (!isBillSyncPending(st)) {
+            bill.syncStatus = 'synced';
+            paintBillSettledSync(modal, 'synced');
+            try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
+            syncTimer = null;
+          } else if (ticks % 2 === 0) {
+            paintBillSettledSync(modal, st);
+          }
+        }, 700);
+      }
+
+      const bodyHtml = connectBanner + '<div class="receipt-paper" id="rc-paper">' + receiptHTML(bill, null) + '</div>';
+      const footHtml =
+        '<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">' +
+        '<button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">' +
+        '<i class="fa-brands fa-whatsapp"></i></button>' +
+        '<button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print receipt (thermal when available, otherwise browser)" aria-label="Print">' +
+        '<i class="fa-solid fa-print"></i></button>' +
+        '<button type="button" class="rc-icon-btn rc-new" id="rc-new" title="New order" aria-label="New order">' +
+        '<i class="fa-solid fa-plus"></i></button></div>';
+      const subHtml =
+        '<span class="rc-bill-meta">' + esc(bill.no || '') + ' | ' + rs(bill.grand) + '</span>' + billSyncChipHtml(st0);
+
+      let settle;
+      if (settleShell && typeof settleShell.morphReceipt === 'function') {
+        settle = settleShell.morphReceipt({
+          title: 'Bill settled',
+          sub: subHtml,
+          icon: 'fa-circle-check',
+          iconClass: pending0 ? 'mh-ic-sync' : 'mh-ic-ok',
+          iconId: 'rc-settle-ic',
+          body: bodyHtml,
+          foot: footHtml,
+          onMount: wireSettle,
+          onEscape: function (close) {
             try { close(); } catch (_) {}
-            const goPos = !opts || opts.goPos !== false;
-            if (goPos) {
-              try {
-                if (window.RS && typeof RS.clearCart === 'function') RS.clearCart();
-              } catch (_) {}
-              try {
-                if (window.RS && typeof RS.activateTab === 'function') RS.activateTab('pos-tab');
-              } catch (_) {}
-              try {
-                if (window.RS && typeof RS.toast === 'function') RS.toast('Ready for new order', 'fa-plus');
-              } catch (_) {}
+            window.__rsSettleModalOpen = false;
+          },
+          onBackdrop: function (close) {
+            try { close(); } catch (_) {}
+            window.__rsSettleModalOpen = false;
+          },
+        });
+      } else {
+        settle = RSModal.open({
+          title: 'Bill settled',
+          sub: subHtml,
+          icon: 'fa-circle-check',
+          iconClass: pending0 ? 'mh-ic-sync' : 'mh-ic-ok',
+          iconId: 'rc-settle-ic',
+          size: 'sm',
+          fast: true,
+          overlayClass: 'rc-settle-overlay',
+          modalClass: 'rc-settle-modal',
+          bodyClass: 'rc-settle-body',
+          body: bodyHtml,
+          foot: footHtml,
+          onMount: wireSettle,
+        });
+        if (settle && settle.el) {
+          const ov = settle.el;
+          const markClosed = () => { window.__rsSettleModalOpen = false; };
+          ov.addEventListener('click', (e) => {
+            if (e.target === ov) markClosed();
+          });
+          const obs = new MutationObserver(() => {
+            if (!ov.isConnected || !ov.classList.contains('show')) {
+              markClosed();
+              obs.disconnect();
             }
-          };
-
-          // Single Print control: prefers thermal bridge when present, else browser print.
-          // (Previously two buttons often ran the same path — confusing.)
-          const printBtn = modal.querySelector('#rc-print');
-          if (printBtn) {
-            printBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
-                RSOps.printBillThermal(bill);
-              } else {
-                RSPrint(printHtml, 'Receipt ' + bill.no);
-              }
-            };
-          }
-          const waEl = modal.querySelector('#rc-wa');
-          if (waEl) {
-            waEl.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openManualWhatsAppBill(bill);
-            };
-          }
-          const cta = modal.querySelector('#rc-wa-cta');
-          if (cta) {
-            cta.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openGatewayConnectCTA('Link WhatsApp so every bill PDF matches this preview.');
-            };
-          }
-          // Plus = close + new order (POS). Must never throw before close().
-          const newBtn = modal.querySelector('#rc-new');
-          if (newBtn) {
-            newBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              finishSettle({ goPos: true });
-            };
-          }
-          const xBtn = modal.querySelector('.rs-mclose');
-          if (xBtn) {
-            xBtn.addEventListener('click', (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              finishSettle({ goPos: false });
-            }, { once: true });
-          }
-
-          // Soft QR inject: print-safe centered table block (never left/sideways)
-          const injectQr = (qr) => {
-            if (!qr || !modal.isConnected || closed) return;
-            liveQr = qr;
-            printHtml = `<div style="max-width:300px;margin:0 auto">${receiptHTML(bill, qr)}</div>`;
-            const paper = modal.querySelector('#rc-paper');
-            if (!paper || paper.querySelector('.rcp-qr-wrap')) return;
-            const y = mbody ? mbody.scrollTop : 0;
-            const block =
-              (window.RSReceiptEngine && typeof RSReceiptEngine.qrBlockHtml === 'function')
-                ? RSReceiptEngine.qrBlockHtml(qr)
-                : (
-                  '<table class="rcp-qr-wrap" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:14px 0 0;border-collapse:collapse;border-top:1px dashed #8a877c;table-layout:fixed;">' +
-                  '<tr><td align="center" style="width:100%;text-align:center;padding-top:12px;">' +
-                  '<img src="' + qr + '" width="110" height="110" alt="Digital bill QR" crossorigin="anonymous" style="display:block;margin:0 auto;width:110px;height:110px;float:none;" />' +
-                  '<div class="rcp-qr-label" style="display:block;width:100%;text-align:center;font-size:10px;color:#6b6960;margin-top:6px;">Scan to view digital bill</div>' +
-                  '</td></tr></table>'
-                );
-            const footEl = paper.querySelector('.rcp-foot');
-            const holder = document.createElement('div');
-            holder.innerHTML = block.trim();
-            const node = holder.firstElementChild;
-            if (node) {
-              if (footEl) paper.insertBefore(node, footEl);
-              else paper.appendChild(node);
-            }
-            if (mbody) mbody.scrollTop = y;
-          };
-          setTimeout(() => {
-            if (!modal.isConnected || closed) return;
-            generateReceiptQrDataUri(bill).then(injectQr).catch(() => {});
-          }, 600);
-
-          paintBillSettledSync(modal, st0);
-          let ticks = 0;
-          syncTimer = setInterval(() => {
-            ticks += 1;
-            if (closed || ticks > 40 || !modal.isConnected) {
-              try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
-              syncTimer = null;
-              return;
-            }
-            let st = bill.syncStatus || 'synced';
-            try {
-              if (window.RS && Array.isArray(RS.BILLS)) {
-                const hit = RS.BILLS.find((b) => b && (b.no === bill.no || b.id === bill.id || b.orderId === bill.no));
-                if (hit && hit.syncStatus) st = hit.syncStatus;
-              }
-            } catch (_) {}
-            if (!isBillSyncPending(st)) {
-              bill.syncStatus = 'synced';
-              paintBillSettledSync(modal, 'synced');
-              try { if (syncTimer) clearInterval(syncTimer); } catch (_) {}
-              syncTimer = null;
-            } else if (ticks % 2 === 0) {
-              paintBillSettledSync(modal, st);
-            }
-          }, 700);
+          });
+          obs.observe(ov, { attributes: true, attributeFilter: ['class'], childList: true });
         }
-      });
-      // Backdrop / Escape close — clear flag (do not force POS)
-      if (settle && settle.el) {
-        const ov = settle.el;
-        const markClosed = () => { window.__rsSettleModalOpen = false; };
-        ov.addEventListener('click', (e) => {
-          if (e.target === ov) markClosed();
-        });
-        const obs = new MutationObserver(() => {
-          if (!ov.isConnected || !ov.classList.contains('show')) {
-            markClosed();
-            obs.disconnect();
-          }
-        });
-        obs.observe(ov, { attributes: true, attributeFilter: ['class'], childList: true });
       }
     }
 
@@ -1495,6 +1860,7 @@
       if (!checkoutBtn) return;
       // Always leave HTML disabled=false so click handlers run and can toast
       checkoutBtn.disabled = false;
+      delete checkoutBtn.dataset.wasBusy;
       if (ok) {
         checkoutBtn.removeAttribute('aria-disabled');
         checkoutBtn.classList.remove('is-blocked');
@@ -1506,6 +1872,18 @@
         const msg = reason || 'Cannot Print & Pay yet';
         checkoutBtn.dataset.blockReason = msg;
         checkoutBtn.title = msg;
+      }
+    }
+
+    /** Live cart line count — prefer totals, fall back to getCart (avoids stuck grey button). */
+    function liveCartCount(totals) {
+      const fromTotals = totals && Number(totals.count);
+      if (Number.isFinite(fromTotals) && fromTotals > 0) return fromTotals;
+      try {
+        const lines = (typeof RS.getCart === 'function' && RS.getCart()) || [];
+        return lines.reduce((a, c) => a + (Number(c.qty) || 0), 0);
+      } catch (_) {
+        return Number.isFinite(fromTotals) ? fromTotals : 0;
       }
     }
 
@@ -1545,9 +1923,10 @@
       const received = Number(receivedInput.value) || 0;
       const change = Math.max(0, received - totals.grand);
       changeEl.textContent = RS.rs(change);
+      const itemCount = liveCartCount(totals);
 
       if (checkoutBtn) {
-        if (totals.count < 1) {
+        if (itemCount < 1) {
           setCheckoutGate(false, 'Add items to the cart before Print & Pay');
         } else if (paymentState.method === 'Cash' && received < totals.grand) {
           // Keep clickable so we can explain — never silently dead
@@ -1585,10 +1964,11 @@
       const money = (n) => (typeof RS.rs === 'function' ? RS.rs(n) : '₹' + Number(n || 0));
       totalText.textContent = `Paid: ${money(totalPaid)}`;
 
+      const splitCount = liveCartCount(totals);
       if (remaining === 0 || Math.abs(remaining) < 0.005) {
         statusText.textContent = 'Balanced!';
         statusText.style.color = '#25d366';
-        if (totals.count < 1) setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+        if (splitCount < 1) setCheckoutGate(false, 'Add items to the cart before Print & Pay');
         else setCheckoutGate(true, '');
         [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
       } else if (remaining > 0) {
@@ -1604,7 +1984,7 @@
         if (cash >= overpaid) {
           statusText.textContent = `Change Due: ${money(overpaid)}`;
           statusText.style.color = '#25d366';
-          if (totals.count < 1) setCheckoutGate(false, 'Add items to the cart before Print & Pay');
+          if (splitCount < 1) setCheckoutGate(false, 'Add items to the cart before Print & Pay');
           else setCheckoutGate(true, '');
           [splitCash, splitUpi, splitCard, splitDue].forEach(i => i.style.borderColor = '');
         } else {
@@ -2085,7 +2465,8 @@
       if(!checkoutBtn) return;
       document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.classList.toggle('active', btn.dataset.payMethod === paymentState.method));
       if(note) note.textContent = paymentState.method;
-      if (totals.count < 1) {
+      const itemCount = liveCartCount(totals);
+      if (itemCount < 1) {
         setCheckoutGate(false, 'Add items to the cart before Print & Pay');
       } else {
         setCheckoutGate(true, '');
@@ -2416,6 +2797,15 @@
         if (checkoutBtn) {
           checkoutBtn.disabled = true;
           checkoutBtn.dataset.wasBusy = '1';
+          checkoutBtn.classList.add('is-settling');
+        }
+        // One settle card: real cart lines → morph to receipt (10/10)
+        let settleShell = null;
+        let settleHandedOff = false;
+        try {
+          settleShell = openSettleShell(checkoutBtn, totals);
+        } catch (skelErr) {
+          console.warn('[checkout] settle shell', skelErr);
         }
 
         let dueAmount = 0;
@@ -2592,11 +2982,29 @@
           RS.toast('Bill kept on this device. Will sync when online.', 'fa-cloud-arrow-up');
         }
 
-        // 2) Only now clear cart + show receipt (cart was held until durable write path ran)
-        RS.clearCart();
-        resetCustomerFields();
-        resetPayment();
-        showReceipt(bill);
+        // 2) Min skeleton time, then morph same card → real Bill settled
+        try {
+          if (settleShell && settleShell.waitMin) await settleShell.waitMin();
+        } catch (_) {}
+        try {
+          await showReceipt(bill, { shell: settleShell });
+          settleHandedOff = !!(settleShell && settleShell.handedOff);
+        } catch (showErr) {
+          console.warn('[checkout] showReceipt', showErr);
+          if (settleShell && settleShell.setError) {
+            settleShell.setError((showErr && showErr.message) || 'Could not open receipt', {
+              onRetry: function () { try { checkout(); } catch (e) {} },
+            });
+            settleHandedOff = true;
+          } else {
+            throw showErr;
+          }
+        }
+        requestAnimationFrame(() => {
+          try { RS.clearCart(); } catch (_) {}
+          try { resetCustomerFields(); } catch (_) {}
+          try { resetPayment(); } catch (_) {}
+        });
         document.dispatchEvent(new CustomEvent('rs:bill-paid', {
           detail: {
             total: bill.grand || bill.amount || '',
@@ -2736,9 +3144,22 @@
         })();
         } finally {
           checkoutInFlight = false;
+          try {
+            if (settleShell) {
+              if (settleHandedOff) {
+                if (settleShell.restoreButton) settleShell.restoreButton();
+              } else if (settleShell.cleanupIfNeeded) {
+                settleShell.cleanupIfNeeded();
+              } else if (settleShell.forceClose) {
+                settleShell.forceClose();
+              }
+            }
+          } catch (_) {}
           // Button re-enabled by cart refresh when items added; force clear busy flag
           if (checkoutBtn) {
             delete checkoutBtn.dataset.wasBusy;
+            checkoutBtn.classList.remove('is-settling');
+            checkoutBtn.removeAttribute('aria-busy');
             try {
               const t = RS.getTotals && RS.getTotals();
               if (t && t.count > 0) setCheckoutGate(true, '');

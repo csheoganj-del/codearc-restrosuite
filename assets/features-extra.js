@@ -1012,7 +1012,15 @@
       period = period || 'Last 30 days';
       const days = anDays(period);
       const sec = $('#analytics-tab');
-      sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics...</div></div>';
+      try {
+        if (window.RSSkel && RSSkel.reportsDash) {
+          RSSkel.paint(sec, RSSkel.reportsDash({ stats: 4 }));
+        } else {
+          sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics...</div></div>';
+        }
+      } catch (_) {
+        sec.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px"></i><div style="margin-top:12px;font-size:13px">Loading analytics...</div></div>';
+      }
 
       RS_DB.list('bills').then(function(allBills){
         const d = buildAnalytics(allBills||[], days);

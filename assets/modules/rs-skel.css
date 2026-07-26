@@ -1,0 +1,121 @@
+/* ============================================================
+   RestroSuite — RSSkel shared shimmer surfaces
+   ============================================================ */
+
+.rs-skel-host {
+  pointer-events: none;
+  user-select: none;
+}
+
+.rs-skel-bar {
+  display: block;
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.09) 42%,
+    rgba(0, 0, 0, 0.05) 80%
+  );
+  background-size: 220% 100%;
+  animation: rs-skel-shimmer 1.1s ease-in-out infinite;
+}
+.rs-skel-bar.short { height: 9px; opacity: 0.9; }
+.rs-skel-bar.w25 { width: 25%; }
+.rs-skel-bar.w35 { width: 35%; }
+.rs-skel-bar.w40 { width: 40%; }
+.rs-skel-bar.w45 { width: 45%; }
+.rs-skel-bar.w50 { width: 50%; }
+.rs-skel-bar.w55 { width: 55%; }
+.rs-skel-bar.w60 { width: 60%; }
+.rs-skel-bar.w65 { width: 65%; }
+.rs-skel-bar.w70 { width: 70%; }
+.rs-skel-bar.w80 { width: 80%; }
+
+.rs-skel-cell { padding: 4px 0; min-width: 48px; }
+.rs-skel-row td { vertical-align: middle; }
+
+.rs-skel-card {
+  opacity: 0.92;
+}
+.rs-skel-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.rs-skel-card-block {
+  border: 1px solid var(--stroke-2, rgba(0, 0, 0, 0.08));
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--panel, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@keyframes rs-skel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rs-skel-bar {
+    animation: none !important;
+    background: rgba(0, 0, 0, 0.07);
+  }
+}
+
+/* Floor tiles skeleton */
+.rs-skel-floor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 4px 0 12px;
+}
+.rs-skel-floor-tile {
+  border: 1px solid var(--stroke-2, rgba(0, 0, 0, 0.08));
+  border-radius: 14px;
+  padding: 14px 12px;
+  background: var(--panel, #fff);
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Reports skeleton */
+.rs-skel-reports { display: flex; flex-direction: column; gap: 16px; }
+.rs-skel-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.rs-skel-stat-card {
+  border: 1px solid var(--stroke-2, rgba(0, 0, 0, 0.08));
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--panel, #fff);
+}
+.rs-skel-report-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.rs-skel-panel {
+  border: 1px solid var(--stroke-2, rgba(0, 0, 0, 0.08));
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--panel, #fff);
+}
+
+/* Dark theme: slightly brighter shimmer */
+[data-theme="dark"] .rs-skel-bar,
+html.dark .rs-skel-bar {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 42%,
+    rgba(255, 255, 255, 0.05) 80%
+  );
+  background-size: 220% 100%;
+}

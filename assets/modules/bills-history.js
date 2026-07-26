@@ -1680,6 +1680,9 @@
   function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
     if (!body) return;
+    try {
+      if (window.RSSkel && RSSkel.clear) RSSkel.clear(body);
+    } catch (_) {}
 
     if (!filtered.length) {
       const q = ($('#bills-search') && $('#bills-search').value) || '';
@@ -1805,6 +1808,21 @@
 
   function renderBills() {
     const BILLS = getBills();
+    // Pre-hydrate + no local rows → skeleton (never blank hang)
+    try {
+      if (
+        window.RSSkel &&
+        typeof RSSkel.shouldShow === 'function' &&
+        RSSkel.shouldShow(BILLS && BILLS.length > 0)
+      ) {
+        const body = $('#bills-table-body');
+        if (body && RSSkel.billsTable) {
+          RSSkel.paint(body, RSSkel.billsTable({ rows: 7 }));
+        }
+        return;
+      }
+    } catch (_) {}
+
     // Stats always match the active date range (before search/pay/status filters)
     const ranged = BILLS.filter(billInDateRange);
     const paidBills = ranged.filter((b) => String(b.status || '').toLowerCase() === 'paid');
@@ -2039,6 +2057,13 @@
   }
   if (global.RS) attachToRS();
   document.addEventListener('rs:ready', attachToRS);
+  // After first data hydrate: replace skeleton with real bills (or true empty)
+  document.addEventListener('rs:hydrated', () => {
+    try {
+      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      renderBills();
+    } catch (_) {}
+  });
   // Late-bind export if bills tab mounts after ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
