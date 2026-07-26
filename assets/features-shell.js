@@ -1044,7 +1044,7 @@
             <div></div>
           </div>
           ${toggle('Service charge','Add service charge on dine-in orders',false)}
-          <div class="form-grid-2" style="margin-top:10px">${field('Service charge %','5','e.g. 5 or 10')}<div></div></div>
+          <div class="form-grid-2" style="margin-top:10px">${field('Service charge pct','5','e.g. 5 or 10')}<div></div></div>
           ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
           ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice (tax shops only)',false)}
           ${toggle('Inclusive pricing','Menu prices already include tax',false)}`) +

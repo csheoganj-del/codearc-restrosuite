@@ -1,16 +1,14 @@
 {
-  "version": "v217-20260726-settle-skel-tabs",
+  "version": "v218-20260726-tax-shift-toggles",
   "date": "2026-07-26",
-  "title": "Shift-first billing + clear action guides",
-  "summary": "Print and Pay, Hold, refunds, and cash drawer now require an open shift and explain why when blocked. After this update, staff see a short guide of what changed.",
+  "title": "Live update v218-20260726-tax-shift-toggles",
+  "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
   "highlights": [
-    "Open shift first: Print and Pay shows a clear modal when shift is closed (Open shift CTA)",
-    "Hold and Void/Refund use the same shift gate so Z-report stays accurate",
-    "Cash drawer and pay-in/pay-out also prompt to open shift instead of failing silently",
-    "Print and Pay explains empty cart, short cash, and unbalanced split - no dead button",
-    "After update install: Whats New + optional 4-step tour of shift and billing UX"
+    "Automatic content release v218-20260726-tax-shift-toggles",
+    "Desktop EXE picks this up via content updater (no new installer required)",
+    "Restart RestroSuite after Update now if prompted"
   ],
-  "tour": "shift-ux",
-  "contentStamp": "16acdd77ab0a",
-  "buildId": "16acdd77ab0a"
+  "tour": "settle-skel-tabs",
+  "contentStamp": "def0040b42b9",
+  "buildId": "def0040b42b9"
 }

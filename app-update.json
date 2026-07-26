@@ -1,16 +1,14 @@
 {
-  "version": "v217-20260726-settle-skel-tabs",
+  "version": "v218-20260726-tax-shift-toggles",
   "date": "2026-07-26",
-  "title": "Settle shell, system skeletons, faster tabs",
-  "summary": "Print & Pay settles on one card with a live skeleton, main screens show loading skeletons instead of hanging, and tab switches paint first so the cursor no longer freezes 2–3s. Desktop content updater also gets automatic version bumps on every deploy.",
+  "title": "Live update v218-20260726-tax-shift-toggles",
+  "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
   "highlights": [
-    "Print & Pay: Settling… + same-card morph into Bill settled (no blank hang)",
-    "RSSkel loading shapes on Bills, Kitchen, QR, Floor, Inventory, Menu, Reports, Customers",
-    "Tab switch paints immediately, then loads modules — no frozen hand cursor",
-    "Single shared cart path (no dual empty-cart Print & Pay bug)",
-    "Every production deploy auto-bumps content version so installed EXE can pull UI updates"
+    "Automatic content release v218-20260726-tax-shift-toggles",
+    "Desktop EXE picks this up via content updater (no new installer required)",
+    "Restart RestroSuite after Update now if prompted"
   ],
   "tour": "settle-skel-tabs",
-  "contentStamp": "16acdd77ab0a",
-  "buildId": "16acdd77ab0a"
+  "contentStamp": "def0040b42b9",
+  "buildId": "def0040b42b9"
 }

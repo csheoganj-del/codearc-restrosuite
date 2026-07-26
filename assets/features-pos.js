@@ -791,12 +791,19 @@
         }
         y += 7.5;
 
-        // Sub lines (address, phone, etc.)
+        // Sub lines (address, phone, etc.) — tax IDs only when Calculate taxes is ON
+        const taxesOnHeader =
+          typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_calculate_taxes === true ||
+              window.RS_SETTINGS?.set_calculate_taxes === 'true';
         const subLinesData = [
           receiptProfile.address,
           receiptProfile.phone ? 'Phone ' + receiptProfile.phone : '',
-          (country === 'IN' && profile.state_code) ? 'State Code: ' + profile.state_code : '',
-          profile.tax_registration_no ? (profile.tax_system || 'GST') + ' No: ' + profile.tax_registration_no : ''
+          (taxesOnHeader && country === 'IN' && profile.state_code) ? 'State Code: ' + profile.state_code : '',
+          (taxesOnHeader && profile.tax_registration_no)
+            ? (profile.tax_system || 'GST') + ' No: ' + profile.tax_registration_no
+            : ''
         ].filter(Boolean);
 
         setFont('normal', 8.5); // matches 11px
@@ -849,9 +856,14 @@
         bill.items.forEach(i => {
           const catLabel  = i.taxCategory || i.tax_category;
           const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
-          
+          const taxesOnItem =
+            typeof window.RS_featureOn === 'function'
+              ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false)
+              : window.RS_SETTINGS?.set_calculate_taxes === true ||
+                window.RS_SETTINGS?.set_calculate_taxes === 'true';
+
           const qtyStr = `${i.qty}\u00d7 `;
-          const nameStr = i.name + (isIreland ? ` (${rateLabel})` : '');
+          const nameStr = i.name + (taxesOnItem && isIreland ? ` (${rateLabel})` : '');
           const priceStr = rs(i.price * i.qty);
 
           const actualDoc = doc || new jsPDF();
@@ -953,24 +965,82 @@
           y += 5.5;
         });
 
-        // Tax breakdown
-        if (profile.gst_scheme === 'composition' && country === 'IN') {
-          setFont('italic', 8.2);
-          colorMuted();
-          const msg = 'Composition taxable person, not eligible to collect tax';
-          const actualDoc = doc || new jsPDF();
-          const scLines = actualDoc.splitTextToSize(msg, CW);
-          scLines.forEach(sl => {
-            if (!isMeasurePass) {
-              doc.text(sl, W / 2, y + 3, { align: 'center' });
-            }
-            y += 4.5;
-          });
-        } else {
-          const summary = bill.taxSummary || [];
-          if (summary.length > 0) {
-            drawHrThin();
-            if (country === 'IN') {
+        // Tax breakdown — only when Settings → Calculate taxes is ON
+        const taxesOnPdf =
+          typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_calculate_taxes === true ||
+              window.RS_SETTINGS?.set_calculate_taxes === 'true';
+        const hsnOnPdf =
+          taxesOnPdf &&
+          (typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_show_hsn_codes === true ||
+              window.RS_SETTINGS?.set_show_hsn_codes === 'true');
+        if (taxesOnPdf) {
+          if (profile.gst_scheme === 'composition' && country === 'IN') {
+            setFont('italic', 8.2);
+            colorMuted();
+            const msg = 'Composition taxable person, not eligible to collect tax';
+            const actualDoc = doc || new jsPDF();
+            const scLines = actualDoc.splitTextToSize(msg, CW);
+            scLines.forEach(sl => {
+              if (!isMeasurePass) {
+                doc.text(sl, W / 2, y + 3, { align: 'center' });
+              }
+              y += 4.5;
+            });
+          } else {
+            const summary = bill.taxSummary || [];
+            const hasTax =
+              Number(bill.gst) > 0 || summary.some((b) => Number(b && b.tax) > 0);
+            if (hasTax && summary.length > 0) {
+              drawHrThin();
+              if (country === 'IN') {
+                setFont('normal', 9.4);
+                colorInk();
+                const halfGst = Math.round((bill.gst || 0) / 2);
+                const gstLines = [
+                  { left: 'CGST (2.5%)', right: rs(halfGst) },
+                  { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
+                ];
+                gstLines.forEach(row => {
+                  if (!isMeasurePass) {
+                    doc.text(row.left, PAD, y + 4);
+                    doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+                  }
+                  y += 5.5;
+                });
+
+                if (hsnOnPdf) {
+                  setFont('normal', 8.2);
+                  colorMuted();
+                  if (!isMeasurePass) {
+                    doc.text('SAC 9963', PAD, y + 3);
+                  }
+                  y += 4.5;
+                }
+              } else {
+                setFont('bold', 8.2);
+                colorMuted();
+                if (!isMeasurePass) {
+                  doc.text('VAT Breakout', PAD, y + 3);
+                }
+                y += 4.5;
+
+                setFont('normal', 8.2);
+                summary.forEach(band => {
+                  const leftText = 'Rate ' + band.percent + '%';
+                  const rightText = 'Net ' + rs(band.net) + ' | VAT ' + rs(band.tax);
+                  if (!isMeasurePass) {
+                    doc.text(leftText, PAD, y + 3);
+                    doc.text(rightText, W - PAD, y + 3, { align: 'right' });
+                  }
+                  y += 4.5;
+                });
+              }
+            } else if (bill.gst > 0) {
+              drawHrThin();
               setFont('normal', 9.4);
               colorInk();
               const halfGst = Math.round((bill.gst || 0) / 2);
@@ -985,48 +1055,7 @@
                 }
                 y += 5.5;
               });
-              
-              setFont('normal', 8.2);
-              colorMuted();
-              if (!isMeasurePass) {
-                doc.text('SAC 9963', PAD, y + 3);
-              }
-              y += 4.5;
-            } else {
-              setFont('bold', 8.2);
-              colorMuted();
-              if (!isMeasurePass) {
-                doc.text('VAT Breakout', PAD, y + 3);
-              }
-              y += 4.5;
-
-              setFont('normal', 8.2);
-              summary.forEach(band => {
-                const leftText = 'Rate ' + band.percent + '%';
-                const rightText = 'Net ' + rs(band.net) + ' | VAT ' + rs(band.tax);
-                if (!isMeasurePass) {
-                  doc.text(leftText, PAD, y + 3);
-                  doc.text(rightText, W - PAD, y + 3, { align: 'right' });
-                }
-                y += 4.5;
-              });
             }
-          } else if (bill.gst > 0) {
-            drawHrThin();
-            setFont('normal', 9.4);
-            colorInk();
-            const halfGst = Math.round((bill.gst || 0) / 2);
-            const gstLines = [
-              { left: 'CGST (2.5%)', right: rs(halfGst) },
-              { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
-            ];
-            gstLines.forEach(row => {
-              if (!isMeasurePass) {
-                doc.text(row.left, PAD, y + 4);
-                doc.text(row.right, W - PAD, y + 4, { align: 'right' });
-              }
-              y += 5.5;
-            });
           }
         }
 

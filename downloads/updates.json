@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-07-26T14:22:26.443Z",
+  "generatedAt": "2026-07-26T14:34:00.299Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v217-20260726-settle-skel-tabs",
-    "title": "Settle shell, system skeletons, faster tabs",
-    "summary": "Print & Pay settles on one card with a live skeleton, main screens show loading skeletons instead of hanging, and tab switches paint first so the cursor no longer freezes 2–3s. Desktop content updater also gets automatic version bumps on every deploy.",
+    "version": "v218-20260726-tax-shift-toggles",
+    "title": "Live update v218-20260726-tax-shift-toggles",
+    "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {

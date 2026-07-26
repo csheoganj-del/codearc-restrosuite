@@ -792,14 +792,21 @@ function renderCart(){
     metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty">Pts <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
   }
   
-  if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
-    metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
-  } else {
-    const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
-    metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+  // Hide Tax/GST cart line when Calculate taxes is OFF (was always showing ₹0 GST)
+  const taxesOn =
+    typeof global.RS_featureOn === 'function'
+      ? global.RS_featureOn('set_calculate_taxes', settings, false)
+      : settings.set_calculate_taxes === true || settings.set_calculate_taxes === 'true';
+  if (taxesOn) {
+    if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
+      metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
+    } else if (Number(totals.gst) > 0 || taxesOn) {
+      const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
+      metaHTML += `<span title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
+    }
   }
-  
-  if (totals.liquorTax > 0) {
+
+  if (taxesOn && totals.liquorTax > 0) {
     metaHTML += `<span title="Liquor tax">Liquor <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
   }
   
@@ -1310,8 +1317,10 @@ function getTotals(){
     totalGst += item.tax;
     totalLiquorTax += item.liquorTax;
     totalTaxableValue += item.lineTaxableValue;
-    
-    if (item.tax > 0 || item.liquorTax > 0 || item.taxPercent >= 0) {
+
+    // Only build tax bands when taxes are ON and there is actual tax/VAT.
+    // Old bug: `taxPercent >= 0` always true → empty CGST/SGST/SAC on every receipt.
+    if (calculateTaxesEnabled && (item.tax > 0 || item.liquorTax > 0)) {
       const key = item.rateCode;
       if (!bandMap[key]) {
         bandMap[key] = {
@@ -1330,15 +1339,17 @@ function getTotals(){
     }
   });
   
-  const taxSummary = Object.values(bandMap).map(b => ({
-    rateCode: b.rateCode,
-    label: b.label,
-    percent: Number(b.percent.toFixed(2)),
-    net: Number(b.net.toFixed(2)),
-    tax: Number(b.tax.toFixed(2)),
-    gross: Number(b.gross.toFixed(2)),
-    itcAllowed: b.itcAllowed
-  }));
+  const taxSummary = calculateTaxesEnabled
+    ? Object.values(bandMap).map(b => ({
+        rateCode: b.rateCode,
+        label: b.label,
+        percent: Number(b.percent.toFixed(2)),
+        net: Number(b.net.toFixed(2)),
+        tax: Number(b.tax.toFixed(2)),
+        gross: Number(b.gross.toFixed(2)),
+        itcAllowed: b.itcAllowed
+      }))
+    : [];
   
   let cgst = 0;
   let sgst = 0;

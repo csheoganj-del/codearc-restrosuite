@@ -90,6 +90,31 @@
     }
   }
 
+  function featureOn(key, fallback) {
+    try {
+      const settings = global.RS_SETTINGS || {};
+      if (typeof global.RS_featureOn === 'function') {
+        return !!global.RS_featureOn(key, settings, fallback);
+      }
+      const v = settings[key];
+      if (v === true || v === 'true' || v === 1 || v === '1') return true;
+      if (v === false || v === 'false' || v === 0 || v === '0') return false;
+      return !!fallback;
+    } catch (_) {
+      return !!fallback;
+    }
+  }
+
+  /** Settings → Calculate taxes (default OFF for simple cafés). */
+  function taxesEnabled() {
+    return featureOn('set_calculate_taxes', false);
+  }
+
+  /** Settings → Show HSN codes (only when taxes are on). */
+  function showHsnCodes() {
+    return taxesEnabled() && featureOn('set_show_hsn_codes', false);
+  }
+
   function getOutletProfile(override) {
     if (override && (override.name || override.address)) return override;
     const settings = global.RS_SETTINGS || {};
@@ -193,32 +218,45 @@
       }
     } catch (_) {}
 
+    const taxOn = taxesEnabled();
+    const hsnOn = showHsnCodes();
     const profileLines = [
       outlet.address,
       outlet.phone ? `Phone ${outlet.phone}` : '',
-      (country === 'IN' && tax.state_code) ? `State Code: ${tax.state_code}` : '',
-      (tax.tax_registration_no || outlet.gstin) ? `${taxSystem} No: ${tax.tax_registration_no || outlet.gstin}` : '',
+      // State code / GSTIN only when tax engine is on (simple cafés leave taxes OFF)
+      (taxOn && country === 'IN' && tax.state_code) ? `State Code: ${tax.state_code}` : '',
+      (taxOn && (tax.tax_registration_no || outlet.gstin))
+        ? `${taxSystem} No: ${tax.tax_registration_no || outlet.gstin}`
+        : '',
     ].filter(Boolean).map((line) => `<div class="rcp-sub">${esc(line)}</div>`).join('');
 
     const itemsHTML = m.items.map((i) => {
       const rateLabel = isIreland ? (i.taxCategory === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
       const note = i.note || '';
-      return `<div class="rcp-line"><span><span class="q">${i.qty}x </span>${esc(i.name)}${isIreland ? ` <small style="font-size:10px;color:#6b6960">(${rateLabel})</small>` : ''}${note ? `<div style="font-size:10.5px;color:#6b6960;margin-top:1px">* ${esc(note)}</div>` : ''}</span><span>${$(i.price * i.qty)}</span></div>`;
+      const rateBit = (taxOn && isIreland)
+        ? ` <small style="font-size:10px;color:#6b6960">(${rateLabel})</small>`
+        : '';
+      return `<div class="rcp-line"><span><span class="q">${i.qty}x </span>${esc(i.name)}${rateBit}${note ? `<div style="font-size:10.5px;color:#6b6960;margin-top:1px">* ${esc(note)}</div>` : ''}</span><span>${$(i.price * i.qty)}</span></div>`;
     }).join('');
 
     let taxBreakdownHTML = '';
-    if (tax.gst_scheme === 'composition' && country === 'IN') {
+    if (!taxOn) {
+      taxBreakdownHTML = '';
+    } else if (tax.gst_scheme === 'composition' && country === 'IN') {
       taxBreakdownHTML = `<div class="rcp-line" style="text-align:center;font-size:11px;color:#6b6960;margin-top:6px;font-style:italic;">Composition taxable person, not eligible to collect tax</div>`;
     } else {
       const summary = m.taxSummary || [];
-      if (summary.length > 0) {
+      const hasTax = Number(m.gst) > 0 || summary.some((b) => Number(b && b.tax) > 0);
+      if (hasTax && summary.length > 0) {
         taxBreakdownHTML = `<div style="margin-top:6px;border-top:1px dashed #c9c6bd;padding-top:6px;">`;
         if (country === 'IN') {
           const halfGst = Math.round((m.gst || 0) / 2);
           taxBreakdownHTML += `
             <div class="rcp-line"><span>CGST (2.5%)</span><span>${$(halfGst)}</span></div>
-            <div class="rcp-line"><span>SGST (2.5%)</span><span>${$(m.gst - halfGst)}</span></div>
-            <div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>`;
+            <div class="rcp-line"><span>SGST (2.5%)</span><span>${$(m.gst - halfGst)}</span></div>`;
+          if (hsnOn) {
+            taxBreakdownHTML += `<div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>`;
+          }
         } else {
           taxBreakdownHTML += `<div style="font-size:11px;color:#6b6960;margin-bottom:4px;font-weight:700;">VAT Breakout</div>`;
           summary.forEach((band) => {
@@ -230,13 +268,13 @@
           });
         }
         taxBreakdownHTML += `</div>`;
-      } else if (m.gst > 0) {
+      } else if (Number(m.gst) > 0) {
         const halfGst = Math.round((m.gst || 0) / 2);
         taxBreakdownHTML = country === 'IN'
           ? `
             <div class="rcp-line"><span>CGST (2.5%)</span><span>${$(halfGst)}</span></div>
             <div class="rcp-line"><span>SGST (2.5%)</span><span>${$(m.gst - halfGst)}</span></div>
-            <div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>`
+            ${hsnOn ? '<div class="rcp-sub" style="font-size:10.5px;color:#6b6960;margin-top:2px;">SAC 9963</div>' : ''}`
           : `<div class="rcp-line"><span>Tax</span><span>${$(m.gst)}</span></div>`;
       }
     }
@@ -305,16 +343,18 @@
         : '',
       m.liquorTaxAmount ? `Liquor VAT: ${$(m.liquorTaxAmount)}` : '',
     ];
-    if (tax.gst_scheme === 'composition' && country === 'IN') {
-      lines.push('Composition taxable person, not eligible to collect tax');
-    } else if (m.gst > 0) {
-      const halfGst = Math.round((m.gst || 0) / 2);
-      if (country === 'IN') {
-        lines.push(`CGST (2.5%): ${$(halfGst)}`);
-        lines.push(`SGST (2.5%): ${$(m.gst - halfGst)}`);
-        lines.push('SAC: 9963');
-      } else {
-        lines.push(`Tax: ${$(m.gst)}`);
+    if (taxesEnabled()) {
+      if (tax.gst_scheme === 'composition' && country === 'IN') {
+        lines.push('Composition taxable person, not eligible to collect tax');
+      } else if (m.gst > 0) {
+        const halfGst = Math.round((m.gst || 0) / 2);
+        if (country === 'IN') {
+          lines.push(`CGST (2.5%): ${$(halfGst)}`);
+          lines.push(`SGST (2.5%): ${$(m.gst - halfGst)}`);
+          if (showHsnCodes()) lines.push('SAC: 9963');
+        } else {
+          lines.push(`Tax: ${$(m.gst)}`);
+        }
       }
     }
     lines.push(
