@@ -2231,6 +2231,21 @@
           await (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve());
           // Update RS_SETTINGS immediately with new settings
           window.RS_SETTINGS = SET_STORE;
+          // Re-apply staff tab filters (e.g. lock reports) after toggle change
+          try {
+            if (typeof window.RS_applyLiveRoleUpdate === 'function') {
+              const role = (window.RS_ROLE && window.RS_ROLE.staffRole) ||
+                (window.RS_API && RS_API.session && RS_API.session() && RS_API.session().role) ||
+                sessionStorage.getItem('logged_in_role');
+              const sessTabs = window.RS_API && RS_API.session && RS_API.session()
+                ? RS_API.session().allowed_tabs
+                : null;
+              window.RS_applyLiveRoleUpdate(role, sessTabs);
+            }
+          } catch (_) {}
+          try {
+            if (window.RSOps && typeof RSOps.refresh === 'function') RSOps.refresh();
+          } catch (_) {}
           const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
           if(isCloud){
             RS.toast('Settings saved to cloud','fa-circle-check');

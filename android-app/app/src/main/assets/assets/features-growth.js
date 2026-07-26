@@ -4406,6 +4406,16 @@
 
       const broadcastBtn = $('#btn-crm-broadcast');
       if(broadcastBtn) broadcastBtn.onclick = () => {
+        // Settings → Promotional messages (default OFF)
+        const promoOn =
+          typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_promotional_messages', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_promotional_messages === true ||
+              window.RS_SETTINGS?.set_promotional_messages === 'true';
+        if (!promoOn) {
+          RS.toast('Promotional messages are off — enable in Settings → WhatsApp', 'fa-ban');
+          return;
+        }
         if (!window.RSModal) { RS.toast('Modal module is unavailable', 'fa-circle-exclamation'); return; }
         RSModal.open({ title:'Broadcast to customers', sub:'Compose a WhatsApp message for your customer list', icon:'fa-bullhorn', size:'md',
           body:`<div style="display:flex;flex-direction:column;gap:12px">
@@ -5793,6 +5803,15 @@
                   },
                 });
               } else if (name === 'WhatsApp Campaigns') {
+                const promoOn =
+                  typeof window.RS_featureOn === 'function'
+                    ? window.RS_featureOn('set_promotional_messages', window.RS_SETTINGS, false)
+                    : window.RS_SETTINGS?.set_promotional_messages === true ||
+                      window.RS_SETTINGS?.set_promotional_messages === 'true';
+                if (!promoOn) {
+                  RS.toast('Promotional messages are off — enable in Settings → WhatsApp', 'fa-ban');
+                  return;
+                }
                 const crm = (Array.isArray(RS.CUSTOMERS) && RS.CUSTOMERS.length)
                   ? RS.CUSTOMERS
                   : [];

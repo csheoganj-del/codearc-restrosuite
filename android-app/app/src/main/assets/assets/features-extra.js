@@ -492,16 +492,24 @@
             const halfB2c = Math.round(totalB2cGst / 2);
             csv += `"Delhi",5,${totalB2cTaxable.toFixed(2)},${halfB2c},${totalB2cGst - halfB2c}\n`;
             
-            csv += "\nHSN/SAC Summary (SAC 9963)\nHSN/SAC,Description,UQC,Total Quantity,Total Value,Taxable Value,CGST,SGST\n";
-            let totalVal = 0, totalTaxable = 0, totalGst = 0, totalQty = 0;
-            periodBills.forEach(b => {
-              totalVal += b.amount || b.total || 0;
-              totalTaxable += b.subtotal || 0;
-              totalGst += b.gst || 0;
-              totalQty += b.items || 1;
-            });
-            const halfGst = Math.round(totalGst / 2);
-            csv += `"9963","Restaurant Services","NOS",${totalQty},${totalVal.toFixed(2)},${totalTaxable.toFixed(2)},${halfGst},${totalGst - halfGst}\n`;
+            // Settings → Show HSN codes (default OFF for simple cafés)
+            const showHsn =
+              typeof window.RS_featureOn === 'function'
+                ? window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
+                : window.RS_SETTINGS?.set_show_hsn_codes === true ||
+                  window.RS_SETTINGS?.set_show_hsn_codes === 'true';
+            if (showHsn) {
+              csv += "\nHSN/SAC Summary (SAC 9963)\nHSN/SAC,Description,UQC,Total Quantity,Total Value,Taxable Value,CGST,SGST\n";
+              let totalVal = 0, totalTaxable = 0, totalGst = 0, totalQty = 0;
+              periodBills.forEach(b => {
+                totalVal += b.amount || b.total || 0;
+                totalTaxable += b.subtotal || 0;
+                totalGst += b.gst || 0;
+                totalQty += b.items || 1;
+              });
+              const halfGst = Math.round(totalGst / 2);
+              csv += `"9963","Restaurant Services","NOS",${totalQty},${totalVal.toFixed(2)},${totalTaxable.toFixed(2)},${halfGst},${totalGst - halfGst}\n`;
+            }
             
             csv += "\nSection 9(5) ECO Supplies\nECO GSTIN,Taxable Value,CGST,SGST\n";
             let totalEcoTaxable = 0, totalEcoGst = 0;
@@ -564,19 +572,24 @@
                 samt: (b.gst||0) - Math.round((b.gst||0)/2),
                 pos: profile.state_code || "07"
               })),
-              hsn: {
-                data: [{
-                  num: 1,
-                  hsn_sc: "9963",
-                  desc: "Catering Services",
-                  uqc: "NOS",
-                  qty: totalQty,
-                  val: totalVal,
-                  txval: totalTaxable,
-                  camt: halfGst,
-                  samt: totalGst - halfGst
-                }]
-              }
+              hsn: (typeof window.RS_featureOn === 'function'
+                ? window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
+                : window.RS_SETTINGS?.set_show_hsn_codes === true ||
+                  window.RS_SETTINGS?.set_show_hsn_codes === 'true')
+                ? {
+                    data: [{
+                      num: 1,
+                      hsn_sc: "9963",
+                      desc: "Catering Services",
+                      uqc: "NOS",
+                      qty: totalQty,
+                      val: totalVal,
+                      txval: totalTaxable,
+                      camt: halfGst,
+                      samt: totalGst - halfGst
+                    }]
+                  }
+                : { data: [] }
             };
             
             RS.downloadFile(JSON.stringify(jsonPayload, null, 2), 'application/json', `gstr1-offline-${Date.now()}.json`);

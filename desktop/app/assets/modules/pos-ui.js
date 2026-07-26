@@ -30,6 +30,24 @@
     return (global.RS && Array.isArray(RS.MENU) ? RS.MENU : []) || [];
   }
 
+  /** Settings → Cashier can edit prices (default OFF). Owners/admins always may. */
+  function canCashierEditPrice() {
+    try {
+      const sess = global.RS_API && RS_API.session && RS_API.session();
+      const role = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
+        .toLowerCase()
+        .trim();
+      if (['owner', 'admin', 'superadmin', 'brand_admin', 'manager'].includes(role)) return true;
+      if (typeof global.RS_featureOn === 'function') {
+        return global.RS_featureOn('set_cashier_can_edit_prices', global.RS_SETTINGS, false);
+      }
+      const v = (global.RS_SETTINGS || {}).set_cashier_can_edit_prices;
+      return v === true || v === 'true' || v === 1 || v === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
   /** Calm cart chrome: hide pay/KOT/hold until there is at least one line */
   function updatePosCartChrome(isEmpty) {
     const cartEl = document.querySelector('#pos-tab .pos-cart') || document.querySelector('.pos-cart');
@@ -770,7 +788,7 @@ function renderCart(){
       <div class="cinfo">
         <div class="cn-row">
           <span class="cn">${_e(c.name)}${c.happyHour ? ' <span class="cart-hh">HH</span>' : ''}${noRec ? ' <span class="cart-nr" title="No recipe — stock won\'t move">⚠</span>' : ''}</span>
-          <span class="cp" title="Unit price">${rs(c.price)}${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' <s class="cp-was">' + rs(c.basePrice) + '</s>' : ''}</span>
+          <span class="cp cart-unit-price" data-lk="${_e(lk)}" title="Unit price${canCashierEditPrice() ? ' · tap to edit' : ''}" style="${canCashierEditPrice() ? 'cursor:pointer;text-decoration:underline dotted' : ''}">${rs(c.price)}${c.happyHour && c.basePrice != null && c.basePrice > c.price ? ' <s class="cp-was">' + rs(c.basePrice) + '</s>' : ''}</span>
         </div>
         <div class="cart-portion" role="group" aria-label="Portion size">
           <button type="button" class="cart-p-btn${p===0.5?' active':''}" data-portion="0.5" data-lk="${_e(lk)}" title="Half portion · half stock">½</button>
@@ -797,6 +815,33 @@ function renderCart(){
         e.preventDefault();
         e.stopPropagation();
         setLinePortion(b.getAttribute('data-lk'), b.getAttribute('data-portion'));
+      })
+    );
+    $$('#cart-items .cart-unit-price').forEach((el) =>
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!canCashierEditPrice()) {
+          toast('Price edit is off — enable in Settings → Team', 'fa-lock');
+          return;
+        }
+        const lk = el.getAttribute('data-lk');
+        const line = lk ? cart.find((c) => cartLineKey(c) === lk) : null;
+        if (!line) return;
+        const cur = Number(line.price) || 0;
+        const raw = window.prompt('Unit price for ' + (line.name || 'item'), String(cur));
+        if (raw == null) return;
+        const next = Math.max(0, Math.round((Number(raw) || 0) * 100) / 100);
+        if (!Number.isFinite(next)) {
+          toast('Enter a valid price', 'fa-circle-exclamation');
+          return;
+        }
+        line.price = next;
+        line.fullPrice = next;
+        line.basePrice = next;
+        line.priceOverridden = true;
+        renderCart();
+        toast('Price updated', 'fa-indian-rupee-sign');
       })
     );
     $$('#cart-items .cart-line-note').forEach((b) =>

@@ -361,13 +361,22 @@
       }
     }
 
-    // Always gate with Admin PIN when modal is available (setup on first use if unset)
-    if (global.RSPinModal && typeof RSPinModal.request === 'function') {
-      const ok = await RSPinModal.request(`Void / Refund ${b.no || b.id || 'bill'}`);
-      if (!ok) {
-        toast('Void / refund cancelled — manager PIN required', 'fa-lock');
-        return;
+    // PIN for refunds: Settings → Require PIN for refunds (default ON)
+    try {
+      const pinRequired =
+        typeof global.RS_featureOn === 'function'
+          ? global.RS_featureOn('set_require_pin_for_refunds', global.RS_SETTINGS, true)
+          : global.RS_SETTINGS?.set_require_pin_for_refunds !== false &&
+            global.RS_SETTINGS?.set_require_pin_for_refunds !== 'false';
+      if (pinRequired && global.RSPinModal && typeof RSPinModal.request === 'function') {
+        const ok = await RSPinModal.request(`Void / Refund ${b.no || b.id || 'bill'}`);
+        if (!ok) {
+          toast('Void / refund cancelled — manager PIN required', 'fa-lock');
+          return;
+        }
       }
+    } catch (pinErr) {
+      console.warn('[refund] PIN gate', pinErr);
     }
 
     const reason = await showRefundModal(b);

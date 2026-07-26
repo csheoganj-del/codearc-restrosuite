@@ -2206,7 +2206,19 @@
     if (UNRESTRICTED_ROLES.includes(role)) return null; // null = unrestricted
     const fromSession = (Array.isArray(sessionTabs) && sessionTabs.length)
       ? sessionTabs.map(String) : null;
-    return fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
+    let tabs = fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
+    // Settings → Lock reports for staff (default ON): strip reports/analytics from non-managers
+    try {
+      const lockReports =
+        typeof window.RS_featureOn === 'function'
+          ? window.RS_featureOn('set_lock_reports_for_staff', window.RS_SETTINGS, true)
+          : window.RS_SETTINGS?.set_lock_reports_for_staff !== false &&
+            window.RS_SETTINGS?.set_lock_reports_for_staff !== 'false';
+      if (lockReports && role !== 'manager') {
+        tabs = tabs.filter((t) => t !== 'reports-tab' && t !== 'analytics-tab');
+      }
+    } catch (_) {}
+    return tabs;
   }
   const allowedTabs = resolveAllowedTabs(staffRole, sess && sess.allowed_tabs);
 

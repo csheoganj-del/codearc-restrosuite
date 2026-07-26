@@ -290,10 +290,14 @@
       }
     } catch (_) {}
     if (!opts.always && opts.settingKey) {
-      const s = window.RS_SETTINGS || {};
-      const v = s[opts.settingKey];
-      // Default ON unless explicitly disabled
-      if (v === false || v === 'false' || v === 0 || v === '0') return true;
+      // Plug-and-play: respect Settings PIN-gate toggles (default OFF for most gates)
+      if (typeof window.RS_featureOn === 'function') {
+        if (!window.RS_featureOn(opts.settingKey, window.RS_SETTINGS, false)) return true;
+      } else {
+        const s = window.RS_SETTINGS || {};
+        const v = s[opts.settingKey];
+        if (v === false || v === 'false' || v === 0 || v === '0' || v == null || v === '') return true;
+      }
     }
     return request(label || 'Admin PIN required');
   }

@@ -283,6 +283,36 @@
           }, 400);
         }
         toast('Order ' + (item ? item.tok : '') + ' ready', 'fa-bell');
+        // Settings → Order ready alerts (default OFF)
+        try {
+          const alertsOn =
+            typeof global.RS_featureOn === 'function'
+              ? global.RS_featureOn('set_order_ready_alerts', global.RS_SETTINGS, false)
+              : global.RS_SETTINGS?.set_order_ready_alerts === true ||
+                global.RS_SETTINGS?.set_order_ready_alerts === 'true';
+          if (alertsOn && item) {
+            const phone = String(item.phone || item.customerPhone || '').replace(/\D/g, '');
+            if (phone.length >= 10 && global.RS_API && typeof RS_API.data === 'function') {
+              const outlet =
+                (global.RS_SETTINGS &&
+                  (RS_SETTINGS.set_restaurant_name || RS_SETTINGS.set_outlet_name)) ||
+                'our restaurant';
+              const msg =
+                'Hi! Your order ' +
+                (item.tok || item.orderId || '') +
+                ' is ready at ' +
+                outlet +
+                '. Please collect. Thank you!';
+              RS_API.data({
+                operation: 'gateway_send',
+                phone: phone.length === 10 ? '91' + phone : phone,
+                message: msg,
+              }).catch((e) => console.warn('[kds] order ready WA', e && e.message));
+            }
+          }
+        } catch (waReadyErr) {
+          console.warn('[kds] order ready alert', waReadyErr);
+        }
       })
     );
     $$('#kds-grid [data-eta]').forEach((b) =>

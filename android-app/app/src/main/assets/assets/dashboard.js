@@ -425,8 +425,8 @@
     // Prefer the build tag stamped in dashboard.html (single source of truth per deploy).
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v209-20260716-mobile-license';
+    // Fallback only if HTML failed to set the tag — keep in sync with app-update.json.
+    return 'v216-20260725-shift-ux-guide';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
@@ -2206,7 +2206,19 @@
     if (UNRESTRICTED_ROLES.includes(role)) return null; // null = unrestricted
     const fromSession = (Array.isArray(sessionTabs) && sessionTabs.length)
       ? sessionTabs.map(String) : null;
-    return fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
+    let tabs = fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
+    // Settings → Lock reports for staff (default ON): strip reports/analytics from non-managers
+    try {
+      const lockReports =
+        typeof window.RS_featureOn === 'function'
+          ? window.RS_featureOn('set_lock_reports_for_staff', window.RS_SETTINGS, true)
+          : window.RS_SETTINGS?.set_lock_reports_for_staff !== false &&
+            window.RS_SETTINGS?.set_lock_reports_for_staff !== 'false';
+      if (lockReports && role !== 'manager') {
+        tabs = tabs.filter((t) => t !== 'reports-tab' && t !== 'analytics-tab');
+      }
+    } catch (_) {}
+    return tabs;
   }
   const allowedTabs = resolveAllowedTabs(staffRole, sess && sess.allowed_tabs);
 
