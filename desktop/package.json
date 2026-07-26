@@ -86,12 +86,6 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "icon": "build/icon.ico",
@@ -141,11 +135,13 @@
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "RestroSuite Desktop"
+      "shortcutName": "RestroSuite Desktop",
+      "installerLanguages": ["en_US"],
+      "runAfterFinish": true
     },
     "portable": {
       "artifactName": "RestroSuite-Desktop-${version}-portable.exe"

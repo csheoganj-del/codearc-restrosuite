@@ -425,8 +425,8 @@
     // Prefer the build tag stamped in dashboard.html (single source of truth per deploy).
     const raw = String(window.__RESTROSUITE_ASSET_VERSION__ || '').trim();
     if (raw && /^v\d+/i.test(raw) && !/system\s*patch/i.test(raw)) return raw;
-    // Fallback only if HTML failed to set the tag (should match dashboard.html builtin).
-    return 'v209-20260716-mobile-license';
+    // Fallback only if HTML failed to set the tag — keep in sync with app-update.json.
+    return 'v216-20260725-shift-ux-guide';
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 

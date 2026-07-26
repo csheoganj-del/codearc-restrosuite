@@ -1811,17 +1811,14 @@
               <div class="dl-ic windows"><i class="fa-brands fa-windows" aria-hidden="true"></i></div>
               <div><h3>Windows</h3><div class="platform">Counter PC · desktop</div></div>
             </div>
-            <p>App for the counter PC. Portable runs without install; Setup adds a Start Menu shortcut.</p>
-            <div class="dl-stats" data-dl-stats><span>EXE</span></div>
+            <p>Full installer for the counter PC — Start Menu shortcut, silent auto-updates. Do not use portable EXEs.</p>
+            <div class="dl-stats" data-dl-stats><span>Setup EXE</span></div>
             <div class="dl-actions">
-              <a class="btn btn-primary" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe" data-dl-href data-dl-primary>
-                <i class="fa-solid fa-download" aria-hidden="true"></i> Portable EXE
-              </a>
-              <a class="btn btn-ghost" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe" data-dl-setup>
-                Setup installer
+              <a class="btn btn-primary" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Setup.exe" data-dl-href data-dl-primary data-dl-setup>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download Setup
               </a>
             </div>
-            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Windows may show a safety prompt — click <b>More info → Run anyway</b>.</p>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Windows may show a safety prompt — click <b>More info → Run anyway</b>. Prefer install to <b>Program Files</b> when asked.</p>
           </article>
 
           <article class="dl-card" role="listitem" data-dl-id="mac-dmg" data-dl-platform="mac">
@@ -3570,7 +3567,7 @@
           windows: {
             id: 'windows-exe',
             title: 'You’re on Windows — install the desktop app',
-            sub: 'Portable EXE for the counter PC (Setup optional)',
+            sub: 'Windows Setup installer for the counter PC',
             btn: 'Download Windows app',
             icon: 'fa-brands fa-windows',
             color: '#0078d4'
@@ -3664,9 +3661,10 @@
           items.forEach(function (item) { if (item && item.id) byId[item.id] = item; });
 
           // Alias portable → windows-exe card primary
-          if (byId['windows-portable'] && !byId['windows-exe']) {
-            byId['windows-exe'] = byId['windows-portable'];
+          if (byId['windows-setup']) {
+            byId['windows-exe'] = byId['windows-setup'];
           }
+
 
           Object.keys(byId).forEach(function (id) {
             var item = byId[id];

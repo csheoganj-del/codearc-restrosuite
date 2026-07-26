@@ -329,22 +329,20 @@
           </div>
         </div>
         <p class="ok">Best for main billing / reports PC</p>
-        <div class="stats" data-dl-stats><span>EXE</span></div>
+        <div class="stats" data-dl-stats><span>Setup EXE</span></div>
         <ol>
-          <li>Download <b>Setup</b> (Start Menu) or <b>Portable</b> (run only)</li>
+          <li>Download <b>Setup</b> only (not portable)</li>
           <li>If SmartScreen appears: <b>More info → Run anyway</b></li>
+          <li>Install (default is Program Files) · Start Menu shortcut created</li>
           <li>Sign in with Outlet ID + password · leave <b>Keep me signed in</b> on</li>
           <li>Close window → stays in tray (don’t Sign out overnight)</li>
         </ol>
         <div class="actions">
-          <a class="btn" data-dl-setup href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe">
-            <i class="fa-solid fa-download" aria-hidden="true"></i> Setup installer
-          </a>
-          <a class="btn btn-ghost" data-dl-href data-dl-primary href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe">
-            Portable EXE
+          <a class="btn" data-dl-setup data-dl-href data-dl-primary href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Setup.exe">
+            <i class="fa-solid fa-download" aria-hidden="true"></i> Download Setup
           </a>
         </div>
-        <p class="tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Unsigned free-launch build — code signing later removes the SmartScreen step.</p>
+        <p class="tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Use Setup only — portable EXEs extract to Temp and cause license/update problems.</p>
       </article>
 
       <!-- macOS -->
@@ -624,7 +622,7 @@
             id: 'windows',
             platform: 'windows',
             title: 'You’re on Windows — install the desktop app',
-            sub: 'Setup for Start Menu, or Portable to run immediately',
+            sub: 'Full Setup installer — Start Menu + auto-updates (not portable)',
             btn: 'Download Windows Setup',
             hrefSel: '[data-dl-setup]',
             icon: 'fa-brands fa-windows',

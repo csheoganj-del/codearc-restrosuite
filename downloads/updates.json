@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-07-24T09:45:33.303Z",
+  "generatedAt": "2026-07-26T04:42:33.201Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v215-20260722-scan-cart-floor",
-    "title": "Scanner UI + cart scroll + live table status",
-    "summary": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table.",
+    "version": "v216-20260725-shift-ux-guide",
+    "title": "Shift-first billing + clear action guides",
+    "summary": "Print and Pay, Hold, refunds, and cash drawer now require an open shift and explain why when blocked. After this update, staff see a short guide of what changed.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
@@ -19,14 +19,10 @@
       "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Setup.exe",
       "feedFile": "RestroSuite-2.0.7-x64.exe",
       "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-2.0.7-x64.exe",
-      "size": 85516768,
+      "size": 85517053,
       "sizeLabel": "81.6 MB"
     },
-    "portable": {
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Portable.exe",
-      "size": 85201962,
-      "sizeLabel": "81.3 MB"
-    },
+    "portable": null,
     "mac": {
       "appleSilicon": {
         "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Mac-AppleSilicon.dmg",
@@ -46,6 +42,6 @@
     "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Android.apk",
     "size": 13095416,
     "sizeLabel": "12.5 MB",
-    "notes": "Cleaner staff table scanner (dark viewfinder, no broken oval). Mobile POS cart scrolls inside the sheet. Floor tables go Dining when you add items to a selected table."
+    "notes": "Print and Pay, Hold, refunds, and cash drawer now require an open shift and explain why when blocked. After this update, staff see a short guide of what changed."
   }
 }

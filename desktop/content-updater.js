@@ -74,12 +74,30 @@ function readState() {
 function writeState(obj) {
   try {
     fs.mkdirSync(path.dirname(statePath()), { recursive: true });
+    // Merge with previous state so dismiss flags / origin are not wiped by accident.
+    const prev = readState() || {};
+    const next = Object.assign({}, prev, obj || {});
     // Write without BOM (Node utf8 default). Explicit buffer avoids accidental BOM tools.
-    const body = JSON.stringify(obj, null, 2);
+    const body = JSON.stringify(next, null, 2);
     fs.writeFileSync(statePath(), body, { encoding: 'utf8' });
   } catch (e) {
     console.warn('[content-updater] state write failed', e && e.message);
   }
+}
+
+/** User clicked "Later" — do not re-prompt the same remote version until it changes. */
+function rememberDismissed(version) {
+  if (!version) return;
+  writeState({
+    dismissedVersion: String(version),
+    dismissedAt: new Date().toISOString(),
+  });
+}
+
+function clearDismissed() {
+  const st = readState() || {};
+  if (!st.dismissedVersion) return;
+  writeState({ dismissedVersion: '', dismissedAt: '' });
 }
 
 function readBundledAppUpdate(webRoot) {
@@ -320,43 +338,61 @@ async function applyContentUpdate({ origin, version, files, title }) {
   if (list.length > MAX_FILES) throw new Error('Manifest too large (' + list.length + ' files)');
 
   let done = 0;
+  let failed = 0;
+  const failedPaths = [];
   for (const raw of list) {
     const rel = safeRelPath(typeof raw === 'string' ? raw : raw && raw.path);
     if (!rel) continue;
-    const url = base + '/' + rel.split('/').map(encodeURIComponent).join('/').replace(/%2F/g, '/');
     // encodeURIComponent per segment
     const segs = rel.split('/');
     const fileUrl = base + '/' + segs.map((s) => encodeURIComponent(s)).join('/');
-    const buf = await fetchBuffer(fileUrl, 45000);
-    const dest = path.join(staging, ...segs);
-    ensureDirFor(dest);
-    fs.writeFileSync(dest, buf);
-    done++;
-    if (done % 25 === 0) {
-      console.log('[content-updater] downloaded', done + '/' + list.length);
+    try {
+      const buf = await fetchBuffer(fileUrl, 45000);
+      const dest = path.join(staging, ...segs);
+      ensureDirFor(dest);
+      fs.writeFileSync(dest, buf);
+      done++;
+      if (done % 25 === 0) {
+        console.log('[content-updater] downloaded', done + '/' + list.length);
+      }
+    } catch (e) {
+      // One missing asset must not brick the whole feature update (old bug:
+      // any 404 aborted apply → content-state never advanced → prompt forever).
+      failed++;
+      if (failedPaths.length < 12) failedPaths.push(rel + ' (' + String(e && e.message || e) + ')');
+      console.warn('[content-updater] skip file', rel, e && e.message);
     }
   }
 
-  // Always stamp version into overlay app-update.json if missing
+  if (done < 3) {
+    throw new Error(
+      'Too few files downloaded (' + done + '). Check internet / CDN. ' +
+      (failedPaths[0] || '')
+    );
+  }
+
+  // Always stamp the exact remote version into overlay app-update.json so the
+  // next check sees local === remote even if the remote file was skipped.
   try {
     const auPath = path.join(staging, 'app-update.json');
-    if (!fs.existsSync(auPath)) {
-      fs.writeFileSync(
-        auPath,
-        JSON.stringify(
-          {
-            version: version,
-            date: new Date().toISOString().slice(0, 10),
-            title: title || 'Content update',
-            summary: 'Live UI update applied by RestroSuite Desktop',
-          },
-          null,
-          2
-        ),
-        'utf8'
-      );
+    let au = {
+      version: String(version),
+      date: new Date().toISOString().slice(0, 10),
+      title: title || 'Content update',
+      summary: 'Live UI update applied by RestroSuite Desktop',
+    };
+    if (fs.existsSync(auPath)) {
+      try {
+        au = Object.assign({}, JSON.parse(fs.readFileSync(auPath, 'utf8')), {
+          version: String(version),
+          title: title || au.title,
+        });
+      } catch (_) {}
     }
-  } catch (_) {}
+    fs.writeFileSync(auPath, JSON.stringify(au, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('[content-updater] could not stamp app-update.json', e && e.message);
+  }
 
   // Swap staging → overlay (replace)
   try {
@@ -369,10 +405,52 @@ async function applyContentUpdate({ origin, version, files, title }) {
     title: title || '',
     appliedAt: new Date().toISOString(),
     fileCount: done,
+    failedCount: failed,
     origin: base,
+    dismissedVersion: '',
+    dismissedAt: '',
+    source: 'content-updater',
   });
 
-  return { ok: true, version, fileCount: done, overlay: finalDir };
+  // Mirror into sibling userData folders so dual productName installs stop
+  // re-prompting ("RestroSuite" vs "RestroSuite Desktop").
+  try {
+    syncStateToSiblingUserData(String(version), title, base, done);
+  } catch (e) {
+    console.warn('[content-updater] sibling sync failed', e && e.message);
+  }
+
+  return { ok: true, version, fileCount: done, failedCount: failed, overlay: finalDir };
+}
+
+function syncStateToSiblingUserData(version, title, origin, fileCount) {
+  const cur = app.getPath('userData');
+  const home = path.dirname(cur);
+  const siblings = [
+    path.join(home, 'RestroSuite'),
+    path.join(home, 'RestroSuite Desktop'),
+    path.join(home, 'restrosuite-desktop'),
+  ].filter((p) => path.resolve(p) !== path.resolve(cur) && fs.existsSync(p));
+
+  const payload = {
+    version: String(version),
+    title: title || '',
+    appliedAt: new Date().toISOString(),
+    fileCount: fileCount || 0,
+    origin: origin || '',
+    dismissedVersion: '',
+    source: 'content-updater-mirror',
+  };
+  for (const dir of siblings) {
+    try {
+      const sp = path.join(dir, 'content-state.json');
+      let prev = {};
+      try {
+        prev = JSON.parse(fs.readFileSync(sp, 'utf8'));
+      } catch (_) {}
+      fs.writeFileSync(sp, JSON.stringify(Object.assign({}, prev, payload), null, 2), 'utf8');
+    } catch (_) {}
+  }
 }
 
 async function loadRemoteManifest(origin) {
@@ -449,8 +527,14 @@ async function checkContentUpdate(opts) {
       return _lastStatus;
     }
 
-    // String compare is fine for our vNNN-date-slug scheme when equal means current
-    if (!options.force && remoteVer === localVer) {
+    const localRank = versionRank(localVer);
+    const remoteRank = versionRank(remoteVer);
+    // Need update only when remote is newer (by vNNN) or a different build at
+    // the same rank. Never re-prompt for an *older* remote after a reinstall.
+    const needsUpdate =
+      remoteVer !== localVer && remoteRank >= localRank;
+
+    if (!options.force && !needsUpdate) {
       _lastStatus = { status: 'current', version: localVer, kind: 'content' };
       if (!options.silent) {
         await dialog.showMessageBox(parentWindow(), {
@@ -460,11 +544,28 @@ async function checkContentUpdate(opts) {
           detail:
             `UI version: ${localVer}\n` +
             `App shell: v${app.getVersion()}\n\n` +
-            'Feature updates install from the live site automatically when available.\n' +
+            'Feature updates install from the live site when a newer version ships.\n' +
             'Full Setup builds also receive silent EXE upgrades when a new shell ships.',
           buttons: ['OK'],
         });
       }
+      return _lastStatus;
+    }
+
+    // Same remote already dismissed with "Later" — quiet until version changes
+    const stNow = readState() || {};
+    if (
+      !options.force &&
+      options.silent &&
+      stNow.dismissedVersion &&
+      String(stNow.dismissedVersion) === remoteVer
+    ) {
+      _lastStatus = {
+        status: 'dismissed',
+        version: remoteVer,
+        localVersion: localVer,
+        kind: 'content',
+      };
       return _lastStatus;
     }
 
@@ -478,48 +579,29 @@ async function checkContentUpdate(opts) {
       kind: 'content',
     };
 
-    if (options.silent) {
-      // Quiet background: still prompt so staff know — use non-blocking dialog
-      const r = await dialog.showMessageBox(parentWindow(), {
-        type: 'info',
-        title: 'Update available',
-        message: `RestroSuite ${remoteVer} is available`,
-        detail:
-          `${(remoteUpdate && remoteUpdate.title) || 'New features and fixes'}\n\n` +
-          `${(remoteUpdate && remoteUpdate.summary) || ''}\n\n` +
-          `You have: ${localVer}\n` +
-          'This downloads only the updated screens (not the whole installer). Your bills and login stay safe.',
-        buttons: ['Update now', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      });
-      if (r.response !== 0) return _lastStatus;
-    } else {
-      const r = await dialog.showMessageBox(parentWindow(), {
-        type: 'info',
-        title: 'Update available',
-        message: `RestroSuite ${remoteVer} is available`,
-        detail:
-          `${(remoteUpdate && remoteUpdate.title) || 'New features and fixes'}\n\n` +
-          `${(remoteUpdate && remoteUpdate.summary) || ''}\n\n` +
-          `Installed UI: ${localVer}\n` +
-          'Update now downloads the latest screens from the live server and reloads the app.',
-        buttons: ['Update now', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      });
-      if (r.response !== 0) return _lastStatus;
+    const promptDetail =
+      `${(remoteUpdate && remoteUpdate.title) || 'New features and fixes'}\n\n` +
+      `${(remoteUpdate && remoteUpdate.summary) || ''}\n\n` +
+      `You have: ${localVer}\n` +
+      'This downloads only the updated screens (not the whole installer). Your bills and login stay safe.';
+
+    const r = await dialog.showMessageBox(parentWindow(), {
+      type: 'info',
+      title: 'Update available',
+      message: `RestroSuite ${remoteVer} is available`,
+      detail: promptDetail,
+      buttons: ['Update now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (r.response !== 0) {
+      rememberDismissed(remoteVer);
+      _lastStatus = Object.assign({}, _lastStatus, { status: 'dismissed' });
+      return _lastStatus;
     }
 
-    // Download + apply
-    await dialog.showMessageBox(parentWindow(), {
-      type: 'info',
-      title: 'Downloading update',
-      message: 'Downloading feature update…',
-      detail: 'Please wait. This usually takes under a minute on a normal connection.',
-      buttons: ['OK'],
-    }).catch(() => {});
-
+    // Download + apply (no blocking "OK" dialog mid-flight — that felt broken)
+    console.log('[content-updater] applying', remoteVer, 'from', origin);
     const man = await loadRemoteManifest(origin);
     const files = man.files || [];
     // Ensure app-update.json is always pulled
@@ -532,19 +614,29 @@ async function checkContentUpdate(opts) {
       title: remoteUpdate && remoteUpdate.title,
     });
 
+    clearDismissed();
+
+    // Re-read so UI message matches what was actually banked
+    const banked = localContentVersion(webRoot);
     _lastStatus = {
       status: 'applied',
-      version: remoteVer,
+      version: banked || remoteVer,
       fileCount: result.fileCount,
+      failedCount: result.failedCount || 0,
       kind: 'content',
     };
+
+    const failNote =
+      result.failedCount > 0
+        ? `\n(${result.failedCount} optional files skipped — core update still applied.)\n`
+        : '';
 
     const restart = await dialog.showMessageBox(parentWindow(), {
       type: 'info',
       title: 'Update installed',
       message: `RestroSuite ${remoteVer} is ready`,
       detail:
-        `Updated ${result.fileCount} files.\n\n` +
+        `Updated ${result.fileCount} files.${failNote}\n` +
         'Reload the app window to use the new screens. Your data is safe.',
       buttons: ['Reload now', 'Later'],
       defaultId: 0,

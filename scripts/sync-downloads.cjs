@@ -314,65 +314,48 @@ function main() {
   const portablePublicUrl = winPortableUrl || '/downloads/RestroSuite-Windows-Portable.exe';
   const setupPublicUrl = winSetupUrl || '/downloads/RestroSuite-Windows-Setup.exe';
 
-  if (desk.portableMeta || desk.nsisMeta || winPortableUrl || winSetupUrl) {
-    if (desk.portableMeta || winPortableUrl) {
-      items.push({
-        id: 'windows-portable',
-        kind: 'app',
-        platform: 'Windows',
-        title: 'RestroSuite for Windows (Portable)',
-        blurb: 'Single .exe — no install. Hosted on GitHub Releases (not Vercel) so large files always download.',
-        icon: 'fa-windows',
-        brand: 'brands',
-        version: desktopPkg.version || '2.0.2',
-        filename: 'RestroSuite-Windows-Portable.exe',
-        url: portablePublicUrl,
-        size: desk.portableMeta ? desk.portableMeta.size : (ghRelease.assets && ghRelease.assets.portable && ghRelease.assets.portable.size) || 0,
-        sizeLabel: desk.portableMeta ? desk.portableMeta.sizeLabel : formatBytes((ghRelease.assets && ghRelease.assets.portable && ghRelease.assets.portable.size) || 0),
-        updatedAt: desk.portableMeta ? desk.portableMeta.updatedAt : (ghRelease.generatedAt || null),
-        available: true,
-        host: winPortableUrl ? 'github-releases' : 'local',
-      });
-      console.log('EXE portable →', portablePublicUrl, desk.portableMeta && desk.portableMeta.sizeLabel);
-    }
-    if (desk.nsisMeta || winSetupUrl) {
-      items.push({
-        id: 'windows-setup',
-        kind: 'app',
-        platform: 'Windows',
-        title: 'RestroSuite for Windows (Setup)',
-        blurb: 'Full installer with Start Menu shortcuts. Binary on GitHub Releases; auto-update feed on this site.',
-        icon: 'fa-windows',
-        brand: 'brands',
-        version: desktopPkg.version || '2.0.2',
-        filename: 'RestroSuite-Windows-Setup.exe',
-        url: setupPublicUrl,
-        size: desk.nsisMeta ? desk.nsisMeta.size : (ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0,
-        sizeLabel: desk.nsisMeta ? desk.nsisMeta.sizeLabel : formatBytes((ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0),
-        updatedAt: desk.nsisMeta ? desk.nsisMeta.updatedAt : (ghRelease.generatedAt || null),
-        available: true,
-        host: winSetupUrl ? 'github-releases' : 'local',
-      });
-      console.log('EXE setup    →', setupPublicUrl, desk.nsisMeta && desk.nsisMeta.sizeLabel);
-    }
-    // Backward-compatible id used by older homepage markup
+  // Public catalog: Setup installer only (portable removed — it extracts to TEMP
+  // and causes dual license folders / update loops on shop PCs).
+  if (desk.portableMeta || winPortableUrl) {
+    console.log('Portable build present locally but NOT listed on site (Setup-only policy).');
+  }
+  if (desk.nsisMeta || winSetupUrl) {
+    items.push({
+      id: 'windows-setup',
+      kind: 'app',
+      platform: 'Windows',
+      title: 'RestroSuite for Windows',
+      blurb: 'Full installer (Start Menu + auto-updates). Installs for this PC — use Setup only, not portable.',
+      icon: 'fa-windows',
+      brand: 'brands',
+      version: desktopPkg.version || '2.0.2',
+      filename: 'RestroSuite-Windows-Setup.exe',
+      url: setupPublicUrl,
+      size: desk.nsisMeta ? desk.nsisMeta.size : (ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0,
+      sizeLabel: desk.nsisMeta ? desk.nsisMeta.sizeLabel : formatBytes((ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0),
+      updatedAt: desk.nsisMeta ? desk.nsisMeta.updatedAt : (ghRelease.generatedAt || null),
+      available: true,
+      host: winSetupUrl ? 'github-releases' : 'local',
+    });
+    // Backward-compatible id used by older homepage markup → always Setup now
     items.push({
       id: 'windows-exe',
       kind: 'app',
       platform: 'Windows',
       title: 'RestroSuite for Windows',
-      blurb: 'Portable .exe for counter PCs — no install wizard required. Prefer Setup for silent auto-updates.',
+      blurb: 'Full installer with Start Menu shortcuts and silent auto-updates. Not a portable EXE.',
       icon: 'fa-windows',
       brand: 'brands',
       version: desktopPkg.version || '2.0.2',
-      filename: 'RestroSuite-Windows-Portable.exe',
-      url: portablePublicUrl,
-      size: (desk.portableMeta && desk.portableMeta.size) || (desk.nsisMeta && desk.nsisMeta.size) || 0,
-      sizeLabel: (desk.portableMeta && desk.portableMeta.sizeLabel) || (desk.nsisMeta && desk.nsisMeta.sizeLabel) || '—',
-      updatedAt: (desk.portableMeta && desk.portableMeta.updatedAt) || (desk.nsisMeta && desk.nsisMeta.updatedAt) || null,
+      filename: 'RestroSuite-Windows-Setup.exe',
+      url: setupPublicUrl,
+      size: desk.nsisMeta ? desk.nsisMeta.size : (ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0,
+      sizeLabel: desk.nsisMeta ? desk.nsisMeta.sizeLabel : formatBytes((ghRelease.assets && ghRelease.assets.setup && ghRelease.assets.setup.size) || 0),
+      updatedAt: desk.nsisMeta ? desk.nsisMeta.updatedAt : (ghRelease.generatedAt || null),
       available: true,
-      host: winPortableUrl ? 'github-releases' : 'local',
+      host: winSetupUrl ? 'github-releases' : 'local',
     });
+    console.log('EXE setup    →', setupPublicUrl, desk.nsisMeta && desk.nsisMeta.sizeLabel);
   } else {
     items.push({
       id: 'windows-exe',
@@ -598,6 +581,7 @@ function main() {
       latestMacYml: SITE + '/downloads/desktop/latest-mac.yml',
       host: winSetupUrl || winPortableUrl || macArmUrl || macX64Url ? 'github-releases' : 'local',
       githubRelease: ghRelease.tag || null,
+      // portable omitted from public feed (Setup-only)
       nsis: (desk.nsisMeta || winSetupUrl)
         ? {
             url: setupPublicUrl.startsWith('http') ? setupPublicUrl : SITE + setupPublicUrl,
@@ -607,13 +591,7 @@ function main() {
             sizeLabel: desk.nsisMeta ? desk.nsisMeta.sizeLabel : null,
           }
         : null,
-      portable: (desk.portableMeta || winPortableUrl)
-        ? {
-            url: portablePublicUrl.startsWith('http') ? portablePublicUrl : SITE + portablePublicUrl,
-            size: desk.portableMeta ? desk.portableMeta.size : null,
-            sizeLabel: desk.portableMeta ? desk.portableMeta.sizeLabel : null,
-          }
-        : null,
+      portable: null,
       mac: {
         appleSilicon: macArmPublicUrl
           ? {
@@ -696,8 +674,7 @@ function main() {
       '| `updates.json` | Android + Windows + macOS + web version feed |',
       '| `desktop/latest.yml` | electron-updater (Windows Setup) |',
       '| `desktop/latest-mac.yml` | electron-updater (macOS) |',
-      '| `RestroSuite-Windows-Setup.exe` | Full installer (auto-updates) |',
-      '| `RestroSuite-Windows-Portable.exe` | Portable (prompts download) |',
+      '| `RestroSuite-Windows-Setup.exe` | Full installer (auto-updates) — Setup only |',
       '| `RestroSuite-Mac-AppleSilicon.dmg` | macOS Apple Silicon DMG |',
       '| `RestroSuite-Mac-Intel.dmg` | macOS Intel DMG |',
       '| `RestroSuite-Android.apk` | Android package (in-app update) |',
