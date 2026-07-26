@@ -1,6 +1,15 @@
 // Bump this version on every deploy to force clients to update.
 // Format: restrosuite-shell-vYYYYMMDD
-const CACHE_NAME = "restrosuite-shell-v20260725-1258";
+const CACHE_NAME = "restrosuite-shell-v20260726-reload-loop";
+
+// Allow the page to activate a waiting worker immediately (Reload now).
+self.addEventListener("message", (event) => {
+  try {
+    if (event && event.data && event.data.type === "SKIP_WAITING") {
+      self.skipWaiting();
+    }
+  } catch (_) {}
+});
 const APP_SHELL = [
   // Page URLs (Clean & Extension versions to handle redirects gracefully)
   "/",
