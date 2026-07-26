@@ -324,9 +324,14 @@
   async function markBillRefunded(b) {
     if (!b || b.status === 'refunded') return;
 
-    // Shift required so voids land on the open Z-report (same discipline as Print & Pay)
+    // Shift gate only when Settings → Require open shift is ON (default OFF)
     try {
+      const shiftRequired =
+        global.RSOps &&
+        typeof RSOps.isShiftRequired === 'function' &&
+        RSOps.isShiftRequired();
       const needShift =
+        shiftRequired &&
         global.RSOps &&
         typeof RSOps.getOpenShift === 'function' &&
         !RSOps.getOpenShift();
@@ -334,23 +339,26 @@
         document.documentElement.classList.contains('rs-role-superadmin');
       if (needShift && !isSuper) {
         if (typeof RSOps.promptRequireOpenShift === 'function') {
-          await RSOps.promptRequireOpenShift({
+          const ok = await RSOps.promptRequireOpenShift({
             action: 'void / refund',
             reason:
               'Open a shift before voiding or refunding so the refund is tied to this counter’s Z-report.',
           });
+          if (!ok) return;
         } else {
           toast(
             'Open a shift first (orange Shift button), then void / refund',
             'fa-unlock'
           );
+          return;
         }
-        return;
       }
     } catch (shiftErr) {
       console.warn('[refund] shift gate', shiftErr);
-      toast('Open a shift first, then void / refund', 'fa-unlock');
-      return;
+      if (global.RSOps && typeof RSOps.isShiftRequired === 'function' && RSOps.isShiftRequired()) {
+        toast('Open a shift first, then void / refund', 'fa-unlock');
+        return;
+      }
     }
 
     // Always gate with Admin PIN when modal is available (setup on first use if unset)

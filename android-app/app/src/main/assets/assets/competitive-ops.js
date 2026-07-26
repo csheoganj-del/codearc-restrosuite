@@ -618,6 +618,23 @@
   }
 
   /* ---------------- Shift open / close + Z-report ---------------- */
+  /**
+   * Most simple cafés only bill + print — they do not use float/Z-report.
+   * Settings → Printer: "Require open shift" (default OFF).
+   * When OFF, Print & Pay / Hold / refunds / drawer work without opening a shift.
+   * When ON, staff must open a shift first (float + accurate Z-report).
+   */
+  function isShiftRequired() {
+    try {
+      const s = global.RS_SETTINGS || {};
+      const v = s.set_require_open_shift;
+      // Explicit true / 'true' / 1 only — everything else (missing, false) = OFF
+      return v === true || v === 'true' || v === 1 || v === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
   function getOpenShift() {
     try { return JSON.parse(localStorage.getItem(SHIFT_KEY) || 'null'); } catch (_) { return null; }
   }
@@ -690,6 +707,8 @@
    * Returns true if a shift is open; false after notifying (and optional Open shift CTA).
    */
   function promptRequireOpenShift(opts) {
+    // Simple outlets: shift is optional unless Settings enables it
+    if (!isShiftRequired()) return Promise.resolve(true);
     if (getOpenShift()) return Promise.resolve(true);
     try {
       if (document.documentElement.classList.contains('rs-role-superadmin')) {
@@ -1381,11 +1400,18 @@
       }
       document.getElementById('pos-tab')?.classList.remove('rs-shift-is-closed');
     } else {
+      const mustShift = isShiftRequired();
       bar.classList.add('rs-shift-bar-closed');
       bar.classList.remove('rs-shift-bar-open');
-      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — tap to open">
+      // Optional mode: quiet chip (ghost). Required mode: primary “open shift” CTA.
+      bar.innerHTML = mustShift
+        ? `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — required before billing">
         <span class="rs-shift-dot closed"></span>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Shift</span></button>
+      </div>`
+        : `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="Shift optional — enable in Settings → Printer if you need float / Z-report">
+        <span class="rs-shift-dot closed" style="opacity:.45"></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-open" title="Optional: open shift for float & Z-report"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Shift</span></button>
       </div>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)
@@ -1412,18 +1438,28 @@
           if (f === null) return;
           await openShift(Number(f) || 0);
         };
-      // Cart only shows a one-line open prompt when closed (not the full control strip)
+      // Cart banner only when shift is required (simple cafés should not see "Open shift to bill")
       if (cartHint) {
-        cartHint.hidden = false;
-        cartHint.innerHTML =
-          '<i class="fa-solid fa-unlock"></i> <span>Open shift to bill</span>';
-        cartHint.onclick = () => {
-          const btn = document.getElementById('rs-shift-open');
-          if (btn) btn.click();
-          else op && op.click();
-        };
+        if (mustShift) {
+          cartHint.hidden = false;
+          cartHint.innerHTML =
+            '<i class="fa-solid fa-unlock"></i> <span>Open shift to bill</span>';
+          cartHint.onclick = () => {
+            const btn = document.getElementById('rs-shift-open');
+            if (btn) btn.click();
+            else op && op.click();
+          };
+        } else {
+          cartHint.hidden = true;
+          cartHint.onclick = null;
+        }
       }
-      document.getElementById('pos-tab')?.classList.add('rs-shift-is-closed');
+      // Do not mark POS as blocked when shift is optional
+      if (mustShift) {
+        document.getElementById('pos-tab')?.classList.add('rs-shift-is-closed');
+      } else {
+        document.getElementById('pos-tab')?.classList.remove('rs-shift-is-closed');
+      }
     }
   }
 
@@ -1732,7 +1768,16 @@
     const sales = Number(global.__rsTodaySales) || 0;
     const orders = Number(global.__rsTodayOrders) || 0;
     const shiftOpen = !!global.__rsShiftOpen;
-    const summary = rs(sales) + ' today · ' + orders + ' orders · ' + (shiftOpen ? 'Shift open' : 'Shift closed');
+    const summary =
+      rs(sales) +
+      ' today · ' +
+      orders +
+      ' orders · ' +
+      (isShiftRequired()
+        ? shiftOpen
+          ? 'Shift open'
+          : 'Shift closed'
+        : 'Shift optional');
     tools.innerHTML = `
       <div class="rs-pos-more" id="rs-pos-more">
         <button type="button" class="btn btn-ghost btn-sm rs-pos-more-btn" id="rs-pos-more-toggle" aria-expanded="false" aria-haspopup="true" title="Tools">
@@ -1801,14 +1846,15 @@
 
   function maybePromptOpenShift() {
     try {
+      if (!isShiftRequired()) return;
       if (sessionStorage.getItem('rs_shift_prompted') === '1') return;
       if (getOpenShift()) return;
       const pos = document.getElementById('pos-tab');
       if (!pos || !pos.classList.contains('active')) return;
       sessionStorage.setItem('rs_shift_prompted', '1');
-      // Soft reminder on first POS open — Print & Pay still hard-gates with a modal
+      // Soft reminder only when outlet requires shifts
       setTimeout(() => {
-        if (!getOpenShift()) {
+        if (isShiftRequired() && !getOpenShift()) {
           toast(
             'Shift is closed — open Shift before Print & Pay (float + Z-report)',
             'fa-unlock'
@@ -2003,15 +2049,16 @@
   async function openCashDrawer() {
     try {
       if (
+        isShiftRequired() &&
         !getOpenShift() &&
         !document.documentElement.classList.contains('rs-role-superadmin')
       ) {
-        await promptRequireOpenShift({
+        const ok = await promptRequireOpenShift({
           action: 'open cash drawer',
           reason:
             'Open a shift before kicking the cash drawer so cash activity stays on this counter’s shift.',
         });
-        return { ok: false, error: 'shift_closed' };
+        if (!ok) return { ok: false, error: 'shift_closed' };
       }
     } catch (_) {}
     try {
@@ -2318,6 +2365,7 @@
       openShift,
       closeShift,
       getOpenShift,
+      isShiftRequired,
       promptRequireOpenShift,
       summarizeShift,
       addCashMovement,

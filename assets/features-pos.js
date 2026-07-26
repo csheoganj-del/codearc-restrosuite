@@ -2312,9 +2312,14 @@
         }
       } catch (_) {}
 
-      // Shift required — clear modal + toast (never silent)
+      // Shift gate only when Settings → Require open shift is ON (default OFF)
       try {
+        const shiftRequired =
+          window.RSOps &&
+          typeof RSOps.isShiftRequired === 'function' &&
+          RSOps.isShiftRequired();
         const needShift =
+          shiftRequired &&
           window.RSOps &&
           typeof RSOps.getOpenShift === 'function' &&
           !RSOps.getOpenShift();
@@ -2322,26 +2327,29 @@
           document.documentElement.classList.contains('rs-role-superadmin');
         if (needShift && !isSuper) {
           if (typeof RSOps.promptRequireOpenShift === 'function') {
-            await RSOps.promptRequireOpenShift({
+            const ok = await RSOps.promptRequireOpenShift({
               action: 'Print & Pay',
               reason:
                 'A shift must be open before billing. This keeps cash float, bill list, and Z-report correct for this counter.',
             });
+            if (!ok) return;
           } else {
             RS.toast(
               'Open a shift first (orange Shift button), then Print & Pay',
               'fa-unlock'
             );
             document.getElementById('rs-shift-open')?.click();
+            return;
           }
-          return;
         }
       } catch (shiftErr) {
         console.warn('[checkout] shift gate', shiftErr);
-        return RS.toast(
-          'Open a shift first (orange Shift button), then Print & Pay',
-          'fa-unlock'
-        );
+        if (window.RSOps && typeof RSOps.isShiftRequired === 'function' && RSOps.isShiftRequired()) {
+          return RS.toast(
+            'Open a shift first (orange Shift button), then Print & Pay',
+            'fa-unlock'
+          );
+        }
       }
 
       let totals;
@@ -2931,6 +2939,54 @@
           return;
         }
 
+        // Online = Razorpay Standard Checkout, then settle bill as Online/Razorpay
+        if (payment.method === 'Online') {
+          const grand = Number(totals.grand) || 0;
+          if (grand < 1) {
+            return RS.toast('Amount too small for online payment', 'fa-circle-exclamation');
+          }
+          try {
+            if (!window.RSRazorpay) {
+              await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'assets/razorpay-checkout.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('Could not load Razorpay'));
+                document.head.appendChild(s);
+              });
+            }
+            const custSnap = RS.getCustomer ? RS.getCustomer() : {};
+            RS.toast('Opening online payment…', 'fa-globe');
+            const result = await window.RSRazorpay.payRupees(grand, {
+              name: 'RestroSuite POS',
+              description: 'Bill total · ₹' + grand,
+              purpose: 'pos',
+              prefillName: custSnap.name || '',
+              prefillContact: custSnap.phone || '',
+              notes: {
+                purpose: 'pos',
+                table: custSnap.table || '',
+                tenant: (window.RS_API && RS_API.session && RS_API.session().tenant_slug) || '',
+              },
+            });
+            if (result && result.cancelled) {
+              return RS.toast('Online payment cancelled', 'fa-circle-info');
+            }
+            if (!result || !result.verified) {
+              return RS.toast('Online payment not verified — bill not closed', 'fa-circle-exclamation');
+            }
+            await finalizeBill('Online', grand, 0);
+            RS.toast('Online paid · ' + (result.payment_id || ''), 'fa-circle-check');
+            return;
+          } catch (rzpErr) {
+            console.error('[checkout] online', rzpErr);
+            return RS.toast(
+              (rzpErr && rzpErr.message) || 'Online payment failed',
+              'fa-circle-exclamation'
+            );
+          }
+        }
+
         await finalizeBill(payment.method, totals.grand, 0);
       } catch (err) {
         console.error('[checkout] failed', err);
@@ -3416,9 +3472,14 @@
       const totals = RS.getTotals();
       if(!totals.count) return RS.toast('Nothing to hold — add items first, then Hold', 'fa-circle-exclamation');
 
-      // Same shift discipline as billing: park orders only under an open shift
+      // Hold gate only when Require open shift is ON
       try {
+        const shiftRequired =
+          window.RSOps &&
+          typeof RSOps.isShiftRequired === 'function' &&
+          RSOps.isShiftRequired();
         const needShift =
+          shiftRequired &&
           window.RSOps &&
           typeof RSOps.getOpenShift === 'function' &&
           !RSOps.getOpenShift();
@@ -3426,20 +3487,23 @@
           document.documentElement.classList.contains('rs-role-superadmin');
         if (needShift && !isSuper) {
           if (typeof RSOps.promptRequireOpenShift === 'function') {
-            await RSOps.promptRequireOpenShift({
+            const ok = await RSOps.promptRequireOpenShift({
               action: 'Hold order',
               reason:
                 'Open a shift before holding orders so parked tickets stay on this counter’s shift log.',
             });
+            if (!ok) return;
           } else {
             RS.toast('Open a shift first (orange Shift button), then Hold', 'fa-unlock');
             document.getElementById('rs-shift-open')?.click();
+            return;
           }
-          return;
         }
       } catch (shiftErr) {
         console.warn('[hold] shift gate', shiftErr);
-        return RS.toast('Open a shift first, then Hold', 'fa-unlock');
+        if (window.RSOps && typeof RSOps.isShiftRequired === 'function' && RSOps.isShiftRequired()) {
+          return RS.toast('Open a shift first, then Hold', 'fa-unlock');
+        }
       }
 
       const cust = RS.getCustomer();

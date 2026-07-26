@@ -676,6 +676,10 @@
             ${field('Kitchen station label','Main kitchen','Printed on KOT header')}
           </div>
           <p class="set-hint" style="margin-top:10px">Use two names when counter and kitchen have separate thermals. Leave kitchen blank to use the receipt printer.</p>`) +
+        setBlock('Shift (optional)', 'Most small cafés leave this OFF and just bill + print',
+          `${toggle('Require open shift','When ON, staff must open a shift before Print & Pay, Hold, refunds, and cash drawer. When OFF (default), billing works without shift — open Shift only if you want float and Z-report.',false)}
+          <p class="set-hint" style="margin-top:8px"><b>OFF (recommended for simple outlets):</b> no shift dialog blocking pay.<br>
+          <b>ON:</b> orange Shift button → opening float → end-of-day Z-report. Use for multi-cashier cash control.</p>`) +
         setBlock('Auto-print & drawer', 'When to fire receipts, KOTs, and cash drawer',
           `${toggle('Auto-print receipt','Print automatically after payment when a bridge is connected',false)}
           ${toggle('Auto-print KOT','Print KOT on fire (recommended for kitchen printer mode)',true)}
@@ -860,10 +864,11 @@
         growth: ['Everything in Starter', 'Reports & analytics', 'CRM / customers', 'Up to 15 staff', '8,000 orders / month', 'Priority support'],
         enterprise: ['Everything in Growth', 'Multi-outlet ready', 'Up to 75 staff', 'High order volume', 'Dedicated support', 'Custom rollout help'],
       };
+      // Standard Checkout prices (INR/mo) when SaaS catalogue has no razorpay_plan_id yet
       const FALLBACK_PLANS = [
         { plan_code: 'starter', name: 'Starter', price_monthly: 0, currency: 'INR', max_staff: 5, monthly_order_limit: 300, support_level: 'standard', checkout_available: false },
-        { plan_code: 'growth', name: 'Growth', price_monthly: 0, currency: 'INR', max_staff: 15, monthly_order_limit: 8000, support_level: 'priority', checkout_available: false },
-        { plan_code: 'enterprise', name: 'Enterprise', price_monthly: 0, currency: 'INR', max_staff: 75, monthly_order_limit: 100000, support_level: 'dedicated', checkout_available: false },
+        { plan_code: 'growth', name: 'Growth', price_monthly: 999, currency: 'INR', max_staff: 15, monthly_order_limit: 8000, support_level: 'priority', checkout_available: true, standard_checkout: true },
+        { plan_code: 'enterprise', name: 'Enterprise', price_monthly: 2499, currency: 'INR', max_staff: 75, monthly_order_limit: 100000, support_level: 'dedicated', checkout_available: true, standard_checkout: true },
       ];
 
       const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
@@ -962,10 +967,26 @@
           </div>
         </div>`;
 
+      // Merge fallback prices when remote plans are free / missing checkout
+      plans = plans.map((p) => {
+        const code = String(p.plan_code || '').toLowerCase();
+        const fb = FALLBACK_PLANS.find((x) => x.plan_code === code);
+        if (!fb) return p;
+        const price = Number(p.price_monthly) > 0 ? Number(p.price_monthly) : Number(fb.price_monthly) || 0;
+        const canStd = price > 0 && (p.checkout_available || fb.standard_checkout || fb.checkout_available);
+        return Object.assign({}, p, {
+          price_monthly: price,
+          currency: p.currency || fb.currency || 'INR',
+          checkout_available: !!(p.checkout_available || canStd),
+          standard_checkout: !!(p.standard_checkout || fb.standard_checkout || (canStd && !p.razorpay_plan_id)),
+        });
+      });
+
       const cards = plans.map(p => {
         const code = String(p.plan_code || '').toLowerCase();
         const isCurrent = code === curCode;
-        const canCheckout = !!p.checkout_available && Number(p.price_monthly) > 0 && !isCurrent;
+        const priceMo = Number(p.price_monthly) || 0;
+        const canCheckout = priceMo > 0 && !isCurrent && code !== 'starter';
         const feats = FEATURES[code] || [
           `Up to ${p.max_staff != null ? p.max_staff : '—'} staff`,
           `${(Number(p.monthly_order_limit) || 0).toLocaleString()} orders/mo`,
@@ -975,7 +996,7 @@
         if (isCurrent) {
           cta = `<button type="button" class="btn btn-ghost btn-sm" disabled style="width:100%;opacity:.75"><i class="fa-solid fa-check"></i> Your plan</button>`;
         } else if (canCheckout) {
-          cta = `<button type="button" class="btn btn-primary btn-sm rs-upgrade-btn" data-plan="${esc(p.plan_code)}" style="width:100%"><i class="fa-solid fa-arrow-up"></i> Upgrade to ${esc(p.name)}</button>`;
+          cta = `<button type="button" class="btn btn-primary btn-sm rs-upgrade-btn" data-plan="${esc(p.plan_code)}" data-plan-name="${esc(p.name)}" data-price="${priceMo}" data-currency="${esc(p.currency || 'INR')}" style="width:100%"><i class="fa-solid fa-lock"></i> Pay ${esc(money(priceMo, p.currency || 'INR'))}/mo · ${esc(p.name)}</button>`;
         } else {
           cta = `<button type="button" class="btn btn-ghost btn-sm rs-contact-btn" data-plan="${esc(p.plan_code)}" data-plan-name="${esc(p.name)}" style="width:100%"><i class="fa-solid fa-headset"></i> Request ${esc(p.name)}</button>`;
         }
@@ -1008,6 +1029,21 @@
             <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-copy-id"><i class="fa-solid fa-copy"></i> Copy outlet ID</button>
           </div>
         </div>
+        <div style="margin-top:14px;padding:14px 16px;border:1px dashed color-mix(in srgb,var(--orange) 35%,var(--stroke));border-radius:var(--r-md);background:color-mix(in srgb,var(--orange) 6%,var(--panel))">
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+            <div style="min-width:200px;flex:1">
+              <div style="font-weight:800;font-size:13px"><i class="fa-solid fa-shield-halved" style="color:var(--orange);margin-right:6px"></i>Razorpay Standard Checkout</div>
+              <div style="font-size:12px;color:var(--text-soft);margin-top:4px;line-height:1.5">Secure one-time payment (test mode). Order is created on the server; signature is verified before marking success.</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <label style="font-size:11px;color:var(--text-soft);font-weight:700">₹
+                <input type="number" id="rs-rzp-amount" min="1" step="1" value="1" style="width:72px;margin-left:4px;padding:7px 8px;border-radius:8px;border:1px solid var(--stroke);background:var(--panel);color:var(--text)">
+              </label>
+              <button type="button" class="btn btn-primary btn-sm" id="rs-rzp-pay-btn"><i class="fa-solid fa-lock"></i> Pay with Razorpay</button>
+              <a class="btn btn-ghost btn-sm" href="pay.html" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open pay page</a>
+            </div>
+          </div>
+        </div>
         <p style="font-size:11.5px;color:var(--text-soft);margin-top:12px;line-height:1.6">${esc(footerNote)}</p>`;
 
       container.innerHTML = banner + header + includedBlock +
@@ -1030,19 +1066,85 @@
         }
       });
 
+      const runStandardPlanCheckout = async (planCode, planName, priceInr) => {
+        const api = await ensureRazorpayHelper();
+        const rupees = Math.max(1, Number(priceInr) || 1);
+        const result = await api.payRupees(rupees, {
+          name: 'RestroSuite',
+          description: (planName || planCode) + ' · monthly',
+          purpose: 'plan',
+          prefillName: sess.display_name || sess.username || '',
+          prefillEmail: sess.email || '',
+          prefillContact: sess.phone || '',
+          notes: {
+            purpose: 'plan',
+            plan_code: planCode || '',
+            plan_name: planName || '',
+            tenant: sess.tenant_slug || sess.tenant_id || '',
+            tenant_name: sess.tenant_name || '',
+          },
+          meta: {
+            plan_code: planCode || '',
+            tenant: sess.tenant_slug || sess.tenant_id || '',
+          },
+        });
+        if (result && result.cancelled) {
+          RS.toast('Payment cancelled', 'fa-circle-info');
+          return null;
+        }
+        if (result && result.verified) {
+          try {
+            // Optimistic local plan marker until admin/webhook activates entitlements
+            sessionStorage.setItem('rs_plan_code', planCode || '');
+            sessionStorage.setItem('rs_plan_name', planName || planCode || '');
+            sessionStorage.setItem('rs_subscription_status', 'active');
+            sessionStorage.setItem(
+              'rs_last_plan_payment',
+              JSON.stringify({
+                plan_code: planCode,
+                payment_id: result.payment_id,
+                order_id: result.order_id,
+                at: new Date().toISOString(),
+              })
+            );
+          } catch (_) {}
+          RS.toast(
+            'Paid · ' + (planName || planCode) + ' · ' + (result.payment_id || 'ok'),
+            'fa-circle-check'
+          );
+          setTimeout(() => initPlanPanel(body), 600);
+          return result;
+        }
+        throw new Error('Payment not verified');
+      };
+
       container.querySelectorAll('.rs-upgrade-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const plan = btn.getAttribute('data-plan');
+          const planName = btn.getAttribute('data-plan-name') || plan;
+          const price = Number(btn.getAttribute('data-price')) || 0;
           btn.disabled = true;
           const orig = btn.innerHTML;
           btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting checkout…';
           try {
-            const res = await RS_API.subscribe(plan);
-            if (res && res.short_url) {
-              window.open(res.short_url, '_blank', 'noopener');
-              RS.toast('Complete payment in the new tab to activate your plan.', 'fa-arrow-up-right-from-square');
+            // Prefer legacy subscription short_url when configured
+            if (window.RS_API && typeof RS_API.subscribe === 'function') {
+              try {
+                const res = await RS_API.subscribe(plan);
+                if (res && res.short_url) {
+                  window.open(res.short_url, '_blank', 'noopener');
+                  RS.toast('Complete payment in the new tab to activate your plan.', 'fa-arrow-up-right-from-square');
+                  return;
+                }
+              } catch (subErr) {
+                // Fall through to Standard Checkout
+                console.warn('[plan] subscription checkout unavailable', subErr);
+              }
+            }
+            if (price > 0) {
+              await runStandardPlanCheckout(plan, planName, price);
             } else {
-              throw new Error('Checkout is not available for this plan yet.');
+              throw new Error('No price configured for this plan. Email support to upgrade.');
             }
           } catch (e) {
             RS.toast((e && e.message) || 'Could not start checkout. Email support to upgrade.', 'fa-headset');
@@ -1051,6 +1153,76 @@
             btn.innerHTML = orig;
           }
         });
+      });
+
+      // Razorpay Standard Checkout (one-time pay) — server create-order + verify-payment
+      const ensureRazorpayHelper = () => new Promise((resolve, reject) => {
+        if (window.RSRazorpay && typeof RSRazorpay.openCheckout === 'function') {
+          resolve(window.RSRazorpay);
+          return;
+        }
+        const existing = document.querySelector('script[data-rs-razorpay]');
+        if (existing) {
+          existing.addEventListener('load', () => {
+            window.RSRazorpay ? resolve(window.RSRazorpay) : reject(new Error('Razorpay helper failed to load'));
+          });
+          existing.addEventListener('error', () => reject(new Error('Could not load Razorpay helper')));
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = 'assets/razorpay-checkout.js';
+        s.async = true;
+        s.dataset.rsRazorpay = '1';
+        s.onload = () => {
+          window.RSRazorpay ? resolve(window.RSRazorpay) : reject(new Error('Razorpay helper failed to load'));
+        };
+        s.onerror = () => reject(new Error('Could not load Razorpay helper'));
+        document.head.appendChild(s);
+      });
+
+      container.querySelector('#rs-rzp-pay-btn')?.addEventListener('click', async () => {
+        const btn = container.querySelector('#rs-rzp-pay-btn');
+        const amtEl = container.querySelector('#rs-rzp-amount');
+        const rupees = Math.max(1, Number(amtEl && amtEl.value) || 1);
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Opening…';
+        }
+        try {
+          const api = await ensureRazorpayHelper();
+          const result = await api.payRupees(rupees, {
+            name: 'RestroSuite',
+            description: 'Plan / workspace payment · ₹' + rupees,
+            purpose: 'plan',
+            prefillName: sess.display_name || sess.username || '',
+            prefillEmail: sess.email || '',
+            prefillContact: sess.phone || '',
+            notes: {
+              purpose: 'plan',
+              tenant: sess.tenant_slug || sess.tenant_id || '',
+              source: 'settings_plan_quick_pay',
+            },
+            meta: { tenant: sess.tenant_slug || sess.tenant_id || '' },
+          });
+          if (result && result.cancelled) {
+            RS.toast('Payment cancelled', 'fa-circle-info');
+          } else if (result && result.verified) {
+            RS.toast(
+              'Payment verified · ' + (result.payment_id || 'success'),
+              'fa-circle-check'
+            );
+          } else {
+            RS.toast('Payment not confirmed', 'fa-circle-exclamation');
+          }
+        } catch (e) {
+          RS.toast((e && e.message) || 'Payment failed', 'fa-circle-exclamation');
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+          }
+        }
       });
 
       container.querySelectorAll('.rs-contact-btn').forEach(btn => {
