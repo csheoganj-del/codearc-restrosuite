@@ -2471,7 +2471,7 @@
           const on = input && input.value === selectedKey;
           if (input) input.checked = !!on;
           opt.style.borderColor = on ? 'var(--orange)' : 'var(--stroke-2)';
-          opt.style.background = on ? 'var(--orange-tint, rgba(255,79,0,.08))' : 'var(--glass, #fff)';
+          opt.style.background = on ? 'rgba(255,79,0,.08)' : 'var(--glass, var(--panel, #fff))';
           opt.style.boxShadow = on ? '0 0 0 1px var(--orange)' : 'none';
           opt.setAttribute('aria-checked', on ? 'true' : 'false');
         });
@@ -2479,7 +2479,8 @@
           const meta = staffRoleMeta(selectedKey);
           help.innerHTML = selectedKey
             ? `<i class="fa-solid ${meta.icon}" style="color:${meta.color};margin-right:6px"></i><b>${safe(meta.label)}</b> — ${safe(meta.blurb)}`
-            : '<span style="color:var(--text-mute)">Select a role to see what this person can access.</span>';
+            : 'Select a role to see what this person can access.';
+          help.style.display = selectedKey ? '' : 'none';
         }
       }
 
@@ -2690,45 +2691,95 @@
 
       function openAddStaffModal(loginPane) {
         const defaultPwd = genStaffPassword();
+        // Use system .form-input (dashboard.css) — not bare .form-control
         const body = `
-          <div id="sl-form-root" style="display:flex;flex-direction:column;gap:14px">
-            <div style="font-size:12.5px;color:var(--text-soft);line-height:1.45;padding:10px 12px;border-radius:10px;background:var(--glass);border:1px solid var(--stroke-2)">
-              Creates an <b>app login</b> (username + password). For roster & salary use <b>Directory → Add team member</b>.
+          <style>
+            .sl-form { display:flex; flex-direction:column; gap:16px; }
+            .sl-form .sl-field { display:flex; flex-direction:column; gap:6px; margin:0; }
+            .sl-form .sl-label {
+              font-size:12.5px; font-weight:700; color:var(--text); letter-spacing:-0.01em;
+            }
+            .sl-form .sl-hint { font-size:11.5px; color:var(--text-mute); line-height:1.4; margin:0; }
+            .sl-form .form-input { width:100%; box-sizing:border-box; }
+            .sl-form .sl-input-row { display:flex; gap:8px; align-items:stretch; }
+            .sl-form .sl-input-row .form-input { flex:1; min-width:0; }
+            .sl-form .sl-banner {
+              font-size:12.5px; color:var(--text-soft); line-height:1.45;
+              padding:10px 12px; border-radius:var(--r-sm,10px);
+              background:var(--panel-soft, rgba(0,0,0,.03));
+              border:1px solid var(--stroke-2);
+            }
+            .sl-form .sl-role-grid {
+              display:grid; grid-template-columns:1fr 1fr; gap:8px;
+            }
+            .sl-form .sl-role-opt {
+              display:flex; align-items:center; gap:10px;
+              padding:11px 12px; border-radius:var(--r-sm,10px);
+              border:1.5px solid var(--stroke-2); cursor:pointer;
+              background:var(--glass, var(--panel, #fff));
+              transition:border-color .15s, box-shadow .15s, background .15s;
+              user-select:none;
+            }
+            .sl-form .sl-role-opt:hover { border-color:rgba(255,79,0,.35); }
+            .sl-form .sl-role-help {
+              font-size:12px; color:var(--text-soft); line-height:1.4;
+              padding:8px 10px; border-radius:8px;
+              background:rgba(255,79,0,.06); border:1px solid rgba(255,79,0,.12);
+              min-height:2.4em;
+            }
+            .sl-form .sl-err {
+              color:var(--red); font-size:12.5px; line-height:1.4; display:none;
+              padding:8px 10px; border-radius:8px;
+              background:rgba(220,38,38,.06); border:1px solid rgba(220,38,38,.15);
+            }
+          </style>
+          <div id="sl-form-root" class="sl-form">
+            <div class="sl-banner">
+              Creates an <b>app login</b>. For roster &amp; salary use <b>Directory → Add team member</b>.
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label" for="sl-dname">Display name</label>
-              <input id="sl-dname" class="form-control" placeholder="e.g. Ravi Kumar" autocomplete="name">
+
+            <div class="sl-field">
+              <label class="sl-label" for="sl-dname">Display name</label>
+              <input id="sl-dname" class="form-input" type="text" placeholder="e.g. Ravi Kumar" autocomplete="name">
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label" for="sl-uname">Username <span style="color:var(--text-mute);font-weight:500;font-size:11px">— 3–50 chars · letters, numbers, . _ -</span></label>
-              <input id="sl-uname" class="form-control" placeholder="e.g. ravi.kumar" autocomplete="off" spellcheck="false" style="font-family:ui-monospace,monospace">
-              <div id="sl-uname-hint" style="font-size:11.5px;color:var(--text-mute);margin-top:4px">Staff types this on the login screen with your Outlet ID.</div>
+
+            <div class="sl-field">
+              <label class="sl-label" for="sl-uname">Username</label>
+              <input id="sl-uname" class="form-input" type="text" placeholder="e.g. ravi.kumar" autocomplete="off" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">
+              <p class="sl-hint" id="sl-uname-hint">3–50 characters · letters, numbers, . _ - · used with Outlet ID on login</p>
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label">Role</label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="sl-role-grid" role="radiogroup" aria-label="Staff role">
+
+            <div class="sl-field">
+              <label class="sl-label">Role</label>
+              <div class="sl-role-grid" id="sl-role-grid" role="radiogroup" aria-label="Staff role">
                 ${STAFF_ROLES.map((r, i) => `
-                  <label class="sl-role-opt" role="radio" aria-checked="false" tabindex="0" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass);transition:border-color .15s,box-shadow .15s,background .15s">
-                    <input type="radio" name="sl-role" value="${r.key}" style="position:absolute;opacity:0;pointer-events:none" ${i === 1 ? 'checked' : ''}>
-                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:14px;width:18px;text-align:center;flex-shrink:0"></i>
+                  <label class="sl-role-opt" role="radio" aria-checked="false" tabindex="0">
+                    <input type="radio" name="sl-role" value="${r.key}" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0" ${i === 1 ? 'checked' : ''}>
+                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:15px;width:18px;text-align:center;flex-shrink:0"></i>
                     <span style="font-size:13px;font-weight:700;line-height:1.2">${r.label}</span>
                   </label>`).join('')}
               </div>
-              <div id="sl-role-help" style="font-size:12.5px;color:var(--text-soft);margin-top:8px;line-height:1.4;min-height:1.4em"></div>
+              <div id="sl-role-help" class="sl-role-help"></div>
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label" for="sl-pwd">Temporary password <span style="color:var(--text-mute);font-weight:500;font-size:11px">— min 10 characters · share once</span></label>
-              <div style="display:flex;gap:8px;align-items:stretch">
-                <input id="sl-pwd" class="form-control" type="text" value="${safe(defaultPwd)}" autocomplete="new-password" spellcheck="false" style="font-family:ui-monospace,monospace;flex:1">
-                <button type="button" class="btn btn-ghost" id="sl-gen-pwd" title="Generate a strong password" style="white-space:nowrap"><i class="fa-solid fa-shuffle"></i> Generate</button>
+
+            <div class="sl-field">
+              <label class="sl-label" for="sl-pwd">Temporary password</label>
+              <div class="sl-input-row">
+                <input id="sl-pwd" class="form-input" type="text" value="${safe(defaultPwd)}" autocomplete="new-password" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">
+                <button type="button" class="btn btn-ghost" id="sl-gen-pwd" title="Generate password" style="white-space:nowrap;flex-shrink:0">
+                  <i class="fa-solid fa-shuffle"></i> Generate
+                </button>
               </div>
-              <div id="sl-pwd-meter" style="font-size:11.5px;color:var(--text-mute);margin-top:4px"></div>
+              <p class="sl-hint" id="sl-pwd-meter">Min 10 characters · share once with staff</p>
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label" for="sl-phone">Mobile (optional) <span style="color:var(--text-mute);font-weight:500;font-size:11px">— for WhatsApp after create</span></label>
-              <input id="sl-phone" class="form-control" inputmode="tel" placeholder="e.g. 9876543210" autocomplete="tel">
+
+            <div class="sl-field">
+              <label class="sl-label" for="sl-phone">Mobile <span style="font-weight:500;color:var(--text-mute)">(optional)</span></label>
+              <input id="sl-phone" class="form-input" type="tel" inputmode="tel" placeholder="e.g. 9876543210" autocomplete="tel">
+              <p class="sl-hint">Used to open WhatsApp with login details after create</p>
             </div>
-            <div id="sl-add-err" role="alert" style="color:var(--red);font-size:12.5px;display:none;line-height:1.4"></div>
+
+            <div id="sl-add-err" class="sl-err" role="alert"></div>
           </div>`;
 
         if (!window.RSModal) {
