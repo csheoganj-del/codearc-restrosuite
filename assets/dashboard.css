@@ -1364,6 +1364,15 @@ body > .dropdown-menu.is-portaled .dropdown-item.active {
 }
 .totals-meta b { color: var(--text); font-weight: 700; }
 
+/* Soft-disabled actions (still receive click → toast with reason) */
+.btn.rs-action-disabled,
+button.rs-action-disabled,
+[role="button"].rs-action-disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  filter: grayscale(0.15);
+}
+
 /* Hide cart GST unless taxes are ON and cart has items (desktop was stuck showing GST ₹0). */
 html.rs-hide-cart-tax .totals-meta #t-gst-wrap,
 html.rs-hide-cart-tax .totals-meta #t-gst,

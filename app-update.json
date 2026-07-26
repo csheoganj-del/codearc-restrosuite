@@ -1,14 +1,14 @@
 {
-  "version": "v221-20260726-codearc-powered",
+  "version": "v222-20260726-floor-click-notify",
   "date": "2026-07-26",
-  "title": "Live update v221-20260726-codearc-powered",
+  "title": "Live update v222-20260726-floor-click-notify",
   "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
   "highlights": [
-    "Automatic content release v221-20260726-codearc-powered",
+    "Automatic content release v222-20260726-floor-click-notify",
     "Desktop EXE picks this up via content updater (no new installer required)",
     "Restart RestroSuite after Update now if prompted"
   ],
   "tour": "settle-skel-tabs",
-  "contentStamp": "c2f613e6f7eb",
-  "buildId": "c2f613e6f7eb"
+  "contentStamp": "15532ffcfd31",
+  "buildId": "15532ffcfd31"
 }

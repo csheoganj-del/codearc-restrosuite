@@ -83,7 +83,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v220-20260726-hide-cart-gst';
+    var builtin = 'v222-20260726-floor-click-notify';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -1695,6 +1695,7 @@
 <!-- Shared skeleton loading language (before critical.bundle paints Bills/KDS) -->
 <link rel="stylesheet" href="assets/modules/rs-skel.css">
 <script src="assets/modules/rs-skel.js"></script>
+<script src="assets/modules/rs-action-feedback.js"></script>
 <!-- Single-path boot: POS/print/bills/KDS/QR/inventory UI modules load ONCE via
      assets/dist/critical.bundle.js (see async boot below). Do not also tag them here. -->
 <script src="assets/modules/settings-defaults.js"></script>

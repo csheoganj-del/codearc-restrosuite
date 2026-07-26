@@ -206,6 +206,14 @@
     el.removeAttribute('aria-busy');
   }
 
+  /** Paint real HTML and drop skeleton host flags (always call after loading). */
+  function paintReady(el, html) {
+    if (!el) return false;
+    clear(el);
+    el.innerHTML = html;
+    return true;
+  }
+
   /**
    * Should we show skeleton instead of empty?
    * true when app has not finished first hydrate AND no local rows yet.
@@ -229,6 +237,7 @@
     bar: bar,
     paint: paint,
     clear: clear,
+    paintReady: paintReady,
     markHydrated: markHydrated,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
