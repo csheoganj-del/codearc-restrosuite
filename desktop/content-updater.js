@@ -19,7 +19,7 @@
    ============================================================ */
 'use strict';
 
-const { app, dialog, shell } = require('electron');
+const { app, dialog, shell, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -37,6 +37,153 @@ let _onApplied = null;
 let _started = false;
 let _busy = false;
 let _lastStatus = { status: 'idle' };
+let _progressWin = null;
+let _progressReady = false;
+let _pendingUiState = null;
+let _uiActionResolver = null;
+let _ipcWired = false;
+
+/** Push status to main window (in-app banner) + optional progress window. */
+function emitUpdateEvent(payload) {
+  try {
+    const w = parentWindow();
+    if (w && w.webContents && !w.webContents.isDestroyed()) {
+      w.webContents.send('rs-content-update-event', payload || {});
+    }
+  } catch (_) {}
+  _lastStatus = Object.assign({}, _lastStatus, payload || {});
+}
+
+function ensureIpcWired() {
+  if (_ipcWired) return;
+  _ipcWired = true;
+  try {
+    ipcMain.on('rs-update-ui-ready', () => {
+      _progressReady = true;
+      if (_pendingUiState) {
+        sendProgressState(_pendingUiState);
+        _pendingUiState = null;
+      }
+    });
+    ipcMain.on('rs-update-ui-action', (_e, data) => {
+      const action = data && data.action;
+      if (typeof _uiActionResolver === 'function') {
+        const resolve = _uiActionResolver;
+        _uiActionResolver = null;
+        resolve(action || 'close');
+      }
+    });
+  } catch (e) {
+    console.warn('[content-updater] ipc wire failed', e && e.message);
+  }
+}
+
+function progressHtmlPath() {
+  return path.join(__dirname, 'update-progress.html');
+}
+
+function closeProgressWindow() {
+  _progressReady = false;
+  _pendingUiState = null;
+  try {
+    if (_progressWin && !_progressWin.isDestroyed()) {
+      _progressWin.close();
+    }
+  } catch (_) {}
+  _progressWin = null;
+}
+
+function sendProgressState(state) {
+  _pendingUiState = state;
+  try {
+    if (_progressWin && !_progressWin.isDestroyed() && _progressWin.webContents) {
+      if (_progressReady) {
+        _progressWin.webContents.send('rs-update-ui-state', state);
+      }
+    }
+  } catch (_) {}
+  emitUpdateEvent(Object.assign({ source: 'content-updater' }, state || {}));
+}
+
+/**
+ * Open (or reuse) the update progress window.
+ * @returns {Promise<import('electron').BrowserWindow|null>}
+ */
+function openProgressWindow() {
+  ensureIpcWired();
+  return new Promise((resolve) => {
+    try {
+      if (_progressWin && !_progressWin.isDestroyed()) {
+        try { _progressWin.focus(); } catch (_) {}
+        resolve(_progressWin);
+        return;
+      }
+      const parent = parentWindow();
+      _progressReady = false;
+      _progressWin = new BrowserWindow({
+        width: 440,
+        height: 320,
+        parent: parent || undefined,
+        modal: !!parent,
+        show: false,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+        fullscreenable: false,
+        frame: false,
+        transparent: true,
+        backgroundColor: '#00000000',
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+          sandbox: false,
+        },
+      });
+      _progressWin.setMenuBarVisibility(false);
+      _progressWin.on('closed', () => {
+        _progressWin = null;
+        _progressReady = false;
+        if (typeof _uiActionResolver === 'function') {
+          const resolveAction = _uiActionResolver;
+          _uiActionResolver = null;
+          resolveAction('close');
+        }
+      });
+      _progressWin.once('ready-to-show', () => {
+        try { _progressWin.show(); } catch (_) {}
+      });
+      _progressWin.loadFile(progressHtmlPath()).then(() => {
+        resolve(_progressWin);
+      }).catch((e) => {
+        console.warn('[content-updater] progress window load failed', e && e.message);
+        resolve(null);
+      });
+    } catch (e) {
+      console.warn('[content-updater] openProgressWindow failed', e && e.message);
+      resolve(null);
+    }
+  });
+}
+
+/** Wait for a button action from the progress UI (install / later / reload / close). */
+function waitUiAction(timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (action) => {
+      if (settled) return;
+      settled = true;
+      _uiActionResolver = null;
+      if (timer) clearTimeout(timer);
+      resolve(action || 'close');
+    };
+    _uiActionResolver = done;
+    const timer = timeoutMs
+      ? setTimeout(() => done('timeout'), timeoutMs)
+      : null;
+  });
+}
 
 function parentWindow() {
   try {
@@ -343,6 +490,13 @@ async function applyContentUpdate({ origin, version, files, title, contentStamp,
   for (const raw of list) {
     const rel = safeRelPath(typeof raw === 'string' ? raw : raw && raw.path);
     if (!rel) continue;
+    // Serverless / private helpers are not static UI — never download into overlay.
+    // (Older builds aborted the whole update on the first 404 from api/_*.)
+    const baseName = rel.split('/').pop() || '';
+    if (/^api\//i.test(rel) || baseName.startsWith('_')) {
+      console.log('[content-updater] skip non-static', rel);
+      continue;
+    }
     // encodeURIComponent per segment
     const segs = rel.split('/');
     const fileUrl = base + '/' + segs.map((s) => encodeURIComponent(s)).join('/');
@@ -618,7 +772,15 @@ async function checkContentUpdate(opts) {
     // Download + apply (no blocking "OK" dialog mid-flight — that felt broken)
     console.log('[content-updater] applying', remoteVer, 'from', origin);
     const man = await loadRemoteManifest(origin);
-    const files = man.files || [];
+    // Static UI only — drop serverless / private paths so a bad manifest never
+    // 404-aborts install (especially on older EXEs without per-file skip).
+    const files = (man.files || []).filter((f) => {
+      const rel = String(typeof f === 'string' ? f : (f && f.path) || '').replace(/\\/g, '/');
+      if (!rel || /^api\//i.test(rel)) return false;
+      const base = rel.split('/').pop() || '';
+      if (base.startsWith('_')) return false;
+      return true;
+    });
     // Ensure app-update.json is always pulled
     if (!files.includes('app-update.json')) files.unshift('app-update.json');
 

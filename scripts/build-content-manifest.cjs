@@ -35,7 +35,10 @@ const ROOT_FILES = [
   'manifest.webmanifest',
 ];
 
-const DIRS = ['assets', 'src', 'images', 'api'];
+// Desktop content overlay = static UI only. Never ship Vercel serverless
+// (api/*) — those are not public static files and 404/308 breaks older
+// content-updaters that abort on the first failed download.
+const DIRS = ['assets', 'src', 'images'];
 
 function walk(dir, base, out) {
   if (!fs.existsSync(dir)) return;
@@ -57,10 +60,12 @@ function walk(dir, base, out) {
     }
     const rel = path.relative(base, full).replace(/\\/g, '/');
     if (st.isDirectory()) {
-      if (/node_modules|scratch|test-results/.test(rel)) continue;
+      if (/node_modules|scratch|test-results|^api(\/|$)/.test(rel)) continue;
       walk(full, base, out);
     } else if (st.isFile()) {
       if (/\.(map|exe|apk|blockmap)$/i.test(name)) continue;
+      // Private / underscore modules and server helpers are never static UI
+      if (name.startsWith('_')) continue;
       if (st.size > 6 * 1024 * 1024) continue;
       out.push(rel);
     }
