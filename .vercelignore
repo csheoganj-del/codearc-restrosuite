@@ -11,10 +11,9 @@ android-app/build
 android-app/.tmp-gradle-build
 android-app/dist
 android-app
-desktop/dist
-desktop/node_modules
-desktop/app
-desktop
+# Root Electron package only — use leading slash so downloads/desktop/*.yml still ships
+/desktop
+/desktop/**
 scratch
 scratch-*
 codearc-restrosuite
