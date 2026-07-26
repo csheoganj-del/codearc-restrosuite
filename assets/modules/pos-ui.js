@@ -793,8 +793,7 @@ function renderCart(){
   }
   
   // Hide Tax/GST cart line when Calculate taxes is OFF (simple café default).
-  // Never show a permanent "GST ₹0" when the setting is off — that confused
-  // desktop vs web when both showed the same version chip.
+  // Default OFF; only show when ON and cart has items / real tax amount.
   const rawTaxFlag = settings.set_calculate_taxes;
   const taxesOn =
     rawTaxFlag === false || rawTaxFlag === 'false' || rawTaxFlag === 0 || rawTaxFlag === '0'
@@ -802,23 +801,45 @@ function renderCart(){
       : typeof global.RS_featureOn === 'function'
         ? global.RS_featureOn('set_calculate_taxes', settings, false)
         : rawTaxFlag === true || rawTaxFlag === 'true' || rawTaxFlag === 1 || rawTaxFlag === '1';
-  if (taxesOn) {
-    if (totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN') {
-      metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
-    } else if (count > 0 || Number(totals.gst) > 0) {
-      // Only show tax line when cart has items (avoid empty-cart "GST ₹0")
-      const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
-      metaHTML += `<span id="t-gst-wrap" title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
-    }
+  const showTaxLine = taxesOn && (count > 0 || Number(totals.gst) > 0);
+  if (taxesOn && totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN' && count > 0) {
+    metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
+  } else if (showTaxLine) {
+    const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
+    metaHTML += `<span id="t-gst-wrap" title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
   }
 
   if (taxesOn && totals.liquorTax > 0) {
     metaHTML += `<span title="Liquor tax">Liquor <b id="t-liquor-tax">${rs(totals.liquorTax)}</b></span>`;
   }
+
+  // Drive CSS nuclear hide (works even if an old shell left hard-coded GST in HTML)
+  try {
+    document.documentElement.classList.toggle('rs-taxes-on', !!taxesOn);
+    document.documentElement.classList.toggle('rs-cart-has-items', count > 0);
+    document.documentElement.classList.toggle('rs-hide-cart-tax', !showTaxLine);
+  } catch (_) {}
   
-  const metaDiv = document.querySelector('.totals-meta');
+  const metaDiv = document.querySelector('.totals-meta') || document.getElementById('cart-totals-meta');
   if (metaDiv) {
     metaDiv.innerHTML = metaHTML;
+    // Scrub any leftover GST node if taxes should be hidden
+    if (!showTaxLine) {
+      metaDiv.querySelectorAll('#t-gst-wrap, #t-gst').forEach((el) => {
+        try {
+          const wrap = el.id === 't-gst' ? el.parentElement : el;
+          if (wrap && wrap !== metaDiv) wrap.remove();
+          else el.remove();
+        } catch (_) {}
+      });
+      // Remove bare "Tax" / "GST" spans from old HTML
+      Array.from(metaDiv.querySelectorAll('span')).forEach((sp) => {
+        const t = (sp.getAttribute('title') || '') + ' ' + (sp.textContent || '');
+        if (/\b(GST|Tax|CGST|SGST)\b/i.test(t) && !/Subtotal|Discount|Promo|Service|Tip|Delivery|Loyalty|Pts/i.test(t)) {
+          try { sp.remove(); } catch (_) {}
+        }
+      });
+    }
   }
   
   $('#t-grand').textContent=rs(totals.grand);

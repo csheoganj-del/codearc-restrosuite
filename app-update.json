@@ -1,14 +1,14 @@
 {
-  "version": "v219-20260726-cart-tax-sync",
+  "version": "v220-20260726-hide-cart-gst",
   "date": "2026-07-26",
-  "title": "Live update v219-20260726-cart-tax-sync",
+  "title": "Live update v220-20260726-hide-cart-gst",
   "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
   "highlights": [
-    "Automatic content release v219-20260726-cart-tax-sync",
+    "Automatic content release v220-20260726-hide-cart-gst",
     "Desktop EXE picks this up via content updater (no new installer required)",
     "Restart RestroSuite after Update now if prompted"
   ],
   "tour": "settle-skel-tabs",
-  "contentStamp": "19eb283c7423",
-  "buildId": "19eb283c7423"
+  "contentStamp": "6c5511a91b17",
+  "buildId": "6c5511a91b17"
 }
