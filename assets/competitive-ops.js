@@ -28,8 +28,11 @@
 
   /* ---------------- Loyalty (earn / redeem / tiers) ---------------- */
   function loyaltyEnabled() {
+    if (typeof global.RS_featureOn === 'function') {
+      return global.RS_featureOn('set_loyalty_program', global.RS_SETTINGS, false);
+    }
     const s = global.RS_SETTINGS || {};
-    return s.set_loyalty_program !== false && s.set_loyalty_program !== 'false';
+    return s.set_loyalty_program === true || s.set_loyalty_program === 'true';
   }
   function loyaltyEarnRate() {
     const n = Number((global.RS_SETTINGS || {}).set_loyalty_earn_rate);
@@ -238,8 +241,11 @@
 
   /* ---------------- POS promo / coupon codes ---------------- */
   function promoEnabled() {
+    if (typeof global.RS_featureOn === 'function') {
+      return global.RS_featureOn('set_pos_promo_codes', global.RS_SETTINGS, false);
+    }
     const s = global.RS_SETTINGS || {};
-    return s.set_pos_promo_codes !== false && s.set_pos_promo_codes !== 'false';
+    return s.set_pos_promo_codes === true || s.set_pos_promo_codes === 'true';
   }
   function parseOfferExpiry(o) {
     if (!o) return null;
@@ -2433,10 +2439,13 @@
             }
           }, 450);
         }
-        // Cash drawer pulse when cash was taken (or setting always on for any pay)
+        // Cash drawer: only when toggle is ON (default OFF for simple cafés)
         const drawerOn =
-          s.set_open_cash_drawer_on_cash !== false &&
-          s.set_open_cash_drawer_on_cash !== 'false';
+          typeof global.RS_featureOn === 'function'
+            ? global.RS_featureOn('set_open_cash_drawer_on_cash', s, false)
+            : s.set_open_cash_drawer_on_cash === true ||
+              s.set_open_cash_drawer_on_cash === 'true' ||
+              s.set_open_cash_drawer_on_cash === 1;
         if (drawerOn && bill && billHasCashTender(bill)) {
           setTimeout(() => openCashDrawer(), 200);
         }

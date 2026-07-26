@@ -51,7 +51,8 @@
       }
     } catch (_) {}
 
-    return 'full';
+    // Simple café default: billing only (bill + print) until owner picks kitchen modes
+    return 'billing_only';
   }
 
   function isBillingOnly() {
@@ -88,14 +89,16 @@
     return getMode() === 'full';
   }
 
-  /** Auto-fire print when staff taps KOT (kitchen_printer defaults ON) */
+  /** Auto-fire print when staff taps KOT — OFF unless explicitly enabled */
   function autoPrintKot() {
     var s = settings();
     if (getMode() === 'billing_only') return false;
+    if (typeof global.RS_featureOn === 'function') {
+      return global.RS_featureOn('set_auto_print_kot', s, false);
+    }
     if (s.set_auto_print_kot === false || s.set_auto_print_kot === 'false') return false;
     if (s.set_auto_print_kot === true || s.set_auto_print_kot === 'true') return true;
-    // Default: kitchen printer mode auto-prints; full mode also defaults on in settings UI
-    return true;
+    return false;
   }
 
   function shouldWarnKotOnCheckout() {

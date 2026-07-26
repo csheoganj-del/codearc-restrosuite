@@ -18,6 +18,12 @@
     let currentSettings = {};
     function normalizeReceiptProfile(settings){
       currentSettings = settings || {};
+      // Simple-café defaults for any key the outlet never set
+      try {
+        if (typeof window.RS_applyFeatureDefaults === 'function') {
+          currentSettings = window.RS_applyFeatureDefaults(currentSettings);
+        }
+      } catch (_) {}
       // Migrate legacy POS-only → operating mode label for UI
       try {
         if (window.RSOpsMode && typeof RSOpsMode.normalizeStore === 'function') {
@@ -2680,9 +2686,15 @@
 
           try {
             const autoSendSettings = window.RS_SETTINGS || {};
-            // Match gateway: default ON unless explicitly false
-            const autoSendEnabled = autoSendSettings.set_auto_send_receipts !== false
-              && autoSendSettings.set_auto_send_receipts !== 'false';
+            // Plug-and-play: OFF until Settings → Send bill after payment is ON
+            const autoSendEnabled =
+              (typeof window.RS_featureOn === 'function' &&
+                (window.RS_featureOn('set_send_bill_after_payment', autoSendSettings, false) ||
+                  window.RS_featureOn('set_auto_send_receipts', autoSendSettings, false))) ||
+              autoSendSettings.set_send_bill_after_payment === true ||
+              autoSendSettings.set_send_bill_after_payment === 'true' ||
+              autoSendSettings.set_auto_send_receipts === true ||
+              autoSendSettings.set_auto_send_receipts === 'true';
             if (autoSendEnabled && bill.customerPhone && bill.customerPhone.trim() && bill.customerPhone !== 'null') {
               // Give bill settle UI a moment, then send thermal PDF via gateway (not plaintext)
               setTimeout(() => {

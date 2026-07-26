@@ -626,9 +626,9 @@
           ${toggle('Service charge','Add service charge on dine-in orders',false)}
           <div class="form-grid-2" style="margin-top:10px">${field('Service charge %','5','e.g. 5 or 10')}<div></div></div>
           ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
-          ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice',true)}
-          ${toggle('Inclusive pricing','Menu prices include tax',false)}`) +
-        setBlock('Happy hour', 'Time-window menu discount on POS',
+          ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice (tax shops only)',false)}
+          ${toggle('Inclusive pricing','Menu prices already include tax',false)}`) +
+        setBlock('Happy hour', 'Time-window menu discount on POS — leave OFF until you run happy hour',
           `${toggle('Happy hour','Apply time-window menu discount on POS',false)}
           <div class="form-grid-2" style="margin-top:12px">
             ${field('Happy hour start','17:00','HH:MM')}
@@ -639,15 +639,15 @@
             <div></div>
           </div>
           <p class="set-hint">Menu cards show an HH badge. Optional per-item happyHourPrice overrides %.</p>`) +
-        setBlock('Loyalty', 'Points earned and redeemed at checkout',
-          `${toggle('Loyalty program','Earn & redeem points on CRM customers at checkout',true)}
+        setBlock('Loyalty', 'Points at checkout — leave OFF for simple cafés',
+          `${toggle('Loyalty program','Earn & redeem points on CRM customers at checkout',false)}
           <div class="form-grid-2" style="margin-top:12px">
             ${field('Loyalty earn rate','100','Currency spent per 1 point')}
             ${field('Loyalty point value','1','Currency value of 1 redeemed point')}
           </div>
           <p class="set-hint">Gold earns 2×, VIP 3×. Tiers: Silver → Gold at ₹5k spend → VIP at ₹10k.</p>`) +
-        setBlock('POS promo codes', 'Coupon codes on the POS cart',
-          `${toggle('POS promo codes','Apply coupon / offer codes on the POS cart',true)}
+        setBlock('POS promo codes', 'Coupon codes on cart — leave OFF until you run offers',
+          `${toggle('POS promo codes','Apply coupon / offer codes on the POS cart',false)}
           <div class="form-grid-2" style="margin-top:12px">
             ${field('Demo promo code','WELCOME10','Fallback code when no offer matches')}
             ${field('Demo promo pct','10','Percent off for demo code')}
@@ -659,7 +659,7 @@
             'Full ops (KDS + kitchen)',
             'Kitchen printer only',
             'Billing only'
-          ],'Full ops (KDS + kitchen)')}
+          ],'Billing only')}
           <div class="set-hint" style="margin-top:10px;line-height:1.45">
             <b>Full ops</b> — Kitchen Display and/or KOT print; waiters fire tickets to kitchen.<br>
             <b>Kitchen printer only</b> — No KDS screen; kitchen cooks from thermal KOT slips only.<br>
@@ -680,10 +680,10 @@
           `${toggle('Require open shift','When ON, staff must open a shift before Print & Pay, Hold, refunds, and cash drawer. When OFF (default), billing works without shift — open Shift only if you want float and Z-report.',false)}
           <p class="set-hint" style="margin-top:8px"><b>OFF (recommended for simple outlets):</b> no shift dialog blocking pay.<br>
           <b>ON:</b> orange Shift button → opening float → end-of-day Z-report. Use for multi-cashier cash control.</p>`) +
-        setBlock('Auto-print & drawer', 'When to fire receipts, KOTs, and cash drawer',
-          `${toggle('Auto-print receipt','Print automatically after payment when a bridge is connected',false)}
-          ${toggle('Auto-print KOT','Print KOT on fire (recommended for kitchen printer mode)',true)}
-          ${toggle('Open cash drawer on cash','Pulse cash drawer after cash / cash-split payment',true)}
+        setBlock('Auto-print & drawer', 'Turn ON only when hardware is connected',
+          `${toggle('Auto-print receipt','Print automatically after payment when desktop/Android printer bridge is connected',false)}
+          ${toggle('Auto-print KOT','Print kitchen ticket when staff fires KOT (use with kitchen printer mode)',false)}
+          ${toggle('Open cash drawer on cash','Pulse cash drawer after cash payment (needs drawer cable)',false)}
           <div class="form-grid-2" style="margin-top:12px">${sel('KOT copies',['1','2','3'],'1')}${sel('WhatsApp bill PDF mode',['Exact preview','Fast thermal'],'Exact preview')}</div>
           <p class="set-hint" style="margin-top:8px">KOT re-fires only print <b>new / cancelled lines</b> (ADD / VOID slips). Exact preview matches the settled bill screen.</p>`) +
         setBlock('Sounds &amp; alerts', 'New QR orders, waiter calls, and kitchen chimes',
@@ -706,10 +706,10 @@
             <button type="button" class="btn btn-ghost btn-sm" id="btn-gateway-troubleshoot-reset"><i class="fa-solid fa-qrcode"></i> New QR</button>
           </div>
           <p class="set-hint"><i class="fa-solid fa-bolt"></i> <b>Your number (recommended):</b> scan QR once — bills send from <b>your</b> WhatsApp with no Meta API fees. Lazy mode: session wakes only when sending (low server RAM). First send after idle may take a few seconds.</p>`) +
-        setBlock('Bill preferences', 'What customers receive after payment and for order status',
-          `${toggle('Send bill after payment','WhatsApp the bill when payment is taken',true)}
+        setBlock('Bill preferences', 'WhatsApp extras — leave OFF until your number is linked',
+          `${toggle('Send bill after payment','Auto WhatsApp the bill PDF after payment (needs linked WhatsApp + customer phone)',false)}
           <div class="form-grid-2" style="margin-top:12px">${sel('Bill format',['Simple text','PDF receipt (recommended)'],'PDF receipt (recommended)')}<div></div></div>
-          ${toggle('Order ready alerts','Message customer when order is ready',true)}
+          ${toggle('Order ready alerts','Message customer when order is ready',false)}
           ${toggle('Promotional messages','Allow offer campaigns (use sparingly)',false)}
           <div class="set-field" style="margin-top:12px"><label class="fl">Message with the bill</label><textarea class="form-input" rows="2" data-skey="set_bill_message">Thanks for dining with us. Your bill is attached.</textarea></div>`) +
         setBlock('Owner reports', 'Daily sales, stock alerts, and P&amp;L PDFs to your number',
@@ -744,7 +744,11 @@
 
       const hasPIN = window.RSPinModal && RSPinModal.isConfigured();
       const st = Object.assign({}, window.RS_SETTINGS || {}, (typeof SET_STORE !== 'undefined' ? SET_STORE : {}));
-      const gateOn = (k) => st[k] !== false && st[k] !== 'false' && st[k] !== 0 && st[k] !== '0';
+      // PIN gates are opt-in (simple cafés leave them OFF)
+      const gateOn = (k) => {
+        if (typeof window.RS_featureOn === 'function') return window.RS_featureOn(k, st, false);
+        return st[k] === true || st[k] === 'true' || st[k] === 1 || st[k] === '1';
+      };
       const gateVal = (k, d) => (st[k] != null && st[k] !== '' ? st[k] : d);
 
       // -- Sections: PIN management + Protected operations list -------------
@@ -2210,6 +2214,10 @@
         // Business type is registration-locked — never let a stale/hidden field flip the vertical
         const lockedBiz = resolveLockedBusinessType(SET_STORE);
         SET_STORE['set_business_type'] = lockedBiz.key;
+        // Keep WhatsApp auto-send alias in sync with the UI toggle
+        if ('set_send_bill_after_payment' in SET_STORE) {
+          SET_STORE.set_auto_send_receipts = !!SET_STORE.set_send_bill_after_payment;
+        }
         try {
           // Normalize operating mode (migrates legacy POS-only toggle)
           try {
@@ -2247,7 +2255,13 @@
       };
       $('#set-cancel').onclick=()=>show('profile');
       Promise.resolve(RS.getSettings?RS.getSettings():null).then(saved=>{
-        if(saved) SET_STORE=saved;
+        // Plug-and-play defaults for missing keys (simple café first)
+        if (typeof window.RS_applyFeatureDefaults === 'function') {
+          SET_STORE = window.RS_applyFeatureDefaults(saved || {});
+        } else {
+          SET_STORE = saved || {};
+        }
+        try { window.RS_SETTINGS = Object.assign({}, window.RS_SETTINGS || {}, SET_STORE); } catch (_) {}
         const deep = String(window.__rsOpenSettingsSection || '').trim();
         window.__rsOpenSettingsSection = '';
         show(deep && NAV.some(s => s[0] === deep) ? deep : 'profile');

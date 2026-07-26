@@ -1959,11 +1959,24 @@
       window.dispatchEvent(new CustomEvent('rs:sync-queue-drained', { detail: { count: 0, failed: 0, remaining: 0, cleared: true } }));
     },
     getSettings: async ()=>{
-      const s = await guard('getSettings','settings');
+      let s = await guard('getSettings','settings');
+      try {
+        if (typeof window !== 'undefined' && typeof window.RS_applyFeatureDefaults === 'function') {
+          s = window.RS_applyFeatureDefaults(s || {});
+        }
+      } catch (_) {}
       cachePinHashFromSettings(s);
+      try {
+        if (typeof window !== 'undefined') window.RS_SETTINGS = Object.assign({}, window.RS_SETTINGS || {}, s || {});
+      } catch (_) {}
       return s;
     },
     setSettings: async (o)=> {
+      try {
+        if (typeof window !== 'undefined' && typeof window.RS_applyFeatureDefaults === 'function') {
+          o = window.RS_applyFeatureDefaults(o || {});
+        }
+      } catch (_) {}
       const tenantId = getActiveTenantId();
       cachedSettingsMap[tenantId] = o;
       cachePinHashFromSettings(o);

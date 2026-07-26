@@ -225,7 +225,11 @@
   }
   function isHappyHourActive() {
     const s = global.RS_SETTINGS || {};
-    if (!(s.set_happy_hour === true || s.set_happy_hour === 'true')) return false;
+    if (typeof global.RS_featureOn === 'function') {
+      if (!global.RS_featureOn('set_happy_hour', s, false)) return false;
+    } else if (!(s.set_happy_hour === true || s.set_happy_hour === 'true')) {
+      return false;
+    }
     const start = parseHHMM(s.set_happy_hour_start || '17:00');
     const end = parseHHMM(s.set_happy_hour_end || '20:00');
     if (start == null || end == null) return false;
@@ -1091,12 +1095,16 @@ function getTotals(){
     else if (t.includes('deliv')) channel = 'delivery';
   }
   
-  const calculateTaxesEnabled = settings.set_calculate_taxes !== false;
-  const serviceChargeEnabled = settings.set_service_charge === true && channel === 'dine_in';
+  const featureOn = (k, fb) =>
+    typeof global.RS_featureOn === 'function'
+      ? global.RS_featureOn(k, settings, fb)
+      : (settings[k] === true || settings[k] === 'true' || (fb && settings[k] == null));
+  const calculateTaxesEnabled = featureOn('set_calculate_taxes', false);
+  const serviceChargeEnabled = featureOn('set_service_charge', false) && channel === 'dine_in';
   const scPctRaw = Number(settings.set_service_charge_pct);
   const serviceChargePct = Number.isFinite(scPctRaw) && scPctRaw >= 0 ? scPctRaw : 5;
-  const roundOffEnabled = settings.set_round_off_totals !== false;
-  const inclusivePricing = settings.set_inclusive_pricing === true;
+  const roundOffEnabled = featureOn('set_round_off_totals', true);
+  const inclusivePricing = featureOn('set_inclusive_pricing', false);
   
   const rawSubtotal = cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discAmount = Math.round(rawSubtotal * discountPct / 100);
