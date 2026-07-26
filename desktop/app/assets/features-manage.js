@@ -2369,26 +2369,219 @@
 
       // -- Staff Logins subtab ----------------------------------------------
       const STAFF_ROLES = [
-        { key:'manager',   label:'Manager',           color:'#7c3aed', icon:'fa-user-tie'     },
-        { key:'cashier',   label:'Cashier',           color:'#0891b2', icon:'fa-cash-register' },
-        { key:'waiter',    label:'Waiter',            color:'#059669', icon:'fa-utensils'      },
-        { key:'captain',   label:'Captain',           color:'#2563eb', icon:'fa-star'          },
-        { key:'kitchen',   label:'Kitchen Staff',     color:'#dc2626', icon:'fa-fire-burner'   },
-        { key:'inventory', label:'Inventory Manager', color:'#b45309', icon:'fa-boxes-stacked' },
+        { key:'manager',   label:'Manager',           color:'#7c3aed', icon:'fa-user-tie',      blurb:'Full floor ops — POS, kitchen, bills, reports, team' },
+        { key:'cashier',   label:'Cashier',           color:'#0891b2', icon:'fa-cash-register', blurb:'Billing only — POS, tables, bills, customers' },
+        { key:'waiter',    label:'Waiter',            color:'#059669', icon:'fa-utensils',      blurb:'Service — POS, floor, kitchen display' },
+        { key:'captain',   label:'Captain',           color:'#2563eb', icon:'fa-star',          blurb:'Floor lead — POS, tables, KDS, QR orders' },
+        { key:'kitchen',   label:'Kitchen Staff',     color:'#dc2626', icon:'fa-fire-burner',   blurb:'Kitchen only — kitchen display tickets' },
+        { key:'inventory', label:'Inventory Manager', color:'#b45309', icon:'fa-boxes-stacked', blurb:'Stock & menu — inventory, editor, reports' },
       ];
 
       // Cache for loaded staff users
       let staffUsers = [];
       let staffUsage = {};
 
+      function staffRoleMeta(key) {
+        return STAFF_ROLES.find(r => r.key === key) || { key, label: key || 'Staff', color: '#888', icon: 'fa-user', blurb: '' };
+      }
+
+      function genStaffPassword() {
+        const words = ['Fresh', 'Spice', 'Table', 'Chef', 'Plate', 'Order', 'Shift', 'Service'];
+        const w = words[Math.floor(Math.random() * words.length)];
+        const n = String(100 + Math.floor(Math.random() * 900));
+        const symbols = '!@#$%';
+        const s = symbols[Math.floor(Math.random() * symbols.length)];
+        return w + s + n + 'Rs';
+      }
+
+      function slugifyStaffUsername(name) {
+        return String(name || '')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '.')
+          .replace(/^\.+|\.+$/g, '')
+          .slice(0, 40);
+      }
+
+      function validateStaffUsername(u) {
+        return /^[A-Za-z0-9._-]{3,50}$/.test(String(u || '').trim());
+      }
+
+      async function copyTextSafe(text) {
+        const t = String(text || '');
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(t);
+            return true;
+          }
+        } catch (_) {}
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = t;
+          ta.setAttribute('readonly', '');
+          ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand('copy');
+          ta.remove();
+          return ok;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function buildStaffShareText({ name, username, password, roleLabel, outlet }) {
+        const lines = [
+          'RestroSuite login',
+          name ? ('Name: ' + name) : '',
+          outlet ? ('Outlet ID: ' + outlet) : '',
+          'Username: ' + username,
+          'Temp password: ' + password,
+          roleLabel ? ('Role: ' + roleLabel) : '',
+          '',
+          'Open the app → Sign in with Outlet ID + username + password.',
+          'Change your password after first login if your admin asks you to.',
+        ].filter(Boolean);
+        return lines.join('\n');
+      }
+
+      function openWhatsAppShare(phoneRaw, message) {
+        const digits = String(phoneRaw || '').replace(/\D/g, '');
+        let phone = digits;
+        if (phone.length === 10) phone = '91' + phone;
+        const text = encodeURIComponent(message || '');
+        const url = phone.length >= 11
+          ? ('https://wa.me/' + phone + '?text=' + text)
+          : ('https://wa.me/?text=' + text);
+        try {
+          if (window.rsDesktop && typeof window.rsDesktop.openExternal === 'function') {
+            window.rsDesktop.openExternal(url);
+          } else {
+            window.open(url, '_blank', 'noopener');
+          }
+        } catch (_) {
+          window.open(url, '_blank', 'noopener');
+        }
+      }
+
+      function paintRoleSelection(root, selectedKey) {
+        const help = root.querySelector('#sl-role-help');
+        root.querySelectorAll('.sl-role-opt').forEach(opt => {
+          const input = opt.querySelector('input');
+          const on = input && input.value === selectedKey;
+          if (input) input.checked = !!on;
+          opt.style.borderColor = on ? 'var(--orange)' : 'var(--stroke-2)';
+          opt.style.background = on ? 'var(--orange-tint, rgba(255,79,0,.08))' : 'var(--glass, #fff)';
+          opt.style.boxShadow = on ? '0 0 0 1px var(--orange)' : 'none';
+          opt.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+        if (help) {
+          const meta = staffRoleMeta(selectedKey);
+          help.innerHTML = selectedKey
+            ? `<i class="fa-solid ${meta.icon}" style="color:${meta.color};margin-right:6px"></i><b>${safe(meta.label)}</b> — ${safe(meta.blurb)}`
+            : '<span style="color:var(--text-mute)">Select a role to see what this person can access.</span>';
+        }
+      }
+
+      function showStaffCredsSuccess(el, creds, { onDone, onAddAnother } = {}) {
+        const outlet = (sessionStorage.getItem('tenant_slug') || localStorage.getItem('rs_last_slug') || '').trim();
+        const share = buildStaffShareText({
+          name: creds.name,
+          username: creds.username,
+          password: creds.password,
+          roleLabel: creds.roleLabel,
+          outlet,
+        });
+        // RSModal markup: .rs-mbody / .rs-mfoot / .rs-mhead h3
+        const bodyHost = el.querySelector('.rs-mbody') || el.querySelector('.rs-modal-body') || el;
+        const footHost = el.querySelector('.rs-mfoot') || el.querySelector('.rs-modal-foot') || el.querySelector('#sl-foot') || null;
+        const titleEl = el.querySelector('.rs-mhead h3') || el.querySelector('.rs-modal-title') || el.querySelector('h2,h3');
+        if (titleEl) titleEl.textContent = 'Account ready';
+        const iconEl = el.querySelector('.rs-mhead .mh-ic i, .rs-mhead .fa-solid');
+        if (iconEl) {
+          iconEl.className = 'fa-solid fa-circle-check';
+          try { iconEl.style.color = 'var(--ok, #1F8A5B)'; } catch (_) {}
+        }
+
+        bodyHost.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="padding:12px 14px;border-radius:12px;background:rgba(31,138,91,.08);border:1px solid rgba(31,138,91,.22);font-size:13.5px;line-height:1.45;color:var(--text)">
+              <b>${safe(creds.name)}</b> can sign in now. Share these details once — then they should change the password.
+            </div>
+            <div style="display:grid;gap:10px;padding:14px;border-radius:12px;border:1px solid var(--stroke-2);background:var(--glass,#fafafa)">
+              ${outlet ? `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Outlet ID</span><code style="font-size:13px;font-weight:700">${safe(outlet)}</code></div>` : ''}
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Username</span><code style="font-size:13px;font-weight:700">${safe(creds.username)}</code></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Temp password</span><code id="sl-ok-pwd" style="font-size:13px;font-weight:700;letter-spacing:.02em">${safe(creds.password)}</code></div>
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Role</span><span style="font-size:13px;font-weight:600;color:${creds.roleColor || 'var(--text)'}">${safe(creds.roleLabel || '')}</span></div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">WhatsApp number <span style="color:var(--text-mute);font-weight:500;font-size:11px">(optional — to send login)</span></label>
+              <input id="sl-ok-phone" class="form-control" inputmode="tel" placeholder="e.g. 9876543210" value="${safe(creds.phone || '')}" autocomplete="tel">
+            </div>
+            <div style="font-size:12px;color:var(--text-mute);line-height:1.45">
+              Tip: Directory (team members) is for roster & payroll. <b>Logins</b> is only for app usernames.
+            </div>
+          </div>`;
+
+        const footHtml = `
+          <button type="button" class="btn btn-ghost" id="sl-ok-copy"><i class="fa-solid fa-copy"></i> Copy details</button>
+          <button type="button" class="btn btn-ghost" id="sl-ok-wa" style="color:#128C7E"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+          <button type="button" class="btn btn-ghost" id="sl-ok-another"><i class="fa-solid fa-user-plus"></i> Add another</button>
+          <button type="button" class="btn btn-primary" id="sl-ok-done"><i class="fa-solid fa-check"></i> Done</button>`;
+        if (footHost) {
+          footHost.innerHTML = footHtml;
+        } else {
+          const bar = document.createElement('div');
+          bar.id = 'sl-ok-actions';
+          bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:16px';
+          bar.innerHTML = footHtml;
+          bodyHost.appendChild(bar);
+        }
+
+        const copyBtn = el.querySelector('#sl-ok-copy');
+        const waBtn = el.querySelector('#sl-ok-wa');
+        const doneBtn = el.querySelector('#sl-ok-done');
+        const anotherBtn = el.querySelector('#sl-ok-another');
+        if (copyBtn) {
+          copyBtn.onclick = async () => {
+            const ok = await copyTextSafe(share);
+            if (ok) {
+              copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+              RS.toast('Login details copied', 'fa-copy');
+              setTimeout(() => { copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy details'; }, 1600);
+            } else {
+              RS.toast('Could not copy — select and copy manually', 'fa-circle-exclamation');
+            }
+          };
+        }
+        if (waBtn) {
+          waBtn.onclick = () => {
+            const phone = (el.querySelector('#sl-ok-phone') || {}).value || '';
+            openWhatsAppShare(phone, share);
+          };
+        }
+        if (doneBtn) {
+          doneBtn.onclick = () => {
+            if (typeof onDone === 'function') onDone();
+            else if (typeof el.__rsClose === 'function') el.__rsClose();
+          };
+        }
+        if (anotherBtn) {
+          anotherBtn.onclick = () => {
+            if (typeof onAddAnother === 'function') onAddAnother();
+            else if (typeof el.__rsClose === 'function') el.__rsClose();
+          };
+        }
+      }
+
       async function loadStaffUsers() {
         const loginPane = sec.querySelector('[data-pane="logins"]');
         if (!loginPane) return;
         if (!window.RS_API || !RS_API.staffUsers) {
-          loginPane.innerHTML = '<div class="sr-empty">Staff account management requires cloud mode.</div>';
+          loginPane.innerHTML = '<div class="sr-empty">Staff login accounts require cloud mode.</div>';
           return;
         }
-        loginPane.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading staff accounts...</div>';
+        loginPane.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading login accounts…</div>';
         try {
           const res = await RS_API.staffUsers({ action: 'list_users' });
           staffUsers = res.users || [];
@@ -2403,35 +2596,44 @@
         const used = Number.isFinite(Number(staffUsage.active_staff)) ? Number(staffUsage.active_staff) : staffUsers.length;
         const max  = staffUsage.max_staff || '--';
         loginPane.innerHTML = `
-          <div class="panel-head" style="margin-bottom:16px">
+          <div class="panel-head" style="margin-bottom:12px;align-items:flex-start">
             <div>
-              <h3>Staff Login Accounts</h3>
-              <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${used} of ${max} accounts used</div>
+              <h3>Staff logins</h3>
+              <div style="font-size:12.5px;color:var(--text-mute);margin-top:3px;line-height:1.4">
+                App usernames for POS & kitchen. Team roster / payroll lives under <b>Directory</b>.
+              </div>
+              <div style="font-size:12px;color:var(--text-soft);margin-top:6px;font-weight:600">${used} of ${max} login accounts used</div>
             </div>
-            <button class="btn btn-primary btn-sm" id="sl-add-btn"><i class="fa-solid fa-user-plus"></i> Add staff account</button>
+            <button class="btn btn-primary btn-sm" id="sl-add-btn"><i class="fa-solid fa-user-plus"></i> Create login</button>
           </div>
           ${staffUsers.length === 0
-            ? `<div class="sr-empty">No staff accounts yet. Add one to let staff log in with their own credentials.</div>`
+            ? `<div class="sr-empty">
+                <div style="font-weight:700;margin-bottom:6px">No login accounts yet</div>
+                <div style="font-size:13px;color:var(--text-mute);max-width:360px;margin:0 auto 14px;line-height:1.45">
+                  Create a username + temporary password for each person who needs the app. Share it once, then they sign in with your Outlet ID.
+                </div>
+                <button class="btn btn-primary btn-sm" id="sl-add-btn-empty"><i class="fa-solid fa-user-plus"></i> Create first login</button>
+              </div>`
             : `<div class="table-scroll"><table class="data-table">
                 <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr></thead>
                 <tbody>
                 ${staffUsers.map((u,i) => {
-                  const rd = STAFF_ROLES.find(r=>r.key===u.role) || { label: u.role, color:'#888', icon:'fa-user' };
+                  const rd = staffRoleMeta(u.role);
                   const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : 'Never';
                   return `<tr>
                     <td><b>${safe(u.display_name || u.username)}</b></td>
                     <td style="font-family:monospace;font-size:13px;color:var(--text-soft)">${safe(u.username)}</td>
-                    <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${rd.color}"><i class="fa-solid ${rd.icon}"></i>${rd.label}</span></td>
+                    <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:${rd.color}" title="${safe(rd.blurb)}"><i class="fa-solid ${rd.icon}"></i>${rd.label}</span></td>
                     <td><span class="pill ${u.status==='active'?'pill-green':'pill-red'}" style="padding:2px 9px;font-size:11px">${u.status}</span></td>
                     <td style="font-size:12px;color:var(--text-mute)">${lastLogin}</td>
                     <td>
                       <div style="display:flex;gap:6px;justify-content:flex-end">
-                        <button class="btn btn-ghost btn-sm sl-edit-btn" data-idx="${i}" title="Edit role / status"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-ghost btn-sm sl-edit-btn" data-idx="${i}" title="Edit name / role"><i class="fa-solid fa-pen"></i></button>
                         <button class="icon-act sl-pwd-btn" data-idx="${i}" title="Reset password"><i class="fa-solid fa-key"></i></button>
                         <button class="icon-act ${u.status==='active'?'danger':''} sl-toggle-btn" data-idx="${i}" data-status="${u.status}" title="${u.status==='active'?'Suspend':'Reactivate'}">
                           <i class="fa-solid ${u.status==='active'?'fa-ban':'fa-circle-check'}"></i>
                         </button>
-                        <button class="icon-act danger sl-delete-btn" data-idx="${i}" title="Delete account"><i class="fa-solid fa-user-minus"></i></button>
+                        <button class="icon-act danger sl-delete-btn" data-idx="${i}" title="Delete login"><i class="fa-solid fa-user-minus"></i></button>
                       </div>
                     </td>
                   </tr>`;
@@ -2442,6 +2644,7 @@
 
         // -- Add account --
         loginPane.querySelector('#sl-add-btn')?.addEventListener('click', () => openAddStaffModal(loginPane));
+        loginPane.querySelector('#sl-add-btn-empty')?.addEventListener('click', () => openAddStaffModal(loginPane));
 
         // -- Edit role/status --
         loginPane.querySelectorAll('.sl-edit-btn').forEach(b => b.addEventListener('click', () => openEditStaffModal(loginPane, +b.dataset.idx)));
@@ -2453,7 +2656,6 @@
         loginPane.querySelectorAll('.sl-toggle-btn').forEach(b => b.addEventListener('click', async () => {
           const u = staffUsers[+b.dataset.idx];
           const newStatus = b.dataset.status === 'active' ? 'suspended' : 'active';
-          const verb = newStatus === 'suspended' ? 'Suspend' : 'Reactivate';
           if (!confirm(
             newStatus === 'suspended'
               ? `Suspend ${u.display_name || u.username}?\n\nThey cannot log in. Active sessions on other devices will be revoked within a minute.`
@@ -2477,7 +2679,7 @@
         // -- Delete account --
         loginPane.querySelectorAll('.sl-delete-btn').forEach(b => b.addEventListener('click', async () => {
           const u = staffUsers[+b.dataset.idx];
-          if (!confirm(`Delete account for ${u.display_name || u.username}? This cannot be undone.`)) return;
+          if (!confirm(`Delete login for ${u.display_name || u.username}? This cannot be undone.`)) return;
           try {
             await RS_API.staffUsers({ action:'delete_user', user_id:u.id });
             RS.toast(`${u.display_name || u.username} deleted`, 'fa-user-minus');
@@ -2487,82 +2689,181 @@
       }
 
       function openAddStaffModal(loginPane) {
+        const defaultPwd = genStaffPassword();
         const body = `
-          <div style="display:flex;flex-direction:column;gap:14px">
-            <div class="form-group">
-              <label class="form-label">Display name</label>
-              <input id="sl-dname" class="form-control" placeholder="e.g. Ravi Kumar" autocomplete="off">
+          <div id="sl-form-root" style="display:flex;flex-direction:column;gap:14px">
+            <div style="font-size:12.5px;color:var(--text-soft);line-height:1.45;padding:10px 12px;border-radius:10px;background:var(--glass);border:1px solid var(--stroke-2)">
+              Creates an <b>app login</b> (username + password). For roster & salary use <b>Directory → Add team member</b>.
             </div>
-            <div class="form-group">
-              <label class="form-label">Username <span style="color:var(--text-mute);font-size:11px">(staff will type this to log in)</span></label>
-              <input id="sl-uname" class="form-control" placeholder="e.g. ravi.kumar" autocomplete="off" style="font-family:monospace">
+            <div class="form-group" style="margin:0">
+              <label class="form-label" for="sl-dname">Display name</label>
+              <input id="sl-dname" class="form-control" placeholder="e.g. Ravi Kumar" autocomplete="name">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin:0">
+              <label class="form-label" for="sl-uname">Username <span style="color:var(--text-mute);font-weight:500;font-size:11px">— 3–50 chars · letters, numbers, . _ -</span></label>
+              <input id="sl-uname" class="form-control" placeholder="e.g. ravi.kumar" autocomplete="off" spellcheck="false" style="font-family:ui-monospace,monospace">
+              <div id="sl-uname-hint" style="font-size:11.5px;color:var(--text-mute);margin-top:4px">Staff types this on the login screen with your Outlet ID.</div>
+            </div>
+            <div class="form-group" style="margin:0">
               <label class="form-label">Role</label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="sl-role-grid">
-                ${STAFF_ROLES.map(r=>`
-                  <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass)" class="sl-role-opt">
-                    <input type="radio" name="sl-role" value="${r.key}" style="display:none">
-                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:13px;width:16px;text-align:center"></i>
-                    <span style="font-size:13px;font-weight:600">${r.label}</span>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="sl-role-grid" role="radiogroup" aria-label="Staff role">
+                ${STAFF_ROLES.map((r, i) => `
+                  <label class="sl-role-opt" role="radio" aria-checked="false" tabindex="0" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke-2);cursor:pointer;background:var(--glass);transition:border-color .15s,box-shadow .15s,background .15s">
+                    <input type="radio" name="sl-role" value="${r.key}" style="position:absolute;opacity:0;pointer-events:none" ${i === 1 ? 'checked' : ''}>
+                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:14px;width:18px;text-align:center;flex-shrink:0"></i>
+                    <span style="font-size:13px;font-weight:700;line-height:1.2">${r.label}</span>
                   </label>`).join('')}
               </div>
+              <div id="sl-role-help" style="font-size:12.5px;color:var(--text-soft);margin-top:8px;line-height:1.4;min-height:1.4em"></div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Temporary password <span style="color:var(--text-mute);font-size:11px">(min 10 chars -- share with staff)</span></label>
-              <input id="sl-pwd" class="form-control" type="text" placeholder="e.g. Welcome@2025" autocomplete="new-password">
+            <div class="form-group" style="margin:0">
+              <label class="form-label" for="sl-pwd">Temporary password <span style="color:var(--text-mute);font-weight:500;font-size:11px">— min 10 characters · share once</span></label>
+              <div style="display:flex;gap:8px;align-items:stretch">
+                <input id="sl-pwd" class="form-control" type="text" value="${safe(defaultPwd)}" autocomplete="new-password" spellcheck="false" style="font-family:ui-monospace,monospace;flex:1">
+                <button type="button" class="btn btn-ghost" id="sl-gen-pwd" title="Generate a strong password" style="white-space:nowrap"><i class="fa-solid fa-shuffle"></i> Generate</button>
+              </div>
+              <div id="sl-pwd-meter" style="font-size:11.5px;color:var(--text-mute);margin-top:4px"></div>
             </div>
-            <div id="sl-add-err" style="color:var(--red);font-size:12.5px;display:none"></div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label" for="sl-phone">Mobile (optional) <span style="color:var(--text-mute);font-weight:500;font-size:11px">— for WhatsApp after create</span></label>
+              <input id="sl-phone" class="form-control" inputmode="tel" placeholder="e.g. 9876543210" autocomplete="tel">
+            </div>
+            <div id="sl-add-err" role="alert" style="color:var(--red);font-size:12.5px;display:none;line-height:1.4"></div>
           </div>`;
 
         if (!window.RSModal) {
           const name = prompt('Display name?'); if (!name) return;
-          const uname = prompt('Username?'); if (!uname) return;
+          const uname = prompt('Username (3–50: letters, numbers, . _ -)?'); if (!uname) return;
           const roleIdx = prompt('Role:\n'+STAFF_ROLES.map((r,i)=>`${i+1}. ${r.label}`).join('\n')+'\nEnter number:');
           const role = STAFF_ROLES[parseInt(roleIdx,10)-1]?.key; if (!role) return;
-          const pwd = prompt('Temporary password (min 10 chars)?'); if (!pwd || pwd.length < 10) return;
+          const pwd = prompt('Temporary password (min 10 chars)?', genStaffPassword()); if (!pwd || pwd.length < 10) return;
           RS_API.staffUsers({ action:'create_user', display_name:name, username:uname, role, password:pwd })
-            .then(() => { RS.toast(`${name} added`,'fa-user-plus'); loadStaffUsers(); })
+            .then(() => {
+              const share = buildStaffShareText({ name, username: uname, password: pwd, roleLabel: staffRoleMeta(role).label, outlet: sessionStorage.getItem('tenant_slug') || '' });
+              copyTextSafe(share).then(() => RS.toast(`${name} created · details copied`, 'fa-user-plus'));
+              loadStaffUsers();
+            })
             .catch(e => { console.warn(e); RS.toast(String(e.message || e), 'fa-circle-exclamation'); });
           return;
         }
 
         RSModal.open({
-          title:'Add staff account', icon:'fa-user-plus', body,
-          foot:`<button class="btn btn-ghost" id="sl-cancel-add">Cancel</button>
-                <button class="btn btn-primary" id="sl-confirm-add"><i class="fa-solid fa-user-plus"></i> Create account</button>`,
-          onOpen: el => {
-            // Role picker highlight
+          title: 'Create staff login',
+          icon: 'fa-user-plus',
+          size: 'md',
+          body,
+          foot: `<button type="button" class="btn btn-ghost" id="sl-cancel-add">Cancel</button>
+                <button type="button" class="btn btn-primary" id="sl-confirm-add"><i class="fa-solid fa-user-plus"></i> Create login</button>`,
+          onMount: (modal, close) => {
+            const el = modal;
+            const closeModal = typeof close === 'function' ? close : () => { try { RSModal.close && RSModal.close(); } catch (_) {} };
+            // Expose close for success step (RSModal may not have global close)
+            el.__rsClose = closeModal;
+
+            const dnameEl = el.querySelector('#sl-dname');
+            const unameEl = el.querySelector('#sl-uname');
+            const pwdEl = el.querySelector('#sl-pwd');
+            const errEl = el.querySelector('#sl-add-err');
+            let unameTouched = false;
+
+            const updatePwdMeter = () => {
+              const meter = el.querySelector('#sl-pwd-meter');
+              if (!meter || !pwdEl) return;
+              const p = pwdEl.value || '';
+              if (p.length < 10) meter.innerHTML = '<span style="color:var(--red)">Too short — need at least 10 characters.</span>';
+              else if (p.length < 12) meter.innerHTML = '<span style="color:#b45309">OK — consider Generate for a stronger password.</span>';
+              else meter.innerHTML = '<span style="color:var(--ok,#1F8A5B)">Strong enough to share as a temporary password.</span>';
+            };
+
+            // Default role: Cashier
+            paintRoleSelection(el, 'cashier');
+            updatePwdMeter();
+
             el.querySelectorAll('.sl-role-opt').forEach(opt => {
-              opt.addEventListener('click', () => {
-                el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor=''; o.style.background='var(--glass)'; });
-                opt.style.borderColor='var(--orange)'; opt.style.background='var(--orange-tint)';
-                opt.querySelector('input').checked = true;
+              const pick = () => {
+                const key = opt.querySelector('input')?.value;
+                paintRoleSelection(el, key);
+                if (errEl) errEl.style.display = 'none';
+              };
+              opt.addEventListener('click', (e) => { e.preventDefault(); pick(); });
+              opt.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
               });
             });
-            el.querySelector('#sl-cancel-add').onclick = () => RSModal.close();
-            el.querySelector('#sl-confirm-add').onclick = async () => {
-              const errEl = el.querySelector('#sl-add-err');
-              const name  = el.querySelector('#sl-dname').value.trim();
-              const uname = el.querySelector('#sl-uname').value.trim();
+
+            dnameEl?.addEventListener('input', () => {
+              if (unameTouched) return;
+              const slug = slugifyStaffUsername(dnameEl.value);
+              if (slug && unameEl) unameEl.value = slug;
+            });
+            unameEl?.addEventListener('input', () => { unameTouched = true; if (errEl) errEl.style.display = 'none'; });
+            pwdEl?.addEventListener('input', updatePwdMeter);
+
+            el.querySelector('#sl-gen-pwd')?.addEventListener('click', () => {
+              if (pwdEl) {
+                pwdEl.value = genStaffPassword();
+                pwdEl.focus();
+                pwdEl.select();
+                updatePwdMeter();
+              }
+            });
+
+            el.querySelector('#sl-cancel-add').onclick = () => closeModal();
+
+            const doCreate = async () => {
+              const name  = (dnameEl?.value || '').trim();
+              const uname = (unameEl?.value || '').trim();
               const role  = el.querySelector('input[name="sl-role"]:checked')?.value;
-              const pwd   = el.querySelector('#sl-pwd').value;
-              if (!name)  { errEl.textContent='Display name is required.'; errEl.style.display='block'; return; }
-              if (!uname) { errEl.textContent='Username is required.'; errEl.style.display='block'; return; }
-              if (!role)  { errEl.textContent='Select a role.'; errEl.style.display='block'; return; }
-              if (pwd.length < 10) { errEl.textContent='Password must be at least 10 characters.'; errEl.style.display='block'; return; }
+              const pwd   = pwdEl?.value || '';
+              const phone = (el.querySelector('#sl-phone')?.value || '').trim();
+              if (errEl) errEl.style.display = 'none';
+              if (!name)  { if (errEl) { errEl.textContent = 'Enter a display name (what you call them on shift).'; errEl.style.display = 'block'; } dnameEl?.focus(); return; }
+              if (!uname) { if (errEl) { errEl.textContent = 'Enter a username for the login screen.'; errEl.style.display = 'block'; } unameEl?.focus(); return; }
+              if (!validateStaffUsername(uname)) {
+                if (errEl) {
+                  errEl.textContent = 'Username must be 3–50 characters: letters, numbers, dots, underscores, or hyphens only.';
+                  errEl.style.display = 'block';
+                }
+                unameEl?.focus();
+                return;
+              }
+              if (!role)  { if (errEl) { errEl.textContent = 'Select a role so we know what they can open in the app.'; errEl.style.display = 'block'; } return; }
+              if (pwd.length < 10) { if (errEl) { errEl.textContent = 'Password must be at least 10 characters.'; errEl.style.display = 'block'; } pwdEl?.focus(); return; }
+
               const btn = el.querySelector('#sl-confirm-add');
-              btn.disabled = true; btn.textContent = 'Creating...';
+              if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Creating…'; }
               try {
-                await RS_API.staffUsers({ action:'create_user', display_name:name, username:uname, role, password:pwd });
-                RSModal.close();
-                RS.toast(`${name} account created`,'fa-user-plus');
-                loadStaffUsers();
-              } catch(e) {
-                errEl.textContent = e.message; errEl.style.display='block';
-                btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-user-plus"></i> Create account';
+                await RS_API.staffUsers({ action: 'create_user', display_name: name, username: uname, role, password: pwd });
+                const meta = staffRoleMeta(role);
+                await loadStaffUsers();
+                showStaffCredsSuccess(el, {
+                  name,
+                  username: uname,
+                  password: pwd,
+                  phone,
+                  roleLabel: meta.label,
+                  roleColor: meta.color,
+                }, {
+                  onDone: () => closeModal(),
+                  onAddAnother: () => {
+                    closeModal();
+                    setTimeout(() => openAddStaffModal(loginPane), 160);
+                  },
+                });
+                RS.toast(`${name} login created`, 'fa-user-plus');
+              } catch (e) {
+                if (errEl) { errEl.textContent = e.message || String(e); errEl.style.display = 'block'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create login'; }
               }
             };
+
+            el.querySelector('#sl-confirm-add').onclick = doCreate;
+            [dnameEl, unameEl, pwdEl].forEach(inp => {
+              inp?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doCreate(); }
+              });
+            });
+            setTimeout(() => dnameEl?.focus(), 40);
           }
         });
       }
@@ -2600,28 +2901,37 @@
         }
 
         RSModal.open({
-          title:`Edit -- ${u.display_name||u.username}`, icon:'fa-user-gear', body,
-          foot:`<button class="btn btn-ghost" id="sle-cancel">Cancel</button>
-                <button class="btn btn-primary" id="sle-save"><i class="fa-solid fa-check"></i> Save changes</button>`,
-          onOpen: el => {
+          title: `Edit login — ${u.display_name || u.username}`,
+          icon: 'fa-user-gear',
+          body,
+          foot: `<button type="button" class="btn btn-ghost" id="sle-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="sle-save"><i class="fa-solid fa-check"></i> Save changes</button>`,
+          onMount: (modal, close) => {
+            const el = modal;
+            const closeModal = typeof close === 'function' ? close : () => {};
             el.querySelectorAll('.sl-role-opt').forEach(opt => {
               opt.addEventListener('click', () => {
-                el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor=''; o.style.background='var(--glass)'; });
-                opt.style.borderColor='var(--orange)'; opt.style.background='var(--orange-tint)';
-                opt.querySelector('input').checked = true;
+                el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor = 'var(--stroke-2)'; o.style.background = 'var(--glass)'; o.style.boxShadow = 'none'; });
+                opt.style.borderColor = 'var(--orange)';
+                opt.style.background = 'var(--orange-tint, rgba(255,79,0,.08))';
+                opt.style.boxShadow = '0 0 0 1px var(--orange)';
+                const input = opt.querySelector('input');
+                if (input) input.checked = true;
               });
             });
-            el.querySelector('#sle-cancel').onclick = () => RSModal.close();
+            el.querySelector('#sle-cancel').onclick = () => closeModal();
             el.querySelector('#sle-save').onclick = async () => {
               const errEl = el.querySelector('#sle-err');
               const dname = el.querySelector('#sle-dname').value.trim();
               const role  = el.querySelector('input[name="sle-role"]:checked')?.value;
-              if (!dname) { errEl.textContent='Name required.'; errEl.style.display='block'; return; }
-              if (!role)  { errEl.textContent='Select a role.'; errEl.style.display='block'; return; }
+              if (!dname) { errEl.textContent = 'Name required.'; errEl.style.display = 'block'; return; }
+              if (!role)  { errEl.textContent = 'Select a role.'; errEl.style.display = 'block'; return; }
               try {
-                await RS_API.staffUsers({ action:'update_user', user_id:u.id, role, display_name:dname });
-                RSModal.close(); RS.toast('Staff account updated','fa-user-check'); loadStaffUsers();
-              } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+                await RS_API.staffUsers({ action: 'update_user', user_id: u.id, role, display_name: dname });
+                closeModal();
+                RS.toast('Login updated', 'fa-user-check');
+                loadStaffUsers();
+              } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
             };
           }
         });
@@ -2629,38 +2939,79 @@
 
       function openResetPwdModal(loginPane, idx) {
         const u = staffUsers[idx]; if (!u) return;
+        const defaultPwd = genStaffPassword();
         const body = `
           <div style="display:flex;flex-direction:column;gap:14px">
-            <div style="font-size:13px;color:var(--text-soft)">Set a new temporary password for <b>${safe(u.display_name||u.username)}</b>. Share it with them -- they can change it after login.</div>
-            <div class="form-group">
-              <label class="form-label">New password <span style="color:var(--text-mute);font-size:11px">(min 10 chars)</span></label>
-              <input id="slp-pwd" class="form-control" type="text" placeholder="e.g. NewPass@2025" autocomplete="new-password">
+            <div style="font-size:13px;color:var(--text-soft);line-height:1.45">
+              Set a new temporary password for <b>${safe(u.display_name || u.username)}</b>. Share it once — ask them to change it after login.
             </div>
-            <div id="slp-err" style="color:var(--red);font-size:12.5px;display:none"></div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label" for="slp-pwd">New temporary password <span style="color:var(--text-mute);font-weight:500;font-size:11px">— min 10 characters</span></label>
+              <div style="display:flex;gap:8px">
+                <input id="slp-pwd" class="form-control" type="text" value="${safe(defaultPwd)}" autocomplete="new-password" spellcheck="false" style="font-family:ui-monospace,monospace;flex:1">
+                <button type="button" class="btn btn-ghost" id="slp-gen" style="white-space:nowrap"><i class="fa-solid fa-shuffle"></i> Generate</button>
+              </div>
+            </div>
+            <div id="slp-err" role="alert" style="color:var(--red);font-size:12.5px;display:none"></div>
           </div>`;
 
         if (!window.RSModal) {
-          const pwd = prompt('New password (min 10 chars)?'); if (!pwd || pwd.length < 10) return;
+          const pwd = prompt('New password (min 10 chars)?', genStaffPassword()); if (!pwd || pwd.length < 10) return;
           RS_API.staffUsers({ action:'reset_password', user_id:u.id, password:pwd })
-            .then(() => RS.toast('Password reset','fa-key'))
+            .then(() => {
+              copyTextSafe(buildStaffShareText({
+                name: u.display_name || u.username,
+                username: u.username,
+                password: pwd,
+                roleLabel: staffRoleMeta(u.role).label,
+                outlet: sessionStorage.getItem('tenant_slug') || '',
+              }));
+              RS.toast('Password reset · details copied', 'fa-key');
+            })
             .catch(e => { console.warn(e); RS.toast(String(e.message || e), 'fa-circle-exclamation'); });
           return;
         }
 
         RSModal.open({
-          title:`Reset password -- ${u.display_name||u.username}`, icon:'fa-key', body,
-          foot:`<button class="btn btn-ghost" id="slp-cancel">Cancel</button>
-                <button class="btn btn-primary" id="slp-confirm"><i class="fa-solid fa-key"></i> Reset password</button>`,
-          onOpen: el => {
-            el.querySelector('#slp-cancel').onclick = () => RSModal.close();
+          title: `Reset password — ${u.display_name || u.username}`,
+          icon: 'fa-key',
+          body,
+          foot: `<button type="button" class="btn btn-ghost" id="slp-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="slp-confirm"><i class="fa-solid fa-key"></i> Reset & show details</button>`,
+          onMount: (modal, close) => {
+            const el = modal;
+            const closeModal = typeof close === 'function' ? close : () => {};
+            el.__rsClose = closeModal;
+            el.querySelector('#slp-gen')?.addEventListener('click', () => {
+              const inp = el.querySelector('#slp-pwd');
+              if (inp) { inp.value = genStaffPassword(); inp.focus(); inp.select(); }
+            });
+            el.querySelector('#slp-cancel').onclick = () => closeModal();
             el.querySelector('#slp-confirm').onclick = async () => {
               const errEl = el.querySelector('#slp-err');
               const pwd = el.querySelector('#slp-pwd').value;
-              if (pwd.length < 10) { errEl.textContent='Min 10 characters.'; errEl.style.display='block'; return; }
+              if (pwd.length < 10) { errEl.textContent = 'Password must be at least 10 characters.'; errEl.style.display = 'block'; return; }
+              const btn = el.querySelector('#slp-confirm');
+              if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving…'; }
               try {
-                await RS_API.staffUsers({ action:'reset_password', user_id:u.id, password:pwd });
-                RSModal.close(); RS.toast('Password reset successfully','fa-key');
-              } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+                await RS_API.staffUsers({ action: 'reset_password', user_id: u.id, password: pwd });
+                const meta = staffRoleMeta(u.role);
+                showStaffCredsSuccess(el, {
+                  name: u.display_name || u.username,
+                  username: u.username,
+                  password: pwd,
+                  roleLabel: meta.label,
+                  roleColor: meta.color,
+                }, {
+                  onDone: () => closeModal(),
+                  onAddAnother: () => { closeModal(); setTimeout(() => openAddStaffModal(loginPane), 160); },
+                });
+                RS.toast('Password reset — share the new details', 'fa-key');
+              } catch (e) {
+                errEl.textContent = e.message;
+                errEl.style.display = 'block';
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-key"></i> Reset & show details'; }
+              }
             };
           }
         });
