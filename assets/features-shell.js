@@ -291,7 +291,7 @@
             settingsHits
               .map(
                 (s) =>
-                  `<div class="sr-item" role="option" data-kind="settings" data-sec="${safe(s.sec)}">` +
+                  `<div class="sr-item" role="option" data-kind="settings" data-sec="${safe(s.sec)}" data-skey="${safe(s.skey || '')}" data-find="${safe(s.find || s.title)}">` +
                   `<span class="si-ic"><i class="fa-solid ${s.icon || 'fa-gear'}"></i></span>` +
                   `<div><div class="si-t">${safe(s.title)}</div><div class="si-s">${safe(s.sub)}</div></div>` +
                   `<span class="si-meta">Settings</span></div>`
@@ -401,14 +401,14 @@
           box.innerHTML =
             '<div class="sr-group">Quick</div>' +
             [
-              ['printer', 'Require open shift', 'fa-unlock'],
-              ['tax', 'Taxes & GST', 'fa-percent'],
-              ['gateway', 'WhatsApp', 'fa-whatsapp'],
-              ['printer', 'Printers & billing mode', 'fa-print'],
+              ['printer', 'Require open shift', 'fa-unlock', 'set_require_open_shift', 'Require open shift'],
+              ['tax', 'Calculate taxes', 'fa-percent', 'set_calculate_taxes', 'Calculate taxes'],
+              ['gateway', 'Send bill after payment', 'fa-whatsapp', 'set_send_bill_after_payment', 'Send bill after payment'],
+              ['printer', 'Operating mode', 'fa-print', 'set_operating_mode', 'Operating mode'],
             ]
               .map(
-                ([sec, title, ic]) =>
-                  `<div class="sr-item" data-kind="settings" data-sec="${sec}"><span class="si-ic"><i class="fa-solid ${ic}"></i></span><div><div class="si-t">${title}</div><div class="si-s">Settings</div></div><span class="si-meta">Open</span></div>`
+                ([sec, title, ic, skey, find]) =>
+                  `<div class="sr-item" data-kind="settings" data-sec="${sec}" data-skey="${skey}" data-find="${find}"><span class="si-ic"><i class="fa-solid ${ic}"></i></span><div><div class="si-t">${title}</div><div class="si-s">Settings</div></div><span class="si-meta">Open</span></div>`
               )
               .join('');
           box.classList.add('show');
@@ -1988,7 +1988,7 @@
             </header>
             <div id="set-body" class="set-body"></div>
             <footer class="set-save-bar">
-              <span class="set-save-hint" id="set-save-hint">Changes apply after you save</span>
+              <span class="set-save-hint" id="set-save-hint">Toggles apply instantly · Save also syncs to cloud</span>
               <div class="set-save-actions">
                 <button type="button" class="btn btn-ghost" id="set-cancel">Discard</button>
                 <button type="button" class="btn btn-primary" id="set-save"><i class="fa-solid fa-circle-check"></i> Save changes</button>
@@ -2354,6 +2354,82 @@
         $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; });
       }
       function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
+
+      /** Push one control into live settings + refresh UI (no page reload). */
+      function applyControlLive(el) {
+        if (!el || !el.dataset || !el.dataset.skey) return;
+        const k = el.dataset.skey;
+        SET_STORE[k] = el.type === 'checkbox' ? !!el.checked : el.value;
+        if (k === 'set_send_bill_after_payment') {
+          SET_STORE.set_auto_send_receipts = !!SET_STORE[k];
+        }
+        try {
+          if (window.RSOpsMode && typeof RSOpsMode.normalizeStore === 'function') {
+            RSOpsMode.normalizeStore(SET_STORE);
+          } else {
+            const raw = String(SET_STORE.set_operating_mode || '').toLowerCase();
+            SET_STORE.set_pos_only_mode = raw.indexOf('billing') >= 0;
+          }
+        } catch (_) {}
+        window.RS_SETTINGS = Object.assign({}, window.RS_SETTINGS || {}, SET_STORE);
+        if (typeof window.RS_applySettingsLive === 'function') {
+          window.RS_applySettingsLive(SET_STORE, { source: 'toggle', keys: [k], saved: false });
+        } else {
+          try { if (window.RSOps && RSOps.refresh) RSOps.refresh(); } catch (_) {}
+          try { if (window.RS_applyOpsModeUI) window.RS_applyOpsModeUI(); } catch (_) {}
+          try { if (window.RS && RS.renderCart) RS.renderCart(); if (window.RS && RS.renderPOS) RS.renderPOS(); } catch (_) {}
+        }
+        // Persist in background so hard refresh keeps the value (debounced)
+        scheduleSettingsAutosave();
+      }
+
+      let _setSaveTimer = null;
+      function scheduleSettingsAutosave() {
+        if (_setSaveTimer) clearTimeout(_setSaveTimer);
+        _setSaveTimer = setTimeout(async () => {
+          _setSaveTimer = null;
+          try {
+            collect();
+            if ('set_send_bill_after_payment' in SET_STORE) {
+              SET_STORE.set_auto_send_receipts = !!SET_STORE.set_send_bill_after_payment;
+            }
+            const lockedBiz = resolveLockedBusinessType(SET_STORE);
+            SET_STORE['set_business_type'] = lockedBiz.key;
+            try {
+              if (window.RSOpsMode && typeof RSOpsMode.normalizeStore === 'function') {
+                RSOpsMode.normalizeStore(SET_STORE);
+              }
+            } catch (_) {}
+            if (RS.saveSettings) await RS.saveSettings(SET_STORE);
+            window.RS_SETTINGS = SET_STORE;
+            const hint = document.getElementById('set-save-hint');
+            if (hint) {
+              hint.textContent = 'Applied live · saved';
+              setTimeout(() => {
+                if (hint) hint.textContent = 'Toggles apply instantly · Save also syncs to cloud';
+              }, 2000);
+            }
+          } catch (e) {
+            console.warn('[settings] autosave', e);
+          }
+        }, 450);
+      }
+
+      function wireLiveSettingsControls() {
+        $$('[data-skey]', body).forEach((el) => {
+          if (el.dataset.rsLiveWired === '1') return;
+          el.dataset.rsLiveWired = '1';
+          const evt = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'change';
+          el.addEventListener(evt, () => applyControlLive(el));
+          // Text fields: apply on blur so we don't thrash while typing
+          if (el.tagName === 'INPUT' && el.type !== 'checkbox' && el.type !== 'radio') {
+            el.addEventListener('blur', () => applyControlLive(el));
+          }
+          if (el.tagName === 'TEXTAREA') {
+            el.addEventListener('blur', () => applyControlLive(el));
+          }
+        });
+      }
       function show(key){
         // Never render a section this role's nav doesn't include (e.g. a
         // manager deep-linking to Danger Zone via the WhatsApp pill handler)
@@ -2374,8 +2450,8 @@
           if (hint) {
             if (key === 'danger') hint.textContent = 'Destructive actions below — not saved as settings';
             else if (key === 'plan') hint.textContent = 'Plan changes are handled by RestroSuite support';
-            else if (key === 'gateway') hint.textContent = 'Connection is live · preferences save with the button';
-            else hint.textContent = 'Changes apply after you save';
+            else if (key === 'gateway') hint.textContent = 'Connection is live · toggles apply instantly';
+            else hint.textContent = 'Toggles apply instantly · Save also syncs to cloud';
           }
         }
         if (key === 'gateway') {
@@ -2627,6 +2703,8 @@
             }
           };
         }
+        // Instant apply: toggles/selects update the live app without hard refresh
+        try { wireLiveSettingsControls(); } catch (e) { console.warn('live settings wire', e); }
       }
       $$('.set-nav button',sec).forEach(b=> b.onclick=()=>show(b.dataset.s));
       $('#set-save').onclick=async ()=>{ 
@@ -2649,40 +2727,27 @@
             }
           } catch (e) {}
           await (RS.saveSettings?RS.saveSettings(SET_STORE):Promise.resolve());
-          // Update RS_SETTINGS immediately with new settings
-          window.RS_SETTINGS = SET_STORE;
-          // Re-apply staff tab filters (e.g. lock reports) after toggle change
-          try {
-            if (typeof window.RS_applyLiveRoleUpdate === 'function') {
-              const role = (window.RS_ROLE && window.RS_ROLE.staffRole) ||
-                (window.RS_API && RS_API.session && RS_API.session() && RS_API.session().role) ||
-                sessionStorage.getItem('logged_in_role');
-              const sessTabs = window.RS_API && RS_API.session && RS_API.session()
-                ? RS_API.session().allowed_tabs
-                : null;
-              window.RS_applyLiveRoleUpdate(role, sessTabs);
-            }
-          } catch (_) {}
-          try {
-            if (window.RSOps && typeof RSOps.refresh === 'function') RSOps.refresh();
-          } catch (_) {}
+          // Live apply entire store (shift bar, ops mode, cart, tabs) — no page refresh
+          if (typeof window.RS_applySettingsLive === 'function') {
+            window.RS_applySettingsLive(SET_STORE, { source: 'save', saved: true });
+          } else {
+            window.RS_SETTINGS = SET_STORE;
+            try { if (window.RSOps && RSOps.refresh) RSOps.refresh(); } catch (_) {}
+            try { if (window.RS_applyOpsModeUI) window.RS_applyOpsModeUI(); } catch (_) {}
+            try { if (window.RS && RS.renderPOS) RS.renderPOS(); if (window.RS && RS.renderCart) RS.renderCart(); } catch (_) {}
+          }
           const isCloud = RS.dbMode && RS.dbMode()==='cloud' && navigator.onLine && !window.__OFFLINE_CONFIG__ && !window.RS_LAST_CLOUD_ERROR;
           if(isCloud){
-            RS.toast('Settings saved to cloud','fa-circle-check');
+            RS.toast('Saved · applied live','fa-circle-check');
           } else {
-            RS.toast('Settings saved locally only — not synced to cloud. Log in to sync across devices.','fa-triangle-exclamation');
+            RS.toast('Saved locally · applied live (cloud when online)','fa-circle-check');
           }
           if(window.RS_SAAS){ RS_SAAS.refresh(); RS_SAAS.applyToUI(); }
-          // First load receipt profile (which calls normalizeReceiptProfile)
-          if(window.RS && RS.loadReceiptProfile) RS.loadReceiptProfile(SET_STORE);
-          if(window.RS && RS.syncPhoneCombosToSettings) RS.syncPhoneCombosToSettings(SET_STORE);
-          if(window.RS && RS.updateStaticCurrencyLabels) RS.updateStaticCurrencyLabels();
-          try{ if(window.RS && RS.renderPOS) RS.renderPOS(); if(window.RS && RS.renderCart) RS.renderCart(); } catch(e){}
           try{
-            if(window.RS_applyOpsModeUI) window.RS_applyOpsModeUI();
-            else if(window.RS_applyPosOnlyModeUI) window.RS_applyPosOnlyModeUI();
             if(window.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: true });
           } catch(e){}
+          const hint = document.getElementById('set-save-hint');
+          if (hint) hint.textContent = 'Applied live · no refresh needed';
         } catch(err) {
           console.error(err);
           RS.toast('Failed to save settings: ' + err.message, 'fa-circle-exclamation');

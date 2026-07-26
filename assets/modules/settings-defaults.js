@@ -97,15 +97,99 @@
     return fallback === undefined ? false : !!fallback;
   }
 
+  /**
+   * Apply settings to the live app without a page refresh.
+   * Call after Save, or on each toggle change for instant UI.
+   */
+  function applySettingsLive(settings, meta) {
+    meta = meta || {};
+    var next = applyFeatureDefaults(settings || global.RS_SETTINGS || {});
+    try {
+      global.RS_SETTINGS = Object.assign({}, global.RS_SETTINGS || {}, next);
+    } catch (_) {
+      global.RS_SETTINGS = next;
+    }
+
+    // Shift bar / station / cart banners
+    try {
+      if (global.RSOps && typeof global.RSOps.refresh === 'function') global.RSOps.refresh();
+    } catch (_) {}
+    // Hide kitchen tabs etc. for Billing only
+    try {
+      if (typeof global.RS_applyOpsModeUI === 'function') global.RS_applyOpsModeUI();
+      else if (global.RSOpsMode && typeof global.RSOpsMode.applyUi === 'function') global.RSOpsMode.applyUi();
+    } catch (_) {}
+    // POS / cart / tax labels
+    try {
+      if (global.RS) {
+        if (typeof global.RS.loadReceiptProfile === 'function') global.RS.loadReceiptProfile(global.RS_SETTINGS);
+        if (typeof global.RS.syncPhoneCombosToSettings === 'function') {
+          global.RS.syncPhoneCombosToSettings(global.RS_SETTINGS);
+        }
+        if (typeof global.RS.updateStaticCurrencyLabels === 'function') global.RS.updateStaticCurrencyLabels();
+        if (typeof global.RS.renderPOS === 'function') global.RS.renderPOS();
+        if (typeof global.RS.renderCart === 'function') global.RS.renderCart();
+      }
+    } catch (_) {}
+    // Staff tab locks (reports etc.)
+    try {
+      if (typeof global.RS_applyLiveRoleUpdate === 'function') {
+        var role =
+          (global.RS_ROLE && global.RS_ROLE.staffRole) ||
+          (global.RS_API && global.RS_API.session && global.RS_API.session() && global.RS_API.session().role) ||
+          (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('logged_in_role') : '') ||
+          'owner';
+        var sessTabs =
+          global.RS_API && global.RS_API.session && global.RS_API.session()
+            ? global.RS_API.session().allowed_tabs
+            : null;
+        global.RS_applyLiveRoleUpdate(role, sessTabs);
+      }
+    } catch (_) {}
+    // Loyalty / promo chrome if mounted
+    try {
+      if (global.RSLoyalty && typeof global.RSLoyalty.refresh === 'function') global.RSLoyalty.refresh();
+    } catch (_) {}
+    try {
+      if (global.RSPromo && typeof global.RSPromo.refresh === 'function') global.RSPromo.refresh();
+    } catch (_) {}
+
+    try {
+      document.dispatchEvent(
+        new CustomEvent('rs:settings-changed', {
+          detail: {
+            settings: global.RS_SETTINGS,
+            source: meta.source || 'live',
+            saved: !!meta.saved,
+            keys: meta.keys || null,
+          },
+        })
+      );
+    } catch (_) {}
+
+    return global.RS_SETTINGS;
+  }
+
   global.RS_FEATURE_DEFAULTS = FEATURE_DEFAULTS;
   global.RS_applyFeatureDefaults = applyFeatureDefaults;
   global.RS_featureOn = featureOn;
+  global.RS_applySettingsLive = applySettingsLive;
+
+  // Any module can listen once
+  if (typeof document !== 'undefined') {
+    document.addEventListener('rs:settings-changed', function () {
+      try {
+        if (global.RSOps && typeof global.RSOps.refresh === 'function') global.RSOps.refresh();
+      } catch (_) {}
+    });
+  }
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       FEATURE_DEFAULTS: FEATURE_DEFAULTS,
       applyFeatureDefaults: applyFeatureDefaults,
       featureOn: featureOn,
+      applySettingsLive: applySettingsLive,
     };
   }
 })(typeof window !== 'undefined' ? window : globalThis);

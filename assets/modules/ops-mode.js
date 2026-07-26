@@ -420,4 +420,7 @@
   document.addEventListener('rs:hydrated', function () {
     setTimeout(applyUi, 50);
   });
+  document.addEventListener('rs:settings-changed', function () {
+    setTimeout(applyUi, 30);
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

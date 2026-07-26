@@ -632,9 +632,12 @@
    */
   function isShiftRequired() {
     try {
+      if (typeof global.RS_featureOn === 'function') {
+        return global.RS_featureOn('set_require_open_shift', global.RS_SETTINGS, false);
+      }
       const s = global.RS_SETTINGS || {};
       const v = s.set_require_open_shift;
-      // Explicit true / 'true' / 1 only — everything else (missing, false) = OFF
+      // Explicit true only — missing / false / "false" = OFF (simple café default)
       return v === true || v === 'true' || v === 1 || v === '1';
     } catch (_) {
       return false;
@@ -1329,6 +1332,34 @@
       }
     } catch (_) {}
 
+    const mustShift = isShiftRequired();
+    const openShiftNow = getOpenShift();
+
+    // Simple café: Require open shift OFF → hide bar + cart banner completely
+    // (no "Shift" chip, no "Open shift to bill")
+    if (!mustShift && !openShiftNow) {
+      const hostHide = document.getElementById('rs-topbar-shift');
+      if (hostHide) hostHide.style.display = 'none';
+      const barHide = document.getElementById('rs-shift-bar');
+      if (barHide) {
+        barHide.style.display = 'none';
+        barHide.innerHTML = '';
+      }
+      const cartHintHide = document.getElementById('rs-cart-shift-hint');
+      if (cartHintHide) {
+        cartHintHide.hidden = true;
+        cartHintHide.style.display = 'none';
+        cartHintHide.onclick = null;
+      }
+      document.getElementById('pos-tab')?.classList.remove('rs-shift-is-closed');
+      const cartSlot0 = document.getElementById('pos-shift-slot');
+      if (cartSlot0) {
+        cartSlot0.innerHTML = '';
+        cartSlot0.style.display = 'none';
+      }
+      return;
+    }
+
     let host = document.getElementById('rs-topbar-shift');
     if (!host) {
       const topbar = document.querySelector('.topbar');
@@ -1344,6 +1375,7 @@
       else if (spacer) spacer.insertAdjacentElement('afterend', host);
       else topbar.appendChild(host);
     }
+    host.style.display = '';
 
     // Clear legacy cart-side mount (v91–93 put shift on cart)
     const cartSlot = document.getElementById('pos-shift-slot');
@@ -1353,7 +1385,7 @@
     }
 
     let bar = document.getElementById('rs-shift-bar');
-    const shift = getOpenShift();
+    const shift = openShiftNow;
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'rs-shift-bar';
@@ -1362,7 +1394,7 @@
     bar.style.display = '';
     if (bar.parentNode !== host) host.appendChild(bar);
 
-    // Tiny cart status only when shift is closed (don't steal item space when open)
+    // Cart banner only when shift is REQUIRED and closed
     let cartHint = document.getElementById('rs-cart-shift-hint');
     const cartEl = document.querySelector('.pos-cart');
     if (cartEl && !cartHint) {
@@ -1404,25 +1436,22 @@
         cartHint.hidden = true;
         cartHint.onclick = null;
       }
+      // If require-shift is OFF but a shift was left open, still show open controls so staff can close it
+      if (!mustShift) {
+        // keep open UI only
+      }
       document.getElementById('pos-tab')?.classList.remove('rs-shift-is-closed');
     } else {
-      const mustShift = isShiftRequired();
+      // mustShift is true here (required + no open shift)
       bar.classList.add('rs-shift-bar-closed');
       bar.classList.remove('rs-shift-bar-open');
-      // Optional mode: quiet chip (ghost). Required mode: primary “open shift” CTA.
-      bar.innerHTML = mustShift
-        ? `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — required before billing">
+      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — required before billing">
         <span class="rs-shift-dot closed"></span>
         <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Shift</span></button>
-      </div>`
-        : `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="Shift optional — enable in Settings → Printer if you need float / Z-report">
-        <span class="rs-shift-dot closed" style="opacity:.45"></span>
-        <button type="button" class="btn btn-ghost btn-sm" id="rs-shift-open" title="Optional: open shift for float & Z-report"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Shift</span></button>
       </div>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)
         op.onclick = async () => {
-          // Prefer denomination grid (notes/coins) when product-10x is loaded
           if (global.RS10 && typeof RS10.promptDenomination === 'function') {
             const result = await RS10.promptDenomination({
               title: (global.RS10.t && RS10.t('shift_open')) || 'Open shift',
@@ -1444,28 +1473,18 @@
           if (f === null) return;
           await openShift(Number(f) || 0);
         };
-      // Cart banner only when shift is required (simple cafés should not see "Open shift to bill")
       if (cartHint) {
-        if (mustShift) {
-          cartHint.hidden = false;
-          cartHint.innerHTML =
-            '<i class="fa-solid fa-unlock"></i> <span>Open shift to bill</span>';
-          cartHint.onclick = () => {
-            const btn = document.getElementById('rs-shift-open');
-            if (btn) btn.click();
-            else op && op.click();
-          };
-        } else {
-          cartHint.hidden = true;
-          cartHint.onclick = null;
-        }
+        cartHint.hidden = false;
+        cartHint.style.display = '';
+        cartHint.innerHTML =
+          '<i class="fa-solid fa-unlock"></i> <span>Open shift to bill</span>';
+        cartHint.onclick = () => {
+          const btn = document.getElementById('rs-shift-open');
+          if (btn) btn.click();
+          else op && op.click();
+        };
       }
-      // Do not mark POS as blocked when shift is optional
-      if (mustShift) {
-        document.getElementById('pos-tab')?.classList.add('rs-shift-is-closed');
-      } else {
-        document.getElementById('pos-tab')?.classList.remove('rs-shift-is-closed');
-      }
+      document.getElementById('pos-tab')?.classList.add('rs-shift-is-closed');
     }
   }
 
@@ -2421,6 +2440,9 @@
       installPdfPreference();
       installFloorOrderAlerts();
       refreshOpsUi();
+    });
+    document.addEventListener('rs:settings-changed', () => {
+      try { refreshOpsUi(); } catch (_) {}
     });
     document.addEventListener('rs:bill-paid', (ev) => {
       setTimeout(refreshOpsUi, 200);

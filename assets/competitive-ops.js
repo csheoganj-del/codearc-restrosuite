@@ -2441,6 +2441,9 @@
       installFloorOrderAlerts();
       refreshOpsUi();
     });
+    document.addEventListener('rs:settings-changed', () => {
+      try { refreshOpsUi(); } catch (_) {}
+    });
     document.addEventListener('rs:bill-paid', (ev) => {
       setTimeout(refreshOpsUi, 200);
       const bill = ev && ev.detail && ev.detail.bill;
