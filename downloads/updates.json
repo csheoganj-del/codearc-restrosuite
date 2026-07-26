@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-26T04:42:33.201Z",
+  "generatedAt": "2026-07-26T13:48:26.895Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v216-20260725-shift-ux-guide",
+    "version": "v217-20260726-settle-skel-tabs",
     "title": "Shift-first billing + clear action guides",
     "summary": "Print and Pay, Hold, refunds, and cash drawer now require an open shift and explain why when blocked. After this update, staff see a short guide of what changed.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"

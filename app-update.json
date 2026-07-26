@@ -1,14 +1,16 @@
 {
-  "version": "v216-20260725-shift-ux-guide",
-  "date": "2026-07-25",
-  "title": "Shift-first billing + clear action guides",
-  "summary": "Print and Pay, Hold, refunds, and cash drawer now require an open shift and explain why when blocked. After this update, staff see a short guide of what changed.",
+  "version": "v217-20260726-settle-skel-tabs",
+  "date": "2026-07-26",
+  "title": "Settle shell, system skeletons, faster tabs",
+  "summary": "Print & Pay settles on one card with a live skeleton, main screens show loading skeletons instead of hanging, and tab switches paint first so the cursor no longer freezes 2–3s. Desktop content updater also gets automatic version bumps on every deploy.",
   "highlights": [
-    "Open shift first: Print and Pay shows a clear modal when shift is closed (Open shift CTA)",
-    "Hold and Void/Refund use the same shift gate so Z-report stays accurate",
-    "Cash drawer and pay-in/pay-out also prompt to open shift instead of failing silently",
-    "Print and Pay explains empty cart, short cash, and unbalanced split - no dead button",
-    "After update install: Whats New + optional 4-step tour of shift and billing UX"
+    "Print & Pay: Settling… + same-card morph into Bill settled (no blank hang)",
+    "RSSkel loading shapes on Bills, Kitchen, QR, Floor, Inventory, Menu, Reports, Customers",
+    "Tab switch paints immediately, then loads modules — no frozen hand cursor",
+    "Single shared cart path (no dual empty-cart Print & Pay bug)",
+    "Every production deploy auto-bumps content version so installed EXE can pull UI updates"
   ],
-  "tour": "shift-ux"
+  "tour": "settle-skel-tabs",
+  "contentStamp": "16acdd77ab0a",
+  "buildId": "16acdd77ab0a"
 }

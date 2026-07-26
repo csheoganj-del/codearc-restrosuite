@@ -322,7 +322,7 @@ function ensureDirFor(filePath) {
 /**
  * Download remote content into a staging folder, then swap into web-overlay.
  */
-async function applyContentUpdate({ origin, version, files, title }) {
+async function applyContentUpdate({ origin, version, files, title, contentStamp, buildId }) {
   const base = String(origin || '').replace(/\/+$/, '');
   const staging = path.join(app.getPath('userData'), 'web-overlay-staging');
   const finalDir = overlayDir();
@@ -403,6 +403,8 @@ async function applyContentUpdate({ origin, version, files, title }) {
   writeState({
     version: String(version),
     title: title || '',
+    contentStamp: String(contentStamp || buildId || ''),
+    buildId: String(buildId || contentStamp || ''),
     appliedAt: new Date().toISOString(),
     fileCount: done,
     failedCount: failed,
@@ -529,10 +531,23 @@ async function checkContentUpdate(opts) {
 
     const localRank = versionRank(localVer);
     const remoteRank = versionRank(remoteVer);
-    // Need update only when remote is newer (by vNNN) or a different build at
-    // the same rank. Never re-prompt for an *older* remote after a reinstall.
+    // contentStamp / buildId: every Vercel deploy can force a pull even if
+    // someone forgot to bump the human-facing vNNN (belt-and-suspenders).
+    const remoteStamp = String(
+      (remoteUpdate && (remoteUpdate.contentStamp || remoteUpdate.buildId)) || ''
+    ).trim();
+    const stForStamp = readState() || {};
+    const localStamp = String(stForStamp.contentStamp || stForStamp.buildId || '').trim();
+    const stampNewer = !!(remoteStamp && remoteStamp !== localStamp && remoteRank >= localRank);
+
+    // Need update when:
+    //  - remote version string differs and is not older (by vNNN), OR
+    //  - remote contentStamp/buildId differs (auto-deploy fingerprint)
+    // Never re-prompt for an *older* remote major after a reinstall.
     const needsUpdate =
-      remoteVer !== localVer && remoteRank >= localRank;
+      options.force ||
+      (remoteVer !== localVer && remoteRank >= localRank) ||
+      stampNewer;
 
     if (!options.force && !needsUpdate) {
       _lastStatus = { status: 'current', version: localVer, kind: 'content' };
@@ -612,6 +627,8 @@ async function checkContentUpdate(opts) {
       version: remoteVer,
       files,
       title: remoteUpdate && remoteUpdate.title,
+      contentStamp: remoteUpdate && (remoteUpdate.contentStamp || remoteUpdate.buildId),
+      buildId: remoteUpdate && remoteUpdate.buildId,
     });
 
     clearDismissed();
