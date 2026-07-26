@@ -1128,7 +1128,7 @@
               .join('')
           : ''
       }
-      <div style="text-align:center;font-size:11px;color:#666;margin-top:14px">Powered by RestroSuite</div>
+      <div style="text-align:center;font-size:11px;color:#666;margin-top:14px">Powered by CodeArc RestroSuite</div>
     </div>`;
   }
 

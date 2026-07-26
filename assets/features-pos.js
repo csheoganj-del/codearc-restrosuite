@@ -651,7 +651,7 @@
       return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div></div>
         <hr class="rcp-hr"><div class="rcp-meta"><span>${esc(bill.no)}</span><span>${esc(bill.time)}</span></div>
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
-        <div class="rcp-foot">Thank you!<br><b>Powered by RestroSuite</b></div>`;
+        <div class="rcp-foot">Thank you!<br><b>Powered by CodeArc RestroSuite</b></div>`;
     }
 
     function receiptText(bill) {
@@ -1110,7 +1110,7 @@
         setFont('bold', 8.5); // matches 11px
         colorInk();
         if (!isMeasurePass) {
-          doc.text('Powered by RestroSuite', W / 2, y + 3.5, { align: 'center' });
+          doc.text('Powered by CodeArc RestroSuite', W / 2, y + 3.5, { align: 'center' });
         }
         y += 9.5; // margin-bottom
 

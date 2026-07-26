@@ -131,7 +131,7 @@
     enc.hr(32).bold(true);
     const grand = Number(b.grand != null ? b.grand : b.amount != null ? b.amount : b.total) || 0;
     enc.line('TOTAL' + ' '.repeat(Math.max(1, 27 - String(Math.round(grand)).length)) + Math.round(grand));
-    enc.bold(false).hr(32).align('center').line('Thank you!').line('RestroSuite').feed(3).cut();
+    enc.bold(false).hr(32).align('center').line('Thank you!').line('CodeArc RestroSuite').feed(3).cut();
     return enc;
   }
 

@@ -1,14 +1,14 @@
 {
-  "version": "v220-20260726-hide-cart-gst",
+  "version": "v221-20260726-codearc-powered",
   "date": "2026-07-26",
-  "title": "Live update v220-20260726-hide-cart-gst",
+  "title": "Live update v221-20260726-codearc-powered",
   "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
   "highlights": [
-    "Automatic content release v220-20260726-hide-cart-gst",
+    "Automatic content release v221-20260726-codearc-powered",
     "Desktop EXE picks this up via content updater (no new installer required)",
     "Restart RestroSuite after Update now if prompted"
   ],
   "tour": "settle-skel-tabs",
-  "contentStamp": "6c5511a91b17",
-  "buildId": "6c5511a91b17"
+  "contentStamp": "c2f613e6f7eb",
+  "buildId": "c2f613e6f7eb"
 }

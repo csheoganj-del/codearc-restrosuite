@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-26T14:48:41.967Z",
+  "generatedAt": "2026-07-26T15:01:19.854Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v220-20260726-hide-cart-gst",
-    "title": "Live update v220-20260726-hide-cart-gst",
+    "version": "v221-20260726-codearc-powered",
+    "title": "Live update v221-20260726-codearc-powered",
     "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },

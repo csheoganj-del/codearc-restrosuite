@@ -115,7 +115,7 @@ export default async function handler(req, res) {
   } else {
     message += `${cfg.taxLabel} (${cfg.taxRate}%)    ${rs(tax)}\n`;
   }
-  message += `\n*TOTAL    ${rs(total)}*\n\nThank you for dining with us.\nPowered by RestroSuite`;
+  message += `\n*TOTAL    ${rs(total)}*\n\nThank you for dining with us.\nPowered by CodeArc RestroSuite`;
 
   try {
     // Prefer a clear offline/not-linked message before attempting send

@@ -306,7 +306,7 @@
       ${tenders}
       ${m.change ? `<div class="rcp-line"><span class="q">Change</span><span>${$(m.change)}</span></div>` : ''}
       ${qrBlockHtml(qrDataUri)}
-      <div class="rcp-foot" style="text-align:center;width:100%;display:block;margin-top:12px;">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>`;
+      <div class="rcp-foot" style="text-align:center;width:100%;display:block;margin-top:12px;">Thank you for dining with us!<br><b>Powered by CodeArc RestroSuite</b></div>`;
   }
 
   function toText(bill, outletProfile) {
@@ -362,7 +362,7 @@
       `Paid by: ${(m.tenders[0] && m.tenders[0].method) || 'Cash'}`,
       '',
       'Thank you for dining with us!',
-      'Powered by RestroSuite',
+      'Powered by CodeArc RestroSuite',
     );
     return lines.filter((x) => x !== '' && x != null).join('\n');
   }
