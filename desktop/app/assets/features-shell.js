@@ -41,39 +41,140 @@
         ['tax-tab', 'Tax & GST', 'percent', 'tax invoice'],
       ];
 
-      // Settings jump targets: section + searchable keywords
+      // Settings jump targets: section + optional skey/find text to scroll + highlight
       const SETTINGS = [
-        { sec: 'profile', title: 'Outlet profile', sub: 'Name, address, phone, country', kw: 'profile outlet name address phone email gstin cuisine wifi qr' },
-        { sec: 'tax', title: 'Taxes & pricing', sub: 'GST, tax, round-off, loyalty, promo', kw: 'tax gst calculate taxes service charge round-off hsn inclusive happy hour loyalty promo coupon' },
-        { sec: 'printer', title: 'Printers & KOT', sub: 'Billing only, shift, print, drawer', kw: 'printer kot receipt thermal shift require open shift auto-print cash drawer paper billing only kitchen' },
-        { sec: 'gateway', title: 'WhatsApp', sub: 'Link number, send bill, alerts', kw: 'whatsapp gateway send bill after payment order ready promotional messages' },
-        { sec: 'payments', title: 'Payments', sub: 'UPI / card settlement', kw: 'razorpay stripe upi payments bank' },
-        { sec: 'security', title: 'Security & PIN', sub: 'Admin PIN, pin gates', kw: 'pin security lock idle' },
-        { sec: 'team', title: 'Team & roles', sub: 'Staff permissions, refunds PIN', kw: 'team cashier edit prices require pin refunds lock reports staff' },
-        { sec: 'plan', title: 'Plan & billing', sub: 'Subscription plan', kw: 'plan upgrade subscription' },
-        { sec: 'danger', title: 'Danger zone', sub: 'Reset outlet data', kw: 'danger reset wipe delete data' },
-        // Direct feature shortcuts → open correct settings pane
-        { sec: 'printer', title: 'Require open shift', sub: 'Settings · Printers', kw: 'shift open float z-report', icon: 'fa-unlock' },
-        { sec: 'printer', title: 'Operating mode / Billing only', sub: 'Settings · Printers', kw: 'billing only kitchen printer full ops', icon: 'fa-sliders' },
-        { sec: 'printer', title: 'Auto-print receipt', sub: 'Settings · Printers', kw: 'auto print receipt thermal', icon: 'fa-print' },
-        { sec: 'printer', title: 'Auto-print KOT', sub: 'Settings · Printers', kw: 'auto print kot kitchen', icon: 'fa-receipt' },
-        { sec: 'tax', title: 'Calculate taxes / GST', sub: 'Settings · Taxes', kw: 'tax gst calculate', icon: 'fa-percent' },
-        { sec: 'tax', title: 'Loyalty program', sub: 'Settings · Taxes', kw: 'loyalty points', icon: 'fa-star' },
-        { sec: 'tax', title: 'POS promo codes', sub: 'Settings · Taxes', kw: 'promo coupon offer code', icon: 'fa-tag' },
-        { sec: 'gateway', title: 'Send bill after payment', sub: 'Settings · WhatsApp', kw: 'whatsapp auto bill send', icon: 'fa-whatsapp' },
-        { sec: 'team', title: 'Require PIN for refunds', sub: 'Settings · Team', kw: 'pin refund void', icon: 'fa-key' },
-        { sec: 'team', title: 'Cashier can edit prices', sub: 'Settings · Team', kw: 'price edit cashier override', icon: 'fa-indian-rupee-sign' },
-        { sec: 'team', title: 'Lock reports for staff', sub: 'Settings · Team', kw: 'lock reports staff', icon: 'fa-lock' },
+        { sec: 'profile', title: 'Outlet profile', sub: 'Name, address, phone, country', kw: 'profile outlet name address phone email gstin cuisine wifi qr', find: 'Identity' },
+        { sec: 'tax', title: 'Taxes & pricing', sub: 'GST, tax, round-off, loyalty, promo', kw: 'tax gst calculate taxes service charge round-off hsn inclusive happy hour loyalty promo coupon', find: 'Tax engine' },
+        { sec: 'printer', title: 'Printers & KOT', sub: 'Billing only, shift, print, drawer', kw: 'printer kot receipt thermal shift require open shift auto-print cash drawer paper billing only kitchen', find: 'Kitchen & billing' },
+        { sec: 'gateway', title: 'WhatsApp', sub: 'Link number, send bill, alerts', kw: 'whatsapp gateway send bill after payment order ready promotional messages', find: 'Connection' },
+        { sec: 'payments', title: 'Payments', sub: 'UPI / card settlement', kw: 'razorpay stripe upi payments bank', find: 'Card' },
+        { sec: 'security', title: 'Security & PIN', sub: 'Admin PIN, pin gates', kw: 'pin security lock idle', find: 'Admin PIN' },
+        { sec: 'team', title: 'Team & roles', sub: 'Staff permissions, refunds PIN', kw: 'team cashier edit prices require pin refunds lock reports staff', find: 'Cashier permissions' },
+        { sec: 'plan', title: 'Plan & billing', sub: 'Subscription plan', kw: 'plan upgrade subscription', find: 'workspace plan' },
+        { sec: 'danger', title: 'Danger zone', sub: 'Reset outlet data', kw: 'danger reset wipe delete data', find: 'Reset operational' },
+        // Direct feature shortcuts → open pane + highlight exact row
+        { sec: 'printer', title: 'Require open shift', sub: 'Settings · Printers', kw: 'shift open float z-report', icon: 'fa-unlock', skey: 'set_require_open_shift', find: 'Require open shift' },
+        { sec: 'printer', title: 'Operating mode / Billing only', sub: 'Settings · Printers', kw: 'billing only kitchen printer full ops', icon: 'fa-sliders', skey: 'set_operating_mode', find: 'Operating mode' },
+        { sec: 'printer', title: 'Auto-print receipt', sub: 'Settings · Printers', kw: 'auto print receipt thermal', icon: 'fa-print', skey: 'set_auto_print_receipt', find: 'Auto-print receipt' },
+        { sec: 'printer', title: 'Auto-print KOT', sub: 'Settings · Printers', kw: 'auto print kot kitchen', icon: 'fa-receipt', skey: 'set_auto_print_kot', find: 'Auto-print KOT' },
+        { sec: 'printer', title: 'Open cash drawer on cash', sub: 'Settings · Printers', kw: 'cash drawer pulse', icon: 'fa-cash-register', skey: 'set_open_cash_drawer_on_cash', find: 'Open cash drawer' },
+        { sec: 'tax', title: 'Calculate taxes / GST', sub: 'Settings · Taxes', kw: 'tax gst calculate', icon: 'fa-percent', skey: 'set_calculate_taxes', find: 'Calculate taxes' },
+        { sec: 'tax', title: 'Service charge', sub: 'Settings · Taxes', kw: 'service charge', icon: 'fa-receipt', skey: 'set_service_charge', find: 'Service charge' },
+        { sec: 'tax', title: 'Round-off totals', sub: 'Settings · Taxes', kw: 'round off', icon: 'fa-coins', skey: 'set_round_off_totals', find: 'Round-off' },
+        { sec: 'tax', title: 'Show HSN codes', sub: 'Settings · Taxes', kw: 'hsn sac invoice', icon: 'fa-barcode', skey: 'set_show_hsn_codes', find: 'Show HSN' },
+        { sec: 'tax', title: 'Loyalty program', sub: 'Settings · Taxes', kw: 'loyalty points', icon: 'fa-star', skey: 'set_loyalty_program', find: 'Loyalty program' },
+        { sec: 'tax', title: 'POS promo codes', sub: 'Settings · Taxes', kw: 'promo coupon offer code', icon: 'fa-tag', skey: 'set_pos_promo_codes', find: 'POS promo' },
+        { sec: 'tax', title: 'Happy hour', sub: 'Settings · Taxes', kw: 'happy hour discount', icon: 'fa-clock', skey: 'set_happy_hour', find: 'Happy hour' },
+        { sec: 'gateway', title: 'Send bill after payment', sub: 'Settings · WhatsApp', kw: 'whatsapp auto bill send', icon: 'fa-whatsapp', skey: 'set_send_bill_after_payment', find: 'Send bill after payment' },
+        { sec: 'gateway', title: 'Order ready alerts', sub: 'Settings · WhatsApp', kw: 'order ready message', icon: 'fa-bell', skey: 'set_order_ready_alerts', find: 'Order ready' },
+        { sec: 'gateway', title: 'Promotional messages', sub: 'Settings · WhatsApp', kw: 'promotional campaign broadcast', icon: 'fa-bullhorn', skey: 'set_promotional_messages', find: 'Promotional messages' },
+        { sec: 'team', title: 'Require PIN for refunds', sub: 'Settings · Team', kw: 'pin refund void', icon: 'fa-key', skey: 'set_require_pin_for_refunds', find: 'Require PIN for refunds' },
+        { sec: 'team', title: 'Cashier can edit prices', sub: 'Settings · Team', kw: 'price edit cashier override', icon: 'fa-indian-rupee-sign', skey: 'set_cashier_can_edit_prices', find: 'Cashier can edit prices' },
+        { sec: 'team', title: 'Lock reports for staff', sub: 'Settings · Team', kw: 'lock reports staff', icon: 'fa-lock', skey: 'set_lock_reports_for_staff', find: 'Lock reports for staff' },
       ];
 
-      function openSettingsSection(sec) {
+      function clearSearchHighlight() {
+        document.querySelectorAll('.rs-search-hit').forEach((el) => {
+          el.classList.remove('rs-search-hit');
+        });
+      }
+
+      function highlightSettingsTarget(opts) {
+        opts = opts || {};
+        const skey = opts.skey || '';
+        const find = String(opts.find || opts.title || '').trim().toLowerCase();
+        const root = document.getElementById('set-body') || document.getElementById('settings-tab');
+        if (!root) return false;
+
+        clearSearchHighlight();
+
+        let target = null;
+        if (skey) {
+          const ctrl = root.querySelector('[data-skey="' + skey.replace(/"/g, '') + '"]');
+          if (ctrl) {
+            target =
+              ctrl.closest('.set-row') ||
+              ctrl.closest('.set-field') ||
+              ctrl.closest('.set-block') ||
+              ctrl;
+          }
+        }
+        if (!target && find) {
+          // Match toggle title (.st), field label (.fl), or block heading (h4)
+          const nodes = root.querySelectorAll('.set-row, .set-field, .set-block, .set-block-head, h4');
+          for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i];
+            const text = (n.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (text.includes(find) || find.split(/\s+/).every((w) => w.length < 2 || text.includes(w))) {
+              target =
+                n.classList && n.classList.contains('set-block-head')
+                  ? n.closest('.set-block') || n
+                  : n;
+              // Prefer the tightest set-row when possible
+              if (n.classList && n.classList.contains('set-row')) {
+                target = n;
+                break;
+              }
+              if (n.classList && n.classList.contains('set-field')) {
+                target = n;
+                break;
+              }
+            }
+          }
+        }
+        if (!target) return false;
+
+        target.classList.add('rs-search-hit');
+        try {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (_) {
+          try {
+            target.scrollIntoView(true);
+          } catch (__) {}
+        }
+        // Focus interactive control when present
+        try {
+          const focusEl =
+            target.querySelector('input, select, textarea, button, .toggle') || target;
+          if (focusEl && typeof focusEl.focus === 'function') {
+            setTimeout(() => {
+              try {
+                focusEl.focus({ preventScroll: true });
+              } catch (_) {
+                focusEl.focus();
+              }
+            }, 280);
+          }
+        } catch (_) {}
+
+        // Pulse then clear highlight
+        setTimeout(() => {
+          if (target && target.classList) target.classList.remove('rs-search-hit');
+        }, 4200);
+        return true;
+      }
+
+      function openSettingsSection(sec, highlight) {
+        highlight = highlight || {};
         window.__rsOpenSettingsSection = sec || 'profile';
+        window.__rsSettingsHighlight = highlight;
         return Promise.resolve(RS.activateTab('settings-tab')).then(() => {
           let tries = 0;
           const go = () => {
             const b = document.querySelector('.set-nav button[data-s="' + sec + '"]');
             if (b) {
               b.click();
+              // Wait for pane render, then scroll + highlight
+              let hTries = 0;
+              const tryHighlight = () => {
+                const ok = highlightSettingsTarget(window.__rsSettingsHighlight || highlight);
+                if (ok || ++hTries > 20) {
+                  window.__rsSettingsHighlight = null;
+                  return;
+                }
+                setTimeout(tryHighlight, 80);
+              };
+              setTimeout(tryHighlight, 60);
               return;
             }
             if (++tries < 25) setTimeout(go, 70);
@@ -82,7 +183,11 @@
         });
       }
       window.RS_openSettingsSection = openSettingsSection;
-      if (RS) RS.openSettingsSection = openSettingsSection;
+      window.RS_highlightSettingsTarget = highlightSettingsTarget;
+      if (RS) {
+        RS.openSettingsSection = openSettingsSection;
+        RS.highlightSettingsTarget = highlightSettingsTarget;
+      }
 
       function match(hay, t) {
         return String(hay || '').toLowerCase().includes(t);
@@ -104,12 +209,13 @@
         const go = el.dataset.go || '';
         const sec = el.dataset.sec || '';
         const q = el.dataset.q || '';
+        const skey = el.dataset.skey || '';
+        const find = el.dataset.find || (el.querySelector('.si-t') && el.querySelector('.si-t').textContent) || '';
         box.classList.remove('show');
         searchInput.value = '';
         activeIdx = -1;
         if (kind === 'settings' || sec) {
-          openSettingsSection(sec || 'profile');
-          if (RS.toast) RS.toast('Opening ' + (el.querySelector('.si-t')?.textContent || 'Settings'), 'fa-gear');
+          openSettingsSection(sec || 'profile', { skey: skey, find: find, title: find });
           return;
         }
         if (kind === 'menu') {
@@ -120,6 +226,20 @@
               posIn.value = q || '';
               posIn.dispatchEvent(new Event('input', { bubbles: true }));
               posIn.focus();
+              // Soft highlight menu grid if present
+              try {
+                const cards = document.querySelectorAll('#pos-tab .menu-card, #pos-tab .pos-item, #pos-tab [data-item-id]');
+                cards.forEach((c) => c.classList.remove('rs-search-hit'));
+                const needle = String(q || '').toLowerCase();
+                for (const c of cards) {
+                  if ((c.textContent || '').toLowerCase().includes(needle)) {
+                    c.classList.add('rs-search-hit');
+                    c.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setTimeout(() => c.classList.remove('rs-search-hit'), 3500);
+                    break;
+                  }
+                }
+              } catch (_) {}
             }
           }, 120);
           return;
