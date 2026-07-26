@@ -33,7 +33,11 @@ downloads/**/*.exe
 downloads/**/*.exe.blockmap
 downloads/**/*.dmg
 downloads/**/*.zip
-downloads/desktop/**
+# Keep downloads/desktop/*.yml (electron-updater feed). Only skip fat binaries:
+downloads/desktop/**/*.exe
+downloads/desktop/**/*.exe.blockmap
+downloads/desktop/**/*.dmg
+downloads/desktop/**/*.zip
 *.exe
 *.dmg
 *.blockmap

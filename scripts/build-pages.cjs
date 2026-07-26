@@ -90,10 +90,15 @@ function main() {
         copyFile(src, path.join(dlOut, name));
       }
     }
-    // electron-updater feed: tiny latest.yml only (EXE URLs point at GitHub)
-    const yml = path.join(dl, 'desktop', 'latest.yml');
-    if (fs.existsSync(yml) && fs.statSync(yml).size < 100 * 1024) {
-      copyFile(yml, path.join(dlOut, 'desktop', 'latest.yml'));
+    // electron-updater feed: tiny YAML only (EXE/DMG URLs point at GitHub Releases)
+    for (const ymlName of ['latest.yml', 'latest-mac.yml']) {
+      const yml = path.join(dl, 'desktop', ymlName);
+      if (fs.existsSync(yml) && fs.statSync(yml).size < 100 * 1024) {
+        copyFile(yml, path.join(dlOut, 'desktop', ymlName));
+        console.log('[pages:build] shipped downloads/desktop/' + ymlName);
+      } else {
+        console.warn('[pages:build] missing electron-updater feed', yml);
+      }
     }
   }
 

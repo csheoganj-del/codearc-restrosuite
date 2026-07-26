@@ -615,12 +615,19 @@ async function runFullUpdateCheck() {
     console.warn('[main] content check failed', e && e.message);
   }
 
-  // If user just applied content update, don't spam shell dialogs
-  if (contentResult && contentResult.status === 'applied') {
+  // Feature update already handled the user-facing result — don't also run
+  // the EXE shell check (broken/missing latest.yml used to show a scary HTML
+  // parse error after a successful content update).
+  if (
+    contentResult &&
+    (contentResult.status === 'applied' ||
+      contentResult.status === 'current' ||
+      contentResult.status === 'dismissed')
+  ) {
     return { content: contentResult, shell: { status: 'skipped' } };
   }
 
-  // 2) App shell (packaged only)
+  // 2) App shell (packaged only) — quiet unless content check failed/skipped
   let shellResult = { status: 'skipped' };
   try {
     shellResult = await autoUpdater.checkNow();

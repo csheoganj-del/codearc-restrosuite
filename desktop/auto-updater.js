@@ -362,11 +362,21 @@ function start(opts) {
         return checkMacDmgUpdate({ silent: !!silent });
       }
       if (!silent) {
+        const raw = String(e && e.message || e);
+        // electron-updater dumps full HTML when latest.yml is missing/SPA-fallback —
+        // show a short human message instead of the page source.
+        const looksLikeHtml = /<!DOCTYPE|<html|yaml|parse/i.test(raw);
+        const detail = looksLikeHtml
+          ? `Could not read the desktop installer feed (latest.yml).\n\n` +
+            `Your feature/UI updates still work from the live site.\n` +
+            `Shell (EXE) updates: download the latest installer from the website if needed.\n\n` +
+            `Current shell: v${app.getVersion()}`
+          : raw + '\n\nYou can still download from the website.';
         dialog.showMessageBox(parentWindow(), {
           type: 'warning',
-          title: 'Update check failed',
-          message: 'Could not check for updates.',
-          detail: String(e && e.message || e) + '\n\nYou can still download from the website.',
+          title: 'App shell check',
+          message: 'Could not check for a new installer.',
+          detail,
           buttons: ['OK', 'Open downloads'],
           defaultId: 0,
         }).then((r) => {

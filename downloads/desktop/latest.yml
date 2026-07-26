@@ -1,8 +1,8 @@
 version: 2.0.7
 files:
   - url: https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-2.0.7-x64.exe
-    sha512: oEQs9ttBAp/CgXKq+tDqCpluwSUU7pkJLyyDCm//Z3XWy0t3j3S8+iCiqWoWbFcJ3nLLzJ926p8NCpOPLXC9pg==
-    size: 85516768
+    sha512: 0IYvTLMoAt8YxUvswRWvGTr5J/p9Mc/NpLV445HnciguoxYtq9ljV9CpYc79jkfcM4yq+vXu4ghYXkAEwBBo7A==
+    size: 85517053
 path: https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-2.0.7-x64.exe
-sha512: oEQs9ttBAp/CgXKq+tDqCpluwSUU7pkJLyyDCm//Z3XWy0t3j3S8+iCiqWoWbFcJ3nLLzJ926p8NCpOPLXC9pg==
-releaseDate: '2026-07-24T09:41:51.113Z'
+sha512: 0IYvTLMoAt8YxUvswRWvGTr5J/p9Mc/NpLV445HnciguoxYtq9ljV9CpYc79jkfcM4yq+vXu4ghYXkAEwBBo7A==
+releaseDate: '2026-07-24T10:13:59.304Z'
