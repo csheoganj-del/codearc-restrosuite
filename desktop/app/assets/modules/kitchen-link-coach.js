@@ -1241,13 +1241,43 @@
   /**
    * Sidebar / mobile badge: how many dishes still need a recipe.
    */
+  /** Staff without Menu/Inventory must never see Kitchen Setup (role filter). */
+  function staffMaySeeKitchenSetup() {
+    try {
+      if (isPlatformConsole()) return false;
+      const role = String(
+        (window.RS_API && RS_API.session && RS_API.session()?.role) ||
+        sessionStorage.getItem('logged_in_role') || ''
+      ).toLowerCase().trim();
+      // Unrestricted outlet roles
+      if (role === 'owner' || role === 'admin' || role === 'manager') return true;
+      // RS_ROLE.allowedTabs === null means unrestricted shell
+      if (window.RS_ROLE && window.RS_ROLE.allowedTabs == null &&
+          (role === 'owner' || role === 'admin' || !role)) return true;
+      let tabs = [];
+      if (window.RS_ROLE && Array.isArray(window.RS_ROLE.allowedTabs)) {
+        tabs = window.RS_ROLE.allowedTabs;
+      } else {
+        try { tabs = JSON.parse(sessionStorage.getItem('allowed_tabs') || '[]') || []; } catch (_) { tabs = []; }
+      }
+      if (!Array.isArray(tabs) || !tabs.length) {
+        // Restricted role with empty list → no setup coach
+        if (role && role !== 'owner' && role !== 'admin') return false;
+        return true;
+      }
+      return tabs.includes('editor-tab') || tabs.includes('inventory-tab');
+    } catch (_) {
+      return false;
+    }
+  }
+
   function refreshSetupNav() {
     try {
       const badge = document.getElementById('klc-setup-badge');
       const link = document.getElementById('klc-sidebar-setup');
       const mobile = document.getElementById('klc-mobile-setup');
-      // Super-Admin / Brand Admin: hide kitchen setup entry entirely
-      if (isPlatformConsole()) {
+      // Super-Admin / Brand Admin / POS-only staff: hide kitchen setup entry
+      if (isPlatformConsole() || !staffMaySeeKitchenSetup()) {
         if (link) link.style.display = 'none';
         if (mobile) mobile.style.display = 'none';
         if (badge) badge.style.display = 'none';

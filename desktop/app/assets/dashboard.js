@@ -2616,8 +2616,17 @@
         RS_API.applyLocalRoleTabs(payload);
       }
     } catch (_) {}
+    // Re-run Kitchen Setup visibility (coach otherwise force-shows the link)
+    try {
+      if (window.RSKitchenLinkCoach && typeof RSKitchenLinkCoach.refreshSetupNav === 'function') {
+        RSKitchenLinkCoach.refreshSetupNav();
+      }
+    } catch (_) {}
     if (changed && !(opts && opts.silent)) {
       toast('Your access permissions were just updated', 'fa-user-shield');
+    } else if (changed && opts && opts.silent) {
+      // Quiet poll still notifies once so staff see Floor/KDS appear
+      toast('Access updated — new modules unlocked', 'fa-user-shield');
     }
     return changed;
   }
@@ -2638,7 +2647,10 @@
         /* offline / network — keep local tabs */
       }
     };
-    window.__rsRolePollTimer = setInterval(pollRole, 15000);
+    window.__rsRolePollTimer = setInterval(pollRole, 8000);
+    // First poll soon after boot so Floor/KDS grants appear without full reload
+    setTimeout(pollRole, 1500);
+    setTimeout(pollRole, 4000);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) pollRole();
     });

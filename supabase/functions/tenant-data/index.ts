@@ -188,7 +188,8 @@ function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
     ? userTabs.map(String)
     : roleTabs;
   const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
-  return requestedTabs.filter((tab) => roleTabs.includes(tab) && enabledTenantTabs.includes(tab));
+  // Honor explicit per-user tabs within tenant plan (may expand past role template)
+  return [...new Set(requestedTabs.filter((tab) => enabledTenantTabs.includes(tab)))];
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {

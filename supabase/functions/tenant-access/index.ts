@@ -129,19 +129,32 @@ function planFor(code: unknown) {
 }
 
 function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
-  const planTabs = planFor(planCode).allowedTabs;
-  return Array.isArray(tenantTabs) && tenantTabs.length > 0
-    ? tenantTabs.map(String)
-    : planTabs;
+  const planTabs = planFor(planCode).allowedTabs.map(String);
+  // Prefer full plan list as ceiling. A short/stale tenant.allowed_tabs used to
+  // hide Floor/KDS from staff even when the plan includes them.
+  if (!Array.isArray(tenantTabs) || tenantTabs.length === 0) return planTabs;
+  const custom = tenantTabs.map(String);
+  // If custom list looks complete (≥ half of plan modules), honor it as a restrict.
+  // Otherwise treat it as stale and use the plan.
+  if (custom.length >= Math.max(4, Math.floor(planTabs.length / 2))) {
+    return planTabs.filter((t) => custom.includes(t));
+  }
+  return planTabs;
 }
 
+/**
+ * Resolve staff module access for login / validate.
+ * Role defaults are a template when allowed_tabs is empty.
+ * Explicit allowed_tabs can increase OR decrease access within the tenant plan
+ * (no longer clipped to role defaults — that blocked Floor/Bills grants).
+ */
 function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
   const roleTabs = ROLE_DEFAULT_TABS[role] || [];
   const requestedTabs = Array.isArray(userTabs) && userTabs.length > 0
     ? userTabs.map(String)
     : roleTabs;
   const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
-  return requestedTabs.filter((tab) => roleTabs.includes(tab) && enabledTenantTabs.includes(tab));
+  return [...new Set(requestedTabs.filter((tab) => enabledTenantTabs.includes(tab)))];
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {

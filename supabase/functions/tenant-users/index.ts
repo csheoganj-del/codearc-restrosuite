@@ -205,7 +205,12 @@ async function verifyAdminSession(req: Request) {
       return { ok: false, error: "Workspace access is not active." };
     }
     const plan = planFor(tenant.plan_code);
-    const tenantTabs = Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs.map(String) : plan.allowedTabs;
+    // Always use plan entitlements as the module ceiling. Older tenants may have a
+    // partial/stale allowed_tabs array that omitted floor-tab etc., which silently
+    // stripped staff grants (owner ticks Floor → save succeeds → waiter never gets it).
+    const tenantTabs = Array.isArray(plan.allowedTabs) && plan.allowedTabs.length
+      ? plan.allowedTabs.map(String)
+      : (Array.isArray(tenant.allowed_tabs) ? tenant.allowed_tabs.map(String) : []);
 
     const userId = String(payload.user_id || "");
     if (!userId) {
