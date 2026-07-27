@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-26T15:06:21.589Z",
+  "generatedAt": "2026-07-27T12:01:22.118Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v222-20260726-floor-click-notify",
+    "version": "v223-20260727-auto",
     "title": "Live update v222-20260726-floor-click-notify",
     "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"

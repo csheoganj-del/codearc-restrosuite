@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-07-26T10:00:13.858Z",
+  "builtAt": "2026-07-27T12:07:23.664Z",
   "sources": [
     "assets/escpos-encoder.js",
     "assets/modules/bill-identity.js",
@@ -17,6 +17,6 @@
     "assets/modules/wa-send-queue.js",
     "assets/competitive-ops.js"
   ],
-  "bytes": 349074,
-  "kb": 341
+  "bytes": 351498,
+  "kb": 343
 }

@@ -638,6 +638,7 @@ function addToCart(id, opts){
       happyHour: hh,
     });
   }
+  try { if (global.RSActionFeedback) global.RSActionFeedback.click(); } catch (_) {}
   renderCart();
   const pLab = pFactor === 0.5 ? '½' : pFactor === 2 ? '×2' : '';
   toast(
@@ -1530,9 +1531,13 @@ function getCustomer(){
 function runKotAction(){
   if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
   try {
-    if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
+    if(window.RSPOS && window.RSPOS.kot) {
+      try { if (global.RSActionFeedback) global.RSActionFeedback.success(); } catch (_) {}
+      return window.RSPOS.kot();
+    }
   } catch (err) {
     console.error('[KOT Error]', err);
+    try { if (global.RSActionFeedback) global.RSActionFeedback.error(); } catch (_) {}
     return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
   }
   toast('KOT sent to kitchen','fa-fire');
@@ -1540,9 +1545,13 @@ function runKotAction(){
 function runCheckoutAction(){
   if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
   try {
-    if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
+    if(window.RSPOS && window.RSPOS.checkout) {
+      try { if (global.RSActionFeedback) global.RSActionFeedback.success(); } catch (_) {}
+      return window.RSPOS.checkout();
+    }
   } catch (err) {
     console.error('[Checkout Error]', err);
+    try { if (global.RSActionFeedback) global.RSActionFeedback.error(); } catch (_) {}
     return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
   }
   // RSPOS module not loaded -- do not silently show false success

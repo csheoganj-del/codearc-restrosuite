@@ -33,7 +33,8 @@
     "build:content-manifest": "node scripts/build-content-manifest.cjs",
     "publish:release": "node scripts/publish-github-release.cjs",
     "release:binaries": "node scripts/sync-downloads.cjs && node scripts/publish-github-release.cjs && node scripts/sync-downloads.cjs",
-    "pages:build": "node scripts/bump-content-version.cjs --ci && node scripts/build-critical.cjs && node scripts/build-content-manifest.cjs && node scripts/build-pages.cjs",
+    "pages:build": "node scripts/bump-content-version.cjs --ci && node scripts/build-critical.cjs && node scripts/build-content-manifest.cjs && node scripts/build-pages.cjs && node scripts/minify-assets.cjs",
+    "minify:assets": "node scripts/minify-assets.cjs",
     "vercel-build": "npm run pages:build"
   },
   "engines": {
