@@ -323,16 +323,21 @@
   }
   /**
    * @param {{ intentional?: boolean }} [opts]
-   * intentional (default true) = user clicked Sign out → block auto-resume + show signed-out hint.
-   * intentional false = expired/invalid token → clear save but do not treat as user sign-out.
+   * intentional (default true) = user clicked Sign out → wipe keep-me-signed-in + block auto-resume.
+   * intentional false = cloud rejected token (expired/revoked) → clear live tab session only.
+   *   Keep the remember blob so offline POS / Continue still works without re-typing password.
    */
   function ssClear(opts){
     const intentional = !(opts && opts.intentional === false);
     SESSION_KEYS.forEach(k => { SS.removeItem(k); });
     purgeLegacyFlatSessionKeys();
-    clearAllRememberBlobs();
-    if (intentional) markExplicitLogout();
-    else clearExplicitLogout();
+    if (intentional) {
+      clearAllRememberBlobs();
+      markExplicitLogout();
+    } else {
+      // Soft expire: do NOT clear keep-me-signed-in blob
+      clearExplicitLogout();
+    }
     SS.removeItem(IMP_ORIGIN_KEY);
     SS.removeItem(IMP_TARGET_KEY);
   }
@@ -412,10 +417,26 @@
         body: JSON.stringify(body)
       });
       const out = await res.json().catch(()=>({}));
-      if(!res.ok){ const e=new Error(out.error||fallbackMsg||'Request failed'); e.status=res.status; throw e; }
+      if(!res.ok){
+        const msg = out.error || fallbackMsg || 'Request failed';
+        const e = new Error(msg);
+        e.status = res.status;
+        // Desktop/local proxy returns 502 when the machine cannot reach Supabase
+        // (Wi‑Fi on but no internet, airplane mode, DNS down). Treat as network —
+        // never as auth failure — so offline-first login/session resume still works.
+        if (
+          res.status === 502 || res.status === 503 || res.status === 504 ||
+          /could not reach|reach supabase|fetch failed|failed to fetch|econnrefused|enotfound|etimedout|network|offline|socket/i.test(String(msg))
+        ) {
+          e.network = true;
+          if (res.status >= 500) e.status = 0;
+        }
+        throw e;
+      }
       return out;
     } catch(err) {
-      if (err.name === 'TypeError' || err.message === 'Failed to fetch') {
+      if (err.name === 'TypeError' || err.message === 'Failed to fetch' || err.network) {
+        if (err.network && err.status === 0) throw err;
         const isAndroid = !!(window.RS_ANDROID || window.RS_NATIVE_APP || /RestroSuiteAndroid/i.test(navigator.userAgent || ''));
         const isLocalShell = /appassets\.androidplatform\.net/i.test(location.origin || '');
         let hint = 'Connection failed: could not reach the cloud. Check internet, then retry.';
@@ -426,6 +447,7 @@
         }
         const e = new Error(hint);
         e.status = 0;
+        e.network = true;
         throw e;
       }
       throw err;

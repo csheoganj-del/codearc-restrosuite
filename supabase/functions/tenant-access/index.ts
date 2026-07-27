@@ -297,17 +297,28 @@ function timingSafeEqualString(a: string, b: string): boolean {
   return diff === 0;
 }
 
-async function createSignedSessionToken(payload: Record<string, unknown>) {
+// Offline-first POS: long-lived device sessions (not bank-style 8h tabs).
+// Keep-me-signed-in + sliding validate_session refresh = no daily password re-entry.
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// After hard exp, still allow one validate_session refresh for this window so older
+// 8-hour tokens and brief offline periods do not force a password prompt.
+const SESSION_STALE_REFRESH_MS = 14 * 24 * 60 * 60 * 1000; // 14 days past exp
+
+async function createSignedSessionToken(payload: Record<string, unknown>, ttlMs = SESSION_TTL_MS) {
   if (!SUPERADMIN_SESSION_SECRET) return null;
+  const clean: Record<string, unknown> = { ...payload };
+  delete clean.exp;
+  delete clean.iat;
   const payloadEncoded = encodeBase64Url(new TextEncoder().encode(JSON.stringify({
-    ...payload,
-    exp: Date.now() + (8 * 60 * 60 * 1000),
+    ...clean,
+    iat: Date.now(),
+    exp: Date.now() + ttlMs,
   })));
   const signature = await signValue(payloadEncoded, SUPERADMIN_SESSION_SECRET);
   return `${payloadEncoded}.${signature}`;
 }
 
-async function verifySignedSessionToken(token: string) {
+async function verifySignedSessionToken(token: string, opts?: { allowStale?: boolean }) {
   if (!SUPERADMIN_SESSION_SECRET) return { ok: false, error: "Session signing secret is not configured." };
   const [payloadEncoded, signature] = token.split(".");
   if (!payloadEncoded || !signature) return { ok: false, error: "Invalid session token." };
@@ -318,11 +329,27 @@ async function verifySignedSessionToken(token: string) {
   try {
     const payloadText = new TextDecoder().decode(decodeBase64Url(payloadEncoded));
     const payload = JSON.parse(payloadText);
-    if (!payload.exp || Date.now() > Number(payload.exp)) return { ok: false, error: "Session expired. Please log in again." };
-    return { ok: true, payload };
+    const exp = Number(payload.exp || 0);
+    if (!exp) return { ok: false, error: "Session expired. Please log in again." };
+    if (Date.now() > exp) {
+      // Sliding / migration refresh path for validate_session only
+      if (opts?.allowStale && Date.now() <= exp + SESSION_STALE_REFRESH_MS) {
+        return { ok: true, payload, stale: true };
+      }
+      return { ok: false, error: "Session expired. Please log in again." };
+    }
+    return { ok: true, payload, stale: false };
   } catch {
     return { ok: false, error: "Invalid session token." };
   }
+}
+
+/** Mint a fresh token from verified claims (sliding keep-me-signed-in). */
+async function refreshSignedSessionToken(sessionPayload: Record<string, unknown>) {
+  const claims: Record<string, unknown> = { ...sessionPayload };
+  delete claims.exp;
+  delete claims.iat;
+  return createSignedSessionToken(claims);
 }
 
 function normalizeSlug(raw: string) {
@@ -717,11 +744,14 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
 
 async function handleValidateSession(payload: Record<string, unknown>, req: Request) {
   const token = String(payload.session_token || "");
-  const verified = await verifySignedSessionToken(token);
+  // allowStale: revive recently expired tokens and always re-issue a fresh 30d token
+  // so Keep me signed in does not force password every 8 hours.
+  const verified = await verifySignedSessionToken(token, { allowStale: true });
   if (!verified.ok) return jsonResponse({ error: verified.error }, 401, req);
 
   const sessionPayload = verified.payload as Record<string, unknown>;
   if (sessionPayload.role === "superadmin") {
+    const freshToken = await refreshSignedSessionToken(sessionPayload);
     return jsonResponse({
       session: {
         username: String(sessionPayload.username || "superadmin"),
@@ -730,6 +760,8 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
         tenant_slug: "superadmin",
         tenant_name: "SaaS Platform Owner",
         allowed_tabs: ["super-admin-tab", "gateway-monitor-tab"],
+        session_token: freshToken || token,
+        admin_token: freshToken || token,
       },
     }, 200, req);
   }
@@ -778,6 +810,15 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
       return jsonResponse({ error: "Session was revoked. Please log in again." }, 401, req);
     }
 
+    const freshToken = await createSignedSessionToken({
+      role: staffUser.role,
+      username: staffUser.username,
+      user_id: staffUser.id,
+      tenant_id: tenant.id,
+      tenant_slug: tenant.slug,
+      session_version: staffUser.session_version,
+    });
+
     return jsonResponse({
       session: {
         username: staffUser.username,
@@ -797,9 +838,19 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
           max_staff: plan.maxStaff,
           monthly_order_limit: plan.monthlyOrderLimit,
         },
+        session_token: freshToken || token,
       },
     }, 200, req);
   }
+
+  const freshToken = await createSignedSessionToken({
+    role: "admin",
+    username: String(sessionPayload.username || tenant.username || ""),
+    tenant_id: tenant.id,
+    tenant_slug: tenant.slug,
+    legacy_owner: true,
+    auth_version: tenant.auth_version,
+  });
 
   return jsonResponse({
     session: {
@@ -818,6 +869,7 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
         max_staff: plan.maxStaff,
         monthly_order_limit: plan.monthlyOrderLimit,
       },
+      session_token: freshToken || token,
     },
   }, 200, req);
 }

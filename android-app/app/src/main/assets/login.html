@@ -1076,6 +1076,35 @@
   function sessionLabel(s){
     return s.tenant_name || s.tenant_slug || s.username || 'saved workspace';
   }
+  /** True when cloud is unreachable (not wrong password). Desktop proxy 502s included. */
+  function isNetworkAuthError(err){
+    if (!err) return false;
+    if (err.network === true || err.status === 0) return true;
+    if (err.status === 502 || err.status === 503 || err.status === 504) return true;
+    const m = String(err.message || err || '');
+    return /failed to fetch|fetch failed|could not reach|reach supabase|connection failed|network|offline|econnrefused|enotfound|etimedout|socket|ERR_INTERNET|ERR_NAME_NOT|ERR_CONNECTION/i.test(m);
+  }
+  /** Resume keep-me-signed-in workspace offline (optional slug/user match). */
+  async function tryOpenOfflineSession(slug, username, opts){
+    const force = !(opts && opts.force === false);
+    const saved = savedClientSession(force);
+    if (!saved || !saved.token) return false;
+    const wantSlug = String(slug || '').trim().toLowerCase();
+    const wantUser = String(username || '').trim().toLowerCase();
+    const gotSlug = String(saved.tenant_slug || '').trim().toLowerCase();
+    const gotUser = String(saved.username || '').trim().toLowerCase();
+    if (wantSlug && gotSlug && wantSlug !== gotSlug) return false;
+    if (wantUser && gotUser && wantUser !== gotUser) return false;
+    const ok = await offlinePinGate();
+    if (!ok) {
+      showErr('PIN required to open the saved workspace offline.');
+      return 'pin';
+    }
+    try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
+    showOk(navigator.onLine ? 'Opening your saved dashboard…' : 'Offline mode — opening your saved dashboard…');
+    setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),350);
+    return true;
+  }
   function justSignedOut(){
     try {
       if (window.RS_API && typeof RS_API.wasExplicitLogout === 'function') {
@@ -1209,7 +1238,9 @@
       _autoResumeTried = true;
       updateOfflineResume();
       showOk(navigator.onLine ? 'Welcome back — opening dashboard…' : 'Opening offline dashboard…');
-      // Online: soft-validate; if server rejects (401), clear and stay on login
+      // Online: soft-validate; if server rejects (401), clear and stay on login.
+      // Network / desktop-proxy failures must NEVER clear keep-me-signed-in —
+      // that is what made users re-type username/password after every offline open.
       if (navigator.onLine && window.RS_API && typeof RS_API.validateSession === 'function') {
         // Wait for config so we do not treat "not configured yet" as logged out
         try {
@@ -1225,11 +1256,14 @@
               try { RS_API.logout({ intentional: false }); } catch (_) {}
               _autoResumeTried = false;
               updateOfflineResume();
-              showErr('Saved session expired — please sign in again.');
+              // Soft-expire already keeps keep-me-signed-in blob (offline Continue).
+              // Only true revoke/expiry after long idle needs online password again.
+              showErr('Cloud session needs a quick sign-in for sync. If you are offline, tap Continue — no password needed.');
               return;
             }
-          } catch (_) {
-            // Network blip / offline — open local dashboard with remembered session
+          } catch (valErr) {
+            // Network blip / offline / "could not reach Supabase" — keep local session
+            console.warn('[login] validateSession network — resuming offline session', valErr && valErr.message);
           }
         }
       }
@@ -1275,23 +1309,33 @@
     e.preventDefault();
     const slug=document.getElementById('tenant-id').value.trim().toLowerCase(), u=document.getElementById('username').value.trim(), p=document.getElementById('password').value;
     const remember = document.getElementById('remember-me').checked;
+    // Offline-first: navigator.onLine is often still true on Windows with Wi‑Fi
+    // but no internet. Prefer saved keep-me-signed-in session when cloud is down.
     if(!navigator.onLine){
-      const saved = savedClientSession(true);
-      if(saved){
-        const ok = await offlinePinGate();
-        if (!ok) {
-          showErr('PIN required to open the saved workspace offline.');
-          loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
-          return;
-        }
-        try { if (window.RS_API && RS_API.clearExplicitLogout) RS_API.clearExplicitLogout(); } catch (_) {}
-        showOk('Offline mode — opening your saved dashboard…');
-        setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),350);
+      const offlineOpen = await tryOpenOfflineSession(slug, u);
+      if (offlineOpen === true) return;
+      if (offlineOpen === 'pin') {
+        loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+        return;
+      }
+      // No password required offline when a saved session exists for this device
+      if (savedClientSession(true)) {
+        showErr('Saved session does not match this outlet/user. Use the same Outlet ID & username you signed in with online, or connect to internet.');
       } else {
         showErr('Offline login needs a saved session. Connect to internet, sign in once with “Keep me signed in” checked, then you can open the app offline.');
-        loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
       }
+      loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
       return;
+    }
+    // Already signed in on this device — open dashboard without re-typing password
+    // when fields match (or are empty) and Keep me signed in blob is present.
+    if (!p) {
+      const resumed = await tryOpenOfflineSession(slug, u);
+      if (resumed === true) return;
+      if (resumed === 'pin') {
+        loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+        return;
+      }
     }
     if(!slug||!u||!p){showErr('Please fill in your outlet ID, username and password.');loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);return;}
     const btn=document.getElementById('login-submit'); const orig=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying…'; btn.disabled=true;
@@ -1363,9 +1407,21 @@
       }
     }catch(err){
       btn.innerHTML=orig; btn.disabled=false;
-      if(savedClientSession() && (err.status === 0 || /failed to fetch|connection failed|network/i.test(err.message || ''))){
+      // Cloud down / desktop proxy 502 / airplane mode — open saved offline session
+      // instead of demanding a fresh password every time.
+      if (isNetworkAuthError(err)) {
+        const offlineOpen = await tryOpenOfflineSession(slug, u);
+        if (offlineOpen === true) return;
+        if (offlineOpen === 'pin') {
+          loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
+          return;
+        }
         updateOfflineResume();
-        showErr('Cloud is not reachable. Use Continue offline to open the saved dashboard on this device.');
+        if (savedClientSession(true)) {
+          showErr('Cloud is not reachable. Tap Continue to open the saved dashboard offline (no password needed).');
+        } else {
+          showErr('No internet and no saved session on this device. Connect once, sign in with “Keep me signed in” checked, then offline works.');
+        }
         loginForm.classList.add('shake');setTimeout(()=>loginForm.classList.remove('shake'),500);
         return;
       }
