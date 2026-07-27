@@ -1,9 +1,9 @@
 {
   "version": "v222-20260726-floor-click-notify",
   "title": "Live update v222-20260726-floor-click-notify",
-  "generatedAt": "2026-07-26T15:06:21.734Z",
+  "generatedAt": "2026-07-27T05:49:18.423Z",
   "baseUrl": "https://restrosuite.codearc.co.in",
-  "fileCount": 125,
+  "fileCount": 126,
   "files": [
     "app-update.json",
     "assets/competitive-ops.js",
@@ -83,6 +83,7 @@
     "assets/restrosuite-social.png",
     "assets/restrosuite.css",
     "assets/restrosuite_logo.png",
+    "assets/role-defaults.js",
     "assets/saas-core.js",
     "assets/screenshot-cart.png",
     "assets/screenshot-pos.png",
