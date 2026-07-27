@@ -1,6 +1,8 @@
 {
-  "builtAt": "2026-07-27T12:07:23.664Z",
+  "builtAt": "2026-07-27T14:44:30.651Z",
+  "hash": "5db0d7621c43",
   "sources": [
+    "assets/modules/rs-action-feedback.js",
     "assets/escpos-encoder.js",
     "assets/modules/bill-identity.js",
     "assets/modules/inventory-ledger.js",
@@ -17,6 +19,33 @@
     "assets/modules/wa-send-queue.js",
     "assets/competitive-ops.js"
   ],
-  "bytes": 351498,
-  "kb": 343
+  "bytes": 352835,
+  "kb": 345,
+  "esbuildMeta": {
+    "inputs": {
+      "assets/dist/_critical-src.js": {
+        "bytes": 582121,
+        "imports": []
+      }
+    },
+    "outputs": {
+      "assets/dist/critical.bundle.js.map": {
+        "imports": [],
+        "exports": [],
+        "inputs": {},
+        "bytes": 937913
+      },
+      "assets/dist/critical.bundle.js": {
+        "imports": [],
+        "exports": [],
+        "entryPoint": "assets/dist/_critical-src.js",
+        "inputs": {
+          "assets/dist/_critical-src.js": {
+            "bytesInOutput": 352790
+          }
+        },
+        "bytes": 352835
+      }
+    }
+  }
 }

@@ -1,141 +1,115 @@
-/* ============================================================
-   RestroSuite — action feedback
-   ------------------------------------------------------------
-   Never fail silently. If an action is unavailable, staff get a
-   clear toast when they try to use it.
-
-   Usage:
-     RS_setActionEnabled(btn, false, 'No open tables to clear');
-     RS_setActionEnabled(btn, true);
-     RS_notifyWhy('Camera not available on this device');
-   ============================================================ */
+/**
+ * RestroSuite — RSActionFeedback module (Wave 14 UI/UX refinement)
+ * ---------------------------------------------------------------
+ * Provides safe, non-blocking audio and haptic feedback for key POS/KDS actions
+ * (e.g. Add to Cart, Print Bill, KOT Complete).
+ *
+ * Guarded against:
+ *   - Browser autoplay policies (AudioContext state check + resume)
+ *   - Missing Web Audio API (try/catch throughout)
+ *   - Missing haptic hardware (navigator.vibrate existence check)
+ *   - prefers-reduced-motion OS setting (audio and vibration both suppressed)
+ */
 (function (global) {
   'use strict';
 
-  function toast(msg, icon) {
-    const text = String(msg || '').trim();
-    if (!text) return;
-    try {
-      if (global.RS && typeof global.RS.toast === 'function') {
-        global.RS.toast(text, icon || 'fa-circle-info');
-        return;
-      }
-    } catch (_) {}
-    try {
-      if (typeof global.__toast === 'function') {
-        global.__toast(text, icon || 'fa-circle-info');
-        return;
-      }
-    } catch (_) {}
-    try {
-      console.info('[RS action]', text);
-    } catch (_) {}
-  }
-
-  /** Show a one-shot explanation (why something did not run). */
-  function notifyWhy(reason, icon) {
-    toast(reason || 'This action is not available right now', icon || 'fa-circle-info');
-  }
+  let audioCtx = null;
 
   /**
-   * Mark a control as available or not. Keeps it clickable when disabled so
-   * we can explain why (native disabled=true swallows clicks).
-   * @param {Element|null} el
-   * @param {boolean} enabled
-   * @param {string} [why] required when enabled=false
+   * Returns true when the user's OS/browser accessibility setting requests
+   * reduced motion. Both audio tones and haptic vibration are suppressed
+   * in this mode — they share the same motion-based sensory disruption
+   * that the user is opting out of.
+   *
+   * The media query is checked live on every call (not cached at module load)
+   * so that changes made while the tab is open take effect immediately.
    */
-  function setActionEnabled(el, enabled, why) {
-    if (!el) return;
-    const on = !!enabled;
-    const reason = String(why || 'This action is not available right now').trim();
-    try {
-      if (on) {
-        el.classList.remove('rs-action-disabled');
-        el.removeAttribute('aria-disabled');
-        el.removeAttribute('data-rs-why');
-        if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-          el.disabled = false;
-        }
-        el.style.opacity = '';
-        el.style.cursor = '';
-        // keep useful title if it was not only the disable reason
-        if (el.dataset.rsTitleBackup != null) {
-          if (el.dataset.rsTitleBackup) el.title = el.dataset.rsTitleBackup;
-          else el.removeAttribute('title');
-          delete el.dataset.rsTitleBackup;
-        }
-      } else {
-        if (el.dataset.rsTitleBackup == null) {
-          el.dataset.rsTitleBackup = el.getAttribute('title') || '';
-        }
-        el.classList.add('rs-action-disabled');
-        el.setAttribute('aria-disabled', 'true');
-        el.setAttribute('data-rs-why', reason);
-        el.title = reason;
-        // Never use native disabled — it blocks click + feedback
-        if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-          el.disabled = false;
-        }
-        el.style.opacity = '0.55';
-        el.style.cursor = 'not-allowed';
-      }
-    } catch (_) {}
-  }
-
-  function isActionDisabled(el) {
-    if (!el) return false;
-    try {
-      if (el.classList && el.classList.contains('rs-action-disabled')) return true;
-      if (el.getAttribute('aria-disabled') === 'true') return true;
-      if (el.disabled) return true;
-    } catch (_) {}
-    return false;
-  }
-
-  function reasonFor(el) {
+  function prefersReducedMotion() {
     try {
       return (
-        (el && el.getAttribute('data-rs-why')) ||
-        (el && el.getAttribute('title')) ||
-        'This action is not available right now'
+        typeof global.matchMedia === 'function' &&
+        global.matchMedia('(prefers-reduced-motion: reduce)').matches
       );
     } catch (_) {
-      return 'This action is not available right now';
+      return false;
     }
   }
 
-  // Capture-phase: soft-disabled controls stay clickable and explain why.
-  // Prefer RS_setActionEnabled() over native disabled=true (native blocks click).
-  function onClickCapture(e) {
+  function getAudioContext() {
+    if (audioCtx) {return audioCtx;}
     try {
-      const el = e.target && e.target.closest
-        ? e.target.closest('button, [role="button"], a.btn, .btn, [data-rs-why]')
-        : null;
-      if (!el) return;
-      if (el.dataset && el.dataset.rsSilentDisable === '1') return;
+      const AudioContext = global.AudioContext || global.webkitAudioContext;
+      if (AudioContext) {
+        audioCtx = new AudioContext();
+      }
+    } catch (_) {}
+    return audioCtx;
+  }
 
-      if (el.classList.contains('rs-action-disabled') || el.getAttribute('aria-disabled') === 'true') {
-        e.preventDefault();
-        e.stopPropagation();
-        notifyWhy(reasonFor(el), 'fa-circle-info');
+  function playTone(freq, type, duration, vol) {
+    // Respect the user's OS "reduce motion" preference — no audio surprises.
+    if (prefersReducedMotion()) {return;}
+    try {
+      const ctx = getAudioContext();
+      if (!ctx || ctx.state === 'suspended') {
+        if (ctx && ctx.resume) {ctx.resume().catch(function () {});}
+      }
+      if (!ctx || ctx.state !== 'running') {return;}
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq || 440, ctx.currentTime);
+
+      gain.gain.setValueAtTime(vol || 0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (duration || 0.1));
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + (duration || 0.1));
+    } catch (_) {}
+  }
+
+  function vibrate(pattern) {
+    // Respect the user's OS "reduce motion" preference — no haptic surprises.
+    if (prefersReducedMotion()) {return;}
+    try {
+      if (global.navigator && typeof global.navigator.vibrate === 'function') {
+        global.navigator.vibrate(pattern || 30);
       }
     } catch (_) {}
   }
 
-  function boot() {
-    if (global.__rsActionFeedbackBooted) return;
-    global.__rsActionFeedbackBooted = true;
-    document.addEventListener('click', onClickCapture, true);
-  }
+  const RSActionFeedback = {
+    /** Light click confirmation — adding an item, toggling a switch. */
+    click: function () {
+      playTone(600, 'sine', 0.04, 0.03);
+      vibrate(15);
+    },
+    /** Two-tone ascending chime — KOT sent, bill printed, checkout complete. */
+    success: function () {
+      playTone(800, 'sine', 0.08, 0.04);
+      setTimeout(function () { playTone(1200, 'sine', 0.1, 0.04); }, 60);
+      vibrate([20, 30, 40]);
+    },
+    /** Single mid-tone notice — new order arrived, low stock warning. */
+    notice: function () {
+      playTone(450, 'triangle', 0.06, 0.04);
+      vibrate(25);
+    },
+    /** Low sawtooth buzz — validation error, payment failure. */
+    error: function () {
+      playTone(300, 'sawtooth', 0.15, 0.05);
+      vibrate([50, 50, 50]);
+    }
+  };
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  global.RSActionFeedback = RSActionFeedback;
 
-  global.RS_notifyWhy = notifyWhy;
-  global.RS_setActionEnabled = setActionEnabled;
-  global.RS_isActionDisabled = isActionDisabled;
-  global.RS_actionReason = reasonFor;
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = RSActionFeedback;
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

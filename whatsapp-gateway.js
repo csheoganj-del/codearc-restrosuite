@@ -49,10 +49,55 @@ const unzipper = require('unzipper');
 // Meta signals we soften: uniform timing, no typing, identical payloads, bursts.
 // Issue 1 (complaints) is product: only paid guests, bills only, no promos.
 
-// Per-tenant daily send counter { tenantId: { date, count } }
-const _dailySendCount = {};
+// Per-tenant daily send counter — persisted to disk so process restarts
+// do NOT reset the count and accidentally breach Meta's per-number rate signals.
+// File: <authDataPath>/daily-send-counts.json (written atomically via temp-rename).
 const DAILY_LIMIT = process.env.DAILY_LIMIT ? parseInt(process.env.DAILY_LIMIT, 10) : 180; // softer default for "human" feel
 const HUMAN_CRAFT_MODE = String(process.env.HUMAN_CRAFT_MODE || 'true').toLowerCase() !== 'false';
+
+// Internal in-memory cache, synced to disk on every mutation.
+let _dailySendCount = {};
+
+/** Absolute path for the persisted counter file. Resolved after authDataPath is set. */
+function _dailyCounterPath() {
+    // authDataPath is guaranteed to exist before this is called (it is set/created at boot).
+    return path.join(authDataPath, 'daily-send-counts.json');
+}
+
+/** Load persisted counters from disk into memory (called once at startup). */
+function _loadDailyCounts() {
+    try {
+        const p = _dailyCounterPath();
+        if (fs.existsSync(p)) {
+            const raw = fs.readFileSync(p, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                // Prune stale entries (any date that is not today) at load time.
+                const today = new Date().toISOString().slice(0, 10);
+                for (const tid of Object.keys(parsed)) {
+                    if (parsed[tid] && parsed[tid].date === today) {
+                        _dailySendCount[tid] = parsed[tid];
+                    }
+                }
+                console.log(`[DailyCounter] Loaded persisted send counts (${Object.keys(_dailySendCount).length} tenant(s) active today).`);
+            }
+        }
+    } catch (err) {
+        console.warn('[DailyCounter] Could not load persisted counts (non-fatal, starting fresh):', err.message);
+    }
+}
+
+/** Flush in-memory counters to disk atomically (temp file → rename). */
+function _flushDailyCounts() {
+    try {
+        const p = _dailyCounterPath();
+        const tmp = p + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(_dailySendCount, null, 2), 'utf8');
+        fs.renameSync(tmp, p);
+    } catch (err) {
+        console.warn('[DailyCounter] Could not persist send counts (non-fatal):', err.message);
+    }
+}
 
 // Per-tenant send queue to prevent bursting
 const _sendQueues = new Map(); // tenantId -> Promise chain
@@ -78,7 +123,7 @@ function _isBusinessHour() {
  * System / transactional WhatsApp (OTP, alerts) must NEVER get bill openers like
  * "Sharing your bill" / "Appreciate your visit" — that looks unprofessional and confusing.
  */
-function isSystemOrTransactionalMessage(text) {
+function _legacy_isSystemOrTransactionalMessage(text) {
     const t = String(text || '').trim();
     if (!t) return false;
     return (
@@ -94,7 +139,7 @@ function isSystemOrTransactionalMessage(text) {
  * Natural bill captions — staff phrasing, not "Bill #DO-123"
  * Only for guest bills / receipts. Skip for OTP and other system traffic.
  */
-function humanCraftCaption({ orderId, outletName, isPlatform, baseCaption }) {
+function _legacy_humanCraftCaption({ orderId, outletName, isPlatform, baseCaption }) {
     if (!HUMAN_CRAFT_MODE) {
         return (baseCaption || (orderId ? `Bill ${orderId}` : 'Your bill')).toString().slice(0, 200);
     }
@@ -200,7 +245,7 @@ function _uniquifyText(text) {
     return out;
 }
 
-/** Check and increment daily counter. Returns false if limit reached. */
+/** Check and increment daily counter. Returns false if limit reached. Persists to disk. */
 function _checkDailyLimit(tenantId) {
     const today = new Date().toISOString().slice(0, 10);
     if (!_dailySendCount[tenantId] || _dailySendCount[tenantId].date !== today) {
@@ -208,6 +253,9 @@ function _checkDailyLimit(tenantId) {
     }
     if (_dailySendCount[tenantId].count >= DAILY_LIMIT) return false;
     _dailySendCount[tenantId].count++;
+    // Persist synchronously after every increment so a crash/restart never
+    // loses the count and accidentally resets it to zero mid-day.
+    _flushDailyCounts();
     return true;
 }
 
@@ -249,7 +297,7 @@ async function _humanPresenceBeforeSend(client, cleanJid, msgText, isDocument) {
  * @param {object} [opts]
  * @param {string} [tenantId]
  */
-async function humanSend(client, chatId, msg, opts, tenantId) {
+async function _legacy_humanSend(client, chatId, msg, opts, tenantId) {
     tenantId = tenantId || chatId;
 
     let cleanJid = chatId;
@@ -618,7 +666,7 @@ function reconnectDelayMs(attempt) {
 // ============================================================
 // HEALTH LOGGING -- writes to gateway_health_log in Supabase
 // ============================================================
-async function logHealthEvent(event, status, details = {}) {
+async function _legacy_logHealthEvent(event, status, details = {}) {
     const entry = { event, status, details, created_at: new Date().toISOString() };
     // Keep last 200 events in memory for dashboard filtering
     recentHealthEvents.unshift(entry);
@@ -714,7 +762,7 @@ async function fanOutExtraAlerts(type, subject, plainText) {
 // ============================================================
 // ADMIN ALERT -- sends email to admin when gateway is in trouble
 // ============================================================
-async function sendAdminAlert(type, extraDetails = {}) {
+async function _legacy_sendAdminAlert(type, extraDetails = {}) {
     const emailConfigured = !!(transporter || emailConfig.relayUrl);
     if (!emailConfigured && !TELEGRAM_BOT_TOKEN && !DESKTOP_ALERTS_ENABLED) {
         console.warn('[Admin Alert] No alert channel is configured (email, Telegram, desktop). Alert not sent.');
@@ -871,7 +919,7 @@ async function sendAdminAlert(type, extraDetails = {}) {
 // ============================================================
 // SESSION PERSISTENCE -- Save/Restore WhatsApp session via Supabase Storage
 // ============================================================
-async function saveSessionToSupabaseScoped(tenantId) {
+async function _legacy_saveSessionToSupabaseScoped(tenantId) {
     if (!supabaseService) {
         console.warn(`[Session Save] SUPABASE_SERVICE_KEY not set. Session backup skipped for tenant: ${tenantId}`);
         return;
@@ -971,7 +1019,7 @@ async function saveSessionToSupabaseScoped(tenantId) {
     }
 }
 
-function cleanupStaleLockFiles(dir) {
+function _legacy_cleanupStaleLockFiles(dir) {
     if (!fs.existsSync(dir)) return;
     try {
         const items = fs.readdirSync(dir);
@@ -1006,7 +1054,7 @@ function cleanupStaleLockFiles(dir) {
     }
 }
 
-async function restoreSessionsFromSupabase() {
+async function _legacy_restoreSessionsFromSupabase() {
     if (!supabaseService) {
         console.warn('[Session Restore] SUPABASE_SERVICE_KEY not set. Skipping remote restore.');
         return;
@@ -1196,6 +1244,65 @@ if (!authDataPath) {
 }
 try { fs.mkdirSync(authDataPath, { recursive: true }); } catch (_) {}
 console.log(`[Auth] Session data path: ${authDataPath}`);
+
+// ── Bootstrap focused gateway modules ─────────────────────────────────────
+// Each module is a pure factory that receives a shared context object.
+// We build ctx incrementally, injecting each module's API back into ctx
+// so subsequent modules can call logHealthEvent, sendAdminAlert, etc.
+const {
+    createHealthLogger,
+    createAlertManager,
+    createSendEngine,
+    createSessionManager,
+} = require('./gateway-modules');
+
+const _gwCtx = {
+    supabaseService,
+    authDataPath,
+    fs, path, os, archiver, unzipper,
+    emailConfig,
+    get transporter() { return transporter; },   // late binding — transporter set above
+    sendMailHelper,
+};
+
+// Health logger — in-memory ring + Supabase write
+const { logHealthEvent: _logHealthEvent, getRecentEvents } = createHealthLogger(_gwCtx);
+_gwCtx.logHealthEvent = _logHealthEvent;
+
+// Alert manager — email / Telegram / desktop fan-out
+const { sendAdminAlert: _sendAdminAlert } = createAlertManager(_gwCtx);
+_gwCtx.sendAdminAlert = _sendAdminAlert;
+
+// Send engine — human-crafted WhatsApp send with disk-persisted daily counter
+const {
+    humanSend: _humanSend,
+    humanCraftCaption: _humanCraftCaption,
+    isSystemOrTransactionalMessage: _isSystemOrTransactionalMessage,
+} = createSendEngine(_gwCtx);
+_gwCtx.humanSend = _humanSend;
+
+// Session manager — Supabase Storage zip backup / restore
+const {
+    saveSession: _saveSession,
+    restoreSessions: _restoreSessions,
+    cleanupStaleLockFiles: _cleanupStaleLockFiles,
+} = createSessionManager(_gwCtx);
+_gwCtx.saveSession = _saveSession;
+
+// ── Alias module functions over the legacy inline definitions ─────────────
+// The inline functions (logHealthEvent, sendAdminAlert, humanSend, etc.) still
+// exist in this file for reference but all active call-sites now use the module
+// versions via these aliases. This preserves backward compatibility with any
+// external script that requires('./whatsapp-gateway') while cleanly routing
+// through the testable, focused modules.
+const logHealthEvent            = _logHealthEvent;
+const sendAdminAlert            = _sendAdminAlert;
+const humanSend                 = _humanSend;
+const humanCraftCaption         = _humanCraftCaption;
+const isSystemOrTransactionalMessage = _isSystemOrTransactionalMessage;
+const saveSessionToSupabaseScoped    = (tenantId) => _saveSession(tenantId);
+const restoreSessionsFromSupabase    = ()         => _restoreSessions();
+const cleanupStaleLockFiles          = (dir)      => _cleanupStaleLockFiles(dir);
 
 // Initialize WhatsApp client with local session caching
 // Multi-Tenant Client Factory
