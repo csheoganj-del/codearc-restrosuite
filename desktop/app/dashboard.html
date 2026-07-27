@@ -423,7 +423,7 @@
       <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
-      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup | Menu | Recipe | Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
+      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" data-role-gate="editor-tab,inventory-tab" title="Kitchen Setup | Menu | Recipe | Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
       <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
       <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
@@ -1651,7 +1651,7 @@
   <!-- Legacy mobile more sheet retired (features-shell RSModal "All sections" is canonical).
        Kept hidden for any residual ID lookups (kitchen-link-coach). -->
   <div id="mobile-more-sheet" hidden aria-hidden="true" style="display:none!important;pointer-events:none!important;visibility:hidden!important;">
-    <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup" tabindex="-1" aria-hidden="true" style="display:none"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
+    <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup" data-role-gate="editor-tab,inventory-tab" tabindex="-1" aria-hidden="true" style="display:none"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
   </div>
 
   <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:100000;pointer-events:none;">

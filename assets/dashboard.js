@@ -2480,12 +2480,20 @@
   // taking effect after the next login.
   function applyStaffRoleTabFiltering(role, tabs) {
     if (isSuper || isBrandAdmin) return;
+    function roleGateAllows(el, allowed) {
+      const raw = el.getAttribute('data-role-gate') || '';
+      if (!raw) return null; // null = no gate attribute
+      if (!allowed) return true; // unrestricted
+      const need = raw.split(',').map((s) => s.trim()).filter(Boolean);
+      return need.some((t) => allowed.includes(t));
+    }
     if (!tabs) {
       // Unrestricted (owner or unrecognised role) -- make sure nothing is
       // left hidden from a previous, more restrictive role.
       const roleStyle = document.getElementById('rs-role-filter-style');
       if (roleStyle) roleStyle.remove();
-      $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab]').forEach(link => { link.style.display = ''; });
+      $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab], [data-role-gate]').forEach(link => { link.style.display = ''; });
+      $$('.sb-section').forEach((sec) => { sec.style.display = ''; });
       return;
     }
     const roleStyleId = 'rs-role-filter-style';
@@ -2504,22 +2512,52 @@
       : `.sidebar-link[data-tab], .mnav-link[data-tab], .mnav-more-btn[data-tab], .more-sheet-link[data-tab] { display: none !important; }`;
     // Hide sidebar links not in allowed list
     $$('.sidebar-link').forEach(link => {
+      const gate = roleGateAllows(link, tabs);
+      if (gate === false) { link.style.display = 'none'; return; }
+      if (gate === true) { link.style.display = ''; return; }
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Hide mobile bottom nav links not in allowed list
     $$('.mnav-link').forEach(link => {
+      const gate = roleGateAllows(link, tabs);
+      if (gate === false) { link.style.display = 'none'; return; }
+      if (gate === true) { link.style.display = ''; return; }
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Hide mobile "More" sheet entries not in allowed list (built later by
     // features-shell, so this also re-runs on rs:hydrated below)
-    $$('.mnav-more-btn[data-tab], .more-sheet-link[data-tab]').forEach(link => {
+    $$('.mnav-more-btn[data-tab], .more-sheet-link[data-tab], .mnav-more-btn[data-role-gate], [data-klc-nav="setup"]').forEach(link => {
+      const gate = roleGateAllows(link, tabs);
+      if (gate === false) { link.style.display = 'none'; return; }
+      if (gate === true) { link.style.display = ''; return; }
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
+    });
+    // Explicit Kitchen Setup (coach modal) — never show for POS-only staff
+    const klc = document.getElementById('klc-sidebar-setup');
+    if (klc) {
+      const ok = roleGateAllows(klc, tabs);
+      klc.style.display = ok === false ? 'none' : (ok === true || tabs.includes('editor-tab') || tabs.includes('inventory-tab') ? '' : 'none');
+    }
+    const klcMob = document.getElementById('klc-mobile-setup');
+    if (klcMob) {
+      const ok = tabs.includes('editor-tab') || tabs.includes('inventory-tab');
+      klcMob.style.display = ok ? '' : 'none';
+    }
+    // Hide empty sidebar section labels (e.g. Manage when only Kitchen Setup was visible)
+    $$('.sb-nav .sb-section').forEach((sec) => {
+      let n = sec.nextElementSibling;
+      let any = false;
+      while (n && !n.classList.contains('sb-section')) {
+        if (n.classList.contains('sidebar-link') && n.style.display !== 'none' && getComputedStyle(n).display !== 'none') any = true;
+        n = n.nextElementSibling;
+      }
+      sec.style.display = any ? '' : 'none';
     });
     // Update user pill role label
     const userRoleEl = document.querySelector('.user-pill .ur');
