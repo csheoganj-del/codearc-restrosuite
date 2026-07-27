@@ -283,6 +283,59 @@ function tabsAllow(userTabs: string[], need: string[]): boolean {
   return need.some((t) => userTabs.includes(t));
 }
 
+/** Strip PIN / reset secrets from settings payload for cashiers, waiters, kitchen, etc. */
+function scrubFeatureFlags(flags: unknown): Record<string, unknown> {
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = typeof flags === "string"
+      ? (JSON.parse(flags) || {})
+      : (flags && typeof flags === "object" ? { ...(flags as Record<string, unknown>) } : {});
+  } catch {
+    parsed = {};
+  }
+  delete parsed.pin_reset_code_hash;
+  delete parsed.master_pin_reset_hash;
+  delete parsed.admin_pin_hash;
+  delete parsed.admin_pin;
+  if (parsed.ui_settings && typeof parsed.ui_settings === "object") {
+    const ui = { ...(parsed.ui_settings as Record<string, unknown>) };
+    const hadPin = !!(ui.admin_pin_hash || ui.admin_pin);
+    delete ui.admin_pin_hash;
+    delete ui.admin_pin;
+    delete ui.pin_reset_code_hash;
+    delete ui.master_pin_reset_hash;
+    // Signal that a PIN exists without leaking the hash (offline admin devices bank hash only when admin)
+    if (hadPin) ui.admin_pin_configured = true;
+    parsed.ui_settings = ui;
+  }
+  return parsed;
+}
+
+function sanitizeBusinessProfileForStaff(data: unknown): unknown {
+  if (data == null) return data;
+  const scrubOne = (row: Record<string, unknown>) => {
+    const next = { ...row };
+    if (next.feature_flags != null) {
+      next.feature_flags = scrubFeatureFlags(next.feature_flags);
+    }
+    // Hard-delete any top-level secret-ish fields if present on older schemas
+    delete next.admin_pin_hash;
+    delete next.admin_pin;
+    delete next.pin_reset_code_hash;
+    delete next.master_pin_reset_hash;
+    return next;
+  };
+  if (Array.isArray(data)) {
+    return data.map((row) =>
+      row && typeof row === "object" ? scrubOne(row as Record<string, unknown>) : row
+    );
+  }
+  if (typeof data === "object") {
+    return scrubOne(data as Record<string, unknown>);
+  }
+  return data;
+}
+
 function canAccessTableOp(
   table: string,
   operation: string,
@@ -1006,7 +1059,13 @@ serve(async (req) => {
       await broadcastTenantDataChange(verified.tenantId as string, table, operation);
     }
 
-    return jsonResponse({ data }, 200, req);
+    // Never send PIN hashes / reset secrets to non-admin staff (POS still gets tax UI flags)
+    let safeData = data;
+    if (table === "doppio_business_profile" && !isOutletAdmin) {
+      safeData = sanitizeBusinessProfileForStaff(data);
+    }
+
+    return jsonResponse({ data: safeData }, 200, req);
   } catch (error) {
     console.error("tenant-data function error:", error);
     return jsonResponse({ error: "Unexpected server error." }, 500, req);

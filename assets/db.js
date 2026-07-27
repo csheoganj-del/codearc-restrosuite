@@ -1327,8 +1327,43 @@
       for (const k in uiSettings) {
         out[k] = uiSettings[k];
       }
+      // Defense-in-depth: never keep PIN material in staff browser memory
+      try {
+        const role = String(
+          (window.RS_API && RS_API.session && RS_API.session()?.role) ||
+          sessionStorage.getItem('logged_in_role') || ''
+        ).toLowerCase();
+        const isAdmin = role === 'admin' || role === 'manager' || role === 'owner' || role === 'superadmin';
+        if (!isAdmin) {
+          if (out.admin_pin_hash) out.admin_pin_configured = true;
+          delete out.admin_pin_hash;
+          delete out.admin_pin;
+          delete out.pin_reset_code_hash;
+          delete out.master_pin_reset_hash;
+          if (out._raw && typeof out._raw === 'object') {
+            try {
+              const raw = JSON.parse(JSON.stringify(out._raw));
+              if (raw.feature_flags) {
+                let ff = raw.feature_flags;
+                if (typeof ff === 'string') { try { ff = JSON.parse(ff); } catch (_) { ff = {}; } }
+                if (ff && typeof ff === 'object') {
+                  delete ff.pin_reset_code_hash;
+                  delete ff.master_pin_reset_hash;
+                  delete ff.admin_pin_hash;
+                  if (ff.ui_settings && typeof ff.ui_settings === 'object') {
+                    delete ff.ui_settings.admin_pin_hash;
+                    delete ff.ui_settings.admin_pin;
+                  }
+                  raw.feature_flags = ff;
+                }
+              }
+              out._raw = raw;
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
       
-      out._raw = row; return out;
+      out._raw = out._raw || row; return out;
     },
     async setSettings(o){
       const body={}; for(const k in o){ if(SETTINGS_MAP[k]) body[SETTINGS_MAP[k]] = o[k]; }
@@ -1955,6 +1990,16 @@
 
   function cachePinHashFromSettings(settings) {
     try {
+      // Only bank PIN hash for admin/manager sessions (never staff browsers)
+      const role = String(
+        (window.RS_API && RS_API.session && RS_API.session()?.role) ||
+        sessionStorage.getItem('logged_in_role') || ''
+      ).toLowerCase();
+      const isAdmin = role === 'admin' || role === 'manager' || role === 'owner' || role === 'superadmin';
+      if (!isAdmin) {
+        try { localStorage.removeItem('rs:admin_pin_hash'); } catch (_) {}
+        return;
+      }
       if (settings && settings.admin_pin_hash) {
         localStorage.setItem('rs:admin_pin_hash', String(settings.admin_pin_hash));
       }
