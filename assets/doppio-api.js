@@ -323,20 +323,22 @@
     rawLocalRemove('rs:session');
   }
   /**
-   * @param {{ intentional?: boolean }} [opts]
+   * @param {{ intentional?: boolean, clearRemember?: boolean }} [opts]
    * intentional (default true) = user clicked Sign out → wipe keep-me-signed-in + block auto-resume.
-   * intentional false = cloud rejected token (expired/revoked) → clear live tab session only.
-   *   Keep the remember blob so offline POS / Continue still works without re-typing password.
+   * intentional false = cloud rejected token → clear live tab only by default.
+   * clearRemember true = also wipe offline resume (use for revoke / suspended / password reset).
    */
   function ssClear(opts){
     const intentional = !(opts && opts.intentional === false);
+    const wipeRemember = intentional || !!(opts && opts.clearRemember);
     SESSION_KEYS.forEach(k => { SS.removeItem(k); });
     purgeLegacyFlatSessionKeys();
-    if (intentional) {
+    if (wipeRemember) {
       clearAllRememberBlobs();
-      markExplicitLogout();
+      if (intentional) markExplicitLogout();
+      else clearExplicitLogout();
     } else {
-      // Soft expire: do NOT clear keep-me-signed-in blob
+      // Soft expire: keep keep-me-signed-in for offline POS
       clearExplicitLogout();
     }
     SS.removeItem(IMP_ORIGIN_KEY);
@@ -425,6 +427,23 @@
         const msg = out.error || fallbackMsg || 'Request failed';
         const e = new Error(msg);
         e.status = res.status;
+        if (out.code) e.code = out.code;
+        // Classify auth failures for remember-blob policy (revoke vs soft expire)
+        if (res.status === 401 || res.status === 403 || res.status === 402) {
+          const m = String(msg || '');
+          if (
+            out.code === 'session_revoked' ||
+            /revok|no longer active|was revoked|workspace no longer|not active/i.test(m)
+          ) {
+            e.authCode = 'revoked';
+          } else if (out.code === 'session_expired' || /expired/i.test(m)) {
+            e.authCode = 'expired';
+          } else if (res.status === 402 || out.code === 'subscription_inactive' || /subscription/i.test(m)) {
+            e.authCode = 'subscription';
+          } else {
+            e.authCode = 'unauthorized';
+          }
+        }
         // Desktop/local proxy returns 502 when the machine cannot reach Supabase
         // (Wi‑Fi on but no internet, airplane mode, DNS down). Treat as network —
         // never as auth failure — so offline-first login/session resume still works.
@@ -531,9 +550,13 @@
     async requestRecovery({ slug, email }){ return post('tenant-access', { action:'request_recovery', slug, email }, ANON, 'Recovery request failed'); },
     async resetPassword({ token, password }){ return post('tenant-access', { action:'reset_password', token, password }, ANON, 'Password reset failed'); },
 
+    /** Last validateSession auth failure: { authCode, message, status } or null */
+    lastValidateError: null,
+
     async validateSession(){
       // Never treat "config still loading" as logged-out — that caused:
       // homepage → dashboard flash → login (wiping keep-me-signed-in).
+      api.lastValidateError = null;
       if(!CONFIGURED) {
         try { absorbRuntimeConfig(); } catch (_) {}
         if (!CONFIGURED) {
@@ -566,6 +589,11 @@
       } catch (err) {
         // If the server explicitly rejected it with 401 or 403, bounce to login (sess = null)
         if (err.status === 401 || err.status === 403 || err.status === 402) {
+          api.lastValidateError = {
+            authCode: err.authCode || 'unauthorized',
+            message: err.message || '',
+            status: err.status,
+          };
           return null;
         }
         // Network error or offline -- keep the local session alive

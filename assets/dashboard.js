@@ -2323,13 +2323,17 @@
       ? sessionTabs.map(String) : null;
     let tabs = fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
     // Settings → Lock reports for staff (default ON): strip reports/analytics from non-managers
+    // unless Team access explicitly granted those tabs for this user.
     try {
       const lockReports =
         typeof window.RS_featureOn === 'function'
           ? window.RS_featureOn('set_lock_reports_for_staff', window.RS_SETTINGS, true)
           : window.RS_SETTINGS?.set_lock_reports_for_staff !== false &&
             window.RS_SETTINGS?.set_lock_reports_for_staff !== 'false';
-      if (lockReports && role !== 'manager') {
+      const explicitReports = !!(fromSession && (
+        fromSession.includes('reports-tab') || fromSession.includes('analytics-tab')
+      ));
+      if (lockReports && role !== 'manager' && !explicitReports) {
         tabs = tabs.filter((t) => t !== 'reports-tab' && t !== 'analytics-tab');
       }
     } catch (_) {}
@@ -2652,8 +2656,12 @@
       try {
         const sess = await RS_API.validateSession();
         if (sess === null && navigator.onLine) {
-          // Revoked / suspended / hard-expired while online — kick to login
-          try { RS_API.logout({ intentional: false }); } catch (_) {}
+          // Revoked/suspended → wipe offline resume. Soft expire → keep blob for offline POS.
+          const code = (RS_API.lastValidateError && RS_API.lastValidateError.authCode) || '';
+          const wipeOffline = code === 'revoked' || code === 'subscription' || code === 'unauthorized';
+          try {
+            RS_API.logout({ intentional: false, clearRemember: wipeOffline });
+          } catch (_) {}
           location.href = 'login?stay=1';
           return;
         }
@@ -3260,8 +3268,9 @@
     if(window.RS_API && RS_API.configured){
       RS_API.validateSession().then(sess => {
         if(sess === null){
-          // Expired / revoked only — do not mark as user Sign out (that blocked re-open)
-          try { RS_API.logout({ intentional: false }); } catch (e) {}
+          const code = (RS_API.lastValidateError && RS_API.lastValidateError.authCode) || '';
+          const wipeOffline = code === 'revoked' || code === 'subscription' || code === 'unauthorized';
+          try { RS_API.logout({ intentional: false, clearRemember: wipeOffline }); } catch (e) {}
           location.href = 'login?stay=1';
         }
       }).catch(() => {

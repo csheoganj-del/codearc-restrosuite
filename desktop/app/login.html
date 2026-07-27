@@ -1253,12 +1253,16 @@
           try {
             const sess = await RS_API.validateSession();
             if (sess === null) {
-              try { RS_API.logout({ intentional: false }); } catch (_) {}
+              const code = (RS_API.lastValidateError && RS_API.lastValidateError.authCode) || '';
+              const wipeOffline = code === 'revoked' || code === 'subscription' || code === 'unauthorized';
+              try { RS_API.logout({ intentional: false, clearRemember: wipeOffline }); } catch (_) {}
               _autoResumeTried = false;
               updateOfflineResume();
-              // Soft-expire already keeps keep-me-signed-in blob (offline Continue).
-              // Only true revoke/expiry after long idle needs online password again.
-              showErr('Cloud session needs a quick sign-in for sync. If you are offline, tap Continue — no password needed.');
+              if (wipeOffline) {
+                showErr('Session ended on the server — please sign in again.');
+              } else {
+                showErr('Cloud session needs a quick sign-in for sync. If you are offline, tap Continue — no password needed.');
+              }
               return;
             }
           } catch (valErr) {

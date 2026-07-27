@@ -343,13 +343,13 @@ async function verifySignedSessionToken(token: string, opts?: { allowStale?: boo
     const payloadText = new TextDecoder().decode(decodeBase64Url(payloadEncoded));
     const payload = JSON.parse(payloadText);
     const exp = Number(payload.exp || 0);
-    if (!exp) return { ok: false, error: "Session expired. Please log in again." };
+    if (!exp) return { ok: false, error: "Session expired. Please log in again.", code: "session_expired" };
     if (Date.now() > exp) {
       // Sliding / migration refresh path for validate_session only
       if (opts?.allowStale && Date.now() <= exp + SESSION_STALE_REFRESH_MS) {
         return { ok: true, payload, stale: true };
       }
-      return { ok: false, error: "Session expired. Please log in again." };
+      return { ok: false, error: "Session expired. Please log in again.", code: "session_expired" };
     }
     return { ok: true, payload, stale: false };
   } catch {
@@ -760,7 +760,13 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
   // allowStale: revive recently expired tokens and always re-issue a fresh 30d token
   // so Keep me signed in does not force password every 8 hours.
   const verified = await verifySignedSessionToken(token, { allowStale: true });
-  if (!verified.ok) return jsonResponse({ error: verified.error }, 401, req);
+  if (!verified.ok) {
+    return jsonResponse(
+      { error: verified.error, code: (verified as { code?: string }).code || "session_expired" },
+      401,
+      req,
+    );
+  }
 
   const sessionPayload = verified.payload as Record<string, unknown>;
   if (sessionPayload.role === "superadmin") {
@@ -793,12 +799,14 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
     return jsonResponse({ error: "Failed to validate session." }, 500, req);
   }
 
-  if (!tenant) return jsonResponse({ error: "Workspace no longer exists." }, 401, req);
-  if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active." }, 403, req);
-  if (!activeSubscription(tenant.subscription_status)) return jsonResponse({ error: "Workspace subscription is not active." }, 402, req);
+  if (!tenant) return jsonResponse({ error: "Workspace no longer exists.", code: "session_revoked" }, 401, req);
+  if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active.", code: "session_revoked" }, 403, req);
+  if (!activeSubscription(tenant.subscription_status)) {
+    return jsonResponse({ error: "Workspace subscription is not active.", code: "subscription_inactive" }, 402, req);
+  }
   const userId = String(sessionPayload.user_id || "");
   if (!userId && Number(sessionPayload.auth_version) !== Number(tenant.auth_version)) {
-    return jsonResponse({ error: "Session was revoked. Please log in again." }, 401, req);
+    return jsonResponse({ error: "Session was revoked. Please log in again.", code: "session_revoked" }, 401, req);
   }
 
   const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
@@ -817,10 +825,10 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
       return jsonResponse({ error: "Failed to validate staff session." }, 500, req);
     }
     if (!staffUser || staffUser.status !== "active") {
-      return jsonResponse({ error: "Staff account is no longer active." }, 401, req);
+      return jsonResponse({ error: "Staff account is no longer active.", code: "session_revoked" }, 401, req);
     }
     if (Number(sessionPayload.session_version) !== Number(staffUser.session_version)) {
-      return jsonResponse({ error: "Session was revoked. Please log in again." }, 401, req);
+      return jsonResponse({ error: "Session was revoked. Please log in again.", code: "session_revoked" }, 401, req);
     }
 
     const freshToken = await createSignedSessionToken({
