@@ -83,44 +83,170 @@ const TENANT_TABLES = new Set([
   "doppio_table_sessions",
 ]);
 
-const TABLE_TAB_ACCESS: Record<string, string[]> = {
-  doppio_aggregator_config: ["pos-tab", "editor-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
-  doppio_online_orders: ["pos-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
-  doppio_table_layout: ["pos-tab", "floor-tab", "growth-hub-tab"],
-  doppio_table_sessions: ["pos-tab", "floor-tab", "growth-hub-tab"],
-  doppio_business_profile: ["pos-tab", "editor-tab", "employees-tab", "reports-tab"],
-  doppio_waitlist: ["pos-tab", "crm-tab", "growth-hub-tab"],
-  doppio_menu: ["pos-tab", "editor-tab", "online-tab"],
-  doppio_inventory: ["pos-tab", "inventory-tab", "editor-tab"],
-  doppio_inventory_batches: ["pos-tab", "inventory-tab"],
-  doppio_inventory_thresholds: ["pos-tab", "inventory-tab"],
-  doppio_bills: ["pos-tab", "bills-tab", "reports-tab", "tax-tab"],
-  doppio_pending_orders: ["pos-tab", "qr-orders-tab", "kds-tab", "tokens-tab", "online-tab", "aggregator-tab"],
-  doppio_shifts: ["pos-tab", "employees-tab"],
-  doppio_shift_events: ["pos-tab", "employees-tab"],
-  doppio_employees: ["employees-tab"],
-  doppio_leave_requests: ["employees-tab"],
-  doppio_attendance: ["employees-tab"],
-  doppio_crm: ["pos-tab", "crm-tab", "customers-tab"],
-  doppio_notifications: ["pos-tab", "qr-orders-tab", "inventory-tab", "employees-tab"],
-  doppio_custom_recipes: ["pos-tab", "editor-tab"],
-  doppio_pos_popularity: ["pos-tab", "reports-tab"],
-  doppio_draft_orders: ["pos-tab"],
-  doppio_support_tickets: ["growth-hub-tab"],
-  doppio_onboarding_tasks: ["growth-hub-tab"],
-  doppio_reservations: ["growth-hub-tab", "qr-orders-tab"],
-  doppio_vendors: ["growth-hub-tab", "inventory-tab"],
-  doppio_purchase_orders: ["growth-hub-tab", "inventory-tab"],
-  doppio_item_costs: ["growth-hub-tab", "inventory-tab", "reports-tab"],
-  doppio_offers: ["growth-hub-tab", "crm-tab"],
-  doppio_refund_requests: ["growth-hub-tab", "bills-tab"],
-  doppio_device_setups: ["growth-hub-tab"],
-  doppio_backup_snapshots: ["growth-hub-tab"],
-  doppio_outlets: ["growth-hub-tab", "reports-tab"],
-  doppio_migration_status: ["growth-hub-tab"],
-  doppio_saas_invoices: ["growth-hub-tab"],
-  doppio_tax_rates: ["pos-tab", "tax-tab", "editor-tab"],
+/**
+ * Operation-level module ACL.
+ * - read: SELECT
+ * - write: INSERT / UPDATE / UPSERT / DELETE (still combined with TABLE_WRITE_ROLES for staff)
+ *
+ * POS must be able to SELL without full history dumps:
+ * bills write includes pos-tab; bills read does NOT (only bills/reports/tax modules).
+ */
+type TableAccess = { read: string[]; write: string[] };
+const TABLE_ACCESS: Record<string, TableAccess> = {
+  doppio_aggregator_config: {
+    read: ["editor-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
+    write: ["editor-tab", "aggregator-tab", "growth-hub-tab"],
+  },
+  doppio_online_orders: {
+    read: ["pos-tab", "online-tab", "aggregator-tab", "growth-hub-tab", "qr-orders-tab"],
+    write: ["pos-tab", "online-tab", "aggregator-tab", "qr-orders-tab"],
+  },
+  doppio_table_layout: {
+    read: ["pos-tab", "floor-tab", "growth-hub-tab"],
+    write: ["floor-tab", "growth-hub-tab"],
+  },
+  doppio_table_sessions: {
+    read: ["pos-tab", "floor-tab", "growth-hub-tab"],
+    write: ["pos-tab", "floor-tab"],
+  },
+  doppio_business_profile: {
+    // POS needs tax/settings snapshot to bill; writes stay admin-only below
+    read: ["pos-tab", "editor-tab", "employees-tab", "reports-tab", "tax-tab"],
+    write: ["editor-tab", "employees-tab"],
+  },
+  doppio_waitlist: {
+    read: ["pos-tab", "crm-tab", "customers-tab", "growth-hub-tab", "floor-tab"],
+    write: ["pos-tab", "customers-tab", "growth-hub-tab", "floor-tab"],
+  },
+  doppio_menu: {
+    read: ["pos-tab", "editor-tab", "kds-tab", "floor-tab", "online-tab", "aggregator-tab", "qr-orders-tab", "tokens-tab"],
+    write: ["editor-tab"],
+  },
+  // Inventory READ is module-only; POS still deducts via deduct_inventory RPC
+  doppio_inventory: {
+    read: ["inventory-tab", "editor-tab"],
+    write: ["inventory-tab", "editor-tab", "pos-tab"],
+  },
+  doppio_inventory_batches: {
+    read: ["inventory-tab"],
+    write: ["inventory-tab", "pos-tab"],
+  },
+  doppio_inventory_thresholds: {
+    read: ["inventory-tab"],
+    write: ["inventory-tab"],
+  },
+  // CRITICAL split: pos-tab may CREATE bills, not dump full history
+  doppio_bills: {
+    read: ["bills-tab", "reports-tab", "tax-tab"],
+    write: ["pos-tab", "bills-tab"],
+  },
+  doppio_pending_orders: {
+    read: ["pos-tab", "qr-orders-tab", "kds-tab", "tokens-tab", "online-tab", "aggregator-tab", "floor-tab"],
+    write: ["pos-tab", "qr-orders-tab", "kds-tab", "floor-tab", "online-tab", "aggregator-tab"],
+  },
+  doppio_shifts: {
+    read: ["pos-tab", "employees-tab", "reports-tab"],
+    write: ["pos-tab", "employees-tab"],
+  },
+  doppio_shift_events: {
+    read: ["pos-tab", "employees-tab"],
+    write: ["pos-tab", "employees-tab"],
+  },
+  doppio_employees: {
+    read: ["employees-tab"],
+    write: ["employees-tab"],
+  },
+  doppio_leave_requests: {
+    read: ["employees-tab"],
+    write: ["employees-tab"],
+  },
+  doppio_attendance: {
+    read: ["employees-tab"],
+    write: ["employees-tab", "pos-tab"],
+  },
+  // CRM directory is customers module; POS may only write walk-in touch
+  doppio_crm: {
+    read: ["crm-tab", "customers-tab"],
+    write: ["pos-tab", "crm-tab", "customers-tab"],
+  },
+  doppio_notifications: {
+    read: ["pos-tab", "qr-orders-tab", "inventory-tab", "employees-tab", "kds-tab"],
+    write: ["pos-tab", "qr-orders-tab", "inventory-tab", "employees-tab", "kds-tab"],
+  },
+  doppio_custom_recipes: {
+    read: ["editor-tab", "inventory-tab", "pos-tab"],
+    write: ["editor-tab", "inventory-tab"],
+  },
+  doppio_pos_popularity: {
+    read: ["pos-tab", "reports-tab"],
+    write: ["pos-tab"],
+  },
+  doppio_draft_orders: {
+    read: ["pos-tab", "floor-tab"],
+    write: ["pos-tab", "floor-tab"],
+  },
+  doppio_support_tickets: {
+    read: ["growth-hub-tab"],
+    write: ["growth-hub-tab", "pos-tab"],
+  },
+  doppio_onboarding_tasks: {
+    read: ["growth-hub-tab"],
+    write: ["growth-hub-tab"],
+  },
+  doppio_reservations: {
+    read: ["growth-hub-tab", "qr-orders-tab", "floor-tab", "pos-tab"],
+    write: ["growth-hub-tab", "qr-orders-tab", "floor-tab", "pos-tab"],
+  },
+  doppio_vendors: {
+    read: ["growth-hub-tab", "inventory-tab"],
+    write: ["growth-hub-tab", "inventory-tab"],
+  },
+  doppio_purchase_orders: {
+    read: ["growth-hub-tab", "inventory-tab"],
+    write: ["growth-hub-tab", "inventory-tab"],
+  },
+  doppio_item_costs: {
+    read: ["growth-hub-tab", "inventory-tab", "reports-tab", "editor-tab"],
+    write: ["growth-hub-tab", "inventory-tab", "editor-tab"],
+  },
+  doppio_offers: {
+    read: ["growth-hub-tab", "crm-tab", "customers-tab", "pos-tab"],
+    write: ["growth-hub-tab", "crm-tab"],
+  },
+  doppio_refund_requests: {
+    read: ["growth-hub-tab", "bills-tab"],
+    write: ["growth-hub-tab", "bills-tab", "pos-tab"],
+  },
+  doppio_device_setups: {
+    read: ["growth-hub-tab"],
+    write: ["growth-hub-tab"],
+  },
+  doppio_backup_snapshots: {
+    read: ["growth-hub-tab"],
+    write: ["growth-hub-tab"],
+  },
+  doppio_outlets: {
+    read: ["growth-hub-tab", "reports-tab"],
+    write: ["growth-hub-tab"],
+  },
+  doppio_migration_status: {
+    read: ["growth-hub-tab"],
+    write: ["growth-hub-tab"],
+  },
+  doppio_saas_invoices: {
+    read: ["growth-hub-tab"],
+    write: ["growth-hub-tab"],
+  },
+  doppio_tax_rates: {
+    read: ["pos-tab", "tax-tab", "editor-tab"],
+    write: ["tax-tab", "editor-tab"],
+  },
 };
+
+// Legacy alias used by ROLE_DEFAULT_TABS admin flatten
+const TABLE_TAB_ACCESS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(TABLE_ACCESS).map(([k, v]) => [k, [...new Set([...v.read, ...v.write])]]),
+);
 
 const ROLE_DEFAULT_TABS: Record<string, string[]> = {
   admin: Array.from(new Set(Object.values(TABLE_TAB_ACCESS).flat())),
@@ -137,23 +263,61 @@ const ROLE_DEFAULT_TABS: Record<string, string[]> = {
   customer_display: ["tokens-tab"],
 };
 
+/** Non-admin roles allowed to mutate each table (admin/manager always can write). */
 const TABLE_WRITE_ROLES: Record<string, string[]> = {
   doppio_menu: ["inventory"],
-  doppio_inventory: ["cashier", "inventory"],
+  doppio_inventory: ["cashier", "inventory", "waiter", "captain"],
   doppio_inventory_batches: ["cashier", "inventory"],
   doppio_inventory_thresholds: ["inventory"],
-  doppio_bills: ["cashier"],
+  doppio_bills: ["cashier", "waiter", "captain"],
   doppio_pending_orders: ["cashier", "kitchen", "waiter", "captain"],
-  doppio_shifts: ["cashier"],
-  doppio_shift_events: ["cashier"],
-  doppio_crm: ["cashier"],
-  doppio_notifications: ["cashier", "kitchen", "waiter"],
-  doppio_pos_popularity: ["cashier"],
-  doppio_draft_orders: ["cashier", "waiter"],
+  doppio_shifts: ["cashier", "waiter", "captain"],
+  doppio_shift_events: ["cashier", "waiter", "captain"],
+  doppio_crm: ["cashier", "waiter", "captain"],
+  doppio_notifications: ["cashier", "kitchen", "waiter", "captain"],
+  doppio_pos_popularity: ["cashier", "waiter", "captain"],
+  doppio_draft_orders: ["cashier", "waiter", "captain"],
   doppio_support_tickets: ["cashier", "kitchen", "waiter", "captain"],
   doppio_reservations: ["cashier", "waiter", "captain"],
   doppio_table_sessions: ["cashier", "waiter", "captain"],
+  doppio_table_layout: ["waiter", "captain", "cashier"],
+  doppio_attendance: ["cashier", "waiter"],
+  doppio_refund_requests: ["cashier"],
+  doppio_offers: [],
+  doppio_custom_recipes: ["inventory"],
 };
+
+function tabsAllow(userTabs: string[], need: string[]): boolean {
+  if (!need || !need.length) return false;
+  return need.some((t) => userTabs.includes(t));
+}
+
+function canAccessTableOp(
+  table: string,
+  operation: string,
+  userTabs: string[],
+  actorRole: string,
+): { ok: boolean; error?: string } {
+  const access = TABLE_ACCESS[table];
+  // Tables without an ACL entry: deny by default (was open before)
+  if (!access) {
+    if (actorRole === "admin" || actorRole === "manager" || actorRole === "owner") {
+      return { ok: true };
+    }
+    return { ok: false, error: "You do not have permission to access this module." };
+  }
+  const isMutate = operation !== "select";
+  const need = isMutate ? access.write : access.read;
+  if (!tabsAllow(userTabs, need)) {
+    return {
+      ok: false,
+      error: isMutate
+        ? "Your role cannot change this data."
+        : "You do not have permission to view this module.",
+    };
+  }
+  return { ok: true };
+}
 
 // Wave 2: raise caps so multi-month outlets don't silently truncate bills/CRM.
 // Still capped to protect free-tier egress; use sales_summary for full aggregates.
@@ -674,6 +838,16 @@ serve(async (req) => {
 
     // Wave 2: multi-device bill sequence (atomic counter in Postgres)
     if (operation === "next_bill_no") {
+      const canBillNo =
+        isOutletAdmin ||
+        tabsForOps.includes("pos-tab") ||
+        tabsForOps.includes("bills-tab") ||
+        actorRole === "cashier" ||
+        actorRole === "waiter" ||
+        actorRole === "captain";
+      if (!canBillNo) {
+        return jsonResponse({ error: "Your role cannot allocate bill numbers." }, 403, req);
+      }
       const day = payload.day != null ? String(payload.day) : null;
       const { data, error } = await supabaseAdmin.rpc("rs_next_bill_no", {
         p_tenant_id: verified.tenantId,
@@ -757,10 +931,15 @@ serve(async (req) => {
     const filters = Array.isArray(payload.filters) ? payload.filters : [];
     const columns = typeof payload.columns === "string" && payload.columns.trim() ? payload.columns : "*";
 
-    const allowedTableTabs = TABLE_TAB_ACCESS[table];
-
-    if (allowedTableTabs && !allowedTableTabs.some((tab) => (verified.allowedTabs as string[]).includes(tab))) {
-      return jsonResponse({ error: "You do not have permission to access this module." }, 403, req);
+    // Operation-level ACL (POS write ≠ full module read)
+    const userTabs = (verified.allowedTabs as string[]) || [];
+    if (isOutletAdmin) {
+      // admins pass tab check
+    } else {
+      const access = canAccessTableOp(table, operation, userTabs, actorRole);
+      if (!access.ok) {
+        return jsonResponse({ error: access.error || "Permission denied." }, 403, req);
+      }
     }
     // Outlet settings / PIN material: only admins may write
     if (
@@ -776,6 +955,7 @@ serve(async (req) => {
       operation !== "select"
       && verified.actorRole !== "admin"
       && verified.actorRole !== "manager"
+      && verified.actorRole !== "owner"
       && !(TABLE_WRITE_ROLES[table] || []).includes(verified.actorRole as string)
     ) {
       return jsonResponse({ error: "Your role has read-only access to this module." }, 403, req);
@@ -789,9 +969,15 @@ serve(async (req) => {
         query = query.order(String(order.column || "id"), { ascending: order.ascending !== false });
       }
       const requestedLimit = payload.limit !== null && payload.limit !== undefined ? Number(payload.limit) : NaN;
-      // Bills/customers get a higher default so POS + reports stay accurate longer
+      // Full history only for bills/CRM module holders; POS never needs 1000-row dumps
+      const hasHistoryModule =
+        userTabs.includes("bills-tab") ||
+        userTabs.includes("reports-tab") ||
+        userTabs.includes("customers-tab") ||
+        userTabs.includes("crm-tab") ||
+        isOutletAdmin;
       const tableDefault = (table === "doppio_bills" || table === "doppio_crm")
-        ? Math.min(1000, ZERO_COST_MAX_LIMIT)
+        ? (hasHistoryModule ? Math.min(1000, ZERO_COST_MAX_LIMIT) : Math.min(50, ZERO_COST_DEFAULT_LIMIT))
         : ZERO_COST_DEFAULT_LIMIT;
       const safeLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
         ? Math.min(requestedLimit, ZERO_COST_MAX_LIMIT)
