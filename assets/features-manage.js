@@ -2999,7 +2999,14 @@
                 <label style="font-size:12.5px;font-weight:700">Module access</label>
                 <button type="button" class="btn btn-ghost btn-sm" id="sle-tabs-reset" style="font-size:11.5px"><i class="fa-solid fa-rotate-left"></i> Reset to role defaults</button>
               </div>
+              <div class="sl-access-presets" id="sle-presets">
+                <button type="button" data-preset="billing">Billing only</button>
+                <button type="button" data-preset="floor_kds">Floor + KDS</button>
+                <button type="button" data-preset="kitchen">Kitchen only</button>
+                <button type="button" data-preset="manager">Full manager</button>
+              </div>
               ${renderTabPermissionGrid(curTabs)}
+              <div class="sl-access-summary" id="sle-summary"></div>
             </div>
             <div id="sle-err" style="color:var(--red);font-size:12.5px;display:none"></div>
           </div>`;
@@ -3027,7 +3034,43 @@
               el.querySelectorAll('.sle-tab').forEach((cb) => {
                 cb.checked = defaults.has(cb.value);
               });
+              updateAccessSummary();
             }
+            function applyTabList(list) {
+              const set = new Set((list || []).map(String));
+              el.querySelectorAll('.sle-tab').forEach((cb) => {
+                cb.checked = set.has(cb.value);
+              });
+              updateAccessSummary();
+            }
+            function updateAccessSummary() {
+              const sum = el.querySelector('#sle-summary');
+              if (!sum) return;
+              const tabs = [...el.querySelectorAll('.sle-tab:checked')].map((c) => c.value);
+              const labels = {
+                'pos-tab': 'POS', 'floor-tab': 'Floor', 'kds-tab': 'Kitchen', 'bills-tab': 'Bills',
+                'qr-orders-tab': 'QR', 'customers-tab': 'Customers', 'inventory-tab': 'Inventory',
+                'editor-tab': 'Menu', 'reports-tab': 'Reports', 'employees-tab': 'Team',
+              };
+              const nice = tabs.map((t) => labels[t] || t.replace(/-tab$/, '')).join(' · ');
+              sum.innerHTML = tabs.length
+                ? 'They can open: <b>' + nice + '</b>. Changes apply on their open app within ~10s — no re-login.'
+                : 'Select at least one module.';
+            }
+            el.querySelectorAll('.sle-tab').forEach((cb) => cb.addEventListener('change', updateAccessSummary));
+            el.querySelectorAll('#sle-presets [data-preset]').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                const key = btn.getAttribute('data-preset');
+                let tabs = window.RS_tabsForPreset ? RS_tabsForPreset(key) : null;
+                if (!tabs || !tabs.length) {
+                  if (key === 'manager') tabs = tabsForRole('manager');
+                  else if (key === 'billing') tabs = ['pos-tab', 'floor-tab', 'bills-tab', 'customers-tab'];
+                  else if (key === 'floor_kds') tabs = ['pos-tab', 'floor-tab', 'kds-tab'];
+                  else if (key === 'kitchen') tabs = ['kds-tab'];
+                }
+                applyTabList(tabs);
+              });
+            });
             el.querySelectorAll('.sl-role-opt').forEach(opt => {
               opt.addEventListener('click', () => {
                 el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor = 'var(--stroke-2)'; o.style.background = 'var(--glass)'; o.style.boxShadow = 'none'; });
@@ -3045,6 +3088,7 @@
               const role = el.querySelector('input[name="sle-role"]:checked')?.value || curRole;
               applyRoleDefaultsToCheckboxes(role);
             });
+            updateAccessSummary();
             el.querySelector('#sle-cancel').onclick = () => closeModal();
             el.querySelector('#sle-save').onclick = async () => {
               const errEl = el.querySelector('#sle-err');
@@ -3068,8 +3112,11 @@
                   display_name: dname,
                   allowed_tabs,
                 });
+                try {
+                  if (window.RS_ownerAudit) RS_ownerAudit('staff.access_update', (u.username || '') + ' → ' + allowed_tabs.join(','));
+                } catch (_) {}
                 closeModal();
-                RS.toast('Access updated — live on their open session', 'fa-user-shield');
+                RS.toast('Access updated — live on their open app within ~10s', 'fa-user-shield');
                 loadStaffUsers();
               } catch (e) {
                 errEl.textContent = e.message || String(e);

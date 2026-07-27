@@ -464,9 +464,9 @@
         const isLocalShell = /appassets\.androidplatform\.net/i.test(location.origin || '');
         let hint = 'Connection failed: could not reach the cloud. Check internet, then retry.';
         if (isAndroid || isLocalShell) {
-          hint = 'Connection failed on Android. 1) Enable internet / Wi‑Fi for BlueStacks or the phone. 2) Use the latest APK (2.0.4+). 3) Open Chrome and try https://restrosuite.codearc.co.in/login — if that works, reinstall the APK. 4) Support: support@codearc.co.in';
+          hint = 'No internet on this device — offline mode still works after first login. Turn on Wi‑Fi and retry for cloud sync.';
         } else {
-          hint = 'Connection failed: Failed to fetch. Check internet, confirm the site loads, and that ALLOWED_ORIGINS includes https://restrosuite.codearc.co.in (and Android shell if offline).';
+          hint = 'No internet — using offline mode when available. Check Wi‑Fi, then retry for cloud sync.';
         }
         const e = new Error(hint);
         e.status = 0;
