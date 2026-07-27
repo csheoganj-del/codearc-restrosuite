@@ -337,12 +337,22 @@
       // Kitchen/Cashier/Waiter login can never land on a tab outside its
       // role's allowed list (audit findings #1 and #2).
       const roleInfo = window.RS_ROLE;
-      if (roleInfo && Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length) {
-        const permitted = roleInfo.allowedTabs.slice();
-        // Managers may open Settings (Plan & Billing / Danger Zone are
-        // additionally gated inside the Settings screen itself).
-        if (roleInfo.staffRole === 'manager') permitted.push('settings-tab');
-        if (!permitted.includes(id)) id = permitted[0];
+      const rRole = String((roleInfo && roleInfo.staffRole) || roleRaw || '').toLowerCase();
+      const unrestricted = ['owner', 'admin', 'superadmin', 'brand_admin'].includes(rRole);
+      if (roleInfo && !unrestricted) {
+        // null allowedTabs = unrestricted (owner). [] or missing list = fail-closed for staff.
+        let permitted = Array.isArray(roleInfo.allowedTabs)
+          ? roleInfo.allowedTabs.slice()
+          : (roleInfo.allowedTabs == null ? null : []);
+        if (permitted === null && rRole === 'manager') {
+          // manager defaults when map not hydrated yet
+          permitted = (window.RS_ROLE && window.RS_ROLE.ROLE_TAB_MAP && window.RS_ROLE.ROLE_TAB_MAP.manager) || ['pos-tab'];
+        }
+        if (Array.isArray(permitted)) {
+          if (rRole === 'manager') permitted.push('settings-tab');
+          if (!permitted.length) permitted = ['pos-tab'];
+          if (!permitted.includes(id)) id = permitted[0] || 'pos-tab';
+        }
       }
     }
 
@@ -2297,9 +2307,10 @@
   /** Role-first home tab  -  reduces cognitive load for staff logins */
   const ROLE_HOME_TAB = ROLE_HOME_TAB_EARLY;
 
-  // Resolve current staff role (session meta -> sessionStorage fallback)
-  const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
-    .toLowerCase().trim();
+  // Resolve current staff role (session meta -> sessionStorage fallback).
+  // Never default restricted shells to "owner" (that opened full nav by accident).
+  const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '')
+    .toLowerCase().trim() || (sess && sess.token ? 'cashier' : 'owner');
   // Roles that get the full, unrestricted dashboard.
   const UNRESTRICTED_ROLES = ['owner', 'admin', 'superadmin', 'brand_admin'];
   // Prefer the backend-computed allowed_tabs from the session (it already
@@ -2562,14 +2573,14 @@
     // Update user pill role label
     const userRoleEl = document.querySelector('.user-pill .ur');
     if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[role] || role;
-    // Hide settings entry points from non-managers (only owner/admin/manager
-    // may open Settings; this covers both the sidebar link and the gear
-    // button in the sidebar footer, which previously was never gated)
-    if (role !== 'manager') {
+    // Settings: owner/admin unrestricted path has tabs=null; managers get settings;
+    // cashiers/waiters never. Always set both directions so live promote works.
+    {
+      const canSettings = !tabs || role === 'manager' || role === 'owner' || role === 'admin';
       const settingsLink = document.querySelector('.sidebar-link[data-tab="settings-tab"]');
-      if (settingsLink) settingsLink.style.display = 'none';
+      if (settingsLink) settingsLink.style.display = canSettings ? '' : 'none';
       const settingsGear = document.getElementById('open-settings');
-      if (settingsGear) settingsGear.style.display = 'none';
+      if (settingsGear) settingsGear.style.display = canSettings ? '' : 'none';
     }
     // If the tab the user is currently sitting on just got revoked, move
     // them somewhere they can still see rather than leaving a dead screen up.
@@ -2640,6 +2651,12 @@
       if (!window.RS_API || !RS_API.configured || typeof RS_API.validateSession !== 'function') return;
       try {
         const sess = await RS_API.validateSession();
+        if (sess === null && navigator.onLine) {
+          // Revoked / suspended / hard-expired while online — kick to login
+          try { RS_API.logout({ intentional: false }); } catch (_) {}
+          location.href = 'login?stay=1';
+          return;
+        }
         if (sess && sess.role && sess.role !== 'superadmin') {
           applyLiveRoleUpdate(sess.role, sess.allowed_tabs, { silent: true });
         }

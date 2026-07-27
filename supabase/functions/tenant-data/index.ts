@@ -86,8 +86,9 @@ const TENANT_TABLES = new Set([
 const TABLE_TAB_ACCESS: Record<string, string[]> = {
   doppio_aggregator_config: ["pos-tab", "editor-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
   doppio_online_orders: ["pos-tab", "online-tab", "aggregator-tab", "growth-hub-tab"],
-  doppio_table_layout: ["pos-tab", "growth-hub-tab"],
-  doppio_table_sessions: ["pos-tab", "growth-hub-tab"],
+  doppio_table_layout: ["pos-tab", "floor-tab", "growth-hub-tab"],
+  doppio_table_sessions: ["pos-tab", "floor-tab", "growth-hub-tab"],
+  doppio_business_profile: ["pos-tab", "editor-tab", "employees-tab", "reports-tab"],
   doppio_waitlist: ["pos-tab", "crm-tab", "growth-hub-tab"],
   doppio_menu: ["pos-tab", "editor-tab", "online-tab"],
   doppio_inventory: ["pos-tab", "inventory-tab", "editor-tab"],
@@ -552,19 +553,47 @@ serve(async (req) => {
     const table = String(payload.table || "");
     const operation = String(payload.operation || "");
 
-    if (operation === "gateway_status") {
-      return await proxyGatewayRequest("/status", "GET", req, undefined, verified.tenantId);
-    }
-    if (operation === "gateway_logout") {
-      return await proxyGatewayRequest("/logout", "POST", req, undefined, verified.tenantId);
-    }
-    if (operation === "gateway_reset") {
-      return await proxyGatewayRequest("/reset", "POST", req, undefined, verified.tenantId);
-    }
-    if (operation === "gateway_logs") {
-      return await proxyGatewayRequest("/debug-logs?tenantId=" + encodeURIComponent(verified.tenantId), "GET", req, undefined, verified.tenantId);
+    const actorRole = String(verified.actorRole || "").toLowerCase();
+    const isOutletAdmin = actorRole === "admin" || actorRole === "manager" || actorRole === "owner";
+    const tabsForOps = (verified.allowedTabs as string[]) || [];
+
+    // WhatsApp gateway control is owner/manager only — never waiter/kitchen tokens
+    if (
+      operation === "gateway_status" ||
+      operation === "gateway_logout" ||
+      operation === "gateway_reset" ||
+      operation === "gateway_logs"
+    ) {
+      if (!isOutletAdmin) {
+        return jsonResponse({ error: "Only outlet admins can manage the WhatsApp gateway." }, 403, req);
+      }
+      if (operation === "gateway_status") {
+        return await proxyGatewayRequest("/status", "GET", req, undefined, verified.tenantId);
+      }
+      if (operation === "gateway_logout") {
+        return await proxyGatewayRequest("/logout", "POST", req, undefined, verified.tenantId);
+      }
+      if (operation === "gateway_reset") {
+        return await proxyGatewayRequest("/reset", "POST", req, undefined, verified.tenantId);
+      }
+      return await proxyGatewayRequest(
+        "/debug-logs?tenantId=" + encodeURIComponent(String(verified.tenantId)),
+        "GET",
+        req,
+        undefined,
+        verified.tenantId,
+      );
     }
     if (operation === "gateway_send") {
+      // Receipts from POS need send; destructive gateway_reset above is admin-only.
+      const canSend =
+        isOutletAdmin ||
+        tabsForOps.includes("pos-tab") ||
+        tabsForOps.includes("bills-tab") ||
+        actorRole === "cashier";
+      if (!canSend) {
+        return jsonResponse({ error: "Your role cannot send WhatsApp messages." }, 403, req);
+      }
       const phone = String(payload.phone || "");
       const message = String(payload.message || "");
       const caption = payload.caption != null ? String(payload.caption) : undefined;
@@ -579,9 +608,9 @@ serve(async (req) => {
 
     // Wave 7: server-side bill search (history beyond client cache cap)
     if (operation === "search_bills") {
-      const tabs = (verified.allowedTabs as string[]) || [];
+      const tabs = tabsForOps;
+      // Not every POS user — bills/reports modules or billing roles only
       const canSearch = tabs.includes("bills-tab")
-        || tabs.includes("pos-tab")
         || tabs.includes("reports-tab")
         || verified.actorRole === "admin"
         || verified.actorRole === "manager"
@@ -623,6 +652,14 @@ serve(async (req) => {
 
     // Wave 2: server-side sales aggregates (reports without loading every bill)
     if (operation === "sales_summary") {
+      const canSummary =
+        isOutletAdmin ||
+        tabsForOps.includes("reports-tab") ||
+        tabsForOps.includes("analytics-tab") ||
+        tabsForOps.includes("bills-tab");
+      if (!canSummary) {
+        return jsonResponse({ error: "Your role cannot view sales summaries." }, 403, req);
+      }
       const days = Math.max(1, Math.min(365, Number(payload.days) || 30));
       const { data, error } = await supabaseAdmin.rpc("rs_sales_summary", {
         p_tenant_id: verified.tenantId,
@@ -684,6 +721,9 @@ serve(async (req) => {
     }
 
     if (operation === "verify_pin_reset_code") {
+      if (!isOutletAdmin) {
+        return jsonResponse({ valid: false, error: "Only outlet admins can use PIN reset codes." }, 403, req);
+      }
       const code = String(payload.code || "").trim();
       if (!/^[A-Za-z0-9_-]{6,64}$/.test(code)) {
         return jsonResponse({ valid: false, error: "Invalid reset code." }, 400, req);
@@ -721,6 +761,16 @@ serve(async (req) => {
 
     if (allowedTableTabs && !allowedTableTabs.some((tab) => (verified.allowedTabs as string[]).includes(tab))) {
       return jsonResponse({ error: "You do not have permission to access this module." }, 403, req);
+    }
+    // Outlet settings / PIN material: only admins may write
+    if (
+      table === "doppio_business_profile" &&
+      operation !== "select" &&
+      actorRole !== "admin" &&
+      actorRole !== "manager" &&
+      actorRole !== "owner"
+    ) {
+      return jsonResponse({ error: "Only outlet admins can change business settings." }, 403, req);
     }
     if (
       operation !== "select"

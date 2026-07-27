@@ -362,6 +362,10 @@
    * One-screen setup checklist — the main entry for naive users.
    */
   function openSetupChecklist() {
+    if (!staffMaySeeKitchenSetup()) {
+      toast('Kitchen Setup is only for managers with Menu or Inventory access', 'fa-lock');
+      return;
+    }
     if (!global.RSModal) {
       toast('Open Inventory → Recipes', 'fa-circle-info');
       return;
@@ -1177,6 +1181,7 @@
   function maybeOfferFirstVisit() {
     try {
       if (isPlatformConsole()) return;
+      if (!staffMaySeeKitchenSetup()) return;
       if (global.localStorage && localStorage.getItem(LS_FIRST) === '1') return;
       const s = setupStatus();
       if (s.allLinked) return;
@@ -1190,12 +1195,13 @@
       setTimeout(() => {
         try {
           if (isPlatformConsole()) return;
+          if (!staffMaySeeKitchenSetup()) return;
           if (global.localStorage && localStorage.getItem(LS_FIRST) === '1') return;
           if (!global.RSModal) return;
           if (global.localStorage) localStorage.setItem(LS_FIRST, '1');
           global.RSModal.open({
             title: 'Quick tip: connect kitchen stock',
-            sub: 'Takes a few minutes · works for any staff',
+            sub: 'Takes a few minutes · menu & stock access required',
             icon: 'fa-lightbulb',
             size: 'sm',
             body: `<p style="margin:0;font-size:14px;line-height:1.55;color:var(--text-soft)">
@@ -1261,9 +1267,8 @@
         try { tabs = JSON.parse(sessionStorage.getItem('allowed_tabs') || '[]') || []; } catch (_) { tabs = []; }
       }
       if (!Array.isArray(tabs) || !tabs.length) {
-        // Restricted role with empty list → no setup coach
-        if (role && role !== 'owner' && role !== 'admin') return false;
-        return true;
+        // Fail closed for unknown/restricted roles; only bare owner/admin open
+        return role === 'owner' || role === 'admin';
       }
       return tabs.includes('editor-tab') || tabs.includes('inventory-tab');
     } catch (_) {

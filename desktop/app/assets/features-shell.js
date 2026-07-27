@@ -1044,7 +1044,7 @@
             <div></div>
           </div>
           ${toggle('Service charge','Add service charge on dine-in orders',false)}
-          <div class="form-grid-2" style="margin-top:10px">${field('Service charge %','5','e.g. 5 or 10')}<div></div></div>
+          <div class="form-grid-2" style="margin-top:10px">${field('Service charge pct','5','e.g. 5 or 10')}<div></div></div>
           ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
           ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice (tax shops only)',false)}
           ${toggle('Inclusive pricing','Menu prices already include tax',false)}`) +
@@ -2936,10 +2936,20 @@
         }
         // Filter the sheet by the signed-in staff role's allowed tabs so
         // restricted roles can't even see (let alone open) forbidden screens.
+        // Fail closed: empty allowedTabs for staff ≠ full menu (was a privilege leak).
         const roleInfo = window.RS_ROLE || {};
-        const allowed = Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length
-          ? roleInfo.allowedTabs.concat(roleInfo.staffRole === 'manager' ? ['settings-tab'] : [], ['logout'])
-          : null;
+        const rRole = String(roleInfo.staffRole || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+        const unrestricted = !rRole || ['owner', 'admin', 'superadmin', 'brand_admin'].includes(rRole);
+        let allowed = null;
+        if (unrestricted && roleInfo.allowedTabs == null) {
+          allowed = null; // full MORE
+        } else if (Array.isArray(roleInfo.allowedTabs)) {
+          allowed = roleInfo.allowedTabs.slice();
+          if (rRole === 'manager') allowed.push('settings-tab');
+          allowed.push('logout');
+        } else if (!unrestricted) {
+          allowed = ['pos-tab', 'logout'];
+        }
         const VISIBLE = allowed ? MORE.filter(m => allowed.includes(m[0])) : MORE;
         RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
           body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${VISIBLE.map(m=>{
