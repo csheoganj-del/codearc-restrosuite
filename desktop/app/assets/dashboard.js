@@ -2579,7 +2579,7 @@
     // Update user pill role label
     const userRoleEl = document.querySelector('.user-pill .ur');
     if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[role] || role;
-    // Settings + Help: owner/admin unrestricted (tabs=null); managers get both;
+    // Settings + Help + support call: owner/admin unrestricted (tabs=null); managers get them;
     // cashiers/waiters never. Always set both directions so live promote works.
     {
       const canSettings = !tabs || role === 'manager' || role === 'owner' || role === 'admin';
@@ -2589,6 +2589,8 @@
       if (settingsGear) settingsGear.style.display = canSettings ? '' : 'none';
       const helpBtn = document.getElementById('open-product-guide-btn');
       if (helpBtn) helpBtn.style.display = canSettings ? '' : 'none';
+      const supportWrap = document.getElementById('tb-support-wrap');
+      if (supportWrap) supportWrap.style.display = canSettings ? '' : 'none';
     }
     // If the tab the user is currently sitting on just got revoked, move
     // them somewhere they can still see rather than leaving a dead screen up.
@@ -2641,11 +2643,16 @@
         RSKitchenLinkCoach.refreshSetupNav();
       }
     } catch (_) {}
-    if (changed && !(opts && opts.silent)) {
-      toast('Your access permissions were just updated', 'fa-user-shield');
-    } else if (changed && opts && opts.silent) {
-      // Quiet poll still notifies once so staff see Floor/KDS appear
-      toast('Access updated — new modules unlocked', 'fa-user-shield');
+    if (changed) {
+      // Debounce toasts (poll every 8s must not spam if something re-normalizes tabs)
+      const now = Date.now();
+      if (!window.__rsRoleToastAt || now - window.__rsRoleToastAt > 12000) {
+        window.__rsRoleToastAt = now;
+        toast(
+          opts && opts.silent ? 'Access updated — modules refreshed' : 'Your access permissions were just updated',
+          'fa-user-shield'
+        );
+      }
     }
     return changed;
   }

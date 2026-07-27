@@ -45,6 +45,16 @@
     // what stops the very first deploy from locking out live restaurants.
     BOOTSTRAP_GRACE_MS: 3 * 24 * 60 * 60 * 1000,
 
+    // Clock-rollback detection: wall clock earlier than high-water mark by more
+    // than this → suspect offline cheat. Was 60s (too tight for Windows NTP /
+    // dual-boot / VM resume). 15 minutes covers normal glitches; larger offline
+    // skew is handled separately when a verified lease is still unexpired.
+    CLOCK_SKEW_TOLERANCE_MS: 15 * 60 * 1000,
+
+    // Offline-only: if clock is behind HWM but we still hold a cryptographically
+    // valid unexpired lease, allow up to this much skew before hard lock.
+    CLOCK_SKEW_OFFLINE_GRACE_MS: 4 * 60 * 60 * 1000,
+
     // localStorage / IndexedDB keys.
     STORE_LEASE_KEY: 'rs_license_lease_v1',
     STORE_HWM_KEY: 'rs_license_hwm_v1',       // monotonic high-water mark (ms)

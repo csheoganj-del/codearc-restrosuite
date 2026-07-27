@@ -357,13 +357,25 @@
   function updateScanVisibility() {
     const scan = document.getElementById('tb-qr-scan');
     if (!scan) return;
-    // Always show — staff on counter PC also need table QR scan / table #
-    scan.style.display = '';
-    scan.hidden = false;
+    // Kitchen / inventory / token display do not need floor QR scan chrome
+    const role = String(
+      (session() && session().role) || sessionStorage.getItem('logged_in_role') || ''
+    ).toLowerCase();
+    const hideFor = /^(kitchen|inventory|customer_display)$/.test(role);
+    let hideByTabs = false;
+    try {
+      const tabs = window.RS_ROLE && window.RS_ROLE.allowedTabs;
+      if (Array.isArray(tabs) && tabs.length) {
+        hideByTabs = !tabs.includes('pos-tab') && !tabs.includes('floor-tab');
+      }
+    } catch (_) {}
+    const show = !hideFor && !hideByTabs;
+    scan.style.display = show ? '' : 'none';
+    scan.hidden = !show;
   }
 
   function openStaffQrScanner() {
-    // Role gate: waiter, admin, manager, owner, captain
+    // Role gate: waiter, admin, manager, owner, captain, cashier
     const role = String(session().role || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
     const allowed = /owner|admin|manager|waiter|captain|cashier|superadmin/.test(role) || !role;
     if (!allowed) {
