@@ -201,12 +201,22 @@ function startLocalServer() {
         }
         reject(err);
       });
-      // Bind to loopback only -- never exposed on the network.
-      srv.listen(candidate, '127.0.0.1', () => {
+      // Bind all interfaces so kitchen tablets on the same Wi‑Fi can open
+      // http://POS_LAN_IP:port for LAN KOT sync when internet is down.
+      // (Still only local network — firewall may prompt once on Windows.)
+      const host = config.lanBindHost != null ? String(config.lanBindHost) : '0.0.0.0';
+      srv.listen(candidate, host, () => {
         PORT = candidate;
         if (PORT !== PREFERRED_PORT) {
           console.warn(`[main] listening on fallback port ${PORT} (preferred ${PREFERRED_PORT} was busy)`);
         }
+        try {
+          const { listLanIPs } = require('./lan-hub');
+          const ips = listLanIPs();
+          if (ips.length) {
+            console.log('[main] LAN kitchen hub: open on tablets → http://' + ips[0] + ':' + PORT);
+          }
+        } catch (_) {}
         resolve(srv);
       });
     }

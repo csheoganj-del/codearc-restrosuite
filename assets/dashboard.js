@@ -1198,8 +1198,46 @@
     if (window.RS_DB) {
       try {
         let rows;
+        // ANTI-CHAOS: never wipe local Ready/served with stale cloud Pending
+        // when internet returns after verbal/manual kitchen work.
         if (forceCloud && RS_DB.isCloud && RS_DB.listCloud && RS_DB.writeLocal) {
-          rows = await RS_DB.listCloud('pending_orders');
+          const localRows = (typeof RS_DB.listLocal === 'function'
+            ? await RS_DB.listLocal('pending_orders')
+            : await RS_DB.list('pending_orders').catch(() => [])) || [];
+          let cloudRows = [];
+          try {
+            cloudRows = (await RS_DB.listCloud('pending_orders')) || [];
+          } catch (cloudErr) {
+            console.warn('[sync] listCloud pending_orders failed — keeping local', cloudErr && cloudErr.message);
+            cloudRows = [];
+          }
+          if (window.RSLanSync && typeof RSLanSync.mergeRows === 'function') {
+            rows = RSLanSync.mergeRows(localRows, cloudRows);
+          } else {
+            rows = cloudRows.length ? cloudRows : localRows;
+            // Prefer higher status from local when same orderId
+            const rank = (s) => {
+              const x = String(s || '').toLowerCase();
+              if (/ready|served|complete|done|closed|settled|paid|cancel/.test(x)) return 80;
+              if (/prepar/.test(x)) return 50;
+              if (/accept/.test(x)) return 40;
+              return 20;
+            };
+            const by = new Map();
+            cloudRows.forEach((r) => {
+              const k = String(r.orderId || r.id || '');
+              if (k) by.set(k, r);
+            });
+            localRows.forEach((r) => {
+              const k = String(r.orderId || r.id || '');
+              if (!k) return;
+              const prev = by.get(k);
+              if (!prev || rank(r.status) >= rank(prev.status)) by.set(k, Object.assign({}, prev || {}, r, {
+                status: !prev || rank(r.status) >= rank(prev.status) ? r.status : prev.status,
+              }));
+            });
+            rows = Array.from(by.values());
+          }
           await RS_DB.writeLocal('pending_orders', rows || []);
         } else {
           rows = await RS_DB.list('pending_orders');
@@ -1215,16 +1253,40 @@
         if (!usesKds) {
           replaceArr(KDS, []);
         } else {
-          const activeKds = rows.filter(r => r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review');
-          const mappedKds = activeKds.map(r => ({
-            id: r.id,
-            tok: formatDisplayOrderId(r),
-            type: `${r.orderType} | ${r.tableNumber}`,
-            start: parseOrderTimestamp(r.dateTime) || Date.now(),
-            prepMinutes: r.prepMinutes,
-            prepStartedAt: r.prepStartedAt,
-            items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
-          }));
+          // Hide finished / kitchen-handled tickets (anti-chaos after verbal service).
+          // Older open tickets may still appear after reconnect but WITHOUT alarm spam.
+          const prevIds = new Set((Array.isArray(KDS) ? KDS : []).map((k) => String(k.id || k.tok || '')));
+          const activeKds = rows.filter((r) => {
+            const st = String(r.status || '');
+            if (!/^(Accepted|preparing|Pending Review)$/i.test(st)) return false;
+            if (r.kitchenHandled || r.manualFulfilled || r.skipKdsAlarm) return false;
+            return true;
+          });
+          const mappedKds = activeKds.map((r) => {
+            const start = parseOrderTimestamp(r.dateTime) || Date.now();
+            const ageMs = Date.now() - start;
+            return {
+              id: r.id,
+              tok: formatDisplayOrderId(r),
+              type: `${r.orderType} | ${r.tableNumber}`,
+              start,
+              prepMinutes: r.prepMinutes,
+              prepStartedAt: r.prepStartedAt,
+              items: (r.items || []).map((it) => [String(it.qty), it.name, it.notes || '']),
+              // Reconnect backlog: already on board or older than 5 min → no chime
+              fromBacklog: forceCloud && (ageMs > 5 * 60 * 1000 || prevIds.has(String(r.id || ''))),
+            };
+          });
+          // New-ticket chime only for truly new young tickets (not reconnect dump)
+          try {
+            const fresh = mappedKds.filter((k) => !prevIds.has(String(k.id || '')) && !k.fromBacklog);
+            if (fresh.length && window.RSServiceAlerts && typeof RSServiceAlerts.playChime === 'function') {
+              RSServiceAlerts.playChime(false);
+            } else if (forceCloud && mappedKds.length && fresh.length === 0) {
+              // Quiet reconnect — kitchen already knows / backlog
+              console.info('[KDS] reconnect merge quiet — no new-ticket alarm');
+            }
+          } catch (_) {}
           replaceArr(KDS, mappedKds);
         }
 

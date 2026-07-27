@@ -1,9 +1,9 @@
 {
   "version": "v222-20260726-floor-click-notify",
   "title": "Live update v222-20260726-floor-click-notify",
-  "generatedAt": "2026-07-27T06:24:56.130Z",
+  "generatedAt": "2026-07-27T06:37:03.620Z",
   "baseUrl": "https://restrosuite.codearc.co.in",
-  "fileCount": 128,
+  "fileCount": 129,
   "files": [
     "app-update.json",
     "assets/competitive-ops.js",
@@ -43,6 +43,7 @@
     "assets/modules/inventory-ui.js",
     "assets/modules/kds-ui.js",
     "assets/modules/kitchen-link-coach.js",
+    "assets/modules/lan-sync.js",
     "assets/modules/menu-intelligence.js",
     "assets/modules/ops-mode.js",
     "assets/modules/owner-wa-reports.js",

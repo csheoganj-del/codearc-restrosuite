@@ -22,6 +22,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { attachLanHub } = require('./lan-hub');
 
 // Named rewrites copied verbatim from ../vercel.json so desktop routing
 // matches production exactly. Keep in sync if you add new pages.
@@ -254,6 +255,13 @@ function createServer(opts) {
       overlayActive: !!ov,
     });
   });
+
+  // LAN kitchen hub — same Wi‑Fi devices share KOTs without internet
+  try {
+    attachLanHub(app, { port: Number(config.port) || 8001 });
+  } catch (e) {
+    console.warn('[desktop] LAN hub attach failed', e && e.message);
+  }
 
   return app;
 }

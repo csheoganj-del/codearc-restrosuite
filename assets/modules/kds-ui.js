@@ -269,7 +269,15 @@
             const row = rows.find((r) => r.id === item.id);
             if (row) {
               row.status = 'Ready';
+              // Prevent reconnect chaos: cloud/LAN must not re-open this as a new KOT
+              row.kitchenHandled = true;
+              row.kitchenHandledAt = new Date().toISOString();
+              row.manualFulfilled = true;
+              row.skipKdsAlarm = true;
               await RS_DB.put('pending_orders', item.id, row);
+              try {
+                if (window.RSLanSync && typeof RSLanSync.pushRow === 'function') RSLanSync.pushRow(row);
+              } catch (_) {}
               syncPendingOrders();
             }
           } catch (e) {
