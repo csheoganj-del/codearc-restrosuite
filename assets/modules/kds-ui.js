@@ -224,15 +224,27 @@
     grid.innerHTML = ordered
       .map(({ o, i }) => {
         const ageMin = (Date.now() - (o.start || Date.now())) / 60000;
-        const urgentCls = ageMin > 10 ? ' urgent' : ageMin > 5 ? ' aging' : '';
+        const urgentCls = o.recoveredOffline
+          ? ' recovered'
+          : ageMin > 10
+            ? ' urgent'
+            : ageMin > 5
+              ? ' aging'
+              : '';
         const showItems =
           activeStation === 'all'
             ? o.items || []
             : (o.items || []).filter((it) => itemMatchesStation(it, activeStation));
         const items = showItems.length ? showItems : o.items || [];
+        const recoverBanner = o.recoveredOffline
+          ? `<div class="kds-recover-banner" style="background:#fef3c7;color:#92400e;font-size:11px;font-weight:700;padding:6px 8px;border-radius:8px;margin-bottom:6px">
+              ⚠ Recovered after offline — if kitchen already cooked this, tap <b>Mark ready</b> (do not re-cook)
+            </div>`
+          : '';
         return `
-    <div class="kds-card${urgentCls}" data-k="${i}" data-kds-id="${_e(o.id || '')}">
+    <div class="kds-card${urgentCls}" data-k="${i}" data-kds-id="${_e(o.id || '')}" data-recovered="${o.recoveredOffline ? '1' : '0'}">
       <div class="kds-h"><div><div class="ktok">${_e(o.tok)}</div><div class="ktype">${_e(o.type)}</div></div><span class="kds-timer" data-start="${_e(o.start)}">0:00</span></div>
+      ${recoverBanner}
       <div class="kds-items">${items
         .map((it, j) => {
           // j may not match original index when station-filtered; store name for toggle only

@@ -3154,16 +3154,34 @@
               const draftToDel = draftsList.find(d => d.draftName === draftName);
               if (draftToDel) await RS_DB.del('drafts', draftToDel.id).catch(() => {});
 
+              // Close ALL open KOTs for this table so reconnect never re-opens them as new kitchen work
               const rows = await RS_DB.list('pending_orders').catch(() => []);
-              const matched = rows.find(r =>
-                (r.tableNumber === custSnap.table || r.tableNumber === String(custSnap.table || '').replace('Table ', '')) &&
-                (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing'
-                  || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
+              const tableSnap = String(custSnap.table || '');
+              const tableAlt = tableSnap.replace(/^Table\s+/i, '');
+              const openish = (st) =>
+                /Pending Review|Accepted|preparing|served|Ready|DineIn Active/i.test(String(st || ''));
+              const matched = rows.filter(
+                (r) =>
+                  (r.tableNumber === tableSnap ||
+                    r.tableNumber === tableAlt ||
+                    String(r.tableNumber || '') === tableSnap) &&
+                  openish(r.status)
               );
-              if (matched) {
-                await RS_DB.del('pending_orders', matched.id);
-                if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
+              for (const m of matched) {
+                try {
+                  m.status = 'Ready';
+                  m.kitchenHandled = true;
+                  m.manualFulfilled = true;
+                  m.skipKdsAlarm = true;
+                  m.reconcileReason = 'bill_settled';
+                  m.kitchenHandledAt = new Date().toISOString();
+                  await RS_DB.put('pending_orders', m.id, m);
+                  if (window.RSLanSync && RSLanSync.pushRow) RSLanSync.pushRow(m);
+                } catch (_) {
+                  try { await RS_DB.del('pending_orders', m.id); } catch (__) {}
+                }
               }
+              if (matched.length && window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
               await loadHeldFromDB();
               await renderPosTableGrid();
             } catch (e) {
@@ -3610,8 +3628,12 @@
             priority: 'normal',
             source: 'waiter_pos',
             kitchenRoute: mode === 'kitchen_printer' ? 'print_only' : 'kds',
+            offlineCreated: typeof navigator !== 'undefined' && navigator.onLine === false,
           };
           await RS_DB.put('pending_orders', tempId, orderData);
+          try {
+            if (window.RSLanSync && typeof RSLanSync.pushRow === 'function') RSLanSync.pushRow(orderData);
+          } catch (_) {}
           if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
         } catch (e) {
           console.warn('KOT save failed', e);

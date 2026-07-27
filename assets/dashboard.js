@@ -1238,6 +1238,37 @@
             });
             rows = Array.from(by.values());
           }
+          // Match bills + auto-close stale offline tickets so kitchen never re-cooks
+          try {
+            let bills = [];
+            if (typeof RS_DB.listLocal === 'function') {
+              bills = (await RS_DB.listLocal('bills').catch(() => [])) || [];
+            } else {
+              bills = (await RS_DB.list('bills').catch(() => [])) || [];
+            }
+            if (window.RSLanSync && typeof RSLanSync.reconcileAfterReconnect === 'function') {
+              const rec = RSLanSync.reconcileAfterReconnect(rows, bills, { staleMs: 12 * 60 * 1000, reviewMs: 5 * 60 * 1000 });
+              rows = rec.rows || rows;
+              const closed = (rec.closedByBill || 0) + (rec.closedStale || 0);
+              if (closed > 0 || rec.review > 0) {
+                window.__rsReconnectOrderNote = {
+                  at: Date.now(),
+                  closedByBill: rec.closedByBill || 0,
+                  closedStale: rec.closedStale || 0,
+                  review: rec.review || 0,
+                };
+                // Persist closed tickets so next cloud push keeps Ready
+                const dirty = rows.filter((r) => r && (r.reconcileReason === 'bill_exists' || r.reconcileReason === 'stale_offline'));
+                for (const r of dirty) {
+                  try {
+                    if (r.id != null) await RS_DB.put('pending_orders', r.id, r);
+                  } catch (_) {}
+                }
+              }
+            }
+          } catch (recErr) {
+            console.warn('[sync] reconcileAfterReconnect failed', recErr);
+          }
           await RS_DB.writeLocal('pending_orders', rows || []);
         } else {
           rows = await RS_DB.list('pending_orders');
@@ -1253,18 +1284,19 @@
         if (!usesKds) {
           replaceArr(KDS, []);
         } else {
-          // Hide finished / kitchen-handled tickets (anti-chaos after verbal service).
-          // Older open tickets may still appear after reconnect but WITHOUT alarm spam.
+          // Hide finished / kitchen-handled / auto-closed tickets (no re-cook chaos).
           const prevIds = new Set((Array.isArray(KDS) ? KDS : []).map((k) => String(k.id || k.tok || '')));
           const activeKds = rows.filter((r) => {
             const st = String(r.status || '');
             if (!/^(Accepted|preparing|Pending Review)$/i.test(st)) return false;
-            if (r.kitchenHandled || r.manualFulfilled || r.skipKdsAlarm) return false;
+            if (r.kitchenHandled || r.manualFulfilled) return false;
+            if (r.reconcileReason === 'stale_offline' || r.reconcileReason === 'bill_exists') return false;
             return true;
           });
           const mappedKds = activeKds.map((r) => {
             const start = parseOrderTimestamp(r.dateTime) || Date.now();
             const ageMs = Date.now() - start;
+            const recovered = !!(r.recoveredOffline || r.reconcileReason === 'review');
             return {
               id: r.id,
               tok: formatDisplayOrderId(r),
@@ -1273,27 +1305,57 @@
               prepMinutes: r.prepMinutes,
               prepStartedAt: r.prepStartedAt,
               items: (r.items || []).map((it) => [String(it.qty), it.name, it.notes || '']),
-              // Reconnect backlog: already on board or older than 5 min → no chime
-              fromBacklog: forceCloud && (ageMs > 5 * 60 * 1000 || prevIds.has(String(r.id || ''))),
+              fromBacklog: forceCloud && (ageMs > 5 * 60 * 1000 || prevIds.has(String(r.id || '')) || recovered),
+              recoveredOffline: recovered,
+              reconcileNote: r.reconcileNote || '',
             };
           });
           // New-ticket chime only for truly new young tickets (not reconnect dump)
           try {
-            const fresh = mappedKds.filter((k) => !prevIds.has(String(k.id || '')) && !k.fromBacklog);
+            const fresh = mappedKds.filter((k) => !prevIds.has(String(k.id || '')) && !k.fromBacklog && !k.recoveredOffline);
             if (fresh.length && window.RSServiceAlerts && typeof RSServiceAlerts.playChime === 'function') {
               RSServiceAlerts.playChime(false);
-            } else if (forceCloud && mappedKds.length && fresh.length === 0) {
-              // Quiet reconnect — kitchen already knows / backlog
-              console.info('[KDS] reconnect merge quiet — no new-ticket alarm');
+            }
+          } catch (_) {}
+          // One clear message so kitchen/waiter are not confused
+          try {
+            const note = window.__rsReconnectOrderNote;
+            if (forceCloud && note && note.at && Date.now() - note.at < 8000) {
+              const closed = (note.closedByBill || 0) + (note.closedStale || 0);
+              if (closed > 0) {
+                toast(
+                  closed + ' old kitchen ticket' + (closed === 1 ? '' : 's') +
+                    ' auto-closed (already done offline) — do not re-cook',
+                  'fa-circle-check'
+                );
+              } else if (note.review > 0) {
+                toast(
+                  note.review + ' recovered ticket' + (note.review === 1 ? '' : 's') +
+                    ' — confirm if kitchen already cooked',
+                  'fa-circle-info'
+                );
+              }
+              window.__rsReconnectOrderNote = null;
             }
           } catch (_) {}
           replaceArr(KDS, mappedKds);
         }
 
-        // 2. Update QR_ORDERS  -  keep dateTime so UI can live-refresh relative ages
-        const activeQr = rows.filter(r => r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready');
-        const mappedQr = activeQr.map(r => {
+        // 2. Update QR_ORDERS — hide auto-closed; mark recovered for waiters
+        const activeQr = rows.filter((r) => {
+          const st = String(r.status || '');
+          if (r.kitchenHandled && /ready|served/i.test(st) && r.reconcileReason) return false;
+          return (
+            st === 'Pending Review' ||
+            st === 'Accepted' ||
+            st === 'preparing' ||
+            st === 'served' ||
+            st === 'Ready'
+          );
+        });
+        const mappedQr = activeQr.map((r) => {
           const ts = parseOrderTimestamp(r.dateTime);
+          const recovered = !!(r.recoveredOffline || r.reconcileReason === 'review');
           return {
             id: r.id,
             orderId: r.orderId,
@@ -1304,17 +1366,26 @@
             dateTime: r.dateTime || null,
             start: ts || Date.now(),
             time: getRelativeTime(r.dateTime),
-            status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-            items: (r.items || []).map(it => ({
+            status:
+              r.status === 'Pending Review'
+                ? recovered
+                  ? 'preparing'
+                  : 'pending'
+                : r.status === 'preparing' || r.status === 'Accepted'
+                  ? 'preparing'
+                  : 'served',
+            recoveredOffline: recovered,
+            reconcileNote: r.reconcileNote || '',
+            items: (r.items || []).map((it) => ({
               id: it.id,
               name: it.name || 'Item',
               qty: Number(it.qty || 1),
               price: Number(it.price || 0),
               taxCategory: it.taxCategory || it.tax_category,
               notes: it.notes || '',
-              cat: it.cat || it.category || it.station || ''
+              cat: it.cat || it.category || it.station || '',
             })),
-            total: r.total
+            total: r.total,
           };
         });
         replaceArr(QR_ORDERS, mappedQr);

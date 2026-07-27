@@ -290,10 +290,102 @@
     }
   }
 
+  function isOpenKitchenStatus(st) {
+    return /^(Accepted|preparing|Pending Review|DineIn Active)$/i.test(String(st || ''));
+  }
+
+  function normTable(t) {
+    return String(t || '')
+      .toLowerCase()
+      .replace(/^table\s+/i, '')
+      .replace(/\s+/g, '')
+      .trim();
+  }
+
+  function billMatchesOrder(bill, order) {
+    if (!bill || !order) return false;
+    var oid = String(order.orderId || order.order_id || '');
+    var bid = String(bill.no || bill.orderId || bill.order_id || '');
+    if (oid && bid && (oid === bid || oid.indexOf(bid) !== -1 || bid.indexOf(oid) !== -1)) return true;
+    var ot = normTable(order.tableNumber || order.table);
+    var bt = normTable(bill.table || bill.tableNumber);
+    if (!ot || !bt || ot !== bt) return false;
+    if (ot === 'walk-in/takeaway' || ot === 'takeaway' || ot === 'walk-in') return false;
+    var tO = Date.parse(order.dateTime || order.date_time || 0) || 0;
+    var tB = Date.parse(bill.dateTime || bill.time || bill.created_at || 0) || 0;
+    if (!tO || !tB) return false;
+    // Same table bill within 3 hours of the KOT → treat as already served/billed
+    return Math.abs(tB - tO) < 3 * 60 * 60 * 1000;
+  }
+
+  /**
+   * After internet returns: close tickets that kitchen already finished offline
+   * (matched bill, or stale open tickets). Prevents re-cook / revenue waste.
+   * @returns {{ rows: object[], closedByBill: number, closedStale: number, review: number }}
+   */
+  function reconcileAfterReconnect(rows, bills, opts) {
+    opts = opts || {};
+    var now = Date.now();
+    // Open tickets older than this are auto-closed (already cooked verbally offline)
+    var STALE_MS = opts.staleMs != null ? opts.staleMs : 12 * 60 * 1000;
+    // Soft: 5–12 min → still on board but labeled "confirm if done"
+    var REVIEW_MS = opts.reviewMs != null ? opts.reviewMs : 5 * 60 * 1000;
+    var billList = bills || [];
+    var closedByBill = 0;
+    var closedStale = 0;
+    var review = 0;
+    var out = (rows || []).map(function (r) {
+      if (!r || !isOpenKitchenStatus(r.status)) return r;
+      if (r.kitchenHandled || r.manualFulfilled || r.skipKdsAlarm && r.reconcileReason === 'stale_offline') {
+        return r;
+      }
+      var matched = billList.some(function (b) { return billMatchesOrder(b, r); });
+      if (matched) {
+        closedByBill++;
+        return Object.assign({}, r, {
+          status: 'Ready',
+          kitchenHandled: true,
+          manualFulfilled: true,
+          skipKdsAlarm: true,
+          reconcileReason: 'bill_exists',
+          reconcileNote: 'Closed on reconnect — bill already exists (served offline)',
+          kitchenHandledAt: new Date().toISOString(),
+        });
+      }
+      var age = now - (Date.parse(r.dateTime || r.date_time || 0) || now);
+      if (age >= STALE_MS) {
+        closedStale++;
+        return Object.assign({}, r, {
+          status: 'Ready',
+          kitchenHandled: true,
+          manualFulfilled: true,
+          skipKdsAlarm: true,
+          reconcileReason: 'stale_offline',
+          reconcileNote: 'Auto-closed on reconnect — old offline ticket (do not re-cook)',
+          kitchenHandledAt: new Date().toISOString(),
+        });
+      }
+      if (age >= REVIEW_MS) {
+        review++;
+        return Object.assign({}, r, {
+          skipKdsAlarm: true,
+          recoveredOffline: true,
+          reconcileReason: 'review',
+          reconcileNote: 'Recovered after offline — confirm if kitchen already cooked this',
+        });
+      }
+      return r;
+    });
+    return { rows: out, closedByBill: closedByBill, closedStale: closedStale, review: review };
+  }
+
   // Expose merge helper for cloud reconnect anti-chaos
   global.RSLanSync = {
     statusRank: statusRank,
     orderKey: orderKey,
+    isOpenKitchenStatus: isOpenKitchenStatus,
+    billMatchesOrder: billMatchesOrder,
+    reconcileAfterReconnect: reconcileAfterReconnect,
     mergeRows: function (localRows, cloudRows) {
       var map = {};
       function consider(r) {
@@ -308,9 +400,30 @@
         }
         var pr = statusRank(prev.status);
         var nr = statusRank(r.status);
-        if (nr > pr) map[k] = Object.assign({}, prev, r, { status: r.status });
-        else if (nr < pr) map[k] = Object.assign({}, r, prev, { status: prev.status });
-        else map[k] = Object.assign({}, prev, r, { status: prev.status });
+        // Always keep kitchenHandled / skipKdsAlarm flags
+        var handled = !!(prev.kitchenHandled || r.kitchenHandled || prev.manualFulfilled || r.manualFulfilled);
+        var skip = !!(prev.skipKdsAlarm || r.skipKdsAlarm);
+        if (nr > pr) {
+          map[k] = Object.assign({}, prev, r, {
+            status: r.status,
+            kitchenHandled: handled || r.kitchenHandled,
+            manualFulfilled: !!(prev.manualFulfilled || r.manualFulfilled),
+            skipKdsAlarm: skip || r.skipKdsAlarm,
+          });
+        } else if (nr < pr) {
+          map[k] = Object.assign({}, r, prev, {
+            status: prev.status,
+            kitchenHandled: handled || prev.kitchenHandled,
+            manualFulfilled: !!(prev.manualFulfilled || r.manualFulfilled),
+            skipKdsAlarm: skip || prev.skipKdsAlarm,
+          });
+        } else {
+          map[k] = Object.assign({}, prev, r, {
+            status: prev.status,
+            kitchenHandled: handled,
+            skipKdsAlarm: skip,
+          });
+        }
       }
       (cloudRows || []).forEach(consider);
       (localRows || []).forEach(consider); // local wins ties / higher status
