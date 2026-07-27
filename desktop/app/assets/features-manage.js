@@ -2377,8 +2377,9 @@
         { key:'inventory', label:'Inventory Manager', color:'#b45309', icon:'fa-boxes-stacked', blurb:'Stock & menu — inventory, editor, reports' },
       ];
 
-      // Tabs an owner can grant/revoke per staff (live). Ceiling is still plan-limited on server.
-      const STAFF_TAB_OPTIONS = [
+      // Tabs an owner can grant/revoke per staff (live). Canonical list from role-defaults.js
+      const RD = window.RS_ROLE_DEFAULTS || {};
+      const STAFF_TAB_OPTIONS = RD.STAFF_TAB_OPTIONS || [
         { id: 'pos-tab', label: 'POS / Billing', icon: 'fa-cash-register' },
         { id: 'floor-tab', label: 'Floor / Tables', icon: 'fa-border-all' },
         { id: 'kds-tab', label: 'Kitchen (KDS)', icon: 'fa-fire-burner' },
@@ -2391,13 +2392,12 @@
         { id: 'analytics-tab', label: 'Analytics', icon: 'fa-chart-pie' },
         { id: 'employees-tab', label: 'Team / HR', icon: 'fa-id-badge' },
         { id: 'growth-hub-tab', label: 'Growth hub', icon: 'fa-rocket' },
-        { id: 'online-orders-tab', label: 'Online orders', icon: 'fa-globe' },
-        { id: 'aggregator-tab', label: 'Aggregators', icon: 'fa-store' },
+        { id: 'aggregator-tab', label: 'Online orders', icon: 'fa-store' },
         { id: 'tax-tab', label: 'Tax', icon: 'fa-percent' },
         { id: 'tokens-tab', label: 'Token display', icon: 'fa-tv' },
       ];
-      const ROLE_DEFAULT_TABS = {
-        manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab','inventory-tab','editor-tab','customers-tab','reports-tab','analytics-tab','employees-tab','growth-hub-tab','aggregator-tab','tax-tab','online-orders-tab'],
+      const ROLE_DEFAULT_TABS = RD.ROLE_DEFAULT_TABS || {
+        manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab','inventory-tab','editor-tab','customers-tab','reports-tab','analytics-tab','employees-tab','growth-hub-tab','aggregator-tab','tax-tab'],
         cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
         waiter:    ['pos-tab','floor-tab','kds-tab'],
         captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
@@ -2414,6 +2414,7 @@
         return STAFF_ROLES.find(r => r.key === key) || { key, label: key || 'Staff', color: '#888', icon: 'fa-user', blurb: '' };
       }
       function tabsForRole(role) {
+        if (RD.tabsForRole) return RD.tabsForRole(role);
         return (ROLE_DEFAULT_TABS[role] || ROLE_DEFAULT_TABS.waiter).slice();
       }
       function renderTabPermissionGrid(selectedIds) {

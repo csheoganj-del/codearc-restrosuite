@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  ROLE_DEFAULT_TABS,
+  planFor as sharedPlanFor,
+  effectiveTenantTabs,
+  effectiveTabs,
+} from "../_shared/role-defaults.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist (see tenant-access for rationale). Configure extra
@@ -248,21 +254,6 @@ const TABLE_TAB_ACCESS: Record<string, string[]> = Object.fromEntries(
   Object.entries(TABLE_ACCESS).map(([k, v]) => [k, [...new Set([...v.read, ...v.write])]]),
 );
 
-const ROLE_DEFAULT_TABS: Record<string, string[]> = {
-  admin: Array.from(new Set(Object.values(TABLE_TAB_ACCESS).flat())),
-  manager: [
-    "pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab",
-    "inventory-tab", "editor-tab", "customers-tab", "reports-tab",
-    "analytics-tab", "employees-tab", "growth-hub-tab",
-  ],
-  cashier: ["pos-tab", "floor-tab", "bills-tab", "customers-tab"],
-  waiter: ["pos-tab", "floor-tab", "kds-tab"],
-  captain: ["pos-tab", "floor-tab", "kds-tab", "qr-orders-tab"],
-  kitchen: ["kds-tab"],
-  inventory: ["inventory-tab", "editor-tab", "reports-tab"],
-  customer_display: ["tokens-tab"],
-};
-
 /** Non-admin roles allowed to mutate each table (admin/manager always can write). */
 const TABLE_WRITE_ROLES: Record<string, string[]> = {
   doppio_menu: ["inventory"],
@@ -324,37 +315,12 @@ function canAccessTableOp(
 const ZERO_COST_DEFAULT_LIMIT = 250;
 const ZERO_COST_MAX_LIMIT = 500;
 
-const PLAN_ENTITLEMENTS: Record<string, { allowedTabs: string[] }> = {
-  starter: {
-    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "customers-tab"],
-  },
-  growth: {
-    allowedTabs: ROLE_DEFAULT_TABS.admin,
-  },
-  enterprise: {
-    allowedTabs: ROLE_DEFAULT_TABS.admin,
-  },
-};
-
 function activeSubscription(status: unknown) {
   return ["active", "trialing"].includes(String(status || "active"));
 }
 
-function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
-  const planTabs = (PLAN_ENTITLEMENTS[String(planCode || "starter")] || PLAN_ENTITLEMENTS.starter).allowedTabs;
-  return Array.isArray(tenantTabs) && tenantTabs.length > 0
-    ? tenantTabs.map(String)
-    : planTabs;
-}
-
-function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
-  const roleTabs = ROLE_DEFAULT_TABS[role] || [];
-  const requestedTabs = Array.isArray(userTabs) && userTabs.length > 0
-    ? userTabs.map(String)
-    : roleTabs;
-  const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
-  // Honor explicit per-user tabs within tenant plan (may expand past role template)
-  return [...new Set(requestedTabs.filter((tab) => enabledTenantTabs.includes(tab)))];
+function planFor(code: unknown) {
+  return sharedPlanFor(code);
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {

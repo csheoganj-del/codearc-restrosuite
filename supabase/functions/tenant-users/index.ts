@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  ROLE_DEFAULT_TABS,
+  planFor,
+  normalizeTabs,
+  tabsForRole,
+  effectiveTabs as sharedEffectiveTabs,
+} from "../_shared/role-defaults.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist (see tenant-access for rationale). Configure extra
@@ -40,46 +47,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const ROLE_DEFAULT_TABS: Record<string, string[]> = {
-  admin: [
-    "pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab",
-    "editor-tab", "crm-tab", "customers-tab", "tax-tab", "online-tab", "aggregator-tab", "kds-tab", "tokens-tab",
-    "employees-tab", "growth-hub-tab", "customers-tab", "analytics-tab",
-  ],
-  manager: [
-    "pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab",
-    "inventory-tab", "editor-tab", "customers-tab", "reports-tab",
-    "analytics-tab", "employees-tab", "growth-hub-tab",
-  ],
-  cashier: ["pos-tab", "floor-tab", "bills-tab", "customers-tab"],
-  waiter:  ["pos-tab", "floor-tab", "kds-tab"],
-  captain: ["pos-tab", "floor-tab", "kds-tab", "qr-orders-tab"],
-  kitchen: ["kds-tab"],
-  inventory: ["inventory-tab", "editor-tab", "reports-tab"],
-  customer_display: ["tokens-tab"],
-};
 
-const PLAN_ENTITLEMENTS: Record<string, { name: string; maxStaff: number; allowedTabs: string[] }> = {
-  starter: {
-    name: "Starter",
-    maxStaff: 5,
-    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "customers-tab"],
-  },
-  growth: {
-    name: "Growth",
-    maxStaff: 15,
-    allowedTabs: ROLE_DEFAULT_TABS.admin,
-  },
-  enterprise: {
-    name: "Enterprise",
-    maxStaff: 75,
-    allowedTabs: ROLE_DEFAULT_TABS.admin,
-  },
-};
-
-function planFor(code: unknown) {
-  return PLAN_ENTITLEMENTS[String(code || "starter")] || PLAN_ENTITLEMENTS.starter;
-}
 
 function activeSubscription(status: unknown) {
   return ["active", "trialing"].includes(String(status || "active"));
@@ -161,19 +129,13 @@ function normalizeUsername(value: unknown) {
 }
 
 /**
- * Resolve staff tab access.
- * - Role defaults are a template only.
- * - Explicit allowed_tabs can increase or decrease access within the tenant plan ceiling
- *   (so a waiter can be given Bills, or a manager can lose Reports) without a new role.
+ * Resolve staff tab access via shared role-defaults (legacy ids normalized).
  */
 function normalizedTabs(role: string, requested: unknown, tenantTabs: unknown) {
-  const roleTabs = ROLE_DEFAULT_TABS[role] || [];
-  const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
-  const requestedTabs = (requested === undefined || requested === null)
-    ? roleTabs
-    : (Array.isArray(requested) ? requested.map(String) : roleTabs);
-  // Ceiling = plan/tenant tabs only (not role defaults) so access can grow past the template.
-  return [...new Set(requestedTabs.filter((tab) => enabledTenantTabs.includes(tab)))];
+  if (requested === undefined || requested === null) {
+    return sharedEffectiveTabs(role, tabsForRole(role), tenantTabs);
+  }
+  return sharedEffectiveTabs(role, normalizeTabs(requested), tenantTabs);
 }
 
 async function verifyAdminSession(req: Request) {

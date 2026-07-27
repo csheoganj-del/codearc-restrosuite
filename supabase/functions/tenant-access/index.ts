@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  ROLE_DEFAULT_TABS,
+  planFor,
+  effectiveTenantTabs,
+  effectiveTabs,
+  ALL_MODULE_TABS,
+} from "../_shared/role-defaults.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist. Add extra origins (e.g. preview deploys, custom domain)
@@ -62,99 +69,10 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const DEFAULT_ALLOWED_TABS = [
-  "pos-tab",
-  "floor-tab",
-  "qr-orders-tab",
-  "bills-tab",
-  "inventory-tab",
-  "reports-tab",
-  "editor-tab",
-  "crm-tab",
-  "customers-tab",
-  "tax-tab",
-  "online-tab",
-  "aggregator-tab",
-  "kds-tab",
-  "tokens-tab",
-  "employees-tab",
-  "analytics-tab",
-  "growth-hub-tab",
-];
-
-const ROLE_DEFAULT_TABS: Record<string, string[]> = {
-  admin:            DEFAULT_ALLOWED_TABS,
-  manager:          ["pos-tab","floor-tab","qr-orders-tab","kds-tab","bills-tab","inventory-tab","editor-tab","customers-tab","reports-tab","analytics-tab","employees-tab","growth-hub-tab"],
-  cashier:          ["pos-tab","floor-tab","bills-tab","customers-tab"],
-  waiter:           ["pos-tab","floor-tab","kds-tab"],
-  captain:          ["pos-tab","floor-tab","kds-tab","qr-orders-tab"],
-  kitchen:          ["kds-tab"],
-  inventory:        ["inventory-tab","editor-tab","reports-tab"],
-  customer_display: ["tokens-tab"],
-};
-
-const PLAN_ENTITLEMENTS: Record<string, { name: string; maxStaff: number; monthlyOrderLimit: number; allowedTabs: string[] }> = {
-  free: {
-    name: "Free / Demo",
-    maxStaff: 2,
-    monthlyOrderLimit: 50,
-    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "customers-tab"],
-  },
-  starter: {
-    name: "Starter",
-    maxStaff: 5,
-    monthlyOrderLimit: 300,
-    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "customers-tab"],
-  },
-  growth: {
-    name: "Growth",
-    maxStaff: 15,
-    monthlyOrderLimit: 8000,
-    allowedTabs: DEFAULT_ALLOWED_TABS,
-  },
-  enterprise: {
-    name: "Enterprise",
-    maxStaff: 75,
-    monthlyOrderLimit: 100000,
-    allowedTabs: DEFAULT_ALLOWED_TABS,
-  },
-};
+const DEFAULT_ALLOWED_TABS = ALL_MODULE_TABS;
 
 function activeSubscription(status: unknown) {
   return ["active", "trialing"].includes(String(status || "active"));
-}
-
-function planFor(code: unknown) {
-  return PLAN_ENTITLEMENTS[String(code || "starter")] || PLAN_ENTITLEMENTS.starter;
-}
-
-function effectiveTenantTabs(tenantTabs: unknown, planCode: unknown) {
-  const planTabs = planFor(planCode).allowedTabs.map(String);
-  // Prefer full plan list as ceiling. A short/stale tenant.allowed_tabs used to
-  // hide Floor/KDS from staff even when the plan includes them.
-  if (!Array.isArray(tenantTabs) || tenantTabs.length === 0) return planTabs;
-  const custom = tenantTabs.map(String);
-  // If custom list looks complete (≥ half of plan modules), honor it as a restrict.
-  // Otherwise treat it as stale and use the plan.
-  if (custom.length >= Math.max(4, Math.floor(planTabs.length / 2))) {
-    return planTabs.filter((t) => custom.includes(t));
-  }
-  return planTabs;
-}
-
-/**
- * Resolve staff module access for login / validate.
- * Role defaults are a template when allowed_tabs is empty.
- * Explicit allowed_tabs can increase OR decrease access within the tenant plan
- * (no longer clipped to role defaults — that blocked Floor/Bills grants).
- */
-function effectiveTabs(role: string, userTabs: unknown, tenantTabs: unknown) {
-  const roleTabs = ROLE_DEFAULT_TABS[role] || [];
-  const requestedTabs = Array.isArray(userTabs) && userTabs.length > 0
-    ? userTabs.map(String)
-    : roleTabs;
-  const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
-  return [...new Set(requestedTabs.filter((tab) => enabledTenantTabs.includes(tab)))];
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {

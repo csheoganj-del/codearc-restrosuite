@@ -410,7 +410,7 @@
   }
 
   // Early role-home map (must exist before hydrate may call loadSavedTab)
-  const ROLE_HOME_TAB_EARLY = {
+  const ROLE_HOME_TAB_EARLY = Object.assign({
     cashier: 'pos-tab',
     waiter: 'floor-tab',
     captain: 'floor-tab',
@@ -418,7 +418,7 @@
     inventory: 'inventory-tab',
     manager: 'pos-tab',
     customer_display: 'tokens-tab',
-  };
+  }, (window.RS_ROLE_DEFAULTS && window.RS_ROLE_DEFAULTS.ROLE_HOME_TAB) || {});
 
   // Load saved active tab on startup (hash wins; else role home)
   function loadSavedTab() {
@@ -2280,11 +2280,13 @@
   // -- Role-based tab access map ----------------------------------------------
   // Each role key maps to the sidebar data-tab values that staff can see.
   // 'owner' and any unrecognised role -> full access (no filtering).
-  const ROLE_TAB_MAP = {
+  // Canonical maps from assets/role-defaults.js (shared with edge functions)
+  const RD = window.RS_ROLE_DEFAULTS || {};
+  const ROLE_TAB_MAP = RD.ROLE_TAB_MAP || RD.ROLE_DEFAULT_TABS || {
     manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab',
                  'inventory-tab','editor-tab','customers-tab','reports-tab',
                  'analytics-tab','employees-tab', 'growth-hub-tab',
-                 'aggregator-tab', 'tax-tab', 'online-orders-tab'],
+                 'aggregator-tab', 'tax-tab'],
     cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
     waiter:    ['pos-tab','floor-tab','kds-tab'],
     captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
@@ -2293,7 +2295,7 @@
     customer_display: ['tokens-tab'],
   };
 
-  const ROLE_LABELS = {
+  const ROLE_LABELS = Object.assign({
     owner:     'Outlet Owner',
     manager:   'Manager',
     cashier:   'Cashier',
@@ -2302,10 +2304,10 @@
     kitchen:          'Kitchen Staff',
     customer_display: 'Customer Display',
     inventory: 'Inventory Manager',
-  };
+  }, RD.ROLE_LABELS || {});
 
   /** Role-first home tab  -  reduces cognitive load for staff logins */
-  const ROLE_HOME_TAB = ROLE_HOME_TAB_EARLY;
+  const ROLE_HOME_TAB = Object.assign({}, ROLE_HOME_TAB_EARLY, RD.ROLE_HOME_TAB || {});
 
   // Resolve current staff role (session meta -> sessionStorage fallback).
   // Never default restricted shells to "owner" (that opened full nav by accident).

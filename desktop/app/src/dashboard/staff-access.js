@@ -19,9 +19,12 @@
     customer_display: "Customer display"
   };
 
-  const ROLE_TABS = {
+  // Prefer global RS_ROLE_DEFAULTS (assets/role-defaults.js) when present
+  const ROLE_TABS = (typeof globalThis !== "undefined" && globalThis.RS_ROLE_DEFAULTS && globalThis.RS_ROLE_DEFAULTS.ROLE_DEFAULT_TABS)
+    ? globalThis.RS_ROLE_DEFAULTS.ROLE_DEFAULT_TABS
+    : {
     admin: ["pos-tab", "floor-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "customers-tab", "tax-tab", "aggregator-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "analytics-tab"],
-    manager: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "inventory-tab", "editor-tab", "customers-tab", "reports-tab", "analytics-tab", "employees-tab", "growth-hub-tab"],
+    manager: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "inventory-tab", "editor-tab", "customers-tab", "reports-tab", "analytics-tab", "employees-tab", "growth-hub-tab", "aggregator-tab", "tax-tab"],
     cashier: ["pos-tab", "floor-tab", "bills-tab", "customers-tab"],
     waiter: ["pos-tab", "floor-tab", "kds-tab"],
     captain: ["pos-tab", "floor-tab", "kds-tab", "qr-orders-tab"],
