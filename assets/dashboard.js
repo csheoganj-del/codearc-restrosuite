@@ -2549,23 +2549,62 @@
     applyStaffRoleTabFiltering(cur.staffRole || staffRole, cur.allowedTabs || allowedTabs);
   });
 
-  // Live role/permission update -- called from setupSupabaseRealtime()'s
-  // tenant_users subscription when an admin changes this user's role or
-  // allowed tabs, so it takes effect immediately instead of needing a
-  // fresh login.
-  function applyLiveRoleUpdate(newRole, newAllowedTabsColumn) {
+  // Live role/permission update -- realtime (tenant_users) + validate poll.
+  // Admin can increase/decrease tabs without forcing staff to re-login.
+  function applyLiveRoleUpdate(newRole, newAllowedTabsColumn, opts) {
     if (isSuper || isBrandAdmin) return;
     const resolvedRole = String(newRole || staffRole).toLowerCase().trim();
     // Prefer an explicit per-user allowed_tabs override (set in Team & Roles);
     // otherwise fall back to the role's default tab set.
     const resolvedTabs = resolveAllowedTabs(resolvedRole, newAllowedTabsColumn);
+    const prev = window.RS_ROLE || {};
+    const prevRole = String(prev.staffRole || staffRole || '').toLowerCase().trim();
+    const prevTabs = Array.isArray(prev.allowedTabs) ? prev.allowedTabs.slice().sort().join('|') : '';
+    const nextTabs = Array.isArray(resolvedTabs) ? resolvedTabs.slice().sort().join('|') : (resolvedTabs == null ? '__all__' : '');
+    const changed = prevRole !== resolvedRole || prevTabs !== nextTabs;
     sessionStorage.setItem('logged_in_role', resolvedRole);
     sessionStorage.setItem('allowed_tabs', JSON.stringify(resolvedTabs || []));
     applyStaffRoleTabFiltering(resolvedRole, resolvedTabs);
     window.RS_ROLE = { staffRole: resolvedRole, allowedTabs: resolvedTabs, ROLE_TAB_MAP, ROLE_LABELS };
-    toast('Your access permissions were just updated', 'fa-user-shield');
+    // Keep keep-me-signed-in blob in sync so next cold start has new tabs
+    try {
+      if (window.RS_API && typeof RS_API.applyLocalRoleTabs === 'function') {
+        const payload = {
+          role: resolvedRole,
+          user_id: sessionStorage.getItem('tenant_user_id') || '',
+        };
+        // null = unrestricted (owner); do not overwrite with empty list
+        if (resolvedTabs != null) payload.allowed_tabs = resolvedTabs;
+        RS_API.applyLocalRoleTabs(payload);
+      }
+    } catch (_) {}
+    if (changed && !(opts && opts.silent)) {
+      toast('Your access permissions were just updated', 'fa-user-shield');
+    }
+    return changed;
   }
   window.RS_applyLiveRoleUpdate = applyLiveRoleUpdate;
+
+  // Fallback when Supabase realtime RLS drops tenant_users events: soft-poll
+  // validate_session (returns fresh role + allowed_tabs without kicking offline).
+  if (!window.__rsRolePollTimer && !isSuper && !isBrandAdmin) {
+    const pollRole = async () => {
+      if (document.hidden) return;
+      if (!window.RS_API || !RS_API.configured || typeof RS_API.validateSession !== 'function') return;
+      try {
+        const sess = await RS_API.validateSession();
+        if (sess && sess.role && sess.role !== 'superadmin') {
+          applyLiveRoleUpdate(sess.role, sess.allowed_tabs, { silent: true });
+        }
+      } catch (_) {
+        /* offline / network — keep local tabs */
+      }
+    };
+    window.__rsRolePollTimer = setInterval(pollRole, 15000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) pollRole();
+    });
+  }
 
   // Expose role helpers globally for other modules
   window.RS_ROLE = { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };

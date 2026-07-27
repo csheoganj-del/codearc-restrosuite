@@ -72,10 +72,11 @@
   const LS_SESS = window.localStorage; // ONLY for "remember me" restore blob + non-auth prefs
   const K = { token:'tenant_session_token', tid:'tenant_id', slug:'tenant_slug', name:'tenant_name',
               tabs:'allowed_tabs', user:'logged_in_user', role:'logged_in_role', display:'logged_in_display',
+              uid:'tenant_user_id',
               persist:'rs_session_persistent',
               planCode:'rs_plan_code', planName:'rs_plan_name', subStatus:'rs_subscription_status',
               subEnd:'rs_subscription_period_end', planLimits:'rs_plan_limits' };
-  const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.persist,
+  const SESSION_KEYS = [K.token,K.tid,K.slug,K.name,K.tabs,K.user,K.role,K.display,K.uid,K.persist,
     K.planCode,K.planName,K.subStatus,K.subEnd,K.planLimits,'superadmin_admin_token'];
   // Single-blob remember key. Live auth keys must NEVER be flat localStorage entries
   // shared across tabs — that caused multi-outlet session swaps (tab A silently
@@ -381,6 +382,9 @@
     store(K.user, s.username || '');
     store(K.role, s.role || 'admin');
     store(K.display, s.display_name || s.username || '');
+    // Staff id is required for live role/tab realtime (tenant_users filter)
+    if (s.user_id) store(K.uid, String(s.user_id));
+    else if (s.id && s.role !== 'superadmin' && s.role !== 'admin') store(K.uid, String(s.id));
     store(K.persist, persist ? '1' : '0');
     // Plan / billing snapshot (from login + validate_session) for Settings fallback
     if (s.plan_code != null || s.plan_name != null || s.subscription_status != null) {
@@ -589,6 +593,7 @@
         username: ssGet(K.user),
         role,
         display_name: ssGet(K.display),
+        user_id: ssGet(K.uid) || '',
         allowed_tabs: JSON.parse(ssGet(K.tabs) || '[]'),
         plan_code: ssGet(K.planCode) || '',
         plan_name: ssGet(K.planName) || '',
@@ -596,6 +601,21 @@
         subscription_current_period_end: ssGet(K.subEnd) || '',
         plan_limits: planLimits,
       };
+    },
+
+    /**
+     * Apply live role/tab changes without re-login (admin updated permissions).
+     * Updates sessionStorage + keep-me-signed-in blob.
+     */
+    applyLocalRoleTabs({ role, allowed_tabs, user_id } = {}){
+      if (role != null && role !== '') ssSet(K.role, String(role), false);
+      if (allowed_tabs != null) {
+        try { ssSet(K.tabs, JSON.stringify(Array.isArray(allowed_tabs) ? allowed_tabs : []), false); }
+        catch (_) { ssSet(K.tabs, '[]', false); }
+      }
+      if (user_id) ssSet(K.uid, String(user_id), false);
+      if (ssGet(K.persist) !== '0') writeRememberBlobFromSession();
+      return api.session();
     },
 
     /**

@@ -160,11 +160,20 @@ function normalizeUsername(value: unknown) {
   return String(value || "").trim();
 }
 
+/**
+ * Resolve staff tab access.
+ * - Role defaults are a template only.
+ * - Explicit allowed_tabs can increase or decrease access within the tenant plan ceiling
+ *   (so a waiter can be given Bills, or a manager can lose Reports) without a new role.
+ */
 function normalizedTabs(role: string, requested: unknown, tenantTabs: unknown) {
   const roleTabs = ROLE_DEFAULT_TABS[role] || [];
   const enabledTenantTabs = Array.isArray(tenantTabs) ? tenantTabs.map(String) : [];
-  const requestedTabs = Array.isArray(requested) ? requested.map(String) : roleTabs;
-  return requestedTabs.filter((tab) => roleTabs.includes(tab) && enabledTenantTabs.includes(tab));
+  const requestedTabs = (requested === undefined || requested === null)
+    ? roleTabs
+    : (Array.isArray(requested) ? requested.map(String) : roleTabs);
+  // Ceiling = plan/tenant tabs only (not role defaults) so access can grow past the template.
+  return [...new Set(requestedTabs.filter((tab) => enabledTenantTabs.includes(tab)))];
 }
 
 async function verifyAdminSession(req: Request) {
@@ -372,11 +381,18 @@ serve(async (req) => {
       }
 
       const changes: Record<string, unknown> = {
-        role, status,
-        allowed_tabs: normalizedTabs(role, payload.allowed_tabs === undefined ? current.allowed_tabs : payload.allowed_tabs, admin.tenantTabs),
+        role,
+        status,
         updated_at: new Date().toISOString(),
-        session_version: Number(current.session_version) + 1,
       };
+      // Tabs: explicit list from UI, or role defaults when role changes, else keep current.
+      if (payload.allowed_tabs !== undefined) {
+        changes.allowed_tabs = normalizedTabs(role, payload.allowed_tabs, admin.tenantTabs);
+      } else if (role !== current.role) {
+        changes.allowed_tabs = normalizedTabs(role, undefined, admin.tenantTabs);
+      } else {
+        changes.allowed_tabs = normalizedTabs(role, current.allowed_tabs, admin.tenantTabs);
+      }
       if (payload.display_name !== undefined) {
         const displayName = String(payload.display_name || "").trim();
         if (!displayName || displayName.length > 100) {
@@ -386,11 +402,24 @@ serve(async (req) => {
       }
       if (payload.employee_id !== undefined) changes.employee_id = String(payload.employee_id || "").trim() || null;
 
+      // Only force re-login on security-sensitive status changes. Role / tab
+      // edits must stay live (realtime + poll) without kicking the staff out.
+      if (status !== current.status) {
+        changes.session_version = Number(current.session_version) + 1;
+      }
+      if (payload.force_reauth === true) {
+        changes.session_version = Number(current.session_version) + 1;
+      }
+
       const { data, error } = await supabaseAdmin.from("tenant_users")
         .update(changes).eq("id", targetId).eq("tenant_id", admin.tenantId)
         .select("id, employee_id, username, display_name, role, allowed_tabs, status, session_version").single();
       if (error) throw error;
-      await writeAudit(admin, "staff.update", targetId, { role, status });
+      await writeAudit(admin, "staff.update", targetId, {
+        role,
+        status,
+        allowed_tabs: changes.allowed_tabs,
+      });
       return jsonResponse({ user: data }, 200, req);
     }
 
