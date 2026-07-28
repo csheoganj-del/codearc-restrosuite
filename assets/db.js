@@ -344,7 +344,7 @@
       from: r => ({
         id: r.id,
         key: r.key,
-        name: r.label || r.name,
+        name: r.label || r.name || r.item_name || r.itemName,
         cat: r.category,
         stock: num(r.current),
         unit: r.unit,
@@ -352,7 +352,7 @@
         max: num(r.max_stock),
         // unit_cost is optional (added via align migrations / client optional columns)
         cost: num(r.unit_cost != null ? r.unit_cost : r.cost),
-        supplier: r.supplier || r.vendor || '',
+        supplier: r.supplier || r.vendor || r.vendor_name || r.vendorName || '',
       }),
       to: o => ({
         id: o.id,
@@ -368,6 +368,7 @@
         supplier: o.supplier || '',
       }),
     },
+
     customers: {
       table:'doppio_crm', pk:'id', clientId:false, order:{column:'last_visit',ascending:false},
       from: r => {
@@ -735,10 +736,10 @@
         }
         return {
           id: r.id,
-          guestName: r.guest_name,
-          guestPhone: r.phone,
-          pax: num(r.party_size),
-          tableNumber: r.table_number,
+          guestName: r.guest_name || r.guestName || r.name || '',
+          guestPhone: r.phone || r.guest_phone || r.customer_phone || null,
+          pax: num(r.party_size || r.partySize || r.pax),
+          tableNumber: r.table_number || r.table || '',
           time,
           date: String(reserved).slice(0, 10),
           status: r.status,
@@ -768,6 +769,7 @@
         };
       },
     },
+
     offers: {
       table:'doppio_offers', pk:'id', clientId:false, uuidPK:true,
       from: r => {
@@ -813,10 +815,10 @@
       uuidPK: true,
       from: (r) => ({
         id: r.id,
-        name: r.name,
+        name: r.name || r.vendor_name || r.vendorName || '',
         category: r.category || 'General',
         cat: r.category || 'General',
-        contact: r.phone || r.email || '',
+        contact: r.phone || r.vendor_phone || r.email || '',
         email: r.email || '',
         terms: r.terms || 'Net 30',
         rating: num(r.rating) || 4,
@@ -827,7 +829,7 @@
       to: (o) => ({
         name: o.name,
         category: o.category || o.cat || 'General',
-        phone: o.contact || o.phone || '',
+        phone: o.contact || o.phone || o.vendor_phone || '',
         email: o.email || '',
         status: o.status || 'active',
         terms: o.terms || 'Net 30',
@@ -835,6 +837,7 @@
         items_count: num(o.itemsCount != null ? o.itemsCount : o.items),
       }),
     },
+
     purchase_orders: {
       table: 'doppio_purchase_orders',
       pk: 'id',
