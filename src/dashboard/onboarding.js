@@ -165,87 +165,87 @@
 
   const UPDATES_HISTORY = [
     {
-      version: "v216-20260725-shift-ux-guide",
-      date: "2026-07-25",
-      title: "Shift-first billing + clear action guides",
-      summary: "Print & Pay, Hold, refunds, and cash drawer require an open shift and explain why when blocked. After install, a short guide shows what changed.",
+      version: 'v216-20260725-shift-ux-guide',
+      date: '2026-07-25',
+      title: 'Shift-first billing + clear action guides',
+      summary: 'Print & Pay, Hold, refunds, and cash drawer require an open shift and explain why when blocked. After install, a short guide shows what changed.',
       highlights: [
-        "Open shift first: Print & Pay shows a clear modal when shift is closed (Open shift CTA).",
-        "Hold and Void/Refund use the same shift gate so the Z-report stays accurate.",
-        "Cash drawer and pay-in/pay-out prompt to open shift instead of failing silently.",
-        "Print & Pay explains empty cart, short cash, and unbalanced split — no dead button.",
+        'Open shift first: Print & Pay shows a clear modal when shift is closed (Open shift CTA).',
+        'Hold and Void/Refund use the same shift gate so the Z-report stays accurate.',
+        'Cash drawer and pay-in/pay-out prompt to open shift instead of failing silently.',
+        'Print & Pay explains empty cart, short cash, and unbalanced split — no dead button.',
         "After this update: What's New opens automatically with an optional guided tour."
       ],
-      tour: "shift-ux"
+      tour: 'shift-ux'
     },
     {
-      version: "v36-20260708",
-      date: "2026-07-08",
-      title: "Logical Numbering & Update Reliability Fix",
-      summary: "This update replaces timestamp-style visible numbers with short daily sequences, keeps update notes current, and widens the POS guest name and phone fields.",
+      version: 'v36-20260708',
+      date: '2026-07-08',
+      title: 'Logical Numbering & Update Reliability Fix',
+      summary: 'This update replaces timestamp-style visible numbers with short daily sequences, keeps update notes current, and widens the POS guest name and phone fields.',
       highlights: [
-        "Visible bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable daily numbers.",
-        "The update dialog no longer reuses old release notes for patch-only code updates.",
-        "The POS cart guest name and phone fields now have full-width room and mobile-safe wrapping."
+        'Visible bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable daily numbers.',
+        'The update dialog no longer reuses old release notes for patch-only code updates.',
+        'The POS cart guest name and phone fields now have full-width room and mobile-safe wrapping.'
       ]
     },
     {
-      version: "v22-20260621",
-      date: "2026-06-21",
-      title: "POS Active Cart Persistence & Stability",
-      summary: "This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.",
+      version: 'v22-20260621',
+      date: '2026-06-21',
+      title: 'POS Active Cart Persistence & Stability',
+      summary: 'This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.',
       highlights: [
-        "Active Cart Persistence: Cart items are saved to drafts when switching layouts or changing tables.",
-        "Recursion Guard: Implemented safety flags to prevent stack overflow loop crashes on table resets.",
-        "Semantic Release Naming: Updated the versioning system to clean semantic v-format strings."
+        'Active Cart Persistence: Cart items are saved to drafts when switching layouts or changing tables.',
+        'Recursion Guard: Implemented safety flags to prevent stack overflow loop crashes on table resets.',
+        'Semantic Release Naming: Updated the versioning system to clean semantic v-format strings.'
       ]
     },
     {
-      version: "2026.06.20-onboarding",
-      date: "2026-06-20",
-      title: "Onboarding Usability & Tour Update",
+      version: '2026.06.20-onboarding',
+      date: '2026-06-20',
+      title: 'Onboarding Usability & Tour Update',
       summary: "This update resolves tooltip layout overlapping, makes the 'What's New' history button responsive, and fixes settings tab setup task redirects.",
       highlights: [
-        "Collision-Free Tooltips: Tooltip card dynamically shifts to the side with more space (left/right) to keep highlighted elements fully visible.",
+        'Collision-Free Tooltips: Tooltip card dynamically shifts to the side with more space (left/right) to keep highlighted elements fully visible.',
         "What's New Button: Resolved the click event handler on the What's New history button.",
-        "Redirect & Input Focus: Setup task checklist buttons now route directly to settings sub-sections and auto-focus fields.",
-        "Mobile View Centering: Centered tooltip cards on narrow viewports using translate transforms."
+        'Redirect & Input Focus: Setup task checklist buttons now route directly to settings sub-sections and auto-focus fields.',
+        'Mobile View Centering: Centered tooltip cards on narrow viewports using translate transforms.'
       ]
     },
     {
-      version: "2026.06.19-dues",
-      date: "2026-06-19",
-      title: "Customer Dues & QR Printing Update",
-      summary: "This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.",
+      version: '2026.06.19-dues',
+      date: '2026-06-19',
+      title: 'Customer Dues & QR Printing Update',
+      summary: 'This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.',
       highlights: [
         "Credit Payment: cashiers can now select 'Due' as a payment method for registered customers.",
-        "CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.",
-        "POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.",
-        "Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.",
-        "Persistent POS Drafts: parked/held orders are saved to the database and survive reloads."
+        'CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.',
+        'POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.',
+        'Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.',
+        'Persistent POS Drafts: parked/held orders are saved to the database and survive reloads.'
       ]
     },
     {
-      version: "2026.06.19-restrosuite",
-      date: "2026-06-19",
-      title: "RestroSuite dashboard reliability update",
-      summary: "This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness.",
+      version: '2026.06.19-restrosuite',
+      date: '2026-06-19',
+      title: 'RestroSuite dashboard reliability update',
+      summary: 'This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness.',
       highlights: [
-        "Bills now use date-wise numbers like RS-260619-001.",
-        "Bill, tax, menu, inventory, and tenant exports use date-wise filenames.",
-        "Import and export work now shows a clear progress/status bar.",
-        "The dashboard checks for updates in the background and prompts with release notes."
+        'Bills now use date-wise numbers like RS-260619-001.',
+        'Bill, tax, menu, inventory, and tenant exports use date-wise filenames.',
+        'Import and export work now shows a clear progress/status bar.',
+        'The dashboard checks for updates in the background and prompts with release notes.'
       ]
     },
     {
-      version: "2026.06.18",
-      date: "2026-06-18",
-      title: "Menu Import/Export & KDS Optimization",
-      summary: "Introduced bulk menu importing via Excel templates and enhanced kitchen display responsiveness.",
+      version: '2026.06.18',
+      date: '2026-06-18',
+      title: 'Menu Import/Export & KDS Optimization',
+      summary: 'Introduced bulk menu importing via Excel templates and enhanced kitchen display responsiveness.',
       highlights: [
-        "Bulk menu setup using Excel templates.",
-        "KDS screen responsiveness improvements and color coding.",
-        "Multi-station kitchen routing."
+        'Bulk menu setup using Excel templates.',
+        'KDS screen responsiveness improvements and color coding.',
+        'Multi-station kitchen routing.'
       ]
     }
   ];
@@ -347,7 +347,7 @@
 
   function isFeatureVisible(feature) {
     const allowlist = allowedTabIds();
-    if (allowlist.length && !allowlist.includes(feature.tabId)) return false;
+    if (allowlist.length && !allowlist.includes(feature.tabId)) {return false;}
     const link = document.querySelector(`.sidebar-link[data-tab="${feature.tabId}"]`);
     return Boolean(link && window.getComputedStyle(link).display !== 'none');
   }
@@ -374,7 +374,7 @@
 
   function readSettingsSnapshot() {
     try {
-      if (window.RS_SETTINGS && typeof window.RS_SETTINGS === 'object') return window.RS_SETTINGS;
+      if (window.RS_SETTINGS && typeof window.RS_SETTINGS === 'object') {return window.RS_SETTINGS;}
     } catch (_) {}
     return readJson('rs_v2:settings', {}) || {};
   }
@@ -408,14 +408,14 @@
     try {
       if (window.RS_DB && typeof RS_DB.list === 'function') {
         const rows = await RS_DB.list(name);
-        if (Array.isArray(rows)) return rows;
-        if (rows && typeof rows === 'object') return Object.values(rows);
+        if (Array.isArray(rows)) {return rows;}
+        if (rows && typeof rows === 'object') {return Object.values(rows);}
       }
     } catch (_) {}
     if (fallbackKey) {
       const raw = readJson(fallbackKey, null);
-      if (Array.isArray(raw)) return raw;
-      if (raw && typeof raw === 'object') return Object.values(raw);
+      if (Array.isArray(raw)) {return raw;}
+      if (raw && typeof raw === 'object') {return Object.values(raw);}
     }
     return [];
   }
@@ -425,10 +425,10 @@
     try {
       if (window.RS && typeof RS.getSettings === 'function') {
         const s = await RS.getSettings();
-        if (s && typeof s === 'object') settings = s;
+        if (s && typeof s === 'object') {settings = s;}
       } else if (window.RS_DB && typeof RS_DB.getSettings === 'function') {
         const s = await RS_DB.getSettings();
-        if (s && typeof s === 'object') settings = s;
+        if (s && typeof s === 'object') {settings = s;}
       }
     } catch (_) {}
 
@@ -557,7 +557,7 @@
     const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`)
       || document.querySelector(`.mobile-bottom-nav [data-tab="${tabId}"]`)
       || document.querySelector(`.more-sheet-link[data-tab="${tabId}"]`);
-    if (link) link.click();
+    if (link) {link.click();}
   }
 
   function escGuide(s) {
@@ -569,7 +569,7 @@
   }
 
   function injectGuide() {
-    if (document.getElementById('product-guide-modal')) return;
+    if (document.getElementById('product-guide-modal')) {return;}
     const modal = document.createElement('div');
     modal.id = 'product-guide-modal';
     modal.className = 'product-guide-modal';
@@ -665,9 +665,9 @@
 
   function runTask(task) {
     closeGuide();
-    if (!task) return;
-    if (typeof task.action === 'function') task.action();
-    else if (task.tabId) activateTab(task.tabId);
+    if (!task) {return;}
+    if (typeof task.action === 'function') {task.action();}
+    else if (task.tabId) {activateTab(task.tabId);}
   }
 
   async function renderGuide(search = '') {
@@ -682,7 +682,7 @@
     const progressBar = document.getElementById('guide-progress-bar');
 
     if (summary) {
-      summary.innerHTML = `<div class="pg-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking live workspace data…</div>`;
+      summary.innerHTML = '<div class="pg-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking live workspace data…</div>';
     }
 
     let tasks = [];
@@ -704,11 +704,11 @@
         ? 'All set — use this guide to train new staff anytime.'
         : `${completed} of ${tasks.length} done · progress updates from your live data`;
     }
-    if (progressLabel) progressLabel.textContent = `${percent}%`;
+    if (progressLabel) {progressLabel.textContent = `${percent}%`;}
     if (progressBar) {
       progressBar.setAttribute('aria-valuenow', String(percent));
       const fill = progressBar.querySelector('.pg-bar-fill') || progressBar.querySelector('span');
-      if (fill) fill.style.width = `${percent}%`;
+      if (fill) {fill.style.width = `${percent}%`;}
     }
 
     if (nextCta) {
@@ -744,7 +744,7 @@
 
     if (summary) {
       if (!tasks.length) {
-        summary.innerHTML = `<div class="pg-empty-inline">No setup steps for this role.</div>`;
+        summary.innerHTML = '<div class="pg-empty-inline">No setup steps for this role.</div>';
       } else {
         summary.innerHTML = tasks.map((task, index) => {
           const state = task.done ? 'is-done' : (nextTask && task.id === nextTask.id ? 'is-next' : '');
@@ -786,14 +786,14 @@
     }
 
     const features = allFeatures.filter(feature => {
-      if (guideFilterGroup !== 'all' && (feature.group || 'Other') !== guideFilterGroup) return false;
-      if (!query) return true;
+      if (guideFilterGroup !== 'all' && (feature.group || 'Other') !== guideFilterGroup) {return false;}
+      if (!query) {return true;}
       const hay = `${feature.label} ${feature.subtitle} ${feature.description} ${feature.firstAction} ${feature.group || ''}`.toLowerCase();
       return hay.includes(query);
     });
 
     const countEl = document.getElementById('guide-feature-count');
-    if (countEl) countEl.textContent = `${allFeatures.length} enabled`;
+    if (countEl) {countEl.textContent = `${allFeatures.length} enabled`;}
 
     if (grid) {
       grid.innerHTML = features.length ? features.map(feature => `
@@ -835,7 +835,7 @@
     }
     injectGuide();
     const modal = document.getElementById('product-guide-modal');
-    if (!modal) return;
+    if (!modal) {return;}
     // Already open — refresh content, don't require a second click
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -852,7 +852,7 @@
 
   function closeGuide() {
     const modal = document.getElementById('product-guide-modal');
-    if (!modal) return;
+    if (!modal) {return;}
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('product-guide-open');
@@ -860,7 +860,7 @@
 
   function buildDots() {
     const container = document.getElementById('tour-dots');
-    if (!container) return;
+    if (!container) {return;}
     container.innerHTML = steps.map((step, index) =>
       `<button type="button" class="tour-dot ${index === currentStep ? 'is-active' : ''}" data-tour-index="${index}" aria-label="Go to ${step.label}"></button>`
     ).join('');
@@ -871,7 +871,7 @@
 
   function positionSpotlight(target) {
     const spotlight = document.getElementById('onboarding-spotlight');
-    if (!spotlight) return;
+    if (!spotlight) {return;}
     if (!target) {
       spotlight.style.display = 'none';
       return;
@@ -889,7 +889,7 @@
 
   function positionCard(target) {
     const card = document.getElementById('onboarding-card');
-    if (!card) return;
+    if (!card) {return;}
     const mobile = window.innerWidth <= 768;
     if (mobile) {
       card.style.left = '50%';
@@ -898,7 +898,7 @@
       card.style.bottom = card.style.top === 'auto' ? '76px' : 'auto';
       return;
     }
-    
+
     card.style.transform = 'none';
     card.style.bottom = 'auto';
     const width = card.offsetWidth || 380;
@@ -908,11 +908,11 @@
       card.style.top = `${Math.max(20, (window.innerHeight - height) / 2)}px`;
       return;
     }
-    
+
     const rect = target.getBoundingClientRect();
     const spaceLeft = rect.left;
     const spaceRight = window.innerWidth - rect.right;
-    
+
     // Choose the side with more available space
     if (spaceLeft > spaceRight) {
       // Try to place to the left of the target
@@ -948,9 +948,9 @@
   function tourTarget(step) {
     if (step.targetSelector) {
       const el = document.querySelector(step.targetSelector);
-      if (el) return el;
+      if (el) {return el;}
     }
-    if (!step.tabId) return null;
+    if (!step.tabId) {return null;}
     if (window.innerWidth <= 768) {
       return document.querySelector(`.mobile-bottom-nav [data-tab="${step.tabId}"]`)
         || document.getElementById('mobile-more-btn');
@@ -962,7 +962,7 @@
     currentStep = Math.max(0, Math.min(index, steps.length - 1));
     const step = steps[currentStep];
     const last = currentStep === steps.length - 1;
-    if (step.tabId) activateTab(step.tabId);
+    if (step.tabId) {activateTab(step.tabId);}
     document.getElementById('tour-step-label').textContent = step.label;
     document.getElementById('tour-step-icon').textContent = `${currentStep + 1}/${steps.length}`;
     document.getElementById('tour-feature-icon').innerHTML = `<i class="fa-solid ${step.icon}"></i>`;
@@ -992,12 +992,12 @@
 
   function openTourOverlay() {
     const overlay = document.getElementById('onboarding-overlay');
-    if (!overlay) return null;
+    if (!overlay) {return null;}
     const backdrop = document.getElementById('onboarding-backdrop');
     document.body.classList.add('onboarding-active');
     overlay.style.display = 'block';
     overlay.style.pointerEvents = 'auto';
-    if (backdrop) backdrop.style.pointerEvents = 'auto';
+    if (backdrop) {backdrop.style.pointerEvents = 'auto';}
     requestAnimationFrame(() => overlay.classList.add('is-visible'));
     return overlay;
   }
@@ -1005,7 +1005,7 @@
   function closeTourOverlayImmediate() {
     const overlay = document.getElementById('onboarding-overlay');
     const backdrop = document.getElementById('onboarding-backdrop');
-    if (backdrop) backdrop.style.pointerEvents = 'none';
+    if (backdrop) {backdrop.style.pointerEvents = 'none';}
     if (overlay) {
       overlay.classList.remove('is-visible');
       // Drop hit-testing immediately so Print & Pay is never covered by an invisible shield
@@ -1018,10 +1018,10 @@
 
   function startTour() {
     steps = [WELCOME_STEP, ...enabledFeatures()];
-    if (steps.length < 2) return;
+    if (steps.length < 2) {return;}
     currentStep = 0;
     closeGuide();
-    if (!openTourOverlay()) return;
+    if (!openTourOverlay()) {return;}
     goToStep(0);
   }
 
@@ -1041,10 +1041,10 @@
 
   function startUpdateTour() {
     steps = resolveUpdateTourSteps();
-    if (!steps || !steps.length) return;
+    if (!steps || !steps.length) {return;}
     currentStep = 0;
     closeGuide();
-    if (!openTourOverlay()) return;
+    if (!openTourOverlay()) {return;}
     goToStep(0);
   }
 
@@ -1067,7 +1067,7 @@
   }
 
   function openUpdateHistoryModal() {
-    if (typeof window.RSModal === 'undefined') return;
+    if (typeof window.RSModal === 'undefined') {return;}
     const justUpdated = sessionStorage.getItem('rs_update_applied_at');
     const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
 
@@ -1129,7 +1129,7 @@
       `,
       foot: `
         <button class="btn btn-ghost" style="flex:1;" data-close-history>Close</button>
-        ${justUpdated ? `<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>` : ''}
+        ${justUpdated ? '<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>' : ''}
       `,
       onMount(modal, close) {
         modal.querySelector('[data-close-history]').onclick = () => {
@@ -1202,13 +1202,13 @@
       event.preventDefault();
       window.tourNavigate(-1);
     } else if (event.key === 'Escape') {
-      if (overlayOpen) endTour();
-      else closeGuide();
+      if (overlayOpen) {endTour();}
+      else {closeGuide();}
     }
   });
 
   window.addEventListener('resize', () => {
-    if (!document.getElementById('onboarding-overlay')?.classList.contains('is-visible')) return;
+    if (!document.getElementById('onboarding-overlay')?.classList.contains('is-visible')) {return;}
     const target = tourTarget(steps[currentStep]);
     positionSpotlight(target);
     positionCard(target);
@@ -1229,13 +1229,13 @@
   function shouldPromptForProfile() {
     const role = (sessionStorage.getItem('logged_in_role') || '').toLowerCase();
     // Only the person who can actually fix it should be blocked by it.
-    if (role && role !== 'admin' && role !== 'manager' && role !== 'owner' && role !== 'superadmin') return false;
-    if (sessionStorage.getItem('logged_in_role') === 'superadmin') return false;
-    if (detectHasBusinessProfile()) return false;
+    if (role && role !== 'admin' && role !== 'manager' && role !== 'owner' && role !== 'superadmin') {return false;}
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') {return false;}
+    if (detectHasBusinessProfile()) {return false;}
     // "Skip for now" only defers for this browser session -- it comes back
     // next login until it's actually filled in, per "first step ... for
     // smooth working" -- this is necessary setup, not a one-time nag.
-    if (sessionStorage.getItem(profilePromptStorageKey())) return false;
+    if (sessionStorage.getItem(profilePromptStorageKey())) {return false;}
     return true;
   }
 
@@ -1248,11 +1248,11 @@
 
   function closeProfilePromptModal() {
     const modal = document.getElementById('rs-profile-prompt-modal');
-    if (modal) modal.remove();
+    if (modal) {modal.remove();}
   }
 
   function showProfileCompletionModal() {
-    if (document.getElementById('rs-profile-prompt-modal')) return;
+    if (document.getElementById('rs-profile-prompt-modal')) {return;}
     const modal = document.createElement('div');
     modal.id = 'rs-profile-prompt-modal';
     modal.setAttribute('role', 'dialog');
@@ -1336,7 +1336,7 @@
           localStorage.setItem('rs_v2:settings', JSON.stringify(updated));
         }
         sessionStorage.removeItem(profilePromptStorageKey());
-        if (window.RS && typeof RS.toast === 'function') RS.toast('Outlet profile saved', 'fa-circle-check');
+        if (window.RS && typeof RS.toast === 'function') {RS.toast('Outlet profile saved', 'fa-circle-check');}
         closeProfilePromptModal();
       } catch (err) {
         errorEl.textContent = 'Could not save -- ' + (err && err.message ? err.message : 'please try again.');
@@ -1373,7 +1373,7 @@
       const isFile = location.protocol === 'file:';
       const url = isFile ? 'app-update.json' : `app-update.json?v=${Date.now()}`;
       const res = await fetch(url);
-      if (res.ok) latestRelease = await res.json();
+      if (res.ok) {latestRelease = await res.json();}
     } catch(e) {}
 
     if (latestRelease && latestRelease.version) {
@@ -1382,15 +1382,15 @@
         UPDATES_HISTORY.unshift({
           version: latestRelease.version,
           date: latestRelease.date || new Date().toLocaleDateString('en-CA'),
-          title: latestRelease.title || "Custom Update",
-          summary: latestRelease.summary || "This update contains hotfixes and stability improvements.",
-          highlights: latestRelease.highlights || ["System stability and codebase security updates."],
+          title: latestRelease.title || 'Custom Update',
+          summary: latestRelease.summary || 'This update contains hotfixes and stability improvements.',
+          highlights: latestRelease.highlights || ['System stability and codebase security updates.'],
           tour: latestRelease.tour || '',
         });
       } else if (latestRelease.tour) {
         // Keep tour key from live feed on matching history row
         const row = UPDATES_HISTORY.find((u) => u.version === latestRelease.version);
-        if (row && !row.tour) row.tour = latestRelease.tour;
+        if (row && !row.tour) {row.tour = latestRelease.tour;}
       }
 
       // Desktop content reload (?rs_content=) or web Save & Update sets this so we can show guide
@@ -1410,14 +1410,14 @@
           sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
           sessionStorage.setItem('rs_update_show_guide', '1');
         }
-        if (next) localStorage.setItem(seenKey, next);
+        if (next) {localStorage.setItem(seenKey, next);}
       } catch (_) {}
     }
 
     // What's New button click listener is now bound directly inside injectGuide()
 
     setTimeout(() => {
-      if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
+      if (sessionStorage.getItem('logged_in_role') === 'superadmin') {return;}
 
       // Step one of onboarding a new client: a complete business profile.
       // Takes priority over the tour/update modal -- no point touring a
@@ -1459,7 +1459,7 @@
           }, 400);
           return;
         }
-        if (!localStorage.getItem(tourStorageKey())) startTour();
+        if (!localStorage.getItem(tourStorageKey())) {startTour();}
       } catch (error) {
         startTour();
       }

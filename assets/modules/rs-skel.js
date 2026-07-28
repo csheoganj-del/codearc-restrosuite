@@ -20,13 +20,13 @@
   }
 
   try {
-    if (document.documentElement.dataset.rsHydrated === '1') hydrated = true;
+    if (document.documentElement.dataset.rsHydrated === '1') {hydrated = true;}
   } catch (_) {}
 
   document.addEventListener('rs:hydrated', markHydrated);
 
   function isHydrated() {
-    if (hydrated) return true;
+    if (hydrated) {return true;}
     try {
       if (document.documentElement.dataset.rsHydrated === '1') {
         hydrated = true;
@@ -193,7 +193,7 @@
   }
 
   function paint(el, html) {
-    if (!el) return false;
+    if (!el) {return false;}
     el.innerHTML = html;
     el.classList.add('rs-skel-host');
     el.setAttribute('aria-busy', 'true');
@@ -201,14 +201,14 @@
   }
 
   function clear(el) {
-    if (!el) return;
+    if (!el) {return;}
     el.classList.remove('rs-skel-host');
     el.removeAttribute('aria-busy');
   }
 
   /** Paint real HTML and drop skeleton host flags (always call after loading). */
   function paintReady(el, html) {
-    if (!el) return false;
+    if (!el) {return false;}
     clear(el);
     el.innerHTML = html;
     return true;
@@ -219,7 +219,7 @@
    * true when app has not finished first hydrate AND no local rows yet.
    */
   function shouldShow(hasLocalData) {
-    if (hasLocalData) return false;
+    if (hasLocalData) {return false;}
     return !isHydrated();
   }
 

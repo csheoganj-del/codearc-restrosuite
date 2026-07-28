@@ -5,10 +5,10 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function esc(s) {
@@ -34,13 +34,13 @@
     }
   }
   function setOperationStatus(msg, state) {
-    if (global.RS && typeof RS.setOperationStatus === 'function') return RS.setOperationStatus(msg, state);
+    if (global.RS && typeof RS.setOperationStatus === 'function') {return RS.setOperationStatus(msg, state);}
   }
   function finishOperationStatus(msg, state) {
-    if (global.RS && typeof RS.finishOperationStatus === 'function') return RS.finishOperationStatus(msg, state);
+    if (global.RS && typeof RS.finishOperationStatus === 'function') {return RS.finishOperationStatus(msg, state);}
   }
   function activateTab(id) {
-    if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
+    if (global.RS && typeof RS.activateTab === 'function') {return RS.activateTab(id);}
   }
 
   let QR_ORDERS = getOrders();
@@ -49,18 +49,18 @@
   const statusTxt = { pending: 'Pending', preparing: 'Preparing', served: 'Served' };
 
   function parseTs(dateStr) {
-    if (dateStr == null || dateStr === '') return null;
-    if (typeof dateStr === 'number' && Number.isFinite(dateStr)) return dateStr;
+    if (dateStr == null || dateStr === '') {return null;}
+    if (typeof dateStr === 'number' && Number.isFinite(dateStr)) {return dateStr;}
     const m = String(dateStr)
       .trim()
       .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([ap]m)?$/i);
     if (m) {
-      let [, d, mo, y, h, mi, s, meridiem] = m;
+      const [, d, mo, y, h, mi, s, meridiem] = m;
       let hour = Number(h);
       if (meridiem) {
         const pm = meridiem.toLowerCase() === 'pm';
-        if (pm && hour < 12) hour += 12;
-        if (!pm && hour === 12) hour = 0;
+        if (pm && hour < 12) {hour += 12;}
+        if (!pm && hour === 12) {hour = 0;}
       }
       const parsed = new Date(Number(y), Number(mo) - 1, Number(d), hour, Number(mi), Number(s || 0)).getTime();
       return Number.isNaN(parsed) ? null : parsed;
@@ -75,68 +75,68 @@
     if (!ts) {
       // Fall back to preformatted string only if it already looks relative
       const t = String((o && o.time) || '');
-      if (/ago|just now|min|h\s/i.test(t)) return t;
+      if (/ago|just now|min|h\s/i.test(t)) {return t;}
       return 'just now';
     }
     const elapsed = Date.now() - ts;
-    if (elapsed < 0) return 'just now';
+    if (elapsed < 0) {return 'just now';}
     const mins = Math.floor(elapsed / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return mins + ' min ago';
+    if (mins < 1) {return 'just now';}
+    if (mins < 60) {return mins + ' min ago';}
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return hrs + 'h ' + (mins % 60) + 'm ago';
+    if (hrs < 24) {return hrs + 'h ' + (mins % 60) + 'm ago';}
     const days = Math.floor(hrs / 24);
     return days + 'd ago';
   }
 
   function ageMinutes(o) {
     const ts = o && (o.start || parseTs(o.dateTime));
-    if (!ts) return 0;
+    if (!ts) {return 0;}
     return Math.max(0, (Date.now() - ts) / 60000);
   }
 
   function tableTotalCount() {
     try {
-      if (global.RS && Array.isArray(RS.TABLES) && RS.TABLES.length) return RS.TABLES.length;
+      if (global.RS && Array.isArray(RS.TABLES) && RS.TABLES.length) {return RS.TABLES.length;}
       const cards = document.querySelectorAll('#floor-tab .table-card');
-      if (cards.length) return cards.length;
+      if (cards.length) {return cards.length;}
     } catch (_) {}
     return 12;
   }
 
   function qrItemLabel(item) {
-    if (Array.isArray(item)) return item[0];
+    if (Array.isArray(item)) {return item[0];}
     return `${Number(item.qty || 1)}× ${item.name || 'Item'}`;
   }
   function qrItemTotal(item) {
-    if (Array.isArray(item)) return Number(item[1] || 0);
+    if (Array.isArray(item)) {return Number(item[1] || 0);}
     return Number(item.price || 0) * Number(item.qty || 1);
   }
   function qrItemNote(item) {
-    if (Array.isArray(item)) return item[2] || '';
+    if (Array.isArray(item)) {return item[2] || '';}
     return item.notes || item.note || '';
   }
   function qrTableName(table) {
     const raw = String(table || '').trim();
-    if (!raw) return 'Walk-in / Takeaway';
-    if (/^table\s+/i.test(raw)) return raw.replace(/^table/i, 'Table');
-    if (/^\d+$/.test(raw)) return `Table ${raw}`;
+    if (!raw) {return 'Walk-in / Takeaway';}
+    if (/^table\s+/i.test(raw)) {return raw.replace(/^table/i, 'Table');}
+    if (/^\d+$/.test(raw)) {return `Table ${raw}`;}
     return raw;
   }
   function qrTableShort(table) {
     const raw = String(table || '').trim();
-    if (!raw) return '—';
+    if (!raw) {return '—';}
     const parts = raw.split('-');
-    if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) return parts[parts.length - 1];
+    if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) {return parts[parts.length - 1];}
     const m = raw.match(/(\d+)/);
-    if (m) return m[1];
+    if (m) {return m[1];}
     return raw;
   }
   function normalizeStatus(s) {
     const st = String(s || '').toLowerCase().trim();
-    if (/pending|new|hold|draft|review/.test(st) && !/prepar|ready|serv|paid|cancel/.test(st)) return 'pending';
-    if (/prepar|accept|cook|kitchen/.test(st)) return 'preparing';
-    if (/serv|ready|paid|settled|complet/.test(st)) return 'served';
+    if (/pending|new|hold|draft|review/.test(st) && !/prepar|ready|serv|paid|cancel/.test(st)) {return 'pending';}
+    if (/prepar|accept|cook|kitchen/.test(st)) {return 'preparing';}
+    if (/serv|ready|paid|settled|complet/.test(st)) {return 'served';}
     return st || 'pending';
   }
 
@@ -145,7 +145,7 @@
       return RSAmend.canAmendOrderLine(order);
     }
     const st = normalizeStatus(order && order.status);
-    if (st === 'pending') return { ok: true };
+    if (st === 'pending') {return { ok: true };}
     if (st === 'preparing') {
       return { ok: false, reason: 'In kitchen — cannot rewrite items. Void from kitchen if needed.' };
     }
@@ -170,13 +170,15 @@
 
   async function openStaffAmendModal(orderIdx) {
     const o = QR_ORDERS[orderIdx];
-    if (!o) return;
+    if (!o) {return;}
     const check = canStaffAmend(o);
     if (!check.ok) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast(check.reason || 'Cannot amend', 'fa-lock');
       return;
     }
     if (!global.RSModal) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('Modal unavailable', 'fa-circle-exclamation');
       return;
     }
@@ -232,10 +234,11 @@
             btn.onclick = () => {
               const i = +btn.getAttribute('data-i');
               const d = +btn.getAttribute('data-d');
-              if (!lines[i]) return;
+              if (!lines[i]) {return;}
               lines[i].qty += d;
-              if (lines[i].qty <= 0) lines.splice(i, 1);
+              if (lines[i].qty <= 0) {lines.splice(i, 1);}
               if (!lines.length) {
+                try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
                 toast('Keep at least one item', 'fa-circle-exclamation');
                 lines = orderItemsEditable(o);
               }
@@ -287,6 +290,7 @@
             o.total = total;
             o.covers = covers;
             close();
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
             toast('Order amended · guest & kitchen notified', 'fa-bell');
             renderQR();
             try {
@@ -297,6 +301,7 @@
               );
             } catch (_) {}
           } catch (err) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast((err && err.message) || 'Amend failed', 'fa-circle-exclamation');
           }
         };
@@ -326,19 +331,21 @@
       .filter((item) => item.name && Number.isFinite(item.price));
   }
   async function openQrOrderInPos(order) {
-    if (!order) return;
+    if (!order) {return;}
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
     const items = qrCartItems(order);
     if (!items.length) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('This QR order has no billable items', 'fa-circle-exclamation');
       return;
     }
     const tableName = qrTableName(order.table);
     activateTab('pos-tab');
     // Wait for POS tab DOM + cart helpers (RS.setCart) to be ready after tab switch.
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await new Promise((resolve) => { setTimeout(resolve, 120); });
     let attempts = 0;
     while (attempts < 8 && !(window.RS && typeof RS.setCart === 'function')) {
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      await new Promise((resolve) => { setTimeout(resolve, 60); });
       attempts += 1;
     }
 
@@ -357,10 +364,10 @@
         items.forEach((it) => RS.cart.push(it));
       }
       try {
-        if (window.RS && typeof RS.renderCart === 'function') RS.renderCart();
+        if (window.RS && typeof RS.renderCart === 'function') {RS.renderCart();}
       } catch (e) {}
       try {
-        if (typeof window.saveActiveCart === 'function') window.saveActiveCart();
+        if (typeof window.saveActiveCart === 'function') {window.saveActiveCart();}
       } catch (e) {}
     };
 
@@ -407,7 +414,7 @@
     }
     // Apply after table hydrate; re-apply once async showMenuGridForTable may have finished
     applyCart();
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await new Promise((resolve) => { setTimeout(resolve, 350); });
     applyCart();
     toast(`Loaded ${tableName} in POS`, 'fa-receipt');
   }
@@ -450,26 +457,26 @@
       qrBadge.textContent = pendingCount > 0 ? pendingCount : activeCount;
       qrBadge.style.display = activeCount > 0 ? '' : 'none';
       qrBadge.classList.toggle('badge-urgent', pendingCount > 0);
-      if (pendingCount > 0) qrBadge.title = pendingCount + ' awaiting accept';
-      else if (activeCount > 0) qrBadge.title = activeCount + ' active QR orders';
-      else qrBadge.title = '';
+      if (pendingCount > 0) {qrBadge.title = pendingCount + ' awaiting accept';}
+      else if (activeCount > 0) {qrBadge.title = activeCount + ' active QR orders';}
+      else {qrBadge.title = '';}
     }
 
     const grid = $('#qr-grid');
-    if (!grid) return;
+    if (!grid) {return;}
 
-    var qrView =
+    let qrView =
       global.RSViewMode && RSViewMode.get ? RSViewMode.get('qr-orders', 'cards') : 'cards';
     (function ensureQrViewBar() {
       const tab = document.getElementById('qr-orders-tab');
-      if (!tab || !global.RSViewMode) return;
+      if (!tab || !global.RSViewMode) {return;}
       let bar = tab.querySelector('.qr-view-bar');
       if (!bar) {
         bar = document.createElement('div');
         bar.className = 'qr-view-bar';
         bar.style.cssText = 'display:flex;justify-content:flex-end;margin:0 0 10px;';
         const host = grid.parentElement;
-        if (host) host.insertBefore(bar, grid);
+        if (host) {host.insertBefore(bar, grid);}
       }
       bar.innerHTML = RSViewMode.toggleHtml('qr-orders', qrView);
       qrView = RSViewMode.wire(bar, 'qr-orders', function (m) {
@@ -493,32 +500,34 @@
         }
       } catch (_) {}
       try {
-        if (global.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+        if (global.RSSkel && RSSkel.clear) {RSSkel.clear(grid);}
       } catch (_) {}
       grid.innerHTML = emptyQrHtml();
       const floorBtn = grid.querySelector('[data-qr-goto-floor]');
       if (floorBtn)
-        floorBtn.onclick = () => {
-          if (typeof activateTab === 'function') activateTab('floor-tab');
-          else if (global.RS && RS.activateTab) RS.activateTab('floor-tab');
-        };
+        {floorBtn.onclick = () => {
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
+          if (typeof activateTab === 'function') {activateTab('floor-tab');}
+          else if (global.RS && RS.activateTab) {RS.activateTab('floor-tab');}
+        };}
       const refreshBtn = grid.querySelector('[data-qr-refresh]');
       if (refreshBtn)
-        refreshBtn.onclick = () => {
+        {refreshBtn.onclick = () => {
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
           syncPendingOrders({ forceCloud: true });
           toast('Refreshing QR orders…', 'fa-rotate');
-        };
+        };}
       return;
     }
     try {
-      if (global.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+      if (global.RSSkel && RSSkel.clear) {RSSkel.clear(grid);}
     } catch (_) {}
 
     // Pending first, then oldest within status
     const sortedIdx = QR_ORDERS.map((o, i) => ({ o, i })).sort((a, b) => {
       const rank = (s) => (s === 'pending' ? 0 : s === 'preparing' ? 1 : 2);
       const r = rank(a.o.status) - rank(b.o.status);
-      if (r !== 0) return r;
+      if (r !== 0) {return r;}
       return ageMinutes(b.o) - ageMinutes(a.o); // older first within bucket
     });
 
@@ -572,7 +581,7 @@
         const amendBtn = canStaffAmend(o).ok
           ? `<button class="btn btn-ghost btn-sm" data-amend="${i}" title="Amend items / guests"><i class="fa-solid fa-pen-to-square"></i> Amend</button>`
           : o.status === 'preparing'
-            ? `<span class="qr-lock-hint" title="Locked in kitchen" style="font-size:10px;color:var(--text-mute)"><i class="fa-solid fa-lock"></i> Locked</span>`
+            ? '<span class="qr-lock-hint" title="Locked in kitchen" style="font-size:10px;color:var(--text-mute)"><i class="fa-solid fa-lock"></i> Locked</span>'
             : '';
         const lines = (o.items || [])
           .map((it) => {
@@ -612,7 +621,7 @@
     $$('#qr-grid [data-adv]').forEach((b) =>
       b.addEventListener('click', async () => {
         const o = QR_ORDERS[+b.dataset.adv];
-        if (!o) return;
+        if (!o) {return;}
         const nextStatus = o.status === 'pending' ? 'preparing' : 'served';
         const dbStatus = nextStatus === 'preparing' ? 'preparing' : 'served';
         const tableLabel = qrTableShort(o.table);
@@ -635,7 +644,7 @@
             const row = rows.find((r) => r.id === o.id);
             if (row) {
               row.status = billingOnly && nextStatus === 'preparing' ? 'Accepted' : dbStatus;
-              if (billingOnly) row.kitchenRoute = 'none';
+              if (billingOnly) {row.kitchenRoute = 'none';}
               await RS_DB.put('pending_orders', o.id, row);
               syncPendingOrders();
             }
@@ -659,11 +668,13 @@
             );
           } catch (e) {
             console.warn('Failed updating order status', e);
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Could not update Table ' + tableLabel + ' — try again', 'fa-circle-exclamation');
           }
         } else {
           o.status = nextStatus;
           renderQR();
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
           toast('Table ' + tableLabel + ' → ' + statusTxt[nextStatus]);
         }
       })
@@ -672,15 +683,17 @@
       b.addEventListener('click', () => {
         const srcIdx = +b.dataset.merge;
         const src = QR_ORDERS[srcIdx];
-        if (!src) return;
+        if (!src) {return;}
         const candidates = QR_ORDERS.map((o, idx) => ({ o, idx })).filter(
           ({ o, idx }) => idx !== srcIdx && o.status !== 'served' && o.table !== src.table
         );
         if (!candidates.length) {
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
           toast('No other open tables to merge into', 'fa-code-merge');
           return;
         }
         if (!window.RSModal) {
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
           toast('Modal module is unavailable', 'fa-circle-exclamation');
           return;
         }
@@ -705,7 +718,7 @@
             <select class="form-input" id="merge-target">${options}</select>
           </div>
         </div>`,
-          foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-code-merge"></i> Merge tables</button>`,
+          foot: '<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-code-merge"></i> Merge tables</button>',
           onMount(modal, close) {
             modal.querySelector('[data-cancel]').onclick = close;
             modal.querySelector('[data-confirm]').onclick = async () => {
@@ -740,10 +753,12 @@
                   renderQR();
                 }
                 finishOperationStatus('Tables merged');
+                try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
                 toast('Merged into Table ' + qrTableShort(target.table), 'fa-code-merge');
               } catch (e) {
                 console.warn('Failed to merge tables', e);
                 finishOperationStatus('Merge failed', 'error');
+                try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
                 toast('Could not merge tables — try again', 'fa-circle-exclamation');
               }
             };
@@ -760,14 +775,14 @@
 
   function tickQRAges() {
     const tab = document.getElementById('qr-orders-tab');
-    if (!tab || !tab.classList.contains('active')) return;
+    if (!tab || !tab.classList.contains('active')) {return;}
     $$('#qr-grid .qtime[data-qr-start]').forEach((el) => {
       const start = +el.dataset.qrStart;
-      if (!start) return;
+      if (!start) {return;}
       const mins = (Date.now() - start) / 60000;
       const m = Math.floor(mins);
       let text = 'just now';
-      if (m >= 1 && m < 60) text = m + ' min ago';
+      if (m >= 1 && m < 60) {text = m + ' min ago';}
       else if (m >= 60) {
         const hrs = Math.floor(m / 60);
         text = hrs < 24 ? hrs + 'h ' + (m % 60) + 'm ago' : Math.floor(hrs / 24) + 'd ago';
@@ -790,15 +805,15 @@
   global.RSQrOrdersUI = { renderQR, openQrOrderInPos, qrCartItems, qrTableName, qrItemLabel, qrItemTotal, tickQRAges };
   global.openQrOrderInPos = openQrOrderInPos;
   function attach() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderQR = renderQR;
     global.RS.openQrOrderInPos = openQrOrderInPos;
   }
-  if (global.RS) attach();
+  if (global.RS) {attach();}
   document.addEventListener('rs:ready', attach);
   document.addEventListener('rs:hydrated', () => {
     try {
-      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
       renderQR();
     } catch (_) {}
   });

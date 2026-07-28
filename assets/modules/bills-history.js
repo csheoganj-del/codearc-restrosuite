@@ -14,11 +14,11 @@
   };
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
 
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     const v = Number(n) || 0;
     return '₹' + v.toLocaleString('en-IN');
   }
@@ -93,7 +93,7 @@
 
   /** Load bill lines into POS cart for rebill / amend (new sale). */
   async function rebillToPos(b) {
-    if (!b) return;
+    if (!b) {return;}
     const items =
       Array.isArray(b._items) && b._items.length
         ? b._items.map((i) => ({
@@ -108,11 +108,12 @@
           }))
         : [];
     if (!items.length) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('No line items on this bill to rebill', 'fa-circle-exclamation');
       return;
     }
-    if (global.RS && typeof RS.activateTab === 'function') await RS.activateTab('pos-tab');
-    await new Promise((r) => setTimeout(r, 100));
+    if (global.RS && typeof RS.activateTab === 'function') {await RS.activateTab('pos-tab');}
+    await new Promise((r) => { setTimeout(r, 100); });
 
     // Prevent showMenuGridForTable from wiping this cart when #cart-table changes
     if (typeof global.RS_PRESERVE_CART_LOAD === 'function') {
@@ -147,7 +148,7 @@
     }
     // Apply cart after table hydrate so async showMenuGridForTable cannot clear it
     const applyCart = () => {
-      if (global.RS && typeof RS.setCart === 'function') RS.setCart(items);
+      if (global.RS && typeof RS.setCart === 'function') {RS.setCart(items);}
       if (b.tipAmount && global.RS && typeof RS.setTip === 'function') {
         try {
           RS.setTip(b.tipAmount);
@@ -161,12 +162,13 @@
         }
       }
       try {
-        if (global.RS && typeof RS.renderCart === 'function') RS.renderCart();
+        if (global.RS && typeof RS.renderCart === 'function') {RS.renderCart();}
       } catch (_) {}
     };
     applyCart();
-    await new Promise((r) => setTimeout(r, 350));
+    await new Promise((r) => { setTimeout(r, 350); });
     applyCart();
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     toast(
       'Rebill loaded · ' + (b.no || '') + (b.status === 'refunded' ? ' (voided original)' : ' — void first if correcting a paid bill'),
       'fa-rotate'
@@ -179,6 +181,7 @@
       return;
     }
     toast('Receipt preview is unavailable on this screen', 'fa-circle-exclamation');
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
   }
 
   function printBillThermal(b) {
@@ -212,6 +215,7 @@
         : `https://wa.me/?text=${encodeURIComponent(text)}`;
 
       window.open(url, '_blank', 'noopener,noreferrer');
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       toast('WhatsApp receipt ready', 'fa-whatsapp');
     }
   }
@@ -322,7 +326,7 @@
   }
 
   async function markBillRefunded(b) {
-    if (!b || b.status === 'refunded') return;
+    if (!b || b.status === 'refunded') {return;}
 
     // Shift gate only when Settings → Require open shift is ON (default OFF)
     try {
@@ -344,7 +348,7 @@
             reason:
               'Open a shift before voiding or refunding so the refund is tied to this counter’s Z-report.',
           });
-          if (!ok) return;
+          if (!ok) {return;}
         } else {
           toast(
             'Open a shift first (orange Shift button), then void / refund',
@@ -381,6 +385,7 @@
 
     const reason = await showRefundModal(b);
     if (reason === null) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('Void / refund cancelled', 'fa-circle-info');
       return;
     }
@@ -410,12 +415,12 @@
         String(x.orderId || '') === voidKey ||
         String(x.id || '') === voidKey
     );
-    if (localIdx === -1) BILLS.unshift(b);
-    else BILLS[localIdx] = Object.assign({}, BILLS[localIdx], b);
+    if (localIdx === -1) {BILLS.unshift(b);}
+    else {BILLS[localIdx] = Object.assign({}, BILLS[localIdx], b);}
 
     let cloudMarked = false;
     try {
-      if (global.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (global.RS_DB && RS_DB.writeLocal) {await RS_DB.writeLocal('bills', BILLS);}
       if (global.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
         await RS_API.data({
           table: 'doppio_refund_requests',
@@ -470,6 +475,7 @@
       console.warn('Refund cloud update failed', e);
     }
     renderBills();
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     const msg = cloudMarked
       ? 'Void recorded + audit · tap to rebill'
       : 'Void marked locally · tap to rebill';
@@ -485,11 +491,12 @@
   }
 
   async function deleteBill(b) {
-    if (!b) return;
+    if (!b) {return;}
     // Always gate with Admin PIN when modal is available (setup on first use if unset)
     if (global.RSPinModal && typeof RSPinModal.request === 'function') {
       const ok = await RSPinModal.request(`Delete Bill ${b.no || b.id || ''}`);
       if (!ok) {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('Delete cancelled — manager PIN required', 'fa-lock');
         return;
       }
@@ -509,7 +516,7 @@
         String(x.orderId || '') === billKey ||
         String(x.id || '') === billKey
     );
-    if (idx !== -1) BILLS.splice(idx, 1);
+    if (idx !== -1) {BILLS.splice(idx, 1);}
 
     // Only on DELETE — refund does NOT restore stock (food was served)
     try {
@@ -519,11 +526,11 @@
       let invChanged = false;
       bItems.forEach((it) => {
         const menuItem = MENU.find((m) => m.name === it.name);
-        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+        if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) {return;}
         const orderedQty = Number(it.qty) || 1;
         menuItem.ingredients.forEach((ing) => {
           const invItem = INVENTORY.find((x) => x.name === ing.name);
-          if (!invItem) return;
+          if (!invItem) {return;}
           invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
           invChanged = true;
         });
@@ -536,7 +543,7 @@
     }
 
     try {
-      if (global.RS_DB && RS_DB.writeLocal) await RS_DB.writeLocal('bills', BILLS);
+      if (global.RS_DB && RS_DB.writeLocal) {await RS_DB.writeLocal('bills', BILLS);}
       // CRITICAL: filters must be an array of {operator,column,value}.
       // Object filters become [] server-side and would delete ALL tenant bills.
       if (global.RS_API && RS_API.data && RS_API.session && RS_API.session()) {
@@ -567,6 +574,7 @@
       console.warn('Bill delete sync failed', e);
     }
     renderBills();
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     toast(`Bill ${b.no || b.id || ''} deleted -- inventory restored`, 'fa-trash');
   }
 
@@ -578,7 +586,7 @@
   let billsCustomTo = '';
   try {
     const saved = localStorage.getItem('rs_bills_date_range');
-    if (saved && /^(today|yesterday|7d|all|custom)$/.test(saved)) billsDateRange = saved;
+    if (saved && /^(today|yesterday|7d|all|custom)$/.test(saved)) {billsDateRange = saved;}
     billsCustomFrom = localStorage.getItem('rs_bills_date_from') || '';
     billsCustomTo = localStorage.getItem('rs_bills_date_to') || '';
   } catch (_) {}
@@ -592,9 +600,9 @@
   /** Parse bill timestamp from ISO or common POS display strings. */
   function parseBillDate(b) {
     const raw = b && (b.dateTime || b.time || b.created_at || b.createdAt || '');
-    if (!raw) return null;
+    if (!raw) {return null;}
     let d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return d;
+    if (!Number.isNaN(d.getTime())) {return d;}
     const s = String(raw).trim();
     // "13 Jul, 11:18 am" / "13 Jul 2026, 11:18 am"
     const m = s.match(
@@ -611,10 +619,10 @@
         let hour = m[4] != null ? Number(m[4]) : 12;
         const min = m[5] != null ? Number(m[5]) : 0;
         const ap = (m[6] || '').toLowerCase();
-        if (ap === 'pm' && hour < 12) hour += 12;
-        if (ap === 'am' && hour === 12) hour = 0;
+        if (ap === 'pm' && hour < 12) {hour += 12;}
+        if (ap === 'am' && hour === 12) {hour = 0;}
         d = new Date(year, mon, Number(m[1]), hour, min, 0, 0);
-        if (!Number.isNaN(d.getTime())) return d;
+        if (!Number.isNaN(d.getTime())) {return d;}
       }
     }
     return null;
@@ -622,7 +630,7 @@
 
   function billInDateRange(b) {
     const range = billsDateRange || 'today';
-    if (range === 'all') return true;
+    if (range === 'all') {return true;}
     const d = parseBillDate(b);
     if (!d) {
       // Unparseable timestamps only show in All (avoids polluting Today stats)
@@ -631,19 +639,19 @@
     const t = d.getTime();
     const today0 = startOfLocalDay(new Date()).getTime();
     const dayMs = 86400000;
-    if (range === 'today') return t >= today0 && t < today0 + dayMs;
-    if (range === 'yesterday') return t >= today0 - dayMs && t < today0;
-    if (range === '7d') return t >= today0 - 6 * dayMs && t < today0 + dayMs;
+    if (range === 'today') {return t >= today0 && t < today0 + dayMs;}
+    if (range === 'yesterday') {return t >= today0 - dayMs && t < today0;}
+    if (range === '7d') {return t >= today0 - 6 * dayMs && t < today0 + dayMs;}
     if (range === 'custom') {
       let from = -Infinity;
       let to = Infinity;
       if (billsCustomFrom) {
         const f = new Date(billsCustomFrom + 'T00:00:00');
-        if (!Number.isNaN(f.getTime())) from = startOfLocalDay(f).getTime();
+        if (!Number.isNaN(f.getTime())) {from = startOfLocalDay(f).getTime();}
       }
       if (billsCustomTo) {
         const e = new Date(billsCustomTo + 'T00:00:00');
-        if (!Number.isNaN(e.getTime())) to = startOfLocalDay(e).getTime() + dayMs;
+        if (!Number.isNaN(e.getTime())) {to = startOfLocalDay(e).getTime() + dayMs;}
       }
       return t >= from && t < to;
     }
@@ -707,11 +715,11 @@
 
   /** Map cloud doppio_bills row → local bill shape used by the table. */
   function normalizeServerBill(row) {
-    if (!row || typeof row !== 'object') return null;
+    if (!row || typeof row !== 'object') {return null;}
     const items = row.items;
     let itemCount = row.items;
-    if (Array.isArray(items)) itemCount = items.length;
-    else if (typeof items === 'object' && items) itemCount = Object.keys(items).length;
+    if (Array.isArray(items)) {itemCount = items.length;}
+    else if (typeof items === 'object' && items) {itemCount = Object.keys(items).length;}
     return {
       id: row.id,
       no: row.orderId || row.order_id || row.no || String(row.id || ''),
@@ -743,14 +751,14 @@
    */
   async function searchBillsServer(q, limit) {
     const needle = String(q || '').trim();
-    if (needle.length < 2) return null;
-    if (!global.RS_API || typeof RS_API.data !== 'function') return null;
-    if (global.RS_API.zeroCostLaunchMode) return null;
-    if (navigator.onLine === false) return null;
+    if (needle.length < 2) {return null;}
+    if (!global.RS_API || typeof RS_API.data !== 'function') {return null;}
+    if (global.RS_API.zeroCostLaunchMode) {return null;}
+    if (navigator.onLine === false) {return null;}
     try {
       const res = await Promise.race([
         RS_API.data({ operation: 'search_bills', q: needle, limit: limit || 50 }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('search_bills timeout')), 5000)),
+        new Promise((_, rej) => { setTimeout(() => rej(new Error('search_bills timeout')), 5000); }),
       ]);
       const rows =
         (res && res.data && Array.isArray(res.data.rows) && res.data.rows) ||
@@ -768,12 +776,12 @@
     const map = new Map();
     (localFiltered || []).forEach((b) => {
       const key = String(b.no || b.orderId || b.id || '');
-      if (key) map.set(key, b);
+      if (key) {map.set(key, b);}
     });
     const serverFiltered = filterBills(serverRows || [], q, payFilter, statusFilter);
     serverFiltered.forEach((b) => {
       const key = String(b.no || b.orderId || b.id || '');
-      if (key && !map.has(key)) map.set(key, b);
+      if (key && !map.has(key)) {map.set(key, b);}
     });
     return Array.from(map.values());
   }
@@ -781,7 +789,7 @@
   /** Human + Excel-friendly bill timestamp */
   function formatBillTime(b) {
     const raw = b && (b.dateTime || b.time || b.created_at || '');
-    if (!raw) return '';
+    if (!raw) {return '';}
     const d = new Date(raw);
     if (!Number.isNaN(d.getTime())) {
       try {
@@ -808,9 +816,9 @@
 
   function formatBillTimeIsoExcel(b) {
     const raw = b && (b.dateTime || b.time || b.created_at || '');
-    if (!raw) return '';
+    if (!raw) {return '';}
     const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return String(raw);
+    if (Number.isNaN(d.getTime())) {return String(raw);}
     const pad = (n) => String(n).padStart(2, '0');
     // Local wall time yyyy-mm-dd HH:mm:ss — Excel-friendly
     return (
@@ -839,13 +847,13 @@
         })
         .join('; ');
     }
-    if (b.items != null && b.items !== '') return String(b.items);
+    if (b.items != null && b.items !== '') {return String(b.items);}
     return '';
   }
 
   function csvEscape(value) {
     const s = value == null ? '' : String(value);
-    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    if (/[",\n\r]/.test(s)) {return '"' + s.replace(/"/g, '""') + '"';}
     return s;
   }
 
@@ -879,7 +887,7 @@
   function exportOutletSlug() {
     const settings = global.RS_SETTINGS || {};
     const sess = global.RS_API && RS_API.session ? RS_API.session() : null;
-    let name =
+    const name =
       settings.set_restaurant_name ||
       settings.set_outlet_name ||
       (sess && (sess.tenant_name || sess.business_name)) ||
@@ -900,7 +908,7 @@
   }
 
   function numOrBlank(v) {
-    if (v == null || v === '') return '';
+    if (v == null || v === '') {return '';}
     const n = Number(v);
     return Number.isFinite(n) ? n : '';
   }
@@ -908,7 +916,7 @@
   function paymentBreakdown(list) {
     const map = {};
     (list || []).forEach((b) => {
-      if (String(b.status || '').toLowerCase() === 'refunded') return;
+      if (String(b.status || '').toLowerCase() === 'refunded') {return;}
       if (Array.isArray(b.tenders) && b.tenders.length) {
         b.tenders.forEach((t) => {
           const method = t.method || b.pay || 'Cash';
@@ -968,7 +976,7 @@
     Object.keys(payMap)
       .sort()
       .forEach((k) => summaryRows.push([k, payMap[k]]));
-    if (!Object.keys(payMap).length) summaryRows.push(['—', 0]);
+    if (!Object.keys(payMap).length) {summaryRows.push(['—', 0]);}
     summaryRows.push([]);
     summaryRows.push(['Notes']);
     summaryRows.push(['Stats match the active Bills date range and filters.']);
@@ -1102,6 +1110,7 @@
       ]);
       const fname = outlet + '-Bills-' + rangeLabel + '-' + exportStamp() + '.xlsx';
       RSXlsxLite.downloadXlsx(bytes, fname);
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       toast(
         'Exported ' + list.length + ' bills · ' + rangeLabel.replace(/_/g, ' ') + ' · Excel',
         'fa-file-excel'
@@ -1128,12 +1137,12 @@
         unit: 'bills',
       });
     try {
-      if (prog) prog.setIndeterminate('Preparing rows…');
+      if (prog) {prog.setIndeterminate('Preparing rows…');}
       const result = _exportBillsCsvInner(prog);
-      if (prog) prog.close();
+      if (prog) {prog.close();}
       return result;
     } catch (e) {
-      if (prog) prog.close();
+      if (prog) {prog.close();}
       throw e;
     }
   }
@@ -1143,7 +1152,7 @@
       toast('No bills to export for this range', 'fa-circle-exclamation');
       return false;
     }
-    if (prog) prog.update({ total: list.length, done: 0, unit: 'bills', label: 'Writing rows…' });
+    if (prog) {prog.update({ total: list.length, done: 0, unit: 'bills', label: 'Writing rows…' });}
 
     const settings = global.RS_SETTINGS || {};
     const taxLabel = settings.set_tax_label || 'GST';
@@ -1180,7 +1189,7 @@
           : b.items != null
             ? b.items
             : '';
-      if (prog && (idx % 25 === 0 || idx === list.length - 1)) prog.update({ done: idx + 1 });
+      if (prog && (idx % 25 === 0 || idx === list.length - 1)) {prog.update({ done: idx + 1 });}
       return [
         b.no || b.orderId || b.id || '',
         formatBillTimeIsoExcel(b),
@@ -1240,6 +1249,7 @@
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
         exportBillsXlsx();
       });
     }
@@ -1288,7 +1298,7 @@
   }
 
   function formatShortDate(d) {
-    if (!d || Number.isNaN(d.getTime())) return '—';
+    if (!d || Number.isNaN(d.getTime())) {return '—';}
     try {
       return d.toLocaleDateString('en-IN', {
         day: '2-digit',
@@ -1305,9 +1315,9 @@
     let max = null;
     (list || []).forEach((b) => {
       const d = parseBillDate(b);
-      if (!d) return;
-      if (!min || d < min) min = d;
-      if (!max || d > max) max = d;
+      if (!d) {return;}
+      if (!min || d < min) {min = d;}
+      if (!max || d > max) {max = d;}
     });
     if (min && max) {
       const a = formatShortDate(min);
@@ -1339,7 +1349,7 @@
       settings.set_outlet_name ||
       (sess && (sess.tenant_name || sess.business_name)) ||
       'RestroSuite Outlet';
-    if (!outletName || /outlet name/i.test(outletName)) outletName = 'RestroSuite Outlet';
+    if (!outletName || /outlet name/i.test(outletName)) {outletName = 'RestroSuite Outlet';}
 
     const taxLabel = settings.set_tax_label || 'GST';
     const taxPct =
@@ -1610,6 +1620,7 @@
       };
       // Wait for layout
       setTimeout(trigger, 250);
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       toast('Opening sales report · ' + rangeLabel, 'fa-print');
       return true;
     } catch (e) {
@@ -1621,7 +1632,7 @@
 
   function wirePrintReportButton() {
     const btn = document.getElementById('btn-print-day-report');
-    if (!btn || btn.dataset.rsPrintBound === '1') return;
+    if (!btn || btn.dataset.rsPrintBound === '1') {return;}
     btn.dataset.rsPrintBound = '1';
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1633,7 +1644,7 @@
   /** Filter button focuses the inline Payment / Status selects (no dead control). */
   function wireFilterButton() {
     const btn = document.getElementById('btn-bills-filter');
-    if (!btn || btn.dataset.rsFilterBound === '1') return;
+    if (!btn || btn.dataset.rsFilterBound === '1') {return;}
     btn.dataset.rsFilterBound = '1';
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1645,7 +1656,7 @@
         bar.setAttribute('aria-hidden', 'false');
       }
       [pay, status].forEach((el) => {
-        if (!el) return;
+        if (!el) {return;}
         el.classList.add('bills-filter-flash');
         setTimeout(() => el.classList.remove('bills-filter-flash'), 1600);
       });
@@ -1660,28 +1671,28 @@
 
   function statusPillHtml(b) {
     const st = String((b && b.status) || '').toLowerCase();
-    if (st === 'paid') return '<span class="pill pill-green" style="padding:3px 9px">Paid</span>';
+    if (st === 'paid') {return '<span class="pill pill-green" style="padding:3px 9px">Paid</span>';}
     if (st === 'refunded' || st === 'voided' || st === 'void')
-      return '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>';
+      {return '<span class="pill pill-red" style="padding:3px 9px">Refunded</span>';}
     return `<span class="pill" style="padding:3px 9px">${_e(b.status || '—')}</span>`;
   }
 
   function closeAllBillMoreMenus(except) {
     document.querySelectorAll('.bills-more-menu').forEach((menu) => {
-      if (except && menu === except) return;
+      if (except && menu === except) {return;}
       menu.hidden = true;
     });
     document.querySelectorAll('.bills-more.is-open').forEach((wrap) => {
-      if (except && wrap.contains(except)) return;
+      if (except && wrap.contains(except)) {return;}
       wrap.classList.remove('is-open');
     });
   }
 
   function paintBillsTable(filtered) {
     const body = $('#bills-table-body');
-    if (!body) return;
+    if (!body) {return;}
     try {
-      if (window.RSSkel && RSSkel.clear) RSSkel.clear(body);
+      if (window.RSSkel && RSSkel.clear) {RSSkel.clear(body);}
     } catch (_) {}
 
     if (!filtered.length) {
@@ -1718,7 +1729,7 @@
           ? `<div class="bc-name">${_e(cust)}</div>${phone ? `<div class="bc-phone">${_e(phone)}</div>` : ''}`
           : phone
             ? `<div class="bc-phone">${_e(phone)}</div>`
-            : `<span class="bc-empty">—</span>`;
+            : '<span class="bc-empty">—</span>';
         const refunded = String(b.status || '').toLowerCase() === 'refunded';
         return `
       <tr data-bill-no="${_e(b.no || b.orderId || b.id || '')}">
@@ -1750,7 +1761,7 @@
       .join('');
 
     const visibleBills = filtered;
-    if (body._rsBillActionHandler) body.removeEventListener('click', body._rsBillActionHandler, true);
+    if (body._rsBillActionHandler) {body.removeEventListener('click', body._rsBillActionHandler, true);}
     body._rsBillActionHandler = (e) => {
       const moreBtn = e.target.closest('.more-act');
       if (moreBtn && body.contains(moreBtn)) {
@@ -1758,7 +1769,7 @@
         e.stopPropagation();
         const wrap = moreBtn.closest('.bills-more');
         const menu = wrap && wrap.querySelector('.bills-more-menu');
-        if (!menu) return;
+        if (!menu) {return;}
         const open = menu.hidden;
         closeAllBillMoreMenus();
         if (open) {
@@ -1771,25 +1782,25 @@
 
       const menuItem = e.target.closest('.bills-more-item');
       const btn = menuItem || e.target.closest('.icon-act');
-      if (!btn || !body.contains(btn) || btn.disabled) return;
-      if (btn.classList.contains('more-act')) return;
+      if (!btn || !body.contains(btn) || btn.disabled) {return;}
+      if (btn.classList.contains('more-act')) {return;}
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       const row = btn.closest('tr');
       const bill = visibleBills[[...body.querySelectorAll('tr')].indexOf(row)];
-      if (!bill) return;
+      if (!bill) {return;}
       const live = getBills().find(
         (x) => x === bill || String(x.no || x.orderId) === String(bill.no || bill.orderId)
       );
       const target = live || bill;
       closeAllBillMoreMenus();
-      if (btn.classList.contains('go')) return showBillReceipt(target);
-      if (btn.classList.contains('thermal-act')) return printBillThermal(target);
-      if (btn.classList.contains('rebill-act')) return rebillToPos(target);
-      if (btn.classList.contains('refund-act')) return markBillRefunded(target);
-      if (btn.classList.contains('del-act')) return deleteBill(target);
-      if (btn.classList.contains('wa-act')) return shareBillReceipt(target);
+      if (btn.classList.contains('go')) {return showBillReceipt(target);}
+      if (btn.classList.contains('thermal-act')) {return printBillThermal(target);}
+      if (btn.classList.contains('rebill-act')) {return rebillToPos(target);}
+      if (btn.classList.contains('refund-act')) {return markBillRefunded(target);}
+      if (btn.classList.contains('del-act')) {return deleteBill(target);}
+      if (btn.classList.contains('wa-act')) {return shareBillReceipt(target);}
       return shareBillReceipt(target);
     };
     body.addEventListener('click', body._rsBillActionHandler, true);
@@ -1797,7 +1808,7 @@
     if (!document._rsBillsMoreDocBound) {
       document._rsBillsMoreDocBound = true;
       document.addEventListener('click', (ev) => {
-        if (!ev.target.closest('.bills-more')) closeAllBillMoreMenus();
+        if (!ev.target.closest('.bills-more')) {closeAllBillMoreMenus();}
       });
     }
     // Notify mobile card layer (product-10x) without thrashing on unrelated DOM
@@ -1833,19 +1844,19 @@
     const labels = dateRangeLabels();
 
     const salesEl = document.getElementById('bills-stat-sales');
-    if (salesEl) salesEl.textContent = rs(totalSales);
+    if (salesEl) {salesEl.textContent = rs(totalSales);}
     const countEl = document.getElementById('bills-stat-count');
-    if (countEl) countEl.textContent = countInRange;
+    if (countEl) {countEl.textContent = countInRange;}
     const aovEl = document.getElementById('bills-stat-aov');
-    if (aovEl) aovEl.textContent = rs(aov);
+    if (aovEl) {aovEl.textContent = rs(aov);}
     const refundsEl = document.getElementById('bills-stat-refunds');
-    if (refundsEl) refundsEl.textContent = refunds;
+    if (refundsEl) {refundsEl.textContent = refunds;}
     const salesLbl = document.getElementById('bills-stat-sales-label');
-    if (salesLbl) salesLbl.textContent = labels.sales;
+    if (salesLbl) {salesLbl.textContent = labels.sales;}
     const countLbl = document.getElementById('bills-stat-count-label');
-    if (countLbl) countLbl.textContent = labels.count;
+    if (countLbl) {countLbl.textContent = labels.count;}
     const refundsLbl = document.getElementById('bills-stat-refunds-label');
-    if (refundsLbl) refundsLbl.textContent = labels.refunds;
+    if (refundsLbl) {refundsLbl.textContent = labels.refunds;}
 
     syncDateChipsUi();
 
@@ -1873,15 +1884,15 @@
     const gen = ++_searchGen;
     if (String(q || '').trim().length >= 2) {
       searchBillsServer(q, 50).then((rows) => {
-        if (gen !== _searchGen) return;
-        if (!rows) return;
+        if (gen !== _searchGen) {return;}
+        if (!rows) {return;}
         _serverHits = rows;
         const list = getBills();
         rows.forEach((r) => {
           const key = String(r.no || r.orderId || '');
-          if (!key) return;
+          if (!key) {return;}
           const idx = list.findIndex((b) => String(b.no || b.orderId) === key);
-          if (idx === -1) list.push(r);
+          if (idx === -1) {list.push(r);}
         });
         const q2 = ($('#bills-search')?.value || '').toLowerCase();
         const pf2 = $('#bills-pay-filter')?.value || 'All';
@@ -1902,11 +1913,11 @@
       });
     }
     const custom = document.getElementById('bills-custom-range');
-    if (custom) custom.hidden = billsDateRange !== 'custom';
+    if (custom) {custom.hidden = billsDateRange !== 'custom';}
     const from = document.getElementById('bills-date-from');
     const to = document.getElementById('bills-date-to');
-    if (from && billsCustomFrom) from.value = billsCustomFrom;
-    if (to && billsCustomTo) to.value = billsCustomTo;
+    if (from && billsCustomFrom) {from.value = billsCustomFrom;}
+    if (to && billsCustomTo) {to.value = billsCustomTo;}
   }
 
   function wireDateChips() {
@@ -1915,7 +1926,7 @@
       chips.dataset.rsBound = '1';
       chips.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-range]');
-        if (!btn || !chips.contains(btn)) return;
+        if (!btn || !chips.contains(btn)) {return;}
         billsDateRange = btn.getAttribute('data-range') || 'today';
         try {
           localStorage.setItem('rs_bills_date_range', billsDateRange);
@@ -2048,19 +2059,19 @@
 
   // Attach thin helpers on RS when ready
   function attachToRS() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderBills = renderBills;
     global.RS.receiptPayloadFromBill = receiptPayloadFromBill;
     global.RS.exportBillsCsv = exportBillsCsv;
     global.RS.exportBillsXlsx = exportBillsXlsx;
     global.RS.printSalesReport = printSalesReport;
   }
-  if (global.RS) attachToRS();
+  if (global.RS) {attachToRS();}
   document.addEventListener('rs:ready', attachToRS);
   // After first data hydrate: replace skeleton with real bills (or true empty)
   document.addEventListener('rs:hydrated', () => {
     try {
-      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
       renderBills();
     } catch (_) {}
   });

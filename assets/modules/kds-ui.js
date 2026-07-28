@@ -5,7 +5,7 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -30,7 +30,7 @@
     }
   }
   function activateTab(id) {
-    if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
+    if (global.RS && typeof RS.activateTab === 'function') {return RS.activateTab(id);}
   }
 
   let activeStation = 'all';
@@ -42,28 +42,28 @@
   };
 
   function itemMatchesStation(it, station) {
-    if (!station || station === 'all') return true;
+    if (!station || station === 'all') {return true;}
     const keys = STATION_KEYWORDS[station] || [];
     const name = String((Array.isArray(it) ? it[1] : it && it.name) || '').toLowerCase();
     const note = String((Array.isArray(it) ? it[2] : it && (it.notes || it.note)) || '').toLowerCase();
     const cat = String((!Array.isArray(it) && it && (it.cat || it.category || it.station)) || '').toLowerCase();
     const hay = name + ' ' + note + ' ' + cat;
-    if (cat && cat.includes(station)) return true;
+    if (cat && cat.includes(station)) {return true;}
     return keys.some((k) => hay.includes(k));
   }
 
   function orderMatchesStation(o, station) {
-    if (!station || station === 'all') return true;
+    if (!station || station === 'all') {return true;}
     const items = o.items || [];
-    if (!items.length) return true;
+    if (!items.length) {return true;}
     return items.some((it) => itemMatchesStation(it, station));
   }
 
   function wireStationSeg() {
     const tab = document.getElementById('kds-tab');
-    if (!tab) return;
+    if (!tab) {return;}
     const seg = tab.querySelector('.toolbar-row .seg');
-    if (!seg || seg.dataset.kdsStationBound === '1') return;
+    if (!seg || seg.dataset.kdsStationBound === '1') {return;}
     seg.dataset.kdsStationBound = '1';
     const buttons = Array.from(seg.querySelectorAll('button'));
     const map = ['all', 'tandoor', 'curry', 'beverages'];
@@ -72,6 +72,7 @@
       btn.addEventListener('click', () => {
         buttons.forEach((b) => b.classList.toggle('active', b === btn));
         activeStation = btn.dataset.station || 'all';
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
         try {
           renderKDS();
         } catch (e) {}
@@ -110,15 +111,15 @@
   function bindEmptyActions(grid) {
     const pos = grid.querySelector('[data-kds-goto-pos]');
     if (pos)
-      pos.onclick = () => {
+      {pos.onclick = () => {
         activateTab('pos-tab');
-      };
+      };}
     const ref = grid.querySelector('[data-kds-refresh]');
     if (ref)
-      ref.onclick = () => {
+      {ref.onclick = () => {
         syncPendingOrders({ forceCloud: true });
         toast('Refreshing kitchen…', 'fa-rotate');
-      };
+      };}
   }
 
   function renderKDS() {
@@ -160,7 +161,7 @@
     });
 
     const grid = $('#kds-grid');
-    if (!grid) return;
+    if (!grid) {return;}
 
     const _ksEl = document.getElementById('kds-search');
     if (_ksEl && !_ksEl.dataset.bound) {
@@ -200,14 +201,14 @@
         }
       } catch (_) {}
       try {
-        if (window.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+        if (window.RSSkel && RSSkel.clear) {RSSkel.clear(grid);}
       } catch (_) {}
       grid.innerHTML = emptyKdsHtml('empty');
       bindEmptyActions(grid);
       return;
     }
     try {
-      if (window.RSSkel && RSSkel.clear) RSSkel.clear(grid);
+      if (window.RSSkel && RSSkel.clear) {RSSkel.clear(grid);}
     } catch (_) {}
 
     // Oldest first (kitchen priority)
@@ -288,7 +289,7 @@
               row.skipKdsAlarm = true;
               await RS_DB.put('pending_orders', item.id, row);
               try {
-                if (window.RSLanSync && typeof RSLanSync.pushRow === 'function') RSLanSync.pushRow(row);
+                if (window.RSLanSync && typeof RSLanSync.pushRow === 'function') {RSLanSync.pushRow(row);}
               } catch (_) {}
               syncPendingOrders();
             }
@@ -299,9 +300,10 @@
         } else if (item && global.RS && Array.isArray(RS.KDS)) {
           // Local-only: drop ticket from board
           const idx = RS.KDS.indexOf(item);
-          if (idx >= 0) RS.KDS.splice(idx, 1);
+          if (idx >= 0) {RS.KDS.splice(idx, 1);}
         }
         if (failed) {
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
           toast('Could not mark order ready — try again', 'fa-circle-exclamation');
           return;
         }
@@ -320,6 +322,7 @@
             }
           }, 400);
         }
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast('Order ' + (item ? item.tok : '') + ' ready', 'fa-bell');
         // Settings → Order ready alerts (default OFF)
         try {
@@ -356,16 +359,16 @@
     $$('#kds-grid [data-eta]').forEach((b) =>
       b.addEventListener('click', async () => {
         const item = KDS[+b.dataset.eta];
-        if (!item) return;
+        if (!item) {return;}
         let mins = b.dataset.mins;
         if (mins === 'custom') {
           const v = prompt('Prep time in minutes?', item.prepMinutes || '15');
-          if (v == null) return;
+          if (v == null) {return;}
           mins = parseInt(v, 10);
         } else {
           mins = parseInt(mins, 10);
         }
-        if (!Number.isFinite(mins) || mins <= 0) return;
+        if (!Number.isFinite(mins) || mins <= 0) {return;}
         item.prepMinutes = mins;
         item.prepStartedAt = new Date().toISOString();
         if (item.id && window.RS_DB) {
@@ -375,12 +378,13 @@
             if (row) {
               row.prepMinutes = mins;
               row.prepStartedAt = item.prepStartedAt;
-              if (row.status === 'Pending Review' || row.status === 'Accepted') row.status = 'preparing';
+              if (row.status === 'Pending Review' || row.status === 'Accepted') {row.status = 'preparing';}
               await RS_DB.put('pending_orders', item.id, row);
-              if (typeof syncPendingOrders === 'function') syncPendingOrders();
+              if (typeof syncPendingOrders === 'function') {syncPendingOrders();}
             }
           } catch (e) {
             console.warn('set ETA failed', e);
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Could not set prep time', 'fa-circle-exclamation');
             return;
           }
@@ -411,20 +415,20 @@
     global.__rsKdsTickBound = true;
     setInterval(() => {
       const tab = document.getElementById('kds-tab');
-      if (tab && tab.classList.contains('active')) tickKDS();
+      if (tab && tab.classList.contains('active')) {tickKDS();}
     }, 1000);
   }
 
   global.RSKdsUI = { renderKDS, tickKDS };
   function attach() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderKDS = renderKDS;
   }
-  if (global.RS) attach();
+  if (global.RS) {attach();}
   document.addEventListener('rs:ready', attach);
   document.addEventListener('rs:hydrated', () => {
     try {
-      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
       renderKDS();
     } catch (_) {}
   });

@@ -4,7 +4,7 @@
 (function (global) {
   'use strict';
 
-  var SERVE_UNITS = [
+  const SERVE_UNITS = [
     { id: 'plate', label: 'Plate' },
     { id: 'bowl', label: 'Bowl' },
     { id: 'glass', label: 'Glass / cup' },
@@ -15,39 +15,39 @@
   ];
 
   /** Canonical stock / recipe units (display labels). */
-  var STOCK_UNITS = ['kg', 'gm', 'ltr', 'ml'];
+  const STOCK_UNITS = ['kg', 'gm', 'ltr', 'ml'];
 
   /**
    * Normalize to internal keys for math: kg | g | l | ml
    * Accepts aliases: gm/g, ltr/L/litre, etc.
    */
   function normUnit(u) {
-    var s = String(u == null ? '' : u)
+    const s = String(u == null ? '' : u)
       .trim()
       .toLowerCase()
       .replace(/\./g, '');
-    if (!s) return 'kg';
+    if (!s) {return 'kg';}
     if (s === 'l' || s === 'ltr' || s === 'lt' || s === 'liter' || s === 'litre' || s === 'liters' || s === 'litres')
-      return 'l';
+      {return 'l';}
     if (s === 'ml' || s === 'milliliter' || s === 'millilitre' || s === 'milliliters' || s === 'millilitres')
-      return 'ml';
-    if (s === 'kg' || s === 'kgs' || s === 'kilogram' || s === 'kilograms') return 'kg';
-    if (s === 'g' || s === 'gm' || s === 'gms' || s === 'gram' || s === 'grams') return 'g';
+      {return 'ml';}
+    if (s === 'kg' || s === 'kgs' || s === 'kilogram' || s === 'kilograms') {return 'kg';}
+    if (s === 'g' || s === 'gm' || s === 'gms' || s === 'gram' || s === 'grams') {return 'g';}
     // legacy count units — no mass/volume conversion
     if (s === 'pc' || s === 'pcs' || s === 'piece' || s === 'pieces' || s === 'unit' || s === 'pack' || s === 'box')
-      return s === 'pc' || s === 'piece' || s === 'pieces' ? 'pcs' : s;
+      {return s === 'pc' || s === 'piece' || s === 'pieces' ? 'pcs' : s;}
     return s;
   }
 
   /** Display label: always kg | gm | ltr | ml when possible */
   function displayUnit(u) {
-    var n = normUnit(u);
-    if (n === 'kg') return 'kg';
-    if (n === 'g') return 'gm';
-    if (n === 'l') return 'ltr';
-    if (n === 'ml') return 'ml';
+    const n = normUnit(u);
+    if (n === 'kg') {return 'kg';}
+    if (n === 'g') {return 'gm';}
+    if (n === 'l') {return 'ltr';}
+    if (n === 'ml') {return 'ml';}
     // legacy leftover
-    if (n === 'pcs' || n === 'pack' || n === 'box' || n === 'unit') return n;
+    if (n === 'pcs' || n === 'pack' || n === 'box' || n === 'unit') {return n;}
     return String(u || 'kg');
   }
 
@@ -57,19 +57,19 @@
    * Supports kg ↔ gm and ltr ↔ ml.
    */
   function convertQty(qty, fromUnit, toUnit) {
-    var q = Number(qty);
-    if (!isFinite(q)) return null;
-    var f = normUnit(fromUnit);
-    var t = normUnit(toUnit);
-    if (f === t) return q;
+    const q = Number(qty);
+    if (!isFinite(q)) {return null;}
+    const f = normUnit(fromUnit);
+    const t = normUnit(toUnit);
+    if (f === t) {return q;}
 
     // mass → kg base (gm stored as g)
-    var mass = { kg: 1, g: 0.001 };
+    const mass = { kg: 1, g: 0.001 };
     if (mass[f] != null && mass[t] != null) {
       return (q * mass[f]) / mass[t];
     }
     // volume → ltr base (ltr stored as l)
-    var vol = { l: 1, ml: 0.001 };
+    const vol = { l: 1, ml: 0.001 };
     if (vol[f] != null && vol[t] != null) {
       return (q * vol[f]) / vol[t];
     }
@@ -77,8 +77,8 @@
   }
 
   function unitSelectHtml(selected, id, attrs) {
-    var cur = displayUnit(selected || 'kg');
-    var opts = STOCK_UNITS.map(function (u) {
+    const cur = displayUnit(selected || 'kg');
+    let opts = STOCK_UNITS.map(function (u) {
       return (
         '<option value="' +
         u +
@@ -110,18 +110,18 @@
   }
 
   function recipeServingsOf(m) {
-    var n = Number(m && (m.recipeServings != null ? m.recipeServings : m.servings));
-    if (!isFinite(n) || n <= 0) n = 1;
+    let n = Number(m && (m.recipeServings != null ? m.recipeServings : m.servings));
+    if (!isFinite(n) || n <= 0) {n = 1;}
     return n;
   }
 
   function serveUnitOf(m) {
-    var u = (m && (m.serveUnit || m.serve_unit || m.unit)) || 'plate';
+    const u = (m && (m.serveUnit || m.serve_unit || m.unit)) || 'plate';
     return String(u).trim() || 'plate';
   }
 
   function serveUnitLabel(id) {
-    var hit = SERVE_UNITS.find(function (x) {
+    const hit = SERVE_UNITS.find(function (x) {
       return x.id === String(id || '').toLowerCase();
     });
     return hit ? hit.label : id || 'plate';
@@ -132,18 +132,18 @@
    * soldQty (cart) × optional line servings ÷ recipeServings (what the recipe was written for).
    */
   function sellFactor(menuItem, soldQty, lineServings) {
-    var base = recipeServingsOf(menuItem);
-    var sold = Number(soldQty);
-    if (!isFinite(sold) || sold <= 0) sold = 1;
-    var ls = Number(lineServings);
-    if (!isFinite(ls) || ls <= 0) ls = 1;
+    const base = recipeServingsOf(menuItem);
+    let sold = Number(soldQty);
+    if (!isFinite(sold) || sold <= 0) {sold = 1;}
+    let ls = Number(lineServings);
+    if (!isFinite(ls) || ls <= 0) {ls = 1;}
     return (sold * ls) / base;
   }
 
   function findInventory(ing, inventory) {
-    var list = inventory || (global.RS && RS.INVENTORY) || [];
-    var name = String((ing && (ing.name || ing.key)) || '').toLowerCase();
-    var key = String((ing && (ing.key || ing.name)) || '')
+    const list = inventory || (global.RS && RS.INVENTORY) || [];
+    const name = String((ing && (ing.name || ing.key)) || '').toLowerCase();
+    const key = String((ing && (ing.key || ing.name)) || '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
       .replace(/^_|_$/g, '');
@@ -163,30 +163,30 @@
    * Converts recipe unit → inventory unit when possible (g↔kg, ml↔L).
    */
   function deductQtyForIngredient(ing, menuItem, soldQty, lineServings, inventory) {
-    var factor = sellFactor(menuItem, soldQty, lineServings);
-    var raw = (Number(ing && ing.qty) || 0) * factor;
-    if (raw <= 0) return 0;
-    var inv = findInventory(ing, inventory);
-    var recipeUnit = (ing && ing.unit) || 'unit';
-    var invUnit = (inv && inv.unit) || recipeUnit;
-    var converted = convertQty(raw, recipeUnit, invUnit);
-    if (converted != null && isFinite(converted)) return converted;
+    const factor = sellFactor(menuItem, soldQty, lineServings);
+    const raw = (Number(ing && ing.qty) || 0) * factor;
+    if (raw <= 0) {return 0;}
+    const inv = findInventory(ing, inventory);
+    const recipeUnit = (ing && ing.unit) || 'unit';
+    const invUnit = (inv && inv.unit) || recipeUnit;
+    const converted = convertQty(raw, recipeUnit, invUnit);
+    if (converted != null && isFinite(converted)) {return converted;}
     return raw;
   }
 
   /** Plate cost for ONE customer order (1 × serve unit), not the full recipe batch. */
   function plateCost(menuItem, inventory) {
-    var ings = (menuItem && menuItem.ingredients) || [];
-    var base = recipeServingsOf(menuItem);
-    var sum = 0;
+    const ings = (menuItem && menuItem.ingredients) || [];
+    const base = recipeServingsOf(menuItem);
+    let sum = 0;
     ings.forEach(function (g) {
-      var inv = findInventory(g, inventory);
-      var unitCost = inv ? Number(inv.cost) || 0 : 0;
+      const inv = findInventory(g, inventory);
+      const unitCost = inv ? Number(inv.cost) || 0 : 0;
       // cost is per inventory unit; convert recipe qty to inv unit for costing
-      var q = Number(g.qty) || 0;
+      let q = Number(g.qty) || 0;
       if (inv && inv.unit) {
-        var c = convertQty(q, g.unit || inv.unit, inv.unit);
-        if (c != null) q = c;
+        const c = convertQty(q, g.unit || inv.unit, inv.unit);
+        if (c != null) {q = c;}
       }
       sum += q * unitCost;
     });
@@ -198,13 +198,13 @@
    * Returns { lines: [{key,name,qty,unit}], noRecipeCount }
    */
   function buildDeductLines(items, menuList, inventory) {
-    var MENU = menuList || (global.RS && RS.MENU) || [];
-    var INV = inventory || (global.RS && RS.INVENTORY) || [];
-    var noRecipeCount = 0;
-    var map = {};
+    const MENU = menuList || (global.RS && RS.MENU) || [];
+    const INV = inventory || (global.RS && RS.INVENTORY) || [];
+    let noRecipeCount = 0;
+    const map = {};
 
     (items || []).forEach(function (it) {
-      var menuItem =
+      const menuItem =
         MENU.find(function (m) {
           return String(m.id) === String(it.id);
         }) ||
@@ -215,17 +215,17 @@
         noRecipeCount++;
         return;
       }
-      var soldQty = Number(it.qty) || 1;
-      var lineServings = it.servings != null ? it.servings : it.serveCount;
+      const soldQty = Number(it.qty) || 1;
+      const lineServings = it.servings != null ? it.servings : it.serveCount;
       menuItem.ingredients.forEach(function (ing) {
-        var qty = deductQtyForIngredient(ing, menuItem, soldQty, lineServings, INV);
-        if (qty <= 0) return;
-        var key = String(ing.key || ing.name || '')
+        const qty = deductQtyForIngredient(ing, menuItem, soldQty, lineServings, INV);
+        if (qty <= 0) {return;}
+        const key = String(ing.key || ing.name || '')
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '_')
           .replace(/^_|_$/g, '');
-        var inv = findInventory(ing, INV);
-        var unit = (inv && inv.unit) || ing.unit || 'unit';
+        const inv = findInventory(ing, INV);
+        const unit = (inv && inv.unit) || ing.unit || 'unit';
         if (!map[key]) {
           map[key] = { key: key, name: ing.name || key, qty: 0, unit: unit };
         }
@@ -233,17 +233,17 @@
       });
     });
 
-    var lines = Object.keys(map).map(function (k) {
+    const lines = Object.keys(map).map(function (k) {
       return map[k];
     });
     return { lines: lines, noRecipeCount: noRecipeCount };
   }
 
   function servingsSelectHtml(selected, id) {
-    var sel = Number(selected);
-    if (!isFinite(sel) || sel <= 0) sel = 1;
-    var presets = [1, 2, 3, 4, 5, 6, 8, 10, 12];
-    var opts = presets
+    let sel = Number(selected);
+    if (!isFinite(sel) || sel <= 0) {sel = 1;}
+    const presets = [1, 2, 3, 4, 5, 6, 8, 10, 12];
+    let opts = presets
       .map(function (n) {
         return (
           '<option value="' +
@@ -273,8 +273,8 @@
   }
 
   function serveUnitSelectHtml(selected, id) {
-    var cur = String(selected || 'plate').toLowerCase();
-    var opts = SERVE_UNITS.map(function (u) {
+    const cur = String(selected || 'plate').toLowerCase();
+    const opts = SERVE_UNITS.map(function (u) {
       return (
         '<option value="' +
         u.id +
@@ -299,13 +299,13 @@
    * newAvg = (oldQty * oldCost + addQty * buyCost) / (oldQty + addQty)
    */
   function weightedAverageCost(oldQty, oldCost, addQty, buyCost) {
-    var oq = Math.max(0, Number(oldQty) || 0);
-    var oc = Math.max(0, Number(oldCost) || 0);
-    var aq = Math.max(0, Number(addQty) || 0);
-    var bc = Math.max(0, Number(buyCost) || 0);
-    if (aq <= 0) return oc;
-    if (bc <= 0) return oc;
-    if (oq <= 0 || oc <= 0) return bc;
+    const oq = Math.max(0, Number(oldQty) || 0);
+    const oc = Math.max(0, Number(oldCost) || 0);
+    const aq = Math.max(0, Number(addQty) || 0);
+    const bc = Math.max(0, Number(buyCost) || 0);
+    if (aq <= 0) {return oc;}
+    if (bc <= 0) {return oc;}
+    if (oq <= 0 || oc <= 0) {return bc;}
     return Math.round(((oq * oc + aq * bc) / (oq + aq)) * 10000) / 10000;
   }
 
@@ -313,21 +313,21 @@
    * Theoretical stock used from paid bills (recipe-based), for variance.
    */
   function theoreticalUsageFromBills(bills, menuList, inventory) {
-    var map = {};
+    const map = {};
     (bills || []).forEach(function (b) {
-      var st = String(b.status || 'paid').toLowerCase();
-      if (st === 'refunded' || st === 'void' || st === 'cancelled') return;
-      var items = b._items || b.items;
-      if (!Array.isArray(items)) return;
+      const st = String(b.status || 'paid').toLowerCase();
+      if (st === 'refunded' || st === 'void' || st === 'cancelled') {return;}
+      const items = b._items || b.items;
+      if (!Array.isArray(items)) {return;}
       // bills sometimes store count as number
-      if (typeof items === 'number') return;
-      var built = buildDeductLines(items, menuList, inventory);
+      if (typeof items === 'number') {return;}
+      const built = buildDeductLines(items, menuList, inventory);
       (built.lines || []).forEach(function (l) {
-        var k = String(l.name || l.key || '').toLowerCase();
-        if (!k) return;
-        if (!map[k]) map[k] = { name: l.name || l.key, qty: 0, unit: l.unit || 'kg' };
+        const k = String(l.name || l.key || '').toLowerCase();
+        if (!k) {return;}
+        if (!map[k]) {map[k] = { name: l.name || l.key, qty: 0, unit: l.unit || 'kg' };}
         map[k].qty += Number(l.qty) || 0;
-        if (l.unit) map[k].unit = l.unit;
+        if (l.unit) {map[k].unit = l.unit;}
       });
     });
     return Object.keys(map).map(function (k) {
@@ -337,18 +337,18 @@
 
   /** Recipe health for a menu item */
   function recipeHealth(menuItem, inventory) {
-    var m = menuItem || {};
-    var ings = Array.isArray(m.ingredients) ? m.ingredients : [];
-    if (!ings.length) return { ok: false, code: 'no_recipe', label: 'No recipe' };
-    var missing = [];
-    var noCost = [];
+    const m = menuItem || {};
+    const ings = Array.isArray(m.ingredients) ? m.ingredients : [];
+    if (!ings.length) {return { ok: false, code: 'no_recipe', label: 'No recipe' };}
+    const missing = [];
+    const noCost = [];
     ings.forEach(function (g) {
-      var inv = findInventory(g, inventory);
-      if (!inv) missing.push(g.name);
-      else if (!(Number(inv.cost) > 0)) noCost.push(g.name);
+      const inv = findInventory(g, inventory);
+      if (!inv) {missing.push(g.name);}
+      else if (!(Number(inv.cost) > 0)) {noCost.push(g.name);}
     });
-    if (missing.length) return { ok: false, code: 'missing_stock', label: 'Stock missing', missing: missing };
-    if (noCost.length) return { ok: false, code: 'no_cost', label: 'Cost missing', noCost: noCost };
+    if (missing.length) {return { ok: false, code: 'missing_stock', label: 'Stock missing', missing: missing };}
+    if (noCost.length) {return { ok: false, code: 'no_cost', label: 'Cost missing', noCost: noCost };}
     return { ok: true, code: 'ok', label: 'Ready' };
   }
 

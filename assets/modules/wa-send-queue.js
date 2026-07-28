@@ -15,7 +15,7 @@
   let lastProcessAt = 0;
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
 
   function tenantKey() {
@@ -30,7 +30,7 @@
   function readAll() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
+      if (!raw) {return [];}
       const arr = JSON.parse(raw);
       return Array.isArray(arr) ? arr : [];
     } catch (_) {
@@ -60,7 +60,7 @@
   }
 
   function slimBill(bill) {
-    if (!bill || typeof bill !== 'object') return null;
+    if (!bill || typeof bill !== 'object') {return null;}
     // Keep fields needed to re-render PDF/text — skip huge blobs
     const items = Array.isArray(bill.items)
       ? bill.items
@@ -108,9 +108,9 @@
    * @returns {{ ok:boolean, id?:string, reason?:string, count?:number }}
    */
   function enqueue(entry) {
-    if (!entry || !entry.phone) return { ok: false, reason: 'missing phone' };
+    if (!entry || !entry.phone) {return { ok: false, reason: 'missing phone' };}
     const phone = String(entry.phone).replace(/\D/g, '');
-    if (phone.length < 10) return { ok: false, reason: 'bad phone' };
+    if (phone.length < 10) {return { ok: false, reason: 'bad phone' };}
 
     const billSnap = slimBill(entry.bill);
     const orderId = String(
@@ -137,8 +137,8 @@
       createdAt: exists >= 0 ? all[exists].createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    if (exists >= 0) all[exists] = row;
-    else all.push(row);
+    if (exists >= 0) {all[exists] = row;}
+    else {all.push(row);}
     writeAll(all);
     return { ok: true, id: row.id, count: count() };
   }
@@ -164,7 +164,7 @@
     if (!global.RS_API || typeof RS_API.data !== 'function' || RS_API.zeroCostLaunchMode) {
       throw new Error('Gateway API unavailable');
     }
-    if (!gatewayReady()) throw new Error('WhatsApp not ready');
+    if (!gatewayReady()) {throw new Error('WhatsApp not ready');}
 
     const bill = item.bill || {};
     const phone = item.phone;
@@ -199,8 +199,8 @@
 
   async function processQueue(opts) {
     const options = opts || {};
-    if (processing) return { processed: 0, skipped: true };
-    if (!gatewayReady() && !options.force) return { processed: 0, ready: false };
+    if (processing) {return { processed: 0, skipped: true };}
+    if (!gatewayReady() && !options.force) {return { processed: 0, ready: false };}
     if (Date.now() - lastProcessAt < RETRY_COOLDOWN_MS && !options.force) {
       return { processed: 0, cooldown: true };
     }
@@ -218,7 +218,7 @@
 
     try {
       for (const item of pending) {
-        if (!gatewayReady() && !options.force) break;
+        if (!gatewayReady() && !options.force) {break;}
         try {
           await sendOne(item);
           remove(item.id);
@@ -238,7 +238,7 @@
           }
         }
         // Small gap between retries (human / ban hygiene)
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => { setTimeout(r, 1200); });
       }
     } finally {
       processing = false;
@@ -260,7 +260,7 @@
     const n = count();
     let el = document.getElementById('rs-wa-queue-pill');
     if (n <= 0) {
-      if (el) el.style.display = 'none';
+      if (el) {el.style.display = 'none';}
       return;
     }
     if (!el) {
@@ -331,21 +331,21 @@
         });
         const clearBtn = modal.querySelector('#waq-clear');
         if (clearBtn)
-          clearBtn.onclick = () => {
+          {clearBtn.onclick = () => {
             if (confirm('Clear all queued WhatsApp bills for this outlet?')) {
               clear();
               close();
             }
-          };
+          };}
         const retry = modal.querySelector('#waq-retry');
         if (retry)
-          retry.onclick = async () => {
+          {retry.onclick = async () => {
             retry.disabled = true;
             retry.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending…';
             await processQueue({ force: true });
             close();
-            if (count() > 0) setTimeout(openQueuePanel, 120);
-          };
+            if (count() > 0) {setTimeout(openQueuePanel, 120);}
+          };}
       },
     });
   }
@@ -376,8 +376,8 @@
   const _origUpdate = () => {};
   function installStatusHook() {
     const wrap = () => {
-      if (typeof global.updateTopbarWhatsAppStatus !== 'function') return;
-      if (global.updateTopbarWhatsAppStatus.__waQueueHooked) return;
+      if (typeof global.updateTopbarWhatsAppStatus !== 'function') {return;}
+      if (global.updateTopbarWhatsAppStatus.__waQueueHooked) {return;}
       const orig = global.updateTopbarWhatsAppStatus;
       global.updateTopbarWhatsAppStatus = async function () {
         const r = await orig.apply(this, arguments);
@@ -392,8 +392,8 @@
     document.addEventListener('rs:ready', wrap);
     setInterval(wrap, 5000);
     setInterval(() => {
-      if (gatewayReady() && count() > 0) processQueue({ force: false });
-      else paintBadge();
+      if (gatewayReady() && count() > 0) {processQueue({ force: false });}
+      else {paintBadge();}
     }, 20000);
   }
 

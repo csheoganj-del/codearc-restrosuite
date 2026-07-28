@@ -74,5 +74,42 @@ module.exports = {
       watch: false,
       ignore_watch: ['node_modules', '.git', 'publish-static', '*.log'],
     },
+    {
+      // ── Ngrok Tunnel Companion (Belt-and-suspenders restart) ───────────
+      // ngrok-service.js already includes its own in-process respawn loop
+      // with exponential backoff. PM2 here provides a SECOND safety net:
+      // if the wrapper itself crashes (uncaught exception, OOM, etc.),
+      // PM2 will resurrect the entire process tree from zero.
+      name: 'restrosuite-ngrok',
+      script: './ngrok-service.js',
+
+      instances: 1,
+      exec_mode: 'fork',
+
+      autorestart: true,
+      // Use infinite retries for the tunnel wrapper — temporary ngrok
+      // API outages are expected and the process must survive them.
+      // (Gateway uses max_restarts:10 to avoid looping on config errors,
+      // but the tunnel can legitimately need 100+ tiny restarts/year.)
+      max_restarts: 999,
+      min_uptime: '10s',
+      restart_delay: 5000,
+      exp_backoff_restart_delay: 1000,
+
+      kill_timeout: 5000,
+      listen_timeout: 15000,
+
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      max_size: '5M',
+      retain: 5,
+
+      env: {
+        NODE_ENV: 'production',
+      },
+
+      watch: false,
+      ignore_watch: ['node_modules', '.git', 'publish-static', '*.log'],
+    },
   ],
 };

@@ -31,9 +31,9 @@ console.log('[ngrok-service] Durable config path:', machineEnvPath);
 
 function resolveDomain() {
   const direct = (process.env.NGROK_DOMAIN || process.env.NGROK_GATEWAY_DOMAIN || '').trim();
-  if (direct) return direct.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  if (direct) {return direct.replace(/^https?:\/\//i, '').replace(/\/+$/, '');}
   const url = (process.env.NGROK_GATEWAY_URL || '').trim();
-  if (!url) return '';
+  if (!url) {return '';}
   try {
     return new URL(url.includes('://') ? url : `https://${url}`).hostname;
   } catch {
@@ -56,33 +56,84 @@ if (!domain) {
 
 console.log(`Starting Ngrok tunnel ${domain} → localhost:${port}`);
 
-const ngrokProcess = spawn('npx', ['ngrok', 'http', port, `--url=${domain}`], {
-  shell: true,
-  windowsHide: true,
-});
+let ngrokProcess = null;
+let shuttingDown = false;
+let restartAttempts = 0;
+const MAX_RESTART_ATTEMPTS_BEFORE_BACKOFF = 5;
+const BASE_RESTART_DELAY_MS = 3000;
+const MAX_RESTART_DELAY_MS = 60000;
 
-ngrokProcess.stdout.on('data', (data) => {
-  console.log(`[Ngrok STDOUT] ${data.toString().trim()}`);
-});
+function startNgrok() {
+  if (shuttingDown) {return;}
 
-ngrokProcess.stderr.on('data', (data) => {
-  console.error(`[Ngrok STDERR] ${data.toString().trim()}`);
-});
+  if (ngrokProcess && !ngrokProcess.killed) {
+    try { ngrokProcess.kill(); } catch (_) { /* noop */ }
+  }
 
-ngrokProcess.on('close', (code) => {
-  console.log(`Ngrok tunnel process exited with code ${code}`);
-  // Exit so PM2 can restart a clean child (do not spin forever on fatal ngrok errors).
-  process.exit(code == null ? 1 : code);
-});
+  console.log(`[ngrok-service] (Re)starting tunnel (attempt ${restartAttempts + 1}): ${domain} → localhost:${port}`);
+  ngrokProcess = spawn('npx', ['ngrok', 'http', port, `--url=${domain}`], {
+    shell: true,
+    windowsHide: true,
+  });
+
+  ngrokProcess.stdout.on('data', (data) => {
+    console.log(`[Ngrok STDOUT] ${data.toString().trim()}`);
+  });
+
+  ngrokProcess.stderr.on('data', (data) => {
+    console.error(`[Ngrok STDERR] ${data.toString().trim()}`);
+  });
+
+  ngrokProcess.on('close', (code) => {
+    if (shuttingDown) {return;}
+
+    restartAttempts += 1;
+    let delay = BASE_RESTART_DELAY_MS;
+    if (restartAttempts > MAX_RESTART_ATTEMPTS_BEFORE_BACKOFF) {
+      // Exponential backoff capped at 60s, plus 20% jitter to avoid thundering herds
+      const exponent = Math.min(restartAttempts - MAX_RESTART_ATTEMPTS_BEFORE_BACKOFF, 6);
+      delay = Math.min(BASE_RESTART_DELAY_MS * (2 ** exponent), MAX_RESTART_DELAY_MS);
+      delay = Math.round(delay * (0.9 + Math.random() * 0.2));
+    }
+
+    console.log(
+      `[ngrok-service] Tunnel exited with code ${code}. ` +
+      `Restart #${restartAttempts} in ${delay}ms (backoff active after ${MAX_RESTART_ATTEMPTS_BEFORE_BACKOFF} rapid failures).`
+    );
+
+    setTimeout(() => {
+      // Reset counter if it has been a while (restart is clearly recovered)
+      if (restartAttempts > MAX_RESTART_ATTEMPTS_BEFORE_BACKOFF + 4) {
+        restartAttempts = Math.floor(restartAttempts / 2);
+      }
+      startNgrok();
+    }, delay);
+  });
+
+  ngrokProcess.on('error', (err) => {
+    console.error(`[ngrok-service] Process spawn error: ${err && err.message}. Will retry.`);
+  });
+
+  // Successful start: decay the attempt counter over time
+  setTimeout(() => {
+    if (!shuttingDown && ngrokProcess && !ngrokProcess.killed) {
+      restartAttempts = Math.max(0, restartAttempts - 2);
+    }
+  }, 30000);
+}
+
+startNgrok();
 
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Killing Ngrok tunnel...');
-  ngrokProcess.kill();
-  process.exit(0);
+  console.log('SIGTERM received. Killing Ngrok tunnel and shutting down...');
+  shuttingDown = true;
+  if (ngrokProcess) {try { ngrokProcess.kill('SIGTERM'); } catch (_) { /* noop */ }}
+  setTimeout(() => process.exit(0), 1500);
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received. Killing Ngrok tunnel...');
-  ngrokProcess.kill();
-  process.exit(0);
+  console.log('SIGINT received. Killing Ngrok tunnel and shutting down...');
+  shuttingDown = true;
+  if (ngrokProcess) {try { ngrokProcess.kill('SIGINT'); } catch (_) { /* noop */ }}
+  setTimeout(() => process.exit(0), 1500);
 });

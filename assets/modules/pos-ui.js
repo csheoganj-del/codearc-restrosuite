@@ -6,10 +6,10 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function esc(s) {
@@ -37,7 +37,7 @@
       const role = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
         .toLowerCase()
         .trim();
-      if (['owner', 'admin', 'superadmin', 'brand_admin', 'manager'].includes(role)) return true;
+      if (['owner', 'admin', 'superadmin', 'brand_admin', 'manager'].includes(role)) {return true;}
       if (typeof global.RS_featureOn === 'function') {
         return global.RS_featureOn('set_cashier_can_edit_prices', global.RS_SETTINGS, false);
       }
@@ -54,7 +54,7 @@
     const zone = document.getElementById('cart-pay-zone');
     const hint = document.getElementById('cart-empty-hint');
     const more = document.getElementById('cart-more-opts');
-    if (cartEl) cartEl.classList.toggle('pos-cart-empty', !!isEmpty);
+    if (cartEl) {cartEl.classList.toggle('pos-cart-empty', !!isEmpty);}
     if (zone) {
       zone.hidden = !!isEmpty;
       zone.setAttribute('aria-hidden', isEmpty ? 'true' : 'false');
@@ -66,15 +66,15 @@
     }
     if (more) {
       // Keep discount/tip collapsed chrome quiet when empty
-      if (isEmpty) more.open = false;
+      if (isEmpty) {more.open = false;}
     }
     document.getElementById('pos-tab')?.classList.toggle('pos-cart-is-empty', !!isEmpty);
   }
 
   function maskPhoneForChip(phone) {
     const d = String(phone || '').replace(/\D/g, '');
-    if (d.length < 4) return phone || '';
-    if (d.length <= 10) return '··' + d.slice(-4);
+    if (d.length < 4) {return phone || '';}
+    if (d.length <= 10) {return '··' + d.slice(-4);}
     return '··' + d.slice(-4);
   }
 
@@ -83,7 +83,7 @@
     const panel = document.getElementById('cart-cust-direct-inputs');
     const label = document.getElementById('cart-cust-toggle-label');
     const clearBtn = document.getElementById('cart-cust-clear');
-    if (!btn || !panel) return;
+    if (!btn || !panel) {return;}
     const name = ((document.getElementById('cust-input-name') || {}).value || '').trim();
     const phone = ((document.getElementById('cust-input-phone') || {}).value || '').trim();
     const hasCust = !!(name || phone);
@@ -92,7 +92,7 @@
     btn.classList.toggle('is-walkin', !hasCust);
     btn.classList.toggle('is-open', open);
     const hint = btn.querySelector('.cart-cust-hint');
-    if (hint) hint.style.display = hasCust ? 'none' : '';
+    if (hint) {hint.style.display = hasCust ? 'none' : '';}
     if (label) {
       if (hasCust) {
         const phoneBit = phone ? maskPhoneForChip(phone) : '';
@@ -110,7 +110,7 @@
   function setCartCustomerPanelOpen(open) {
     const btn = document.getElementById('cart-cust-toggle');
     const panel = document.getElementById('cart-cust-direct-inputs');
-    if (!btn || !panel) return;
+    if (!btn || !panel) {return;}
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open) {
       panel.hidden = false;
@@ -145,11 +145,11 @@
     const sel = document.getElementById('cart-customer-sel');
     const nameEl = document.getElementById('cust-input-name');
     const phoneEl = document.getElementById('cust-input-phone');
-    if (nameEl) nameEl.value = '';
-    if (phoneEl) phoneEl.value = '';
+    if (nameEl) {nameEl.value = '';}
+    if (phoneEl) {phoneEl.value = '';}
     if (sel) {
       const tempOpt = sel.querySelector('option[data-temp="true"]');
-      if (tempOpt) tempOpt.remove();
+      if (tempOpt) {tempOpt.remove();}
       sel.value = '';
       try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
     }
@@ -165,7 +165,7 @@
   function wireCartCustomerToggle() {
     const btn = document.getElementById('cart-cust-toggle');
     const panel = document.getElementById('cart-cust-direct-inputs');
-    if (!btn || !panel || btn.dataset.bound === '1') return;
+    if (!btn || !panel || btn.dataset.bound === '1') {return;}
     btn.dataset.bound = '1';
 
     // Ensure clear control sits beside toggle (chip row)
@@ -180,8 +180,8 @@
       clear.hidden = true;
       clear.style.display = 'none';
       const row = btn.closest('.cart-cust-row') || btn.parentElement;
-      if (row) row.appendChild(clear);
-      else btn.insertAdjacentElement('afterend', clear);
+      if (row) {row.appendChild(clear);}
+      else {btn.insertAdjacentElement('afterend', clear);}
       clear.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -193,7 +193,7 @@
     btn.addEventListener('click', () => {
       const open = btn.getAttribute('aria-expanded') !== 'true';
       setCartCustomerPanelOpen(open);
-      if (open) setTimeout(() => document.getElementById('cust-input-name')?.focus(), 40);
+      if (open) {setTimeout(() => document.getElementById('cust-input-name')?.focus(), 40);}
     });
     ['cust-input-name', 'cust-input-phone'].forEach((id) => {
       document.getElementById(id)?.addEventListener('input', syncCartCustomerChrome);
@@ -205,11 +205,11 @@
         'pointerdown',
         (e) => {
           const t = e.target;
-          if (!t || !t.closest) return;
-          if (t.closest('#custom-customer-widget')) return;
+          if (!t || !t.closest) {return;}
+          if (t.closest('#custom-customer-widget')) {return;}
           if (t.closest('#cart-items, .cart-foot, #pos-grid, .order-type-btn')) {
             const open = btn.getAttribute('aria-expanded') === 'true';
-            if (open) setCartCustomerPanelOpen(false);
+            if (open) {setCartCustomerPanelOpen(false);}
           }
         },
         true
@@ -219,7 +219,7 @@
     setCartCustomerPanelOpen(false);
   }
   function catColor(c) {
-    if (global.RS && typeof RS.catColor === 'function') return RS.catColor(c);
+    if (global.RS && typeof RS.catColor === 'function') {return RS.catColor(c);}
     return 'var(--orange)';
   }
   function stockLabelMap() {
@@ -229,32 +229,32 @@
     return (global.RS && RS.stockCls) || { ok: 'stock-ok', low: 'stock-low', out: 'stock-out' };
   }
   function activateTab(id) {
-    if (global.RS && typeof RS.activateTab === 'function') return RS.activateTab(id);
+    if (global.RS && typeof RS.activateTab === 'function') {return RS.activateTab(id);}
   }
 
   /* ---- Happy hour (time-window menu pricing) ---- */
   function parseHHMM(str) {
     const m = String(str || '').trim().match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return null;
+    if (!m) {return null;}
     const h = Number(m[1]);
     const mi = Number(m[2]);
-    if (h > 23 || mi > 59) return null;
+    if (h > 23 || mi > 59) {return null;}
     return h * 60 + mi;
   }
   function isHappyHourActive() {
     const s = global.RS_SETTINGS || {};
     if (typeof global.RS_featureOn === 'function') {
-      if (!global.RS_featureOn('set_happy_hour', s, false)) return false;
+      if (!global.RS_featureOn('set_happy_hour', s, false)) {return false;}
     } else if (!(s.set_happy_hour === true || s.set_happy_hour === 'true')) {
       return false;
     }
     const start = parseHHMM(s.set_happy_hour_start || '17:00');
     const end = parseHHMM(s.set_happy_hour_end || '20:00');
-    if (start == null || end == null) return false;
+    if (start == null || end == null) {return false;}
     const now = new Date();
     const cur = now.getHours() * 60 + now.getMinutes();
     // Support overnight windows (e.g. 22:00–02:00)
-    if (start <= end) return cur >= start && cur < end;
+    if (start <= end) {return cur >= start && cur < end;}
     return cur >= start || cur < end;
   }
   function happyHourPct() {
@@ -262,27 +262,27 @@
     return Number.isFinite(n) && n > 0 && n <= 90 ? n : 15;
   }
   function effectiveMenuPrice(m) {
-    if (!m) return 0;
+    if (!m) {return 0;}
     const base = Number(m.price) || 0;
-    if (!isHappyHourActive()) return base;
+    if (!isHappyHourActive()) {return base;}
     if (m.happyHourPrice != null && m.happy_hour_price != null) {
       const hp = Number(m.happyHourPrice != null ? m.happyHourPrice : m.happy_hour_price);
-      if (Number.isFinite(hp) && hp >= 0) return hp;
+      if (Number.isFinite(hp) && hp >= 0) {return hp;}
     }
     if (m.happyHourPrice != null) {
       const hp = Number(m.happyHourPrice);
-      if (Number.isFinite(hp) && hp >= 0) return hp;
+      if (Number.isFinite(hp) && hp >= 0) {return hp;}
     }
     const pct = happyHourPct();
     return Math.round(base * (1 - pct / 100) * 100) / 100;
   }
   function paintHappyHourBanner() {
     const posTab = document.getElementById('pos-tab');
-    if (!posTab) return;
+    if (!posTab) {return;}
     let ban = document.getElementById('rs-happy-hour-banner');
     const active = isHappyHourActive();
     if (!active) {
-      if (ban) ban.style.display = 'none';
+      if (ban) {ban.style.display = 'none';}
       return;
     }
     const s = global.RS_SETTINGS || {};
@@ -295,8 +295,8 @@
       ban.style.cssText =
         'margin:0 0 10px;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,79,0,.35);background:rgba(255,79,0,.1);font-size:12.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px';
       const grid = document.getElementById('pos-grid');
-      if (grid && grid.parentNode) grid.parentNode.insertBefore(ban, grid);
-      else posTab.insertBefore(ban, posTab.firstChild);
+      if (grid && grid.parentNode) {grid.parentNode.insertBefore(ban, grid);}
+      else {posTab.insertBefore(ban, posTab.firstChild);}
     }
     ban.style.display = 'flex';
     ban.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--orange)"></i> Happy Hour · ${pct}% off menu until ${esc(end)}`;
@@ -339,7 +339,7 @@ function syncPosScalars() {
 const renderPOS = () => {
   paintHappyHourBanner();
   const grid = $('#pos-grid');
-  if (!grid) return;
+  if (!grid) {return;}
   const q = ($('#pos-search-input')?.value||'').toLowerCase();
   const sortMode = ($('#pos-sort-select') && $('#pos-sort-select').value) || 'popular';
   let items = getMenu().filter(m=>{
@@ -406,7 +406,7 @@ const renderPOS = () => {
       <div class="prow">
         ${priceHtml}
         ${showStock ? `<span class="stock-dot ${stockClsMap()[stock]}">${stockLabelMap()[stock]}</span>` : ''}
-        ${deal ? `<span class="pos-hh-chip">HH</span>` : ''}
+        ${deal ? '<span class="pos-hh-chip">HH</span>' : ''}
         ${badges}
       </div>
     </div>`;
@@ -425,7 +425,7 @@ const renderPOS = () => {
 };
 async function addToCartSmart(id) {
   const m = getMenu().find(x => String(x.id) === String(id));
-  if (!m) return;
+  if (!m) {return;}
   // Add-ons
   let addons = [];
   try {
@@ -453,7 +453,7 @@ async function addToCartSmart(id) {
   }
   // Water pairing for roti/chapati etc.
   try {
-    if (sessionStorage.getItem('rs_skip_water_prompt') === '1') return;
+    if (sessionStorage.getItem('rs_skip_water_prompt') === '1') {return;}
     if (global.RSMenuIntel && RSMenuIntel.promptWaterPairing) {
       const w = await RSMenuIntel.promptWaterPairing(m);
       if (w) {
@@ -484,7 +484,7 @@ async function addToCartSmart(id) {
 }
 function refreshPosCats(){
   const catsEl = $('#pos-cats');
-  if (!catsEl) return;
+  if (!catsEl) {return;}
   const menu = getMenu();
   const hasSpecials = menu.some(m => m.isSpecial || m.special);
   const hasStaples = menu.some(m => m.isStaple || m.staple || /roti|chapati|naan|rice|paratha/i.test(String(m.name||'')));
@@ -495,7 +495,7 @@ function refreshPosCats(){
       menu.map(m => (m.cat || '').trim() || 'Uncategorized')
     )).sort((a, b) => a.localeCompare(b)));
   const catLabel = (c) => c === '__specials__' ? '★ Specials' : c === '__staples__' ? '🍚 Staples' : c;
-  if (!liveCats.some(c => String(c).toLowerCase() === String(activeCat).toLowerCase())) activeCat = 'All';
+  if (!liveCats.some(c => String(c).toLowerCase() === String(activeCat).toLowerCase())) {activeCat = 'All';}
   catsEl.innerHTML = liveCats.map(c=>`<button class="pos-cat-btn ${String(c).toLowerCase()===String(activeCat).toLowerCase()?'active':''}" data-cat="${_e(c)}">${_e(catLabel(c))}</button>`).join('');
   $$('#pos-cats .pos-cat-btn').forEach(b=> b.addEventListener('click',()=>{
     activeCat=b.dataset.cat;
@@ -516,7 +516,7 @@ function updateMobileCartBar(countArg, totalsArg){
   const barCount = $('#pos-m-cart-bar-count');
   const barTotal = $('#pos-m-cart-bar-total');
   const cartBar = $('#pos-m-cart-bar');
-  if (!barCount || !barTotal || !cartBar) return;
+  if (!barCount || !barTotal || !cartBar) {return;}
   const count = countArg != null ? countArg : cart.reduce((a,c)=>a+c.qty,0);
   const totals = totalsArg || getTotals();
   barCount.textContent = count + (count === 1 ? ' item' : ' items');
@@ -532,13 +532,13 @@ function openMobilePOSCart(e){
     e.stopPropagation();
   }
   const now = Date.now();
-  if (now - lastMobileCartOpenAt < 250) return;
+  if (now - lastMobileCartOpenAt < 250) {return;}
   lastMobileCartOpenAt = now;
-  if (window.innerWidth > 1024 || !cart.length) return;
+  if (window.innerWidth > 1024 || !cart.length) {return;}
   const posLeft = $('.pos-left');
   const posCart = $('.pos-cart');
   const cartBar = $('#pos-m-cart-bar');
-  if (!posLeft || !posCart || !cartBar) return;
+  if (!posLeft || !posCart || !cartBar) {return;}
   posLeft.classList.add('hidden');
   posCart.classList.add('active', 'rs10-cart-sheet');
   cartBar.classList.add('hidden');
@@ -546,35 +546,35 @@ function openMobilePOSCart(e){
   document.body.classList.add('rs10-cart-open', 'pos-mobile-cart-open');
   try {
     const items = posCart.querySelector('#cart-items, .cart-items');
-    if (items) items.scrollTop = 0;
+    if (items) {items.scrollTop = 0;}
   } catch (_) {}
 }
 function closeMobilePOSCart(showBar = true){
   const posLeft = $('.pos-left');
   const posCart = $('.pos-cart');
   const cartBar = $('#pos-m-cart-bar');
-  if (!posLeft || !posCart || !cartBar) return;
+  if (!posLeft || !posCart || !cartBar) {return;}
   posLeft.classList.remove('hidden');
   posCart.classList.remove('active', 'rs10-cart-sheet');
   document.body.classList.remove('rs10-cart-open', 'pos-mobile-cart-open');
-  if (showBar) updateMobileCartBar();
-  else cartBar.classList.add('hidden');
+  if (showBar) {updateMobileCartBar();}
+  else {cartBar.classList.add('hidden');}
 }
 function bindMobileCartBar(){
   const cartBar = $('#pos-m-cart-bar');
-  if (!cartBar || cartBar.dataset.rsBound) return;
+  if (!cartBar || cartBar.dataset.rsBound) {return;}
   cartBar.dataset.rsBound = '1';
   cartBar.addEventListener('click', openMobilePOSCart);
   cartBar.addEventListener('pointerup', openMobilePOSCart);
   cartBar.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') openMobilePOSCart(e);
+    if (e.key === 'Enter' || e.key === ' ') {openMobilePOSCart(e);}
   });
 }
 function addToCart(id, opts){
   cart = _pos.cart;
   opts = opts || {};
   const m=getMenu().find(x=>String(x.id)===String(id));
-  if (!m) return;
+  if (!m) {return;}
   const portion = opts.portion != null ? Number(opts.portion) : 1; // 0.5 half · 1 full · 2 double
   const pFactor = portion > 0 ? portion : 1;
   // Harder recipe/cost/stock checks
@@ -625,7 +625,7 @@ function addToCart(id, opts){
       Number(c.portion || 1) === pFactor &&
       Number(c.price) === price
   );
-  if (line) line.qty++;
+  if (line) {line.qty++;}
   else {
     cart.push({
       ...m,
@@ -638,7 +638,7 @@ function addToCart(id, opts){
       happyHour: hh,
     });
   }
-  try { if (global.RSActionFeedback) global.RSActionFeedback.click(); } catch (_) {}
+  try { if (global.RSActionFeedback) {global.RSActionFeedback.click();} } catch (_) {}
   renderCart();
   const pLab = pFactor === 0.5 ? '½' : pFactor === 2 ? '×2' : '';
   toast(
@@ -652,19 +652,19 @@ function changeQty(id,d){
   cart = _pos.cart;
   // Prefer line matching data-line-key if present via event — fallback first match by id
   const line = cart.find((c) => String(c.id) === String(id));
-  if (!line) return;
+  if (!line) {return;}
   line.qty += d;
-  if (line.qty <= 0) replaceCart(cart.filter((c) => c !== line));
+  if (line.qty <= 0) {replaceCart(cart.filter((c) => c !== line));}
   renderCart();
 }
 function setLinePortion(lineKey, portion) {
   cart = _pos.cart;
   const p = Number(portion);
-  if (!(p > 0)) return;
+  if (!(p > 0)) {return;}
   const line =
     cart.find((c) => cartLineKey(c) === String(lineKey)) ||
     cart.find((c) => String(c.id) === String(lineKey));
-  if (!line) return;
+  if (!line) {return;}
   const full = Number(line.fullPrice != null ? line.fullPrice : line.basePrice != null ? line.basePrice : line.price) || 0;
   line.portion = p;
   line.servings = p;
@@ -680,10 +680,10 @@ function cartLineKey(c) {
 }
 function setLineNote(id, note) {
   const line = cart.find((c) => String(c.id) === String(id));
-  if (!line) return false;
+  if (!line) {return false;}
   const text = String(note == null ? '' : note).trim().slice(0, 140);
   line.note = text;
-  if (!text) delete line.note;
+  if (!text) {delete line.note;}
   try {
     renderCart();
   } catch (_) {}
@@ -695,11 +695,11 @@ function getLineNote(id) {
 }
 function openLineNoteEditor(id) {
   const line = cart.find((c) => String(c.id) === String(id));
-  if (!line) return;
+  if (!line) {return;}
   const chips = ['No onion', 'Extra spicy', 'Less oil', 'Well done', 'No ice', 'Pack separate'];
   if (!global.RSModal) {
     const n = window.prompt('Kitchen note for ' + (line.name || 'item'), line.note || '');
-    if (n != null) setLineNote(id, n);
+    if (n != null) {setLineNote(id, n);}
     return;
   }
   global.RSModal.open({
@@ -728,31 +728,31 @@ function openLineNoteEditor(id) {
       m.querySelectorAll('[data-chip]').forEach((btn) => {
         btn.onclick = () => {
           const chip = btn.getAttribute('data-chip') || '';
-          if (!inp) return;
+          if (!inp) {return;}
           const cur = (inp.value || '').trim();
-          if (!cur) inp.value = chip;
-          else if (cur.toLowerCase().includes(chip.toLowerCase())) return;
-          else inp.value = cur + ', ' + chip;
+          if (!cur) {inp.value = chip;}
+          else if (cur.toLowerCase().includes(chip.toLowerCase())) {return;}
+          else {inp.value = cur + ', ' + chip;}
           inp.focus();
         };
       });
       const x = m.querySelector('[data-ln-x]');
-      if (x) x.onclick = close;
+      if (x) {x.onclick = close;}
       const cl = m.querySelector('[data-ln-clear]');
       if (cl)
-        cl.onclick = () => {
+        {cl.onclick = () => {
           setLineNote(id, '');
           close();
           toast('Note cleared', 'fa-comment');
-        };
+        };}
       const ok = m.querySelector('[data-ln-ok]');
       if (ok)
-        ok.onclick = () => {
+        {ok.onclick = () => {
           setLineNote(id, inp ? inp.value : '');
           close();
           toast(inp && inp.value.trim() ? 'Kitchen note saved' : 'Note cleared', 'fa-comment');
-        };
-      if (inp) setTimeout(() => { inp.focus(); inp.select?.(); }, 40);
+        };}
+      if (inp) {setTimeout(() => { inp.focus(); inp.select?.(); }, 40);}
     },
   });
 }
@@ -771,7 +771,7 @@ function renderCart(){
   const isIncl = totals.taxProfile.inclusive_pricing;
   const taxLabel = totals.taxProfile.tax_system || 'GST';
   const settings = window.RS_SETTINGS || {};
-  
+
   // Plain labels — Sub / Tax / Total always scannable (10/10 readability)
   let metaHTML = `<span title="Subtotal">Sub <b id="t-sub">${rs(totals.sub)}</b></span>`;
   if (totals.disc > 0) {
@@ -792,7 +792,7 @@ function renderCart(){
   if (totals.loyaltyRedeem > 0) {
     metaHTML += `<span style="color:var(--violet-soft)" title="Loyalty">Pts <b id="t-loyal">- ${rs(totals.loyaltyRedeem)}</b></span>`;
   }
-  
+
   // Hide Tax/GST cart line when Calculate taxes is OFF (simple café default).
   // Default OFF; only show when ON and cart has items / real tax amount.
   const rawTaxFlag = settings.set_calculate_taxes;
@@ -804,7 +804,7 @@ function renderCart(){
         : rawTaxFlag === true || rawTaxFlag === 'true' || rawTaxFlag === 1 || rawTaxFlag === '1';
   const showTaxLine = taxesOn && (count > 0 || Number(totals.gst) > 0);
   if (taxesOn && totals.taxProfile.gst_scheme === 'composition' && totals.taxProfile.country === 'IN' && count > 0) {
-    metaHTML += `<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>`;
+    metaHTML += '<span style="font-size:10px;color:var(--text-mute)" title="Composition scheme">Comp</span>';
   } else if (showTaxLine) {
     const taxShort = String(taxLabel || 'Tax').length > 4 ? 'Tax' : taxLabel;
     metaHTML += `<span id="t-gst-wrap" title="${_e(taxLabel)}${isIncl ? ' inclusive' : ''}">${_e(taxShort)}${isIncl ? '*' : ''} <b id="t-gst">${rs(totals.gst)}</b></span>`;
@@ -820,7 +820,7 @@ function renderCart(){
     document.documentElement.classList.toggle('rs-cart-has-items', count > 0);
     document.documentElement.classList.toggle('rs-hide-cart-tax', !showTaxLine);
   } catch (_) {}
-  
+
   const metaDiv = document.querySelector('.totals-meta') || document.getElementById('cart-totals-meta');
   if (metaDiv) {
     metaDiv.innerHTML = metaHTML;
@@ -829,8 +829,8 @@ function renderCart(){
       metaDiv.querySelectorAll('#t-gst-wrap, #t-gst').forEach((el) => {
         try {
           const wrap = el.id === 't-gst' ? el.parentElement : el;
-          if (wrap && wrap !== metaDiv) wrap.remove();
-          else el.remove();
+          if (wrap && wrap !== metaDiv) {wrap.remove();}
+          else {el.remove();}
         } catch (_) {}
       });
       // Remove bare "Tax" / "GST" spans from old HTML
@@ -842,12 +842,12 @@ function renderCart(){
       });
     }
   }
-  
+
   $('#t-grand').textContent=rs(totals.grand);
 
   updateMobileCartBar(count, totals);
 
-  if(!cart.length){ wrap.innerHTML=`<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>`; }
+  if(!cart.length){ wrap.innerHTML='<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i><div>Cart is empty<br><span style="font-size:12px">Tap menu items to add them</span></div></div>'; }
   else { wrap.innerHTML = cart.map(c=>{
     const p = Number(c.portion || 1);
     const lk = cartLineKey(c);
@@ -875,9 +875,9 @@ function renderCart(){
       e.stopPropagation();
       const lk = b.getAttribute('data-lk');
       const line = lk ? cart.find((c) => cartLineKey(c) === lk) : cart.find((c) => String(c.id) === String(b.dataset.id));
-      if (!line) return;
+      if (!line) {return;}
       line.qty += +b.dataset.d;
-      if (line.qty <= 0) replaceCart(cart.filter((c) => c !== line));
+      if (line.qty <= 0) {replaceCart(cart.filter((c) => c !== line));}
       renderCart();
     }));
     $$('#cart-items .cart-p-btn').forEach((b) =>
@@ -897,10 +897,10 @@ function renderCart(){
         }
         const lk = el.getAttribute('data-lk');
         const line = lk ? cart.find((c) => cartLineKey(c) === lk) : null;
-        if (!line) return;
+        if (!line) {return;}
         const cur = Number(line.price) || 0;
         const raw = window.prompt('Unit price for ' + (line.name || 'item'), String(cur));
-        if (raw == null) return;
+        if (raw == null) {return;}
         const next = Math.max(0, Math.round((Number(raw) || 0) * 100) / 100);
         if (!Number.isFinite(next)) {
           toast('Enter a valid price', 'fa-circle-exclamation');
@@ -926,7 +926,7 @@ function renderCart(){
       let pressTimer = null;
       const id = row.getAttribute('data-line-id');
       const startPress = (e) => {
-        if (e.target.closest('.qty, .cart-line-note')) return;
+        if (e.target.closest('.qty, .cart-line-note')) {return;}
         pressTimer = setTimeout(() => {
           pressTimer = null;
           openLineNoteEditor(id);
@@ -943,14 +943,14 @@ function renderCart(){
       row.addEventListener('pointerleave', clearPress);
       row.addEventListener('pointercancel', clearPress);
       row.addEventListener('dblclick', (e) => {
-        if (e.target.closest('.qty, .cart-line-note')) return;
+        if (e.target.closest('.qty, .cart-line-note')) {return;}
         e.preventDefault();
         openLineNoteEditor(id);
       });
     });
   }
 
-  try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) window.RSPOS.refreshPaymentPanel(); } catch (e) {}
+  try { if(window.RSPOS && window.RSPOS.refreshPaymentPanel) {window.RSPOS.refreshPaymentPanel();} } catch (e) {}
   // Never leave Print & Pay stuck grey when cart has lines (stale empty-cart gate)
   try {
     const checkoutBtn = document.getElementById('btn-checkout');
@@ -981,8 +981,8 @@ function renderCart(){
     // Helper function to get tab key (same as in initPOS)
     const getTabKeyForOrderType = (orderTypeText) => {
       const lowerText = orderTypeText.toLowerCase();
-      if (lowerText.includes('delivery')) return 'Delivery';
-      if (lowerText.includes('dine')) return 'Dine-in';
+      if (lowerText.includes('delivery')) {return 'Delivery';}
+      if (lowerText.includes('dine')) {return 'Dine-in';}
       return 'Takeaway';
     };
     const tabKey = getTabKeyForOrderType(activeOrderType);
@@ -1017,7 +1017,7 @@ function renderCart(){
 let __floorOccTimer = null;
 let __floorOccId = null;
 function scheduleFloorOccupancyFromCart() {
-  if (__floorOccTimer) clearTimeout(__floorOccTimer);
+  if (__floorOccTimer) {clearTimeout(__floorOccTimer);}
   __floorOccTimer = setTimeout(() => {
     syncFloorOccupancyFromCart().catch((e) =>
       console.warn('[floor occupancy]', e)
@@ -1026,7 +1026,7 @@ function scheduleFloorOccupancyFromCart() {
 }
 
 async function syncFloorOccupancyFromCart() {
-  if (!window.RS_DB || typeof RS_DB.put !== 'function') return;
+  if (!window.RS_DB || typeof RS_DB.put !== 'function') {return;}
   let cust = {};
   try {
     cust = typeof getCustomer === 'function' ? getCustomer() : {};
@@ -1054,21 +1054,21 @@ async function syncFloorOccupancyFromCart() {
   try {
     const btn = document.querySelector('.order-type-btn.active');
     const t = (btn && (btn.textContent || btn.getAttribute('aria-label') || btn.title || '')) || '';
-    if (/dine/i.test(t)) isDine = true;
-    if (/deliver/i.test(t) && !/dine/i.test(t) && !looksLikeTable) isDine = false;
+    if (/dine/i.test(t)) {isDine = true;}
+    if (/deliver/i.test(t) && !/dine/i.test(t) && !looksLikeTable) {isDine = false;}
   } catch (_) {}
-  if (!isDine) return;
+  if (!isDine) {return;}
 
   // When a table is selected, force dine-in chrome so floor + cart stay consistent
   try {
     if (looksLikeTable) {
       const cartEl = document.querySelector('.pos-cart');
-      if (cartEl) cartEl.classList.add('is-dinein');
+      if (cartEl) {cartEl.classList.add('is-dinein');}
       const btns = document.querySelectorAll('.order-type-btn');
       btns.forEach((b) => {
         const lab = (b.textContent || b.getAttribute('aria-label') || b.title || '').toLowerCase();
-        if (lab.includes('dine')) b.classList.add('active');
-        else if (lab.includes('take') || lab.includes('deliv')) b.classList.remove('active');
+        if (lab.includes('dine')) {b.classList.add('active');}
+        else if (lab.includes('take') || lab.includes('deliv')) {b.classList.remove('active');}
       });
     }
   } catch (_) {}
@@ -1081,7 +1081,7 @@ async function syncFloorOccupancyFromCart() {
     notes: c.note || c.notes || '',
     note: c.note || c.notes || '',
   }));
-  if (!items.length) return;
+  if (!items.length) {return;}
 
   let totals = { grand: 0, sub: 0, gst: 0, disc: 0 };
   try {
@@ -1097,7 +1097,7 @@ async function syncFloorOccupancyFromCart() {
       tn === tableRaw ||
       tn.toLowerCase() === tableRaw.toLowerCase() ||
       (Number.isFinite(tableDig) && dig(tn) === tableDig);
-    if (!same) return false;
+    if (!same) {return false;}
     const st = String(r.status || '');
     const oid = String(r.orderId || r.id || '');
     return (
@@ -1116,7 +1116,7 @@ async function syncFloorOccupancyFromCart() {
   });
 
   // Prefer our cart-driven row, else any seat placeholder, else create
-  let row =
+  const row =
     active.find(
       (r) =>
         r.source === 'pos_cart' ||
@@ -1219,16 +1219,16 @@ function getTotals(){
   const settings = window.RS_SETTINGS || {};
   const taxProfile = window.RS_getTenantTaxProfile ? window.RS_getTenantTaxProfile() : { country: 'IN', tax_system: 'GST', gst_scheme: 'regular', specified_premises: false };
   const country = taxProfile.country;
-  
+
   let channel = 'dine_in';
   const activeTypeBtn = document.querySelector('.order-type-btn.active');
   if (activeTypeBtn) {
     const t = activeTypeBtn.textContent.trim().toLowerCase();
-    if (t.includes('dine')) channel = 'dine_in';
-    else if (t.includes('take') || t.includes('carry')) channel = 'takeaway';
-    else if (t.includes('deliv')) channel = 'delivery';
+    if (t.includes('dine')) {channel = 'dine_in';}
+    else if (t.includes('take') || t.includes('carry')) {channel = 'takeaway';}
+    else if (t.includes('deliv')) {channel = 'delivery';}
   }
-  
+
   const featureOn = (k, fb) =>
     typeof global.RS_featureOn === 'function'
       ? global.RS_featureOn(k, settings, fb)
@@ -1239,7 +1239,7 @@ function getTotals(){
   const serviceChargePct = Number.isFinite(scPctRaw) && scPctRaw >= 0 ? scPctRaw : 5;
   const roundOffEnabled = featureOn('set_round_off_totals', true);
   const inclusivePricing = featureOn('set_inclusive_pricing', false);
-  
+
   const rawSubtotal = cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discAmount = Math.round(rawSubtotal * discountPct / 100);
   const netAfterDiscount = rawSubtotal - discAmount;
@@ -1252,7 +1252,7 @@ function getTotals(){
       deliveryCharge = Math.max(0, Number(dcEl.value) || 0);
     }
   } catch (_) {}
-  
+
   let serviceChargeAmount = 0;
   if (serviceChargeEnabled && serviceChargePct > 0) {
     serviceChargeAmount = Math.round(netAfterDiscount * (serviceChargePct / 100));
@@ -1265,22 +1265,22 @@ function getTotals(){
   } else if (activePromo.pct > 0) {
     promoOff = Math.round(Math.max(0, netAfterDiscount) * (activePromo.pct / 100));
   }
-  
+
   const items = cart.map(c => {
     const lineGross = c.price * c.qty;
     const lineDisc = Math.round(lineGross * discountPct / 100);
     const lineTaxableBase = lineGross - lineDisc;
-    
+
     let lineServiceCharge = 0;
     if (serviceChargeEnabled && rawSubtotal > 0) {
       lineServiceCharge = Math.round(serviceChargeAmount * (lineTaxableBase / netAfterDiscount));
     }
-    
+
     let lineTaxableValue = lineTaxableBase;
     if (serviceChargeEnabled && taxProfile.apply_gst_on_service_charge) {
       lineTaxableValue += lineServiceCharge;
     }
-    
+
     let rateCode = c.taxCategory || c.tax_category;
     if (!rateCode) {
       if (country === 'IE') {
@@ -1295,13 +1295,13 @@ function getTotals(){
         }
       }
     }
-    
+
     const resolved = window.RS_resolveRate(country, rateCode);
-    let taxPercent = resolved.percent;
-    let isAlcohol = (rateCode === 'IN_ALCOHOL_EXEMPT');
+    const taxPercent = resolved.percent;
+    const isAlcohol = (rateCode === 'IN_ALCOHOL_EXEMPT');
     let liquorTax = 0;
     let tax = 0;
-    
+
     if (isAlcohol) {
       const liquorRate = taxProfile.liquor_vat_rate || 20;
       if (inclusivePricing) {
@@ -1320,7 +1320,7 @@ function getTotals(){
         }
       }
     }
-    
+
     return {
       ...c,
       lineGross,
@@ -1335,12 +1335,12 @@ function getTotals(){
       label: resolved.label
     };
   });
-  
+
   const bandMap = {};
   let totalGst = 0;
   let totalLiquorTax = 0;
   let totalTaxableValue = 0;
-  
+
   items.forEach(item => {
     totalGst += item.tax;
     totalLiquorTax += item.liquorTax;
@@ -1366,7 +1366,7 @@ function getTotals(){
       bandMap[key].gross += item.lineTaxableValue + item.tax + item.liquorTax;
     }
   });
-  
+
   const taxSummary = calculateTaxesEnabled
     ? Object.values(bandMap).map(b => ({
         rateCode: b.rateCode,
@@ -1378,27 +1378,27 @@ function getTotals(){
         itcAllowed: b.itcAllowed
       }))
     : [];
-  
+
   let cgst = 0;
   let sgst = 0;
-  let igst = 0;
+  const igst = 0;
   if (country === 'IN' && taxProfile.gst_scheme !== 'composition') {
     cgst = Number((totalGst / 2).toFixed(2));
     sgst = Number((totalGst - cgst).toFixed(2));
   }
-  
+
   let grand = netAfterDiscount - promoOff + serviceChargeAmount + tip + deliveryCharge - loyaltyOff;
   if (!inclusivePricing) {
     grand += totalGst + totalLiquorTax;
   }
-  if (grand < 0) grand = 0;
-  
+  if (grand < 0) {grand = 0;}
+
   if (roundOffEnabled) {
     grand = Math.round(grand);
   } else {
     grand = Number(grand.toFixed(2));
   }
-  
+
   return {
     sub: rawSubtotal,
     disc: discAmount,
@@ -1432,7 +1432,7 @@ function getTotals(){
 function clearPromo() {
   activePromo = { code: '', pct: 0, fixed: 0, title: '', offerId: null };
   const pe = document.getElementById('promo-input');
-  if (pe) pe.value = '';
+  if (pe) {pe.value = '';}
   const badge = document.getElementById('promo-applied-badge');
   if (badge) {
     badge.style.display = 'none';
@@ -1448,7 +1448,7 @@ function setPromo(p) {
     offerId: (p && p.offerId) || null,
   };
   const pe = document.getElementById('promo-input');
-  if (pe && activePromo.code) pe.value = activePromo.code;
+  if (pe && activePromo.code) {pe.value = activePromo.code;}
   const badge = document.getElementById('promo-applied-badge');
   if (badge) {
     if (activePromo.code) {
@@ -1476,22 +1476,22 @@ function clearCart(){
   syncPosScalars();
   clearPromo();
   setCovers(0);
-  const d=$('#disc-input'); if(d) d.value='';
-  const tipEl=$('#tip-input'); if(tipEl) tipEl.value='';
+  const d=$('#disc-input'); if(d) {d.value='';}
+  const tipEl=$('#tip-input'); if(tipEl) {tipEl.value='';}
   renderCart();
-  if (window.innerWidth <= 1024) closeMobilePOSCart(false);
+  if (window.innerWidth <= 1024) {closeMobilePOSCart(false);}
 }
 function getCovers() {
   const el = document.getElementById('cart-covers');
-  if (!el) return 0;
+  if (!el) {return 0;}
   const n = Math.floor(Number(el.value));
-  if (!Number.isFinite(n) || n < 0) return 0;
+  if (!Number.isFinite(n) || n < 0) {return 0;}
   return Math.min(99, n);
 }
 function setCovers(n) {
   const el = document.getElementById('cart-covers');
   const v = Math.max(0, Math.min(99, Math.floor(Number(n) || 0)));
-  if (el) el.value = v > 0 ? String(v) : '';
+  if (el) {el.value = v > 0 ? String(v) : '';}
   return v;
 }
 function getCustomer(){
@@ -1499,12 +1499,12 @@ function getCustomer(){
   const phoneEl = $('#cust-input-phone') || $('#cust-phone');
   const gstEl = $('#cust-gst');
   const covers = getCovers();
-  
+
   let phoneVal = '';
   if (phoneEl) {
     phoneVal = window.RS_getFullPhoneNumber ? window.RS_getFullPhoneNumber(phoneEl) : phoneEl.value;
   }
-  
+
   const sel = $('#cart-customer-sel');
   if (sel && sel.value) {
     const opt = sel.options[sel.selectedIndex];
@@ -1529,29 +1529,29 @@ function getCustomer(){
   };
 }
 function runKotAction(){
-  if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+  if(!cart.length) {return toast('Cart is empty','fa-circle-exclamation');}
   try {
     if(window.RSPOS && window.RSPOS.kot) {
-      try { if (global.RSActionFeedback) global.RSActionFeedback.success(); } catch (_) {}
+      try { if (global.RSActionFeedback) {global.RSActionFeedback.success();} } catch (_) {}
       return window.RSPOS.kot();
     }
   } catch (err) {
     console.error('[KOT Error]', err);
-    try { if (global.RSActionFeedback) global.RSActionFeedback.error(); } catch (_) {}
+    try { if (global.RSActionFeedback) {global.RSActionFeedback.error();} } catch (_) {}
     return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
   }
   toast('KOT sent to kitchen','fa-fire');
 }
 function runCheckoutAction(){
-  if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+  if(!cart.length) {return toast('Cart is empty','fa-circle-exclamation');}
   try {
     if(window.RSPOS && window.RSPOS.checkout) {
-      try { if (global.RSActionFeedback) global.RSActionFeedback.success(); } catch (_) {}
+      try { if (global.RSActionFeedback) {global.RSActionFeedback.success();} } catch (_) {}
       return window.RSPOS.checkout();
     }
   } catch (err) {
     console.error('[Checkout Error]', err);
-    try { if (global.RSActionFeedback) global.RSActionFeedback.error(); } catch (_) {}
+    try { if (global.RSActionFeedback) {global.RSActionFeedback.error();} } catch (_) {}
     return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
   }
   // RSPOS module not loaded -- do not silently show false success
@@ -1559,28 +1559,28 @@ function runCheckoutAction(){
 }
 function ensureCartActionDelegation(){
   // Shared flag — avoid double document listeners when pos-ui loads twice
-  if (_pos.cartActionsDelegated) return;
+  if (_pos.cartActionsDelegated) {return;}
   _pos.cartActionsDelegated = true;
   document.addEventListener('click', e => {
     const btn = e.target.closest('#btn-kot, #btn-checkout');
-    if (!btn) return;
+    if (!btn) {return;}
     e.preventDefault();
     // Soft-blocked (empty cart / cash short): prefer features-pos checkout which explains why
     if (btn.id === 'btn-checkout') {
       if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
-        if (window.RSPOS && typeof window.RSPOS.checkout === 'function') return window.RSPOS.checkout();
+        if (window.RSPOS && typeof window.RSPOS.checkout === 'function') {return window.RSPOS.checkout();}
       }
       return runCheckoutAction();
     }
-    if (btn.id === 'btn-kot') return runKotAction();
+    if (btn.id === 'btn-kot') {return runKotAction();}
   });
 }
 function wireCartActions(){
   ensureCartActionDelegation();
   const kotBtn = $('#btn-kot');
-  if (kotBtn) kotBtn.onclick = null;
+  if (kotBtn) {kotBtn.onclick = null;}
   const checkoutBtn = $('#btn-checkout');
-  if (checkoutBtn) checkoutBtn.onclick = null;
+  if (checkoutBtn) {checkoutBtn.onclick = null;}
 }
 // POS init (static parts present in HTML, wire them)
 function syncTablePaxForOrderType() {
@@ -1614,7 +1614,7 @@ function initPOS(){
         if (tab && tab.classList.contains('active')) {
           paintHappyHourBanner();
           // Re-render prices if HH state flipped
-          if (document.getElementById('pos-grid')) renderPOS();
+          if (document.getElementById('pos-grid')) {renderPOS();}
         }
       } catch (_) {}
     }, 60000);
@@ -1622,17 +1622,17 @@ function initPOS(){
   // Helper function to get tab key for an order type (fixed, not dependent on table number)
   function getTabKeyForOrderType(orderTypeText) {
     const lowerText = orderTypeText.toLowerCase();
-    if (lowerText.includes('delivery')) return 'Delivery';
-    if (lowerText.includes('dine')) return 'Dine-in';
+    if (lowerText.includes('delivery')) {return 'Delivery';}
+    if (lowerText.includes('dine')) {return 'Dine-in';}
     return 'Takeaway';
   }
 
   // Load saved active order type and corresponding cart
   try {
     // Load saved active order type
-    let savedOrderType = localStorage.getItem('rs_active_order_type');
+    const savedOrderType = localStorage.getItem('rs_active_order_type');
     let activeOrderTypeBtn = document.querySelector('.order-type-btn.active');
-    
+
     // If we have a saved order type, activate that button first
     if (savedOrderType) {
       const btns = document.querySelectorAll('.order-type-btn');
@@ -1670,9 +1670,9 @@ function initPOS(){
       const da = document.getElementById('delivery-address');
       const dc = document.getElementById('delivery-charge');
       const dr = document.getElementById('delivery-rider');
-      if (da) da.value = tabData.deliveryAddress || '';
-      if (dc) dc.value = tabData.deliveryCharge || '';
-      if (dr) dr.value = tabData.deliveryRider || '';
+      if (da) {da.value = tabData.deliveryAddress || '';}
+      if (dc) {dc.value = tabData.deliveryCharge || '';}
+      if (dr) {dr.value = tabData.deliveryRider || '';}
     } else {
       // Fall back to the old active cart key if no tab-specific cart exists
       const savedCart = localStorage.getItem('rs_active_cart');
@@ -1684,25 +1684,25 @@ function initPOS(){
     if (savedDiscount) {
       discountPct = Number(savedDiscount) || 0;
       const discInput = $('#disc-input');
-      if (discInput) discInput.value = discountPct;
+      if (discInput) {discInput.value = discountPct;}
     }
     const savedTip = localStorage.getItem('rs_active_cart_tip');
     if (savedTip) {
       tipAmount = Math.max(0, Number(savedTip) || 0);
       const tipInput = $('#tip-input');
-      if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
+      if (tipInput) {tipInput.value = tipAmount > 0 ? tipAmount : '';}
     }
     const savedCustomer = localStorage.getItem('rs_active_cart_customer');
     if (savedCustomer) {
       const customer = JSON.parse(savedCustomer);
       const cartTable = $('#cart-table');
-      if (cartTable && customer.table) cartTable.value = customer.table;
+      if (cartTable && customer.table) {cartTable.value = customer.table;}
       const custName = $('#cust-input-name') || $('#cust-name');
-      if (custName && customer.name) custName.value = customer.name;
+      if (custName && customer.name) {custName.value = customer.name;}
       const custPhone = $('#cust-input-phone') || $('#cust-phone');
-      if (custPhone && customer.phone) custPhone.value = customer.phone;
+      if (custPhone && customer.phone) {custPhone.value = customer.phone;}
       const custGst = $('#cust-gst');
-      if (custGst && customer.gst) custGst.value = customer.gst;
+      if (custGst && customer.gst) {custGst.value = customer.gst;}
     }
   } catch (e) {
     console.warn('[Cart Persistence Warning] Failed to load saved cart:', e);
@@ -1711,12 +1711,12 @@ function initPOS(){
   // -- Mount country-code prefix picker on cart customer phone --
   (function mountCartPhonePicker() {
     const phoneEl = document.getElementById('cust-input-phone');
-    if (!phoneEl || phoneEl.dataset.phonePrefixBuilt) return;
+    if (!phoneEl || phoneEl.dataset.phonePrefixBuilt) {return;}
     const settings = window.RS_SETTINGS || {};
     let countryCode = 'IN';
     if (settings.set_country && window.RS_getCountryByName) {
       const entry = window.RS_getCountryByName(settings.set_country);
-      if (entry) countryCode = entry.code;
+      if (entry) {countryCode = entry.code;}
     }
     if (window.RS_buildPhonePrefix) {
       window.RS_buildPhonePrefix(phoneEl, countryCode);
@@ -1726,11 +1726,11 @@ function initPOS(){
   // Category chips are derived from the live menu, including custom categories.
   refreshPosCats();
   $('#pos-search-input').addEventListener('input', renderPOS);
-  if ($('#pos-sort-select')) $('#pos-sort-select').addEventListener('change', renderPOS);
+  if ($('#pos-sort-select')) {$('#pos-sort-select').addEventListener('change', renderPOS);}
   // Manual / off-menu cart item
   (function wireCustomItemBtn() {
     const head = document.querySelector('.cart-head-actions') || document.querySelector('.pos-toolbar-secondary');
-    if (!head || document.getElementById('btn-custom-cart-item')) return;
+    if (!head || document.getElementById('btn-custom-cart-item')) {return;}
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'btn-custom-cart-item';
@@ -1739,18 +1739,18 @@ function initPOS(){
     btn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (global.RSMenuIntel && RSMenuIntel.openCustomCartItem) RSMenuIntel.openCustomCartItem();
-      else toast('Custom item module loading…', 'fa-circle-info');
+      if (global.RSMenuIntel && RSMenuIntel.openCustomCartItem) {RSMenuIntel.openCustomCartItem();}
+      else {toast('Custom item module loading…', 'fa-circle-info');}
     });
     head.insertBefore(btn, head.firstChild);
   })();
   // Expose cart helpers for menu-intelligence custom lines
   function setCart(next) {
-    if (Array.isArray(next)) replaceCart(next);
+    if (Array.isArray(next)) {replaceCart(next);}
     renderCart();
   }
   function addCustomLine(line) {
-    if (!line) return;
+    if (!line) {return;}
     cart.push(line);
     renderCart();
   }
@@ -1806,15 +1806,15 @@ function initPOS(){
           const newTabData = JSON.parse(savedNewTabCart);
           replaceCart(newTabData.items || []);
           // Load delivery fields if applicable
-          if (da) da.value = newTabData.deliveryAddress || '';
-          if (dc) dc.value = newTabData.deliveryCharge || '';
-          if (dr) dr.value = newTabData.deliveryRider || '';
+          if (da) {da.value = newTabData.deliveryAddress || '';}
+          if (dc) {dc.value = newTabData.deliveryCharge || '';}
+          if (dr) {dr.value = newTabData.deliveryRider || '';}
         } else {
           replaceCart([]); // If no saved cart for new tab, start fresh!
           // Clear delivery fields too
-          if (da) da.value = '';
-          if (dc) dc.value = '';
-          if (dr) dr.value = '';
+          if (da) {da.value = '';}
+          if (dc) {dc.value = '';}
+          if (dr) {dr.value = '';}
         }
 
         // Load the new tab's customer data
@@ -1823,8 +1823,8 @@ function initPOS(){
           const newCustData = JSON.parse(savedNewTabCust);
           const nameEl = document.getElementById('cust-input-name') || document.getElementById('cust-name');
           const phoneEl = document.getElementById('cust-input-phone') || document.getElementById('cust-phone');
-          if (nameEl) nameEl.value = newCustData.name || '';
-          if (phoneEl) phoneEl.value = newCustData.phone || '';
+          if (nameEl) {nameEl.value = newCustData.name || '';}
+          if (phoneEl) {phoneEl.value = newCustData.phone || '';}
         }
 
         // Re-render the cart!
@@ -1847,7 +1847,7 @@ function initPOS(){
       });
     }
     document.querySelectorAll('[data-tip-pct]').forEach((btn) => {
-      if (btn.dataset.bound) return;
+      if (btn.dataset.bound) {return;}
       btn.dataset.bound = '1';
       btn.addEventListener('click', () => {
         const pct = Number(btn.dataset.tipPct) || 0;
@@ -1855,7 +1855,7 @@ function initPOS(){
         // base for % tip = sub - disc (before tip)
         const base = Math.max(0, (totals.sub || 0) - (totals.disc || 0));
         tipAmount = pct <= 0 ? 0 : Math.round(base * (pct / 100));
-        if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
+        if (tipInput) {tipInput.value = tipAmount > 0 ? tipAmount : '';}
         renderCart();
       });
     });
@@ -1920,9 +1920,9 @@ function initPOS(){
     }
   });
   $('#btn-kot').onclick = () => {
-    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+    if(!cart.length) {return toast('Cart is empty','fa-circle-exclamation');}
     try {
-      if(window.RSPOS && window.RSPOS.kot) return window.RSPOS.kot();
+      if(window.RSPOS && window.RSPOS.kot) {return window.RSPOS.kot();}
     } catch (err) {
       console.error('[KOT Error]', err);
       return toast('KOT Error: ' + err.message, 'fa-circle-exclamation');
@@ -1930,9 +1930,9 @@ function initPOS(){
     toast('KOT sent to kitchen','fa-fire');
   };
   $('#btn-checkout').onclick = () => {
-    if(!cart.length) return toast('Cart is empty','fa-circle-exclamation');
+    if(!cart.length) {return toast('Cart is empty','fa-circle-exclamation');}
     try {
-      if(window.RSPOS && window.RSPOS.checkout) return window.RSPOS.checkout();
+      if(window.RSPOS && window.RSPOS.checkout) {return window.RSPOS.checkout();}
     } catch (err) {
       console.error('[Checkout Error]', err);
       return toast('Checkout Error: ' + err.message, 'fa-circle-exclamation');
@@ -1952,12 +1952,12 @@ function initPOS(){
       grid.style.setProperty('--pos-grid-size', val + 'px');
       try { localStorage.setItem('rs-pos-grid-size', val); } catch(e){}
     };
-    slider.oninput = () => updateGridSize(parseInt(slider.value) || 158);
-    decBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) - 15);
-    incBtn.onclick = () => updateGridSize((parseInt(slider.value) || 158) + 15);
+    slider.oninput = () => updateGridSize(parseInt(slider.value, 10) || 158);
+    decBtn.onclick = () => updateGridSize((parseInt(slider.value, 10) || 158) - 15);
+    incBtn.onclick = () => updateGridSize((parseInt(slider.value, 10) || 158) + 15);
     try {
       const savedSize = localStorage.getItem('rs-pos-grid-size') || 158;
-      updateGridSize(parseInt(savedSize));
+      updateGridSize(parseInt(savedSize, 10));
     } catch(e) {
       updateGridSize(158);
     }
@@ -1967,7 +1967,7 @@ function initPOS(){
   const cartBar = $('#pos-m-cart-bar');
   const backBtn = $('#btn-pos-back-menu');
   bindMobileCartBar();
-  if (backBtn && cartBar) backBtn.onclick = () => { if (window.innerWidth <= 1024) closeMobilePOSCart(true); };
+  if (backBtn && cartBar) {backBtn.onclick = () => { if (window.innerWidth <= 1024) {closeMobilePOSCart(true);} };}
 
   renderPOS(); renderCart();
 
@@ -2000,7 +2000,7 @@ function initPOS(){
     tipAmount = Math.max(0, Number(n) || 0);
     syncPosScalars();
     const tipInput = document.getElementById('tip-input');
-    if (tipInput) tipInput.value = tipAmount > 0 ? tipAmount : '';
+    if (tipInput) {tipInput.value = tipAmount > 0 ? tipAmount : '';}
   }
   function getTip() {
     return tipAmount;
@@ -2064,7 +2064,7 @@ function initPOS(){
   global.refreshPosCats = refreshPosCats;
 
   function attachToRS() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     const api = global.RSPosUI;
     global.RS.renderPOS = api.renderPOS;
     global.RS.renderCart = api.renderCart;
@@ -2090,6 +2090,6 @@ function initPOS(){
     global.RS.isHappyHourActive = api.isHappyHourActive;
     global.RS.effectiveMenuPrice = api.effectiveMenuPrice;
   }
-  if (global.RS) attachToRS();
+  if (global.RS) {attachToRS();}
   document.addEventListener('rs:ready', attachToRS);
 })(typeof window !== 'undefined' ? window : globalThis);

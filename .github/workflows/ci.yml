@@ -36,6 +36,9 @@ jobs:
         env:
           SKIP_ANDROID_BUILD: "1"
 
+      - name: ESLint (strict rules — no-var, curly, eqeqeq, no-undef, etc.)
+        run: npm run lint:ci
+
       - name: Run test suite
         run: npm test
 

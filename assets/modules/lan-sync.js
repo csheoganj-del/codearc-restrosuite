@@ -11,20 +11,20 @@
 (function (global) {
   'use strict';
 
-  var HUB_KEY = 'rs_lan_hub_url_v1';
-  var es = null;
-  var lastPushAt = 0;
-  var seenKeys = {};
+  const HUB_KEY = 'rs_lan_hub_url_v1';
+  let es = null;
+  let lastPushAt = 0;
+  const seenKeys = {};
 
   function toast(msg, icon) {
     try {
-      if (global.RS && RS.toast) RS.toast(msg, icon);
+      if (global.RS && RS.toast) { RS.toast(msg, icon); }
     } catch (_) {}
   }
 
   function tenantId() {
     try {
-      var s = global.RS_API && RS_API.session && RS_API.session();
+      const s = global.RS_API && RS_API.session && RS_API.session();
       return String((s && (s.tenant_id || s.tenant_slug)) || sessionStorage.getItem('tenant_id') || 'local');
     } catch (_) {
       return 'local';
@@ -32,12 +32,12 @@
   }
 
   function statusRank(s) {
-    var x = String(s || '').toLowerCase();
-    if (/cancel|void|rejected/.test(x)) return 90;
-    if (/ready|served|complete|done|closed|settled|paid/.test(x)) return 80;
-    if (/prepar/.test(x)) return 50;
-    if (/accept/.test(x)) return 40;
-    if (/pending|review|new/.test(x)) return 20;
+    const x = String(s || '').toLowerCase();
+    if (/cancel|void|rejected/.test(x)) { return 90; }
+    if (/ready|served|complete|done|closed|settled|paid/.test(x)) { return 80; }
+    if (/prepar/.test(x)) { return 50; }
+    if (/accept/.test(x)) { return 40; }
+    if (/pending|review|new/.test(x)) { return 20; }
     return 10;
   }
 
@@ -46,16 +46,16 @@
   }
 
   function defaultHubCandidates() {
-    var list = [];
+    const list = [];
     try {
-      var origin = location.origin || '';
+      const origin = location.origin || '';
       if (/^https?:\/\/(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(origin)) {
         list.push(origin.replace(/\/$/, ''));
       }
     } catch (_) {}
     try {
-      var saved = localStorage.getItem(HUB_KEY);
-      if (saved) list.unshift(String(saved).replace(/\/$/, ''));
+      const saved = localStorage.getItem(HUB_KEY);
+      if (saved) { list.unshift(String(saved).replace(/\/$/, '')); }
     } catch (_) {}
     // Common desktop default
     list.push('http://127.0.0.1:8001');
@@ -64,18 +64,18 @@
 
   async function probeHub(base) {
     try {
-      var r = await fetch(base + '/api/lan/info', { cache: 'no-store' });
-      if (!r.ok) return null;
-      var j = await r.json();
-      if (j && j.enabled) return { base: base, info: j };
+      const r = await fetch(base + '/api/lan/info', { cache: 'no-store' });
+      if (!r.ok) { return null; }
+      const j = await r.json();
+      if (j && j.enabled) { return { base: base, info: j }; }
     } catch (_) {}
     return null;
   }
 
   async function findHub() {
-    var cands = defaultHubCandidates();
-    for (var i = 0; i < cands.length; i++) {
-      var hit = await probeHub(cands[i]);
+    const cands = defaultHubCandidates();
+    for (let i = 0; i < cands.length; i++) {
+      const hit = await probeHub(cands[i]);
       if (hit) {
         try { localStorage.setItem(HUB_KEY, hit.base); } catch (_) {}
         return hit;
@@ -85,40 +85,40 @@
   }
 
   function mergeIntoLocal(row) {
-    if (!row || !global.RS_DB) return Promise.resolve();
-    var key = orderKey(row);
-    if (!key) return Promise.resolve();
+    if (!row || !global.RS_DB) { return Promise.resolve(); }
+    const key = orderKey(row);
+    if (!key) { return Promise.resolve(); }
     return RS_DB.listLocal
       ? RS_DB.listLocal('pending_orders').then(function (rows) {
           rows = rows || [];
-          var idx = rows.findIndex(function (r) { return orderKey(r) === key || String(r.id) === String(row.id); });
-          var prev = idx >= 0 ? rows[idx] : null;
-          var merged;
+          const idx = rows.findIndex(function (r) { return orderKey(r) === key || String(r.id) === String(row.id); });
+          const prev = idx >= 0 ? rows[idx] : null;
+          let merged;
           if (!prev) {
             merged = Object.assign({}, row, { id: row.id != null ? row.id : key });
             rows.push(merged);
           } else {
-            var pr = statusRank(prev.status);
-            var nr = statusRank(row.status);
-            if (nr > pr) merged = Object.assign({}, prev, row, { status: row.status });
-            else if (nr < pr) merged = Object.assign({}, row, prev, { status: prev.status });
-            else merged = Object.assign({}, prev, row, { status: prev.status });
+            const pr = statusRank(prev.status);
+            const nr = statusRank(row.status);
+            if (nr > pr) { merged = Object.assign({}, prev, row, { status: row.status }); }
+            else if (nr < pr) { merged = Object.assign({}, row, prev, { status: prev.status }); }
+            else { merged = Object.assign({}, prev, row, { status: prev.status }); }
             rows[idx] = merged;
           }
-          if (typeof RS_DB.writeLocal === 'function') return RS_DB.writeLocal('pending_orders', rows);
+          if (typeof RS_DB.writeLocal === 'function') { return RS_DB.writeLocal('pending_orders', rows); }
           return null;
         }).then(function () {
           try {
-            if (global.RS_SYNC && RS_SYNC.syncPendingOrders) RS_SYNC.syncPendingOrders({ forceCloud: false });
+            if (global.RS_SYNC && RS_SYNC.syncPendingOrders) { RS_SYNC.syncPendingOrders({ forceCloud: false }); }
           } catch (_) {}
         })
       : Promise.resolve();
   }
 
   async function pushRow(row) {
-    if (!row) return;
-    var hub = await findHub();
-    if (!hub) return;
+    if (!row) { return; }
+    const hub = await findHub();
+    if (!hub) { return; }
     try {
       await fetch(hub.base + '/api/lan/push', {
         method: 'POST',
@@ -133,19 +133,19 @@
   }
 
   function paintLanChip(ok, hub) {
-    var chip = document.getElementById('rs-lan-hub-chip');
+    let chip = document.getElementById('rs-lan-hub-chip');
     if (!chip) {
-      var right = document.getElementById('tb-right');
-      if (!right) return;
+      const right = document.getElementById('tb-right');
+      if (!right) { return; }
       chip = document.createElement('button');
       chip.type = 'button';
       chip.id = 'rs-lan-hub-chip';
       chip.style.cssText =
         'display:none;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--stroke-2);background:var(--glass);cursor:pointer;color:var(--text-soft)';
       chip.innerHTML = '<i class="fa-solid fa-network-wired"></i><span class="t">LAN</span>';
-      var ver = document.getElementById('app-version-pill');
-      if (ver && ver.parentNode) ver.parentNode.insertBefore(chip, ver);
-      else right.appendChild(chip);
+      const ver = document.getElementById('app-version-pill');
+      if (ver && ver.parentNode) { ver.parentNode.insertBefore(chip, ver); }
+      else { right.appendChild(chip); }
       chip.onclick = function () {
         showLanHelp(hub);
       };
@@ -172,19 +172,19 @@
   }
 
   async function showLanHelp(hub) {
-    var info = hub && hub.info;
+    let info = hub && hub.info;
     if (!info) {
       try {
-        var r = await fetch('/api/lan/info', { cache: 'no-store' });
-        if (r.ok) info = await r.json();
+        const r = await fetch('/api/lan/info', { cache: 'no-store' });
+        if (r.ok) { info = await r.json(); }
       } catch (_) {}
     }
-    var ips = (info && info.lanIps) || [];
-    var port = (info && info.port) || location.port || 8001;
-    var lines = ips.length
+    const ips = (info && info.lanIps) || [];
+    const port = (info && info.port) || location.port || 8001;
+    const lines = ips.length
       ? ips.map(function (ip) { return 'http://' + ip + ':' + port; }).join('\n')
       : (location.origin || '');
-    var msg =
+    const msg =
       'Same Wi‑Fi kitchen (no internet needed)\n\n' +
       '1) Run RestroSuite Desktop on the POS PC\n' +
       '2) On kitchen tablet browser open:\n' +
@@ -213,26 +213,26 @@
       try { es.close(); } catch (_) {}
       es = null;
     }
-    if (!hub || typeof EventSource === 'undefined') return;
-    var url = hub.base + '/api/lan/stream?t=' + encodeURIComponent(tenantId());
+    if (!hub || typeof EventSource === 'undefined') { return; }
+    const url = hub.base + '/api/lan/stream?t=' + encodeURIComponent(tenantId());
     try {
       es = new EventSource(url);
       es.addEventListener('order', function (ev) {
         try {
-          var data = JSON.parse(ev.data || '{}');
+          const data = JSON.parse(ev.data || '{}');
           if (data && data.row) {
-            var k = orderKey(data.row);
-            var isNew = k && !seenKeys[k];
+            const k = orderKey(data.row);
+            const isNew = k && !seenKeys[k];
             seenKeys[k] = 1;
             mergeIntoLocal(data.row).then(function () {
               // Only chime for fresh young tickets (anti-chaos)
-              var age = Date.now() - (Date.parse(data.row.dateTime || data.row.date_time || 0) || Date.now());
-              var st = String(data.row.status || '');
-              var active = /pending|accept|prepar/i.test(st) && !/ready|served|cancel/i.test(st);
+              const age = Date.now() - (Date.parse(data.row.dateTime || data.row.date_time || 0) || Date.now());
+              const st = String(data.row.status || '');
+              const active = /pending|accept|prepar/i.test(st) && !/ready|served|cancel/i.test(st);
               if (isNew && active && age < 8 * 60 * 1000) {
                 try {
-                  if (global.RSServiceAlerts && RSServiceAlerts.playChime) RSServiceAlerts.playChime(false);
-                  else if (global.playChime) playChime(false);
+                  if (global.RSServiceAlerts && RSServiceAlerts.playChime) { RSServiceAlerts.playChime(false); }
+                  else if (global.playChime) { playChime(false); }
                 } catch (_) {}
                 toast('LAN KOT: ' + (data.row.tableNumber || data.row.orderId || 'order'), 'fa-fire-burner');
               }
@@ -247,13 +247,13 @@
   }
 
   async function pullSnapshot(hub) {
-    if (!hub) return;
+    if (!hub) { return; }
     try {
-      var r = await fetch(hub.base + '/api/lan/snapshot?t=' + encodeURIComponent(tenantId()), { cache: 'no-store' });
-      if (!r.ok) return;
-      var j = await r.json();
-      var orders = (j && j.orders) || [];
-      for (var i = 0; i < orders.length; i++) {
+      const r = await fetch(hub.base + '/api/lan/snapshot?t=' + encodeURIComponent(tenantId()), { cache: 'no-store' });
+      if (!r.ok) { return; }
+      const j = await r.json();
+      const orders = (j && j.orders) || [];
+      for (let i = 0; i < orders.length; i++) {
         seenKeys[orderKey(orders[i])] = 1;
         await mergeIntoLocal(orders[i]);
       }
@@ -261,11 +261,11 @@
   }
 
   function hookDbPuts() {
-    if (!global.RS_DB || RS_DB._lanHooked) return;
-    var origPut = RS_DB.put && RS_DB.put.bind(RS_DB);
-    if (!origPut) return;
+    if (!global.RS_DB || RS_DB._lanHooked) { return; }
+    const origPut = RS_DB.put && RS_DB.put.bind(RS_DB);
+    if (!origPut) { return; }
     RS_DB.put = function (c, id, obj) {
-      var p = origPut(c, id, obj);
+      const p = origPut(c, id, obj);
       if (c === 'pending_orders' && obj) {
         Promise.resolve(p)
           .then(function (row) {
@@ -280,7 +280,7 @@
 
   async function boot() {
     hookDbPuts();
-    var hub = await findHub();
+    const hub = await findHub();
     if (hub) {
       paintLanChip(true, hub);
       await pullSnapshot(hub);
@@ -303,17 +303,17 @@
   }
 
   function billMatchesOrder(bill, order) {
-    if (!bill || !order) return false;
-    var oid = String(order.orderId || order.order_id || '');
-    var bid = String(bill.no || bill.orderId || bill.order_id || '');
-    if (oid && bid && (oid === bid || oid.indexOf(bid) !== -1 || bid.indexOf(oid) !== -1)) return true;
-    var ot = normTable(order.tableNumber || order.table);
-    var bt = normTable(bill.table || bill.tableNumber);
-    if (!ot || !bt || ot !== bt) return false;
-    if (ot === 'walk-in/takeaway' || ot === 'takeaway' || ot === 'walk-in') return false;
-    var tO = Date.parse(order.dateTime || order.date_time || 0) || 0;
-    var tB = Date.parse(bill.dateTime || bill.time || bill.created_at || 0) || 0;
-    if (!tO || !tB) return false;
+    if (!bill || !order) { return false; }
+    const oid = String(order.orderId || order.order_id || '');
+    const bid = String(bill.no || bill.orderId || bill.order_id || '');
+    if (oid && bid && (oid === bid || oid.indexOf(bid) !== -1 || bid.indexOf(oid) !== -1)) { return true; }
+    const ot = normTable(order.tableNumber || order.table);
+    const bt = normTable(bill.table || bill.tableNumber);
+    if (!ot || !bt || ot !== bt) { return false; }
+    if (ot === 'walk-in/takeaway' || ot === 'takeaway' || ot === 'walk-in') { return false; }
+    const tO = Date.parse(order.dateTime || order.date_time || 0) || 0;
+    const tB = Date.parse(bill.dateTime || bill.time || bill.created_at || 0) || 0;
+    if (!tO || !tB) { return false; }
     // Same table bill within 3 hours of the KOT → treat as already served/billed
     return Math.abs(tB - tO) < 3 * 60 * 60 * 1000;
   }
@@ -325,21 +325,21 @@
    */
   function reconcileAfterReconnect(rows, bills, opts) {
     opts = opts || {};
-    var now = Date.now();
+    const now = Date.now();
     // Open tickets older than this are auto-closed (already cooked verbally offline)
-    var STALE_MS = opts.staleMs != null ? opts.staleMs : 12 * 60 * 1000;
+    const STALE_MS = opts.staleMs != null ? opts.staleMs : 12 * 60 * 1000;
     // Soft: 5–12 min → still on board but labeled "confirm if done"
-    var REVIEW_MS = opts.reviewMs != null ? opts.reviewMs : 5 * 60 * 1000;
-    var billList = bills || [];
-    var closedByBill = 0;
-    var closedStale = 0;
-    var review = 0;
-    var out = (rows || []).map(function (r) {
-      if (!r || !isOpenKitchenStatus(r.status)) return r;
+    const REVIEW_MS = opts.reviewMs != null ? opts.reviewMs : 5 * 60 * 1000;
+    const billList = bills || [];
+    let closedByBill = 0;
+    let closedStale = 0;
+    let review = 0;
+    const out = (rows || []).map(function (r) {
+      if (!r || !isOpenKitchenStatus(r.status)) { return r; }
       if (r.kitchenHandled || r.manualFulfilled || r.skipKdsAlarm && r.reconcileReason === 'stale_offline') {
         return r;
       }
-      var matched = billList.some(function (b) { return billMatchesOrder(b, r); });
+      const matched = billList.some(function (b) { return billMatchesOrder(b, r); });
       if (matched) {
         closedByBill++;
         return Object.assign({}, r, {
@@ -352,7 +352,7 @@
           kitchenHandledAt: new Date().toISOString(),
         });
       }
-      var age = now - (Date.parse(r.dateTime || r.date_time || 0) || now);
+      const age = now - (Date.parse(r.dateTime || r.date_time || 0) || now);
       if (age >= STALE_MS) {
         closedStale++;
         return Object.assign({}, r, {
@@ -387,22 +387,22 @@
     billMatchesOrder: billMatchesOrder,
     reconcileAfterReconnect: reconcileAfterReconnect,
     mergeRows: function (localRows, cloudRows) {
-      var map = {};
+      const map = {};
       function consider(r) {
-        if (!r) return;
-        var k = orderKey(r);
-        if (!k) k = String(r.id || '');
-        if (!k) return;
-        var prev = map[k];
+        if (!r) { return; }
+        let k = orderKey(r);
+        if (!k) { k = String(r.id || ''); }
+        if (!k) { return; }
+        const prev = map[k];
         if (!prev) {
           map[k] = Object.assign({}, r);
           return;
         }
-        var pr = statusRank(prev.status);
-        var nr = statusRank(r.status);
+        const pr = statusRank(prev.status);
+        const nr = statusRank(r.status);
         // Always keep kitchenHandled / skipKdsAlarm flags
-        var handled = !!(prev.kitchenHandled || r.kitchenHandled || prev.manualFulfilled || r.manualFulfilled);
-        var skip = !!(prev.skipKdsAlarm || r.skipKdsAlarm);
+        const handled = !!(prev.kitchenHandled || r.kitchenHandled || prev.manualFulfilled || r.manualFulfilled);
+        const skip = !!(prev.skipKdsAlarm || r.skipKdsAlarm);
         if (nr > pr) {
           map[k] = Object.assign({}, prev, r, {
             status: r.status,
@@ -440,6 +440,6 @@
     // Cloud will drain; re-attach LAN if still useful
     setTimeout(boot, 800);
   });
-  if (document.readyState !== 'loading') setTimeout(boot, 600);
-  else document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 600); });
+  if (document.readyState !== 'loading') { setTimeout(boot, 600); }
+  else { document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 600); }); }
 })(typeof window !== 'undefined' ? window : globalThis);

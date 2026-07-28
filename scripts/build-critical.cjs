@@ -37,7 +37,7 @@ const crypto = require('crypto');
 async function main() {
   const root   = path.join(__dirname, '..');
   const outDir = path.join(root, 'assets', 'dist');
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  if (!fs.existsSync(outDir)) {fs.mkdirSync(outDir, { recursive: true });}
 
   let esbuild;
   try {
@@ -91,7 +91,7 @@ async function main() {
   const concatenated = sources
     .map((rel) => {
       const p = path.join(root, rel);
-      if (!fs.existsSync(p)) throw new Error('[build-critical] Missing source: ' + rel);
+      if (!fs.existsSync(p)) {throw new Error('[build-critical] Missing source: ' + rel);}
       return `\n/* === ${rel} === */\n` + fs.readFileSync(p, 'utf8') + '\n';
     })
     .join('\n');
@@ -153,7 +153,40 @@ async function main() {
     return;
   }
 
-  const featureTargets = [
+  // Auto-discover JS files in publish-static/. Exclude:
+  //   - assets/dist/* (already built in Pass 1)
+  //   - *.min.js / qrcode.min.js (3rd party or pre-minified)
+  //   - *.bundle.js (Pass 1 output)
+  //   - lib/ folder (3rd party vendored)
+  //   - Node 22+ fs.glob fallback to readdir walk for wide Node support
+  function walkPass2(dir, results = []) {
+    if (!fs.existsSync(dir)) {return results;}
+    const relPublish = path.relative(publishDir, dir);
+    if (relPublish.startsWith('assets' + path.sep + 'dist')) {return results;}
+    if (relPublish.startsWith('assets' + path.sep + 'lib')) {return results;}
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        walkPass2(full, results);
+      } else if (e.isFile() && e.name.endsWith('.js')) {
+        if (e.name.endsWith('.min.js')) {continue;}
+        if (e.name === 'qrcode.min.js') {continue;}
+        if (e.name.endsWith('.bundle.js')) {continue;}
+        if (e.name.endsWith('.map')) {continue;}
+        results.push(full);
+      }
+    }
+    return results;
+  }
+
+  const assetsDir = path.join(publishDir, 'assets');
+  const srcDir = path.join(publishDir, 'src');
+  const allPass2 = walkPass2(assetsDir).concat(walkPass2(srcDir));
+
+  // Always also include the explicit dashboard/features root-level relative
+  // entries when they exist directly under publish-static/assets (belt+suspenders)
+  const explicitRel = [
     'assets/dashboard.js',
     'assets/features-shell.js',
     'assets/features-editor.js',
@@ -162,42 +195,53 @@ async function main() {
     'assets/features-pos.js',
     'assets/features-growth.js',
   ];
+  for (const rel of explicitRel) {
+    const p = path.join(publishDir, rel);
+    if (fs.existsSync(p) && !allPass2.includes(p)) {allPass2.push(p);}
+  }
 
-  console.log('[build-critical] Pass 2: minifying standalone feature scripts in publish-static/...');
+  console.log(
+    `[build-critical] Pass 2: minifying ${allPass2.length} standalone JS files in publish-static/...`
+  );
   let pass2SavedBytes = 0;
+  let processed = 0;
 
-  for (const rel of featureTargets) {
-    const srcPath = path.join(publishDir, rel);
-    if (!fs.existsSync(srcPath)) {
-      console.warn('[build-critical] Pass 2 skip (not found):', rel);
-      continue;
-    }
+  for (const srcPath of allPass2) {
+    const rel = path.relative(publishDir, srcPath);
     const original  = fs.readFileSync(srcPath, 'utf8');
     const beforeLen = Buffer.byteLength(original, 'utf8');
+    if (beforeLen === 0) {continue;}
     try {
       const result = await esbuild.transform(original, {
         loader:    'js',
         minify:    true,
-        sourcemap: 'inline',   // inline map keeps the single-file deployment simple
+        sourcemap: 'inline',
         target:    ['es2019'],
       });
       const afterLen = Buffer.byteLength(result.code, 'utf8');
       fs.writeFileSync(srcPath, result.code, 'utf8');
       const saved = Math.round((1 - afterLen / beforeLen) * 100);
       pass2SavedBytes += (beforeLen - afterLen);
-      console.log(
-        '[build-critical] Pass 2',
-        rel.padEnd(40),
-        `${(beforeLen / 1024).toFixed(1)} KB → ${(afterLen / 1024).toFixed(1)} KB`,
-        `(${saved}% saved)`
-      );
+      processed += 1;
+      if (processed <= 12 || saved > 30) {
+        console.log(
+          '[build-critical] Pass 2',
+          rel.padEnd(48),
+          `${(beforeLen / 1024).toFixed(1)} KB → ${(afterLen / 1024).toFixed(1)} KB`,
+          `(${saved}% saved)`
+        );
+      }
     } catch (err) {
       console.warn('[build-critical] Pass 2 skipped (transform error):', rel, err.message);
     }
   }
 
+  if (processed > 12) {
+    console.log(`[build-critical] Pass 2 ... (${processed - 12} additional files minified; see counts above)`);
+  }
+
   console.log(
-    `[build-critical] Pass 2 complete: ${(pass2SavedBytes / 1024).toFixed(1)} KB total saved across feature scripts.`
+    `[build-critical] Pass 2 complete: ${processed} files, ${(pass2SavedBytes / 1024).toFixed(1)} KB total saved.`
   );
 }
 

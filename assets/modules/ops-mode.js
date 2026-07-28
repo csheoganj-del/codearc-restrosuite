@@ -8,10 +8,10 @@
 (function (global) {
   'use strict';
 
-  var SENT_PREFIX = 'rs_kot_sent_v1:';
-  var LAST_KOT_PREFIX = 'rs_kot_last_v1:';
+  const SENT_PREFIX = 'rs_kot_sent_v1:';
+  const LAST_KOT_PREFIX = 'rs_kot_last_v1:';
 
-  var LABELS = {
+  const LABELS = {
     full: 'Full ops (KDS + kitchen)',
     kitchen_printer: 'Kitchen printer only',
     billing_only: 'Billing only',
@@ -27,8 +27,8 @@
 
   /** Normalize stored setting / legacy POS-only into one of three modes. */
   function getMode() {
-    var s = settings();
-    var raw = String(s.set_operating_mode || s.set_kitchen_billing_style || '').trim().toLowerCase();
+    const s = settings();
+    const raw = String(s.set_operating_mode || s.set_kitchen_billing_style || '').trim().toLowerCase();
 
     if (raw.indexOf('billing') >= 0 || raw === 'pos_only' || raw === 'pos-only') {
       return 'billing_only';
@@ -41,13 +41,13 @@
     }
 
     // Legacy toggle: POS-only mode
-    if (truthy(s.set_pos_only_mode)) return 'billing_only';
+    if (truthy(s.set_pos_only_mode)) {return 'billing_only';}
 
     // Vertical defaults (retail / salon / clinic have no kitchen)
     try {
       if (global.RS_SAAS && typeof RS_SAAS.features === 'function') {
-        var f = RS_SAAS.features() || {};
-        if (f.kds === false && f.kotPrint === false) return 'billing_only';
+        const f = RS_SAAS.features() || {};
+        if (f.kds === false && f.kotPrint === false) {return 'billing_only';}
       }
     } catch (_) {}
 
@@ -72,11 +72,11 @@
 
   /** Thermal KOT print is available / expected */
   function usesKitchenPrint() {
-    var m = getMode();
-    if (m === 'billing_only') return false;
-    if (m === 'kitchen_printer') return true;
+    const m = getMode();
+    if (m === 'billing_only') {return false;}
+    if (m === 'kitchen_printer') {return true;}
     // full: respect auto-print / explicit kitchen print preference (default on)
-    var s = settings();
+    const s = settings();
     if (s.set_auto_print_kot === false || s.set_auto_print_kot === 'false') {
       // still allow manual print in full mode
       return true;
@@ -91,43 +91,43 @@
 
   /** Auto-fire print when staff taps KOT — OFF unless explicitly enabled */
   function autoPrintKot() {
-    var s = settings();
-    if (getMode() === 'billing_only') return false;
+    const s = settings();
+    if (getMode() === 'billing_only') {return false;}
     if (typeof global.RS_featureOn === 'function') {
       return global.RS_featureOn('set_auto_print_kot', s, false);
     }
-    if (s.set_auto_print_kot === false || s.set_auto_print_kot === 'false') return false;
-    if (s.set_auto_print_kot === true || s.set_auto_print_kot === 'true') return true;
+    if (s.set_auto_print_kot === false || s.set_auto_print_kot === 'false') {return false;}
+    if (s.set_auto_print_kot === true || s.set_auto_print_kot === 'true') {return true;}
     return false;
   }
 
   function shouldWarnKotOnCheckout() {
     // Billing-only never needs a kitchen fire
-    if (isBillingOnly()) return false;
+    if (isBillingOnly()) {return false;}
     return true;
   }
 
   function kitchenPrinterName() {
-    var s = settings();
-    var n = String(s.set_kitchen_printer_name || s.set_kot_printer_name || '').trim();
+    const s = settings();
+    const n = String(s.set_kitchen_printer_name || s.set_kot_printer_name || '').trim();
     return n || '';
   }
 
   function receiptPrinterName() {
-    var s = settings();
+    const s = settings();
     return String(s.set_preferred_printer_name || '').trim();
   }
 
   function kitchenStationLabel() {
-    var s = settings();
+    const s = settings();
     return String(s.set_kitchen_station_label || 'Main kitchen').trim() || 'Main kitchen';
   }
 
   function kotCopies() {
-    var s = settings();
-    var n = parseInt(String(s.set_kot_copies || '1'), 10);
-    if (!isFinite(n) || n < 1) n = 1;
-    if (n > 5) n = 5;
+    const s = settings();
+    let n = parseInt(String(s.set_kot_copies || '1'), 10);
+    if (!isFinite(n) || n < 1) {n = 1;}
+    if (n > 5) {n = 5;}
     return n;
   }
 
@@ -137,13 +137,13 @@
 
   /** Keep settings store consistent when saving (migrate legacy). */
   function normalizeStore(store) {
-    var st = store || settings();
-    var mode = (function () {
-      var raw = String(st.set_operating_mode || '').trim().toLowerCase();
-      if (raw.indexOf('billing') >= 0) return 'billing_only';
-      if (raw.indexOf('printer') >= 0) return 'kitchen_printer';
-      if (raw.indexOf('full') >= 0 || raw.indexOf('kds') >= 0) return 'full';
-      if (truthy(st.set_pos_only_mode)) return 'billing_only';
+    const st = store || settings();
+    const mode = (function () {
+      const raw = String(st.set_operating_mode || '').trim().toLowerCase();
+      if (raw.indexOf('billing') >= 0) {return 'billing_only';}
+      if (raw.indexOf('printer') >= 0) {return 'kitchen_printer';}
+      if (raw.indexOf('full') >= 0 || raw.indexOf('kds') >= 0) {return 'full';}
+      if (truthy(st.set_pos_only_mode)) {return 'billing_only';}
       return getMode();
     })();
     st.set_operating_mode = LABELS[mode] || LABELS.full;
@@ -154,26 +154,26 @@
   /* ---------- Delta KOT (ADD / VOID) tracking ---------- */
 
   function lineKey(item) {
-    if (!item) return '';
-    var id = item.id != null ? String(item.id) : '';
-    var name = String(item.name || '').trim().toLowerCase();
-    var note = String(item.note || item.notes || '').trim().toLowerCase();
-    var portion = String(item.portion || item.size || '').trim().toLowerCase();
+    if (!item) {return '';}
+    const id = item.id != null ? String(item.id) : '';
+    const name = String(item.name || '').trim().toLowerCase();
+    const note = String(item.note || item.notes || '').trim().toLowerCase();
+    const portion = String(item.portion || item.size || '').trim().toLowerCase();
     return [id || name, portion, note].join('|');
   }
 
   function tableSessionKey(meta) {
-    var m = meta || {};
-    var table = String(m.table || m.tableNumber || 'walk-in').trim().toLowerCase();
-    var ot = String(m.orderType || m.type || '').trim().toLowerCase();
+    const m = meta || {};
+    const table = String(m.table || m.tableNumber || 'walk-in').trim().toLowerCase();
+    const ot = String(m.orderType || m.type || '').trim().toLowerCase();
     return table + '::' + ot;
   }
 
   function loadMap(key) {
     try {
-      var raw = localStorage.getItem(SENT_PREFIX + key);
-      if (!raw) return {};
-      var o = JSON.parse(raw);
+      const raw = localStorage.getItem(SENT_PREFIX + key);
+      if (!raw) {return {};}
+      const o = JSON.parse(raw);
       return o && typeof o === 'object' ? o : {};
     } catch (_) {
       return {};
@@ -187,7 +187,7 @@
   }
 
   function clearSentMap(meta) {
-    var key = tableSessionKey(meta);
+    const key = tableSessionKey(meta);
     try {
       localStorage.removeItem(SENT_PREFIX + key);
       localStorage.removeItem(LAST_KOT_PREFIX + key);
@@ -199,44 +199,44 @@
    * Returns { adds, voids, isFirst, sessionKey, nextMap }
    */
   function diffItems(items, meta) {
-    var sessionKey = tableSessionKey(meta);
-    var prev = loadMap(sessionKey);
-    var next = {};
-    var curList = Array.isArray(items) ? items : [];
+    const sessionKey = tableSessionKey(meta);
+    const prev = loadMap(sessionKey);
+    const next = {};
+    const curList = Array.isArray(items) ? items : [];
     curList.forEach(function (i) {
-      var k = lineKey(i);
-      if (!k) return;
-      var q = Math.max(0, Number(i.qty) || 0);
-      if (q <= 0) return;
+      const k = lineKey(i);
+      if (!k) {return;}
+      const q = Math.max(0, Number(i.qty) || 0);
+      if (q <= 0) {return;}
       next[k] = (next[k] || 0) + q;
-      if (!next._meta) next._meta = {};
+      if (!next._meta) {next._meta = {};}
       // keep display name for print
-      if (!next._names) next._names = {};
+      if (!next._names) {next._names = {};}
       next._names[k] = i.name || k;
       next._notes = next._notes || {};
       next._notes[k] = i.note || i.notes || '';
     });
 
     // Strip internal helpers for qty map
-    var nextQty = {};
+    const nextQty = {};
     Object.keys(next).forEach(function (k) {
-      if (k.charAt(0) === '_') return;
+      if (k.charAt(0) === '_') {return;}
       nextQty[k] = next[k];
     });
-    var names = next._names || {};
-    var notes = next._notes || {};
+    const names = next._names || {};
+    const notes = next._notes || {};
 
-    var adds = [];
-    var voids = [];
-    var prevKeys = Object.keys(prev).filter(function (k) {
+    const adds = [];
+    const voids = [];
+    const prevKeys = Object.keys(prev).filter(function (k) {
       return k.charAt(0) !== '_';
     });
-    var isFirst = prevKeys.length === 0;
+    const isFirst = prevKeys.length === 0;
 
     Object.keys(nextQty).forEach(function (k) {
-      var before = Number(prev[k]) || 0;
-      var after = Number(nextQty[k]) || 0;
-      var delta = after - before;
+      const before = Number(prev[k]) || 0;
+      const after = Number(nextQty[k]) || 0;
+      const delta = after - before;
       if (delta > 0) {
         adds.push({
           key: k,
@@ -256,8 +256,8 @@
       }
     });
     prevKeys.forEach(function (k) {
-      if (nextQty[k] != null) return;
-      var before = Number(prev[k]) || 0;
+      if (nextQty[k] != null) {return;}
+      const before = Number(prev[k]) || 0;
       if (before > 0) {
         voids.push({
           key: k,
@@ -269,12 +269,12 @@
       }
     });
 
-    var nextMap = Object.assign({}, nextQty, { _names: names, _notes: notes });
+    const nextMap = Object.assign({}, nextQty, { _names: names, _notes: notes });
     return { adds: adds, voids: voids, isFirst: isFirst, sessionKey: sessionKey, nextMap: nextMap };
   }
 
   function commitSentMap(diff) {
-    if (!diff || !diff.sessionKey) return;
+    if (!diff || !diff.sessionKey) {return;}
     saveMap(diff.sessionKey, diff.nextMap || {});
     try {
       localStorage.setItem(
@@ -286,10 +286,10 @@
 
   /** Apply nav / button visibility for current mode */
   function applyUi() {
-    var mode = getMode();
-    var billing = mode === 'billing_only';
-    var printerOnly = mode === 'kitchen_printer';
-    var hideKds = billing || printerOnly;
+    const mode = getMode();
+    const billing = mode === 'billing_only';
+    const printerOnly = mode === 'kitchen_printer';
+    const hideKds = billing || printerOnly;
 
     document.documentElement.classList.toggle('rs-pos-only-mode', billing);
     document.documentElement.classList.toggle('rs-billing-only-mode', billing);
@@ -301,7 +301,7 @@
       el.style.display = hideKds ? 'none' : '';
     });
 
-    var kotBtn = document.getElementById('btn-kot');
+    const kotBtn = document.getElementById('btn-kot');
     if (kotBtn) {
       if (billing) {
         kotBtn.style.display = 'none';
@@ -309,9 +309,9 @@
         kotBtn.style.display = '';
         // Friendlier label when kitchen is printer-only
         if (printerOnly) {
-          var span = kotBtn.querySelector('span:not(.fa-solid):not(i)');
-          var label = kotBtn.querySelector('.btn-label, .rs-btn-label');
-          if (label) label.textContent = 'Print KOT';
+          const span = kotBtn.querySelector('span:not(.fa-solid):not(i)');
+          const label = kotBtn.querySelector('.btn-label, .rs-btn-label');
+          if (label) {label.textContent = 'Print KOT';}
           else if (!kotBtn.querySelector('i') || kotBtn.childNodes.length <= 2) {
             // leave icon; ensure title
           }
@@ -332,15 +332,15 @@
 
   function paintModeChip(mode) {
     if (mode === 'full') {
-      var old = document.getElementById('rs-ops-mode-chip');
-      if (old) old.style.display = 'none';
+      const old = document.getElementById('rs-ops-mode-chip');
+      if (old) {old.style.display = 'none';}
       return;
     }
-    var host =
+    const host =
       document.getElementById('tb-left') ||
       document.querySelector('.topbar-right, .topbar-actions, .topbar');
-    if (!host) return;
-    var chip = document.getElementById('rs-ops-mode-chip');
+    if (!host) {return;}
+    let chip = document.getElementById('rs-ops-mode-chip');
     if (!chip) {
       chip = document.createElement('button');
       chip.type = 'button';
@@ -379,7 +379,7 @@
     applyUi();
   }
 
-  var api = {
+  const api = {
     LABELS: LABELS,
     getMode: getMode,
     isBillingOnly: isBillingOnly,

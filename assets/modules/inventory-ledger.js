@@ -6,7 +6,7 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
 
   function getMenu() {
@@ -17,23 +17,23 @@
   }
 
   function markDeducted(deductKey) {
-    if (!deductKey) return;
-    if (!global.__rsInvDeducted) global.__rsInvDeducted = new Set();
+    if (!deductKey) {return;}
+    if (!global.__rsInvDeducted) {global.__rsInvDeducted = new Set();}
     global.__rsInvDeducted.add(deductKey);
     try {
       const dayKey = 'rs_inv_deducted:' + new Date().toISOString().slice(0, 10);
       const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
       if (stored.indexOf(deductKey) === -1) {
         stored.push(deductKey);
-        while (stored.length > 500) stored.shift();
+        while (stored.length > 500) {stored.shift();}
         localStorage.setItem(dayKey, JSON.stringify(stored));
       }
     } catch (_) {}
   }
 
   function alreadyDeducted(deductKey) {
-    if (!deductKey) return false;
-    if (!global.__rsInvDeducted) global.__rsInvDeducted = new Set();
+    if (!deductKey) {return false;}
+    if (!global.__rsInvDeducted) {global.__rsInvDeducted = new Set();}
     try {
       const dayKey = 'rs_inv_deducted:' + new Date().toISOString().slice(0, 10);
       const stored = JSON.parse(localStorage.getItem(dayKey) || '[]');
@@ -62,7 +62,7 @@
       const factor = orderedQty / base;
       menuItem.ingredients.forEach((ing) => {
         const qty = (Number(ing.qty) || 0) * factor;
-        if (qty <= 0) return;
+        if (qty <= 0) {return;}
         const key = String(ing.key || ing.name || '')
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '_')
@@ -92,9 +92,9 @@
       }
       if (!cfg || typeof cfg !== 'object') {
         const raw = global.localStorage && localStorage.getItem('rs_takeaway_pack');
-        if (raw) cfg = JSON.parse(raw);
+        if (raw) {cfg = JSON.parse(raw);}
       }
-      if (!cfg || typeof cfg !== 'object') return { enabled: false, items: [], applyDelivery: true };
+      if (!cfg || typeof cfg !== 'object') {return { enabled: false, items: [], applyDelivery: true };}
       return {
         enabled: cfg.enabled !== false && Array.isArray(cfg.items) && cfg.items.length > 0,
         items: Array.isArray(cfg.items) ? cfg.items : [],
@@ -109,11 +109,11 @@
     const ch = String(
       (billRow && (billRow.channel || billRow.orderType || billRow.order_type || billRow.table)) || ''
     ).toLowerCase();
-    if (ch.includes('dine')) return false;
-    if (ch.includes('take') || ch.includes('parcel') || ch.includes('carry')) return true;
-    if (ch.includes('deliv')) return true;
+    if (ch.includes('dine')) {return false;}
+    if (ch.includes('take') || ch.includes('parcel') || ch.includes('carry')) {return true;}
+    if (ch.includes('deliv')) {return true;}
     // walk-in takeaway tables often labeled this way
-    if (ch.includes('walk') && ch.includes('take')) return true;
+    if (ch.includes('walk') && ch.includes('take')) {return true;}
     return false;
   }
 
@@ -125,9 +125,9 @@
   /** Merge order-level packaging lines into food recipe lines (once per bill). */
   function appendTakeawayPackLines(lines, billRow) {
     const cfg = loadTakeawayPackConfig();
-    if (!cfg.enabled || !cfg.items.length) return { lines: lines || [], packCount: 0 };
+    if (!cfg.enabled || !cfg.items.length) {return { lines: lines || [], packCount: 0 };}
     const parcel = isParcelChannel(billRow);
-    if (!parcel) return { lines: lines || [], packCount: 0 };
+    if (!parcel) {return { lines: lines || [], packCount: 0 };}
     if (isDeliveryChannel(billRow) && cfg.applyDelivery === false) {
       return { lines: lines || [], packCount: 0 };
     }
@@ -137,7 +137,7 @@
     cfg.items.forEach((it) => {
       const name = String(it.name || '').trim();
       const qty = Number(it.qty) || 0;
-      if (!name || qty <= 0) return;
+      if (!name || qty <= 0) {return;}
       const stock = inv.find((x) => String(x.name).toLowerCase() === name.toLowerCase());
       const unit = (stock && stock.unit) || it.unit || 'gm';
       const key = name
@@ -164,7 +164,7 @@
     const MENU = getMenu();
     const INVENTORY = getInventory();
     const items = (billRow && billRow._items) || [];
-    if (!items.length) return;
+    if (!items.length) {return;}
     const deductKey = String(
       (billRow && (billRow.idempotencyKey || billRow.no || billRow.orderId || billRow.id)) || ''
     );
@@ -195,26 +195,26 @@
             order_id: billRow.no || billRow.orderId || '',
             lines,
           }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('deduct_inventory timeout')), 8000)),
+          new Promise((_, rej) => { setTimeout(() => rej(new Error('deduct_inventory timeout')), 8000); }),
         ]);
         const payload = res && res.results != null ? res : (res && res.data) || res;
         if (payload && (payload.ok || payload.duplicate || Array.isArray(payload.results))) {
           markDeducted(deductKey);
           const results = Array.isArray(payload.results) ? payload.results : [];
           results.forEach((r) => {
-            if (!r || r.status !== 'ok') return;
+            if (!r || r.status !== 'ok') {return;}
             const invItem = INVENTORY.find(
               (x) =>
                 String(x.id) === String(r.id) ||
                 (x.key && r.key && String(x.key).toLowerCase() === String(r.key).toLowerCase()) ||
                 (x.name && r.name && String(x.name).toLowerCase() === String(r.name).toLowerCase())
             );
-            if (invItem && r.stock_after != null) invItem.stock = Number(r.stock_after);
+            if (invItem && r.stock_after != null) {invItem.stock = Number(r.stock_after);}
           });
           if (global.RS_DB && RS_DB.writeLocal) {
             try {
               const _w = RS_DB.writeLocal('inventory', INVENTORY);
-              if (_w && _w.catch) _w.catch(() => {});
+              if (_w && _w.catch) {_w.catch(() => {});}
             } catch (e) {}
           }
           const deductedCount = Number(payload.deducted) || results.filter((r) => r && r.status === 'ok').length;
@@ -268,7 +268,7 @@
               1600
             );
           }
-          if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) RS.render('inventory-tab');
+          if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) {RS.render('inventory-tab');}
           return;
         }
       }
@@ -291,7 +291,7 @@
             (x.key && line.key && String(x.key).toLowerCase() === String(line.key).toLowerCase())
         );
         if (!invItem) {
-          if (line.name && missingIngredients.indexOf(line.name) === -1) missingIngredients.push(line.name);
+          if (line.name && missingIngredients.indexOf(line.name) === -1) {missingIngredients.push(line.name);}
           continue;
         }
         const q = Number(line.qty) || 0;
@@ -301,7 +301,7 @@
             await Batches.deductFefo(invItem, q);
             const sum = Batches.summarizeItem(invItem);
             if (sum.status === 'near' || sum.status === 'expired') {
-              if (nearAfter.indexOf(invItem.name) === -1) nearAfter.push(invItem.name);
+              if (nearAfter.indexOf(invItem.name) === -1) {nearAfter.push(invItem.name);}
             }
           } catch (e) {
             console.warn('[Inventory] FEFO deduct failed', e);
@@ -322,7 +322,7 @@
       if (global.RS_DB && RS_DB.writeLocal) {
         try {
           const _w = RS_DB.writeLocal('inventory', INVENTORY);
-          if (_w && _w.catch) _w.catch(() => {});
+          if (_w && _w.catch) {_w.catch(() => {});}
         } catch (e) {}
       }
       try {
@@ -338,7 +338,7 @@
       } catch (e) {
         console.warn('Inventory save failed', e);
       }
-      if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) RS.render('inventory-tab');
+      if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) {RS.render('inventory-tab');}
       toast(
         'Stock updated: ' +
           deductedCount +
@@ -406,15 +406,15 @@
     const MENU = getMenu();
     const INVENTORY = getInventory();
     const items = (billRow && billRow._items) || [];
-    if (!items.length) return;
+    if (!items.length) {return;}
     let changed = false;
     items.forEach((it) => {
       const menuItem = MENU.find((m) => m.name === it.name);
-      if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) return;
+      if (!menuItem || !Array.isArray(menuItem.ingredients) || !menuItem.ingredients.length) {return;}
       const orderedQty = Number(it.qty) || 1;
       menuItem.ingredients.forEach((ing) => {
         const invItem = INVENTORY.find((x) => x.name === ing.name);
-        if (!invItem) return;
+        if (!invItem) {return;}
         invItem.stock = (Number(invItem.stock) || 0) + (Number(ing.qty) || 0) * orderedQty;
         changed = true;
       });
@@ -423,13 +423,13 @@
       if (global.RS_DB && RS_DB.writeLocal) {
         try {
           const _w = RS_DB.writeLocal('inventory', INVENTORY);
-          if (_w && _w.catch) _w.catch(() => {});
+          if (_w && _w.catch) {_w.catch(() => {});}
         } catch (e) {}
       }
       try {
-        if (global.RS && RS.save) RS.save('inventory');
+        if (global.RS && RS.save) {RS.save('inventory');}
       } catch (_) {}
-      if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) RS.render('inventory-tab');
+      if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) {RS.render('inventory-tab');}
     }
   }
 

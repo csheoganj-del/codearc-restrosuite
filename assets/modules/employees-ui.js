@@ -5,10 +5,10 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function esc(s) {
@@ -32,7 +32,7 @@
     return (global.RS && RS.avatarColors) || ['#FF4F00', '#5B6C8F', '#2A9B8F', '#1F8A5B', '#C47B16'];
   }
   function initials(n) {
-    if (global.RS && typeof RS.initials === 'function') return RS.initials(n);
+    if (global.RS && typeof RS.initials === 'function') {return RS.initials(n);}
     return String(n || '')
       .split(' ')
       .map((w) => w[0])
@@ -55,6 +55,7 @@
 
   async function openAddEmployeeModal() {
     if (!window.RSModal) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('Modal unavailable — try again', 'fa-circle-exclamation');
       return;
     }
@@ -111,6 +112,7 @@
         modal.querySelector('[data-ok]').onclick = async () => {
           const name = (modal.querySelector('#emp-new-name').value || '').trim();
           if (!name) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Enter a name', 'fa-circle-exclamation');
             modal.querySelector('#emp-new-name').focus();
             return;
@@ -137,14 +139,15 @@
           };
           EMPLOYEES.push(emp);
           try {
-            if (window.RS && typeof RS.save === 'function') await RS.save('employees');
-            else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
-            if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+            if (window.RS && typeof RS.save === 'function') {await RS.save('employees');}
+            else if (window.RS_DB && RS_DB.put) {await RS_DB.put('employees', emp.id, emp);}
+            if (window.RS) {RS.EMPLOYEES = EMPLOYEES.slice();}
           } catch (e) {
             console.warn('Add employee save failed', e);
             toast('Saved locally — cloud sync may retry', 'fa-cloud');
           }
           close();
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
           toast(name + ' added to team', 'fa-user-check');
           renderEmployees();
         };
@@ -163,7 +166,7 @@
   EMPLOYEES.forEach(e => {
     if (e.payroll) {
       const num = parseFloat(String(e.payroll).replace(/[^0-9.]/g, ''));
-      if (!isNaN(num)) payrollSum += num;
+      if (!isNaN(num)) {payrollSum += num;}
     }
   });
 
@@ -185,7 +188,7 @@
 
   async function openEditRoleModal(empIndex) {
     const emp = EMPLOYEES[empIndex];
-    if (!emp) return;
+    if (!emp) {return;}
     const currentKey = (emp.roleKey || emp.role || '').toLowerCase();
     const body = `
       <div style="margin-bottom:12px;font-size:13px;color:var(--text-soft)">
@@ -215,6 +218,7 @@
         EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
         await RS_DB.save('employees', EMPLOYEES[empIndex]);
         renderEmployees();
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast(`${emp.name} -> ${chosen.label}`,'fa-user-check');
       }
       return;
@@ -250,15 +254,16 @@
         el.querySelector('#role-cancel').onclick = () => RSModal.close();
         el.querySelector('#role-save').onclick = async () => {
           const checked = el.querySelector('input[name="emp-role"]:checked');
-          if (!checked) return;
+          if (!checked) {return;}
           const chosen = ROLE_DEFS.find(r=>r.key===checked.value);
-          if (!chosen) return;
+          if (!chosen) {return;}
           EMPLOYEES[empIndex].role = chosen.label;
           EMPLOYEES[empIndex].roleKey = chosen.key;
           EMPLOYEES[empIndex].rc = 'r-'+chosen.key;
           try { await RS_DB.save('employees', EMPLOYEES[empIndex]); } catch(e) { console.warn('Role save failed',e); }
           RSModal.close();
           renderEmployees();
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
           toast(`${emp.name} is now ${chosen.label}`,'fa-user-check');
         };
       }
@@ -268,25 +273,26 @@
   // Wire header Add button (dashboard.html)
   (function wireHeaderAdd() {
     const tab = document.getElementById('employees-tab');
-    if (!tab) return;
+    if (!tab) {return;}
     let btn = document.getElementById('btn-add-employee');
     if (!btn) {
       btn = tab.querySelector('.toolbar-row .btn-primary, .btn.btn-primary.btn-sm');
-      if (btn && !btn.id) btn.id = 'btn-add-employee';
+      if (btn && !btn.id) {btn.id = 'btn-add-employee';}
     }
     if (btn && btn.dataset.rsEmpAddBound !== '1') {
       btn.dataset.rsEmpAddBound = '1';
       btn.addEventListener('click', (e) => {
         e.preventDefault();
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
         openAddEmployeeModal();
       });
     }
   })();
 
   const grid = $('#emp-grid');
-  if (!grid) return;
+  if (!grid) {return;}
 
-  var empView =
+  let empView =
     global.RSViewMode && RSViewMode.get
       ? RSViewMode.get('employees', 'list')
       : 'list';
@@ -294,15 +300,15 @@
   // Toolbar view toggle above the grid (once)
   (function ensureEmpViewToggle() {
     const tab = document.getElementById('employees-tab');
-    if (!tab) return;
+    if (!tab) {return;}
     let bar = tab.querySelector('.emp-view-bar');
     if (!bar) {
       bar = document.createElement('div');
       bar.className = 'emp-view-bar';
       bar.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 0 12px;';
       const host = grid.parentElement;
-      if (host) host.insertBefore(bar, grid);
-      else tab.insertBefore(bar, grid);
+      if (host) {host.insertBefore(bar, grid);}
+      else {tab.insertBefore(bar, grid);}
     }
     if (global.RSViewMode && RSViewMode.toggleHtml) {
       bar.innerHTML = RSViewMode.toggleHtml('employees', empView);
@@ -332,7 +338,7 @@
 
     const addBtn = grid.querySelector('#emp-add-from-empty');
     if (addBtn) {
-      addBtn.onclick = () => openAddEmployeeModal();
+      addBtn.onclick = () => { try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {} openAddEmployeeModal(); };
     }
     const loginBtn = grid.querySelector('#emp-goto-logins');
     if (loginBtn) {
@@ -340,21 +346,21 @@
         const seg = document.querySelector('#employees-tab .seg button');
         const loginSeg = Array.from(document.querySelectorAll('#employees-tab .seg button'))
           .find(b => /login/i.test(b.textContent || ''));
-        if (loginSeg) loginSeg.click();
-        else toast('Open the Logins sub-tab under Employees', 'fa-key');
+        if (loginSeg) {loginSeg.click();}
+        else {toast('Open the Logins sub-tab under Employees', 'fa-key');}
       };
     }
 
     // Load staff users and offer one-click import into employee directory
     (async () => {
       try {
-        if (!window.RS_API || !RS_API.staffUsers) return;
+        if (!window.RS_API || !RS_API.staffUsers) {return;}
         const res = await RS_API.staffUsers({ action: 'list_users' });
         const users = (res && res.users) || [];
-        if (!users.length) return;
+        if (!users.length) {return;}
         const importBtn = grid.querySelector('#emp-import-staff');
         const soft = grid.querySelector('#emp-staff-softlink');
-        if (!importBtn || !soft) return;
+        if (!importBtn || !soft) {return;}
         importBtn.style.display = '';
         soft.style.display = '';
         soft.innerHTML = `
@@ -399,19 +405,19 @@
           };
           EMPLOYEES.push(emp);
           try {
-            if (window.RS && typeof RS.save === 'function') await RS.save('employees');
-            else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
+            if (window.RS && typeof RS.save === 'function') {await RS.save('employees');}
+            else if (window.RS_DB && RS_DB.put) {await RS_DB.put('employees', emp.id, emp);}
           } catch (e) {
             console.warn('Employee import save failed', e);
           }
-          if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+          if (window.RS) {RS.EMPLOYEES = EMPLOYEES.slice();}
           return emp;
         }
 
         soft.querySelectorAll('.emp-import-one').forEach(btn => {
           btn.onclick = async () => {
             const u = users[+btn.dataset.idx];
-            if (!u) return;
+            if (!u) {return;}
             btn.disabled = true;
             await importStaffUser(u);
             toast((u.display_name || u.username) + ' added to employees', 'fa-user-check');
@@ -427,8 +433,9 @@
               e.staffUserId === u.id
               || (e.name && u.display_name && e.name.toLowerCase() === String(u.display_name).toLowerCase())
             );
-            if (!already) await importStaffUser(u);
+            if (!already) {await importStaffUser(u);}
           }
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
           toast(`Imported ${users.length} staff into employees`, 'fa-users');
           renderEmployees();
         };
@@ -504,7 +511,7 @@
   );
 
   async function revokeLinkedStaffLogin(emp, suspend) {
-    if (!window.RS_API || typeof RS_API.staffUsers !== 'function') return;
+    if (!window.RS_API || typeof RS_API.staffUsers !== 'function') {return;}
     let staffId = emp.staffUserId || null;
     // Match by username/email/display name when staffUserId missing
     if (!staffId) {
@@ -525,7 +532,7 @@
         }
       } catch (_) {}
     }
-    if (!staffId) return;
+    if (!staffId) {return;}
     try {
       await RS_API.staffUsers({
         action: 'update_user',
@@ -549,7 +556,7 @@
   $$('#emp-grid .emp-toggle-active').forEach((b) =>
     b.addEventListener('click', async () => {
       const emp = EMPLOYEES[+b.dataset.idx];
-      if (!emp) return;
+      if (!emp) {return;}
       const inactive = emp.active === false || String(emp.status || '').toLowerCase() === 'inactive';
       if (!inactive) {
         const ok = window.confirm(
@@ -557,7 +564,7 @@
             emp.name +
             '?\n\n• They cannot use staff login (if linked)\n• Active sessions are revoked\n• Directory row stays for payroll history\n\nYou can reactivate later.'
         );
-        if (!ok) return;
+        if (!ok) {return;}
         emp.active = false;
         emp.status = 'Inactive';
         emp.disabledAt = new Date().toISOString();
@@ -566,16 +573,17 @@
           await revokeLinkedStaffLogin(emp, true);
         } catch (_) {}
         try {
-          if (window.RS && typeof RS.save === 'function') await RS.save('employees');
-          else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
-          if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+          if (window.RS && typeof RS.save === 'function') {await RS.save('employees');}
+          else if (window.RS_DB && RS_DB.put) {await RS_DB.put('employees', emp.id, emp);}
+          if (window.RS) {RS.EMPLOYEES = EMPLOYEES.slice();}
         } catch (e) {
           console.warn('Deactivate save failed', e);
         }
         toast(emp.name + ' deactivated · sessions revoked', 'fa-user-slash');
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       } else {
         const ok = window.confirm('Reactivate ' + emp.name + '? Their staff login will be re-enabled if linked.');
-        if (!ok) return;
+        if (!ok) {return;}
         emp.active = true;
         emp.status = 'Active';
         emp.disabledAt = null;
@@ -583,9 +591,9 @@
           await revokeLinkedStaffLogin(emp, false);
         } catch (_) {}
         try {
-          if (window.RS && typeof RS.save === 'function') await RS.save('employees');
-          else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
-          if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+          if (window.RS && typeof RS.save === 'function') {await RS.save('employees');}
+          else if (window.RS_DB && RS_DB.put) {await RS_DB.put('employees', emp.id, emp);}
+          if (window.RS) {RS.EMPLOYEES = EMPLOYEES.slice();}
         } catch (e) {
           console.warn('Reactivate save failed', e);
         }
@@ -598,21 +606,23 @@
   $$('#emp-grid .emp-reset-pin').forEach((b) =>
     b.addEventListener('click', async () => {
       const emp = EMPLOYEES[+b.dataset.idx];
-      if (!emp) return;
+      if (!emp) {return;}
       const pin = window.prompt('Set a 4–6 digit PIN for ' + emp.name + ' (used at POS if enabled):', emp.pin || '');
-      if (pin == null) return;
+      if (pin == null) {return;}
       const cleaned = String(pin).replace(/\D/g, '').slice(0, 6);
       if (cleaned && (cleaned.length < 4 || cleaned.length > 6)) {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('PIN must be 4–6 digits', 'fa-circle-exclamation');
         return;
       }
       emp.pin = cleaned || '';
       try {
-        if (window.RS && typeof RS.save === 'function') await RS.save('employees');
-        else if (window.RS_DB && RS_DB.put) await RS_DB.put('employees', emp.id, emp);
+        if (window.RS && typeof RS.save === 'function') {await RS.save('employees');}
+        else if (window.RS_DB && RS_DB.put) {await RS_DB.put('employees', emp.id, emp);}
       } catch (e) {
         console.warn('PIN save failed', e);
       }
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       toast(cleaned ? 'PIN updated for ' + emp.name : 'PIN cleared for ' + emp.name, 'fa-key');
     })
   );
@@ -620,23 +630,24 @@
     b.addEventListener('click', async () => {
       const idx = +b.dataset.idx;
       const emp = EMPLOYEES[idx];
-      if (!emp) return;
+      if (!emp) {return;}
       const ok = window.confirm(
         'Remove ' +
           emp.name +
           ' from the employee directory?\n\nTip: use Deactivate (user-slash icon) if they left the job but you want payroll history. Remove does not delete staff login — suspend that under Logins.'
       );
-      if (!ok) return;
+      if (!ok) {return;}
       const id = emp.id;
       EMPLOYEES.splice(idx, 1);
       try {
-        if (window.RS && typeof RS.removeOne === 'function') await RS.removeOne('employees', id);
-        else if (window.RS_DB && RS_DB.del) await RS_DB.del('employees', id);
-        else if (window.RS && typeof RS.save === 'function') await RS.save('employees');
-        if (window.RS) RS.EMPLOYEES = EMPLOYEES.slice();
+        if (window.RS && typeof RS.removeOne === 'function') {await RS.removeOne('employees', id);}
+        else if (window.RS_DB && RS_DB.del) {await RS_DB.del('employees', id);}
+        else if (window.RS && typeof RS.save === 'function') {await RS.save('employees');}
+        if (window.RS) {RS.EMPLOYEES = EMPLOYEES.slice();}
       } catch (e) {
         console.warn('Remove employee failed', e);
       }
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       toast(emp.name + ' removed', 'fa-user-minus');
       renderEmployees();
     })
@@ -645,10 +656,10 @@
 
   global.RSEmployeesUI = { renderEmployees, openAddEmployeeModal };
   function attach() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderEmployees = renderEmployees;
     global.RS.openAddEmployeeModal = openAddEmployeeModal;
   }
-  if (global.RS) attach();
+  if (global.RS) {attach();}
   document.addEventListener('rs:ready', attach);
 })(typeof window !== 'undefined' ? window : globalThis);

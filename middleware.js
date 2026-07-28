@@ -75,8 +75,10 @@ export default async function middleware(request) {
   // Only inject nonces on HTML pages. Pass everything else through.
   const isHtmlPage = HTML_PAGES.has(pathname) || pathname === '/';
   if (!isHtmlPage) {
-    // Standard pass-through: no NextResponse needed, just continue
-    return new Response(null, { status: 200 });
+    // Standard Vercel middleware pass-through: return undefined so the
+    // runtime proceeds to fetch the real origin asset. Returning a
+    // Response object here would intercept the request.
+    return undefined;
   }
 
   const nonce = generateNonce();

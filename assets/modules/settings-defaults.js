@@ -15,7 +15,7 @@
    * true  = on by default (safe simple ops)
    * false = off until owner enables
    */
-  var FEATURE_DEFAULTS = {
+  const FEATURE_DEFAULTS = {
     // Tax & promos
     set_calculate_taxes: false,
     set_service_charge: false,
@@ -58,16 +58,16 @@
 
   /** Merge defaults into a settings object (does not overwrite explicit values). */
   function applyFeatureDefaults(settings) {
-    var out = Object.assign({}, settings || {});
-    var keys = Object.keys(FEATURE_DEFAULTS);
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i];
-      if (isUnset(out[k])) out[k] = FEATURE_DEFAULTS[k];
+    const out = Object.assign({}, settings || {});
+    const keys = Object.keys(FEATURE_DEFAULTS);
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (isUnset(out[k])) {out[k] = FEATURE_DEFAULTS[k];}
     }
     // Keep operating mode + legacy pos-only in sync when mode was defaulted
     try {
-      var mode = String(out.set_operating_mode || '').toLowerCase();
-      if (mode.indexOf('billing') >= 0) out.set_pos_only_mode = true;
+      const mode = String(out.set_operating_mode || '').toLowerCase();
+      if (mode.indexOf('billing') >= 0) {out.set_pos_only_mode = true;}
     } catch (_) {}
     return out;
   }
@@ -87,10 +87,10 @@
    * @param {boolean} [fallback] used only if key not in FEATURE_DEFAULTS and unset
    */
   function featureOn(key, settings, fallback) {
-    var s = settings || global.RS_SETTINGS || {};
-    var v = s[key];
-    if (falsy(v)) return false;
-    if (truthy(v)) return true;
+    const s = settings || global.RS_SETTINGS || {};
+    const v = s[key];
+    if (falsy(v)) {return false;}
+    if (truthy(v)) {return true;}
     if (Object.prototype.hasOwnProperty.call(FEATURE_DEFAULTS, key)) {
       return !!FEATURE_DEFAULTS[key];
     }
@@ -103,7 +103,7 @@
    */
   function applySettingsLive(settings, meta) {
     meta = meta || {};
-    var next = applyFeatureDefaults(settings || global.RS_SETTINGS || {});
+    const next = applyFeatureDefaults(settings || global.RS_SETTINGS || {});
     try {
       global.RS_SETTINGS = Object.assign({}, global.RS_SETTINGS || {}, next);
     } catch (_) {
@@ -112,39 +112,39 @@
 
     // Shift bar / station / cart banners
     try {
-      if (global.RSOps && typeof global.RSOps.refresh === 'function') global.RSOps.refresh();
+      if (global.RSOps && typeof global.RSOps.refresh === 'function') {global.RSOps.refresh();}
     } catch (_) {}
     // Hide kitchen tabs etc. for Billing only
     try {
-      if (typeof global.RS_applyOpsModeUI === 'function') global.RS_applyOpsModeUI();
-      else if (global.RSOpsMode && typeof global.RSOpsMode.applyUi === 'function') global.RSOpsMode.applyUi();
+      if (typeof global.RS_applyOpsModeUI === 'function') {global.RS_applyOpsModeUI();}
+      else if (global.RSOpsMode && typeof global.RSOpsMode.applyUi === 'function') {global.RSOpsMode.applyUi();}
     } catch (_) {}
     // POS / cart / tax labels + shift bar (must re-paint when toggles flip)
     try {
       if (global.RS) {
-        if (typeof global.RS.loadReceiptProfile === 'function') global.RS.loadReceiptProfile(global.RS_SETTINGS);
+        if (typeof global.RS.loadReceiptProfile === 'function') {global.RS.loadReceiptProfile(global.RS_SETTINGS);}
         if (typeof global.RS.syncPhoneCombosToSettings === 'function') {
           global.RS.syncPhoneCombosToSettings(global.RS_SETTINGS);
         }
-        if (typeof global.RS.updateStaticCurrencyLabels === 'function') global.RS.updateStaticCurrencyLabels();
-        if (typeof global.RS.renderPOS === 'function') global.RS.renderPOS();
-        if (typeof global.RS.renderCart === 'function') global.RS.renderCart();
+        if (typeof global.RS.updateStaticCurrencyLabels === 'function') {global.RS.updateStaticCurrencyLabels();}
+        if (typeof global.RS.renderPOS === 'function') {global.RS.renderPOS();}
+        if (typeof global.RS.renderCart === 'function') {global.RS.renderCart();}
       }
     } catch (_) {}
     try {
       // Shift Z/lock chrome depends on set_require_open_shift
-      if (global.RSOps && typeof global.RSOps.paintShiftBar === 'function') global.RSOps.paintShiftBar();
-      else if (global.RSOps && typeof global.RSOps.refresh === 'function') global.RSOps.refresh();
+      if (global.RSOps && typeof global.RSOps.paintShiftBar === 'function') {global.RSOps.paintShiftBar();}
+      else if (global.RSOps && typeof global.RSOps.refresh === 'function') {global.RSOps.refresh();}
     } catch (_) {}
     // Staff tab locks (reports etc.)
     try {
       if (typeof global.RS_applyLiveRoleUpdate === 'function') {
-        var role =
+        const role =
           (global.RS_ROLE && global.RS_ROLE.staffRole) ||
           (global.RS_API && global.RS_API.session && global.RS_API.session() && global.RS_API.session().role) ||
           (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('logged_in_role') : '') ||
           'owner';
-        var sessTabs =
+        const sessTabs =
           global.RS_API && global.RS_API.session && global.RS_API.session()
             ? global.RS_API.session().allowed_tabs
             : null;
@@ -153,10 +153,10 @@
     } catch (_) {}
     // Loyalty / promo chrome if mounted
     try {
-      if (global.RSLoyalty && typeof global.RSLoyalty.refresh === 'function') global.RSLoyalty.refresh();
+      if (global.RSLoyalty && typeof global.RSLoyalty.refresh === 'function') {global.RSLoyalty.refresh();}
     } catch (_) {}
     try {
-      if (global.RSPromo && typeof global.RSPromo.refresh === 'function') global.RSPromo.refresh();
+      if (global.RSPromo && typeof global.RSPromo.refresh === 'function') {global.RSPromo.refresh();}
     } catch (_) {}
 
     try {
@@ -184,7 +184,7 @@
   if (typeof document !== 'undefined') {
     document.addEventListener('rs:settings-changed', function () {
       try {
-        if (global.RSOps && typeof global.RSOps.refresh === 'function') global.RSOps.refresh();
+        if (global.RSOps && typeof global.RSOps.refresh === 'function') {global.RSOps.refresh();}
       } catch (_) {}
     });
   }

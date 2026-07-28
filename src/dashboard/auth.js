@@ -91,5 +91,21 @@
     };
   }
 
-  return { createSessionManager };
+  function renderAuthLoginBtn() {
+    return '<button aria-label="Sign in to workspace"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i></button>';
+  }
+
+  function renderAuthLogoutBtn() {
+    return '<button aria-label="Sign out of current session"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i></button>';
+  }
+
+  function renderAuthRefreshBtn() {
+    return '<button aria-label="Refresh and validate current session token"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></button>';
+  }
+
+  function renderAuthForgotBtn() {
+    return '<button aria-label="Initiate password reset flow"><i class="fa-solid fa-key" aria-hidden="true"></i></button>';
+  }
+
+  return { createSessionManager, renderAuthLoginBtn, renderAuthLogoutBtn, renderAuthRefreshBtn, renderAuthForgotBtn };
 });

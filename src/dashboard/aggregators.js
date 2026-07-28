@@ -18,26 +18,26 @@
 
 (function (root, factory) {
   const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) {module.exports = api;}
   if (root) {
     root.RestroSuite = root.RestroSuite || {};
     root.RestroSuite.aggregators = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  "use strict";
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
 
   // -- Constants ----------------------------------------------------------------
 
-  const PLATFORMS = { SWIGGY: "swiggy", ZOMATO: "zomato", CUSTOM: "custom" };
+  const PLATFORMS = { SWIGGY: 'swiggy', ZOMATO: 'zomato', CUSTOM: 'custom' };
 
   const STATUS = {
-    NEW:        "new",
-    ACCEPTED:   "accepted",
-    PREPARING:  "preparing",
-    READY:      "ready",
-    PICKED_UP:  "picked_up",
-    DELIVERED:  "delivered",
-    CANCELLED:  "cancelled"
+    NEW:        'new',
+    ACCEPTED:   'accepted',
+    PREPARING:  'preparing',
+    READY:      'ready',
+    PICKED_UP:  'picked_up',
+    DELIVERED:  'delivered',
+    CANCELLED:  'cancelled'
   };
 
   // -- Normalizers (platform payload -> common order shape) ----------------------
@@ -57,8 +57,8 @@
       platform:          PLATFORMS.SWIGGY,
       platform_order_id: String(raw.order_id || raw.id),
       status:            STATUS.NEW,
-      customer_name:     raw.delivery_address?.name || raw.customer_name || "",
-      customer_phone:    raw.customer_phone || "",
+      customer_name:     raw.delivery_address?.name || raw.customer_name || '',
+      customer_phone:    raw.customer_phone || '',
       items,
       subtotal:          Number(raw.order_total)    || 0,
       tax:               Number(raw.tax_amount)     || 0,
@@ -67,7 +67,7 @@
       total:             Number(raw.net_total || raw.order_total) || 0,
       delivery_address:  raw.delivery_address || null,
       estimated_pickup_at: raw.delivery_time ? new Date(raw.delivery_time).toISOString() : null,
-      notes:             raw.special_instructions || "",
+      notes:             raw.special_instructions || '',
       raw_payload:       raw
     };
   }
@@ -87,8 +87,8 @@
       platform:          PLATFORMS.ZOMATO,
       platform_order_id: String(raw.id || raw.order_id),
       status:            STATUS.NEW,
-      customer_name:     raw.customer?.name || "",
-      customer_phone:    raw.customer?.phone || "",
+      customer_name:     raw.customer?.name || '',
+      customer_phone:    raw.customer?.phone || '',
       items,
       subtotal:          Number(raw.subtotal)    || 0,
       tax:               Number(raw.taxes)       || 0,
@@ -97,7 +97,7 @@
       total:             Number(raw.grand_total || raw.total) || 0,
       delivery_address:  raw.address || null,
       estimated_pickup_at: raw.delivery_details?.time ? new Date(raw.delivery_details.time).toISOString() : null,
-      notes:             raw.special_instructions || "",
+      notes:             raw.special_instructions || '',
       raw_payload:       raw
     };
   }
@@ -118,8 +118,8 @@
     const listeners   = [];
     let   pollTimer   = null;
 
-    if (!db)       throw new Error("aggregators.create: db is required");
-    if (!tenantId) throw new Error("aggregators.create: tenantId is required");
+    if (!db)       {throw new Error('aggregators.create: db is required');}
+    if (!tenantId) {throw new Error('aggregators.create: tenantId is required');}
 
     // -- Private helpers --------------------------------------------------------
 
@@ -129,11 +129,11 @@
 
     async function loadConfigs() {
       const { data, error } = await db
-        .from("doppio_aggregator_config")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .eq("enabled", true);
-      if (error) throw new Error("Failed to load aggregator configs: " + error.message);
+        .from('doppio_aggregator_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('enabled', true);
+      if (error) {throw new Error('Failed to load aggregator configs: ' + error.message);}
       return data || [];
     }
 
@@ -146,15 +146,15 @@
       // Real endpoint: POST https://partner.swiggy.com/api/v1/orders/list
       // Auth: Bearer token obtained via OAuth from cfg.api_key + cfg.api_secret
       const response = await fetch(
-        `https://partner.swiggy.com/api/v1/orders/list`,
+        'https://partner.swiggy.com/api/v1/orders/list',
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type":  "application/json",
-            "Authorization": `Bearer ${cfg.api_key}`,
-            "X-Store-Id":    cfg.store_id
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${cfg.api_key}`,
+            'X-Store-Id':    cfg.store_id
           },
-          body: JSON.stringify({ status: "new", limit: 50 })
+          body: JSON.stringify({ status: 'new', limit: 50 })
         }
       );
       if (!response.ok) {
@@ -175,8 +175,8 @@
         `https://api.zomato.com/partner/v1/orders?status=placed&restaurant_id=${cfg.store_id}`,
         {
           headers: {
-            "Authorization": `Bearer ${cfg.api_key}`,
-            "Content-Type":  "application/json"
+            'Authorization': `Bearer ${cfg.api_key}`,
+            'Content-Type':  'application/json'
           }
         }
       );
@@ -189,12 +189,12 @@
     }
 
     async function upsertOrders(orders) {
-      if (!orders.length) return;
+      if (!orders.length) {return;}
       const rows = orders.map((o) => ({ ...o, tenant_id: tenantId }));
       const { error } = await db
-        .from("doppio_online_orders")
-        .upsert(rows, { onConflict: "tenant_id,platform,platform_order_id" });
-      if (error) throw new Error("Failed to save online orders: " + error.message);
+        .from('doppio_online_orders')
+        .upsert(rows, { onConflict: 'tenant_id,platform,platform_order_id' });
+      if (error) {throw new Error('Failed to save online orders: ' + error.message);}
     }
 
     // -- Public API -------------------------------------------------------------
@@ -218,7 +218,7 @@
             result.zomato += orders.length;
           }
           await upsertOrders(orders);
-          if (orders.length) emit({ type: "new_orders", platform: cfg.platform, count: orders.length });
+          if (orders.length) {emit({ type: 'new_orders', platform: cfg.platform, count: orders.length });}
         } catch (err) {
           result.errors.push(`${cfg.platform}: ${err.message}`);
         }
@@ -231,25 +231,25 @@
      */
     async function listOrders(statusFilter) {
       let query = db
-        .from("doppio_online_orders")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false });
-      if (statusFilter) query = query.eq("status", statusFilter);
+        .from('doppio_online_orders')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false });
+      if (statusFilter) {query = query.eq('status', statusFilter);}
       const { data, error } = await query;
-      if (error) throw new Error("Failed to load online orders: " + error.message);
+      if (error) {throw new Error('Failed to load online orders: ' + error.message);}
       return data || [];
     }
 
     async function updateStatus(orderId, status, extra) {
       const patch = { status, updated_at: new Date().toISOString(), ...(extra || {}) };
       const { error } = await db
-        .from("doppio_online_orders")
+        .from('doppio_online_orders')
         .update(patch)
-        .eq("id", orderId)
-        .eq("tenant_id", tenantId);
-      if (error) throw new Error("Failed to update order: " + error.message);
-      emit({ type: "order_updated", orderId, status });
+        .eq('id', orderId)
+        .eq('tenant_id', tenantId);
+      if (error) {throw new Error('Failed to update order: ' + error.message);}
+      emit({ type: 'order_updated', orderId, status });
     }
 
     async function accept(orderId) {
@@ -257,7 +257,7 @@
     }
 
     async function reject(orderId, reason) {
-      return updateStatus(orderId, STATUS.CANCELLED, { notes: reason || "Rejected by restaurant" });
+      return updateStatus(orderId, STATUS.CANCELLED, { notes: reason || 'Rejected by restaurant' });
     }
 
     async function markPreparing(orderId) {
@@ -274,25 +274,25 @@
 
     /** Save or update aggregator credentials for a platform */
     async function saveConfig(platform, storeId, apiKey, apiSecret) {
-      if (!PLATFORMS[platform.toUpperCase()]) throw new Error("Unknown platform: " + platform);
+      if (!PLATFORMS[platform.toUpperCase()]) {throw new Error('Unknown platform: ' + platform);}
       const { error } = await db
-        .from("doppio_aggregator_config")
+        .from('doppio_aggregator_config')
         .upsert(
           { tenant_id: tenantId, platform, store_id: storeId, api_key: apiKey, api_secret: apiSecret || null, enabled: true },
-          { onConflict: "tenant_id,platform" }
+          { onConflict: 'tenant_id,platform' }
         );
-      if (error) throw new Error("Failed to save config: " + error.message);
+      if (error) {throw new Error('Failed to save config: ' + error.message);}
     }
 
     /** Register a listener for real-time events */
     function subscribe(fn) {
       listeners.push(fn);
-      return () => { const i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); };
+      return () => { const i = listeners.indexOf(fn); if (i !== -1) {listeners.splice(i, 1);} };
     }
 
     /** Start auto-polling on an interval */
     function startPolling() {
-      if (pollTimer) return;
+      if (pollTimer) {return;}
       pollTimer = setInterval(() => poll().catch(console.warn), pollMs);
     }
 
@@ -322,24 +322,24 @@
 
   function renderOrderCard(order) {
     const badge = {
-      new:        "background:#f59e0b;color:#fff",
-      accepted:   "background:#3b82f6;color:#fff",
-      preparing:  "background:#8b5cf6;color:#fff",
-      ready:      "background:#10b981;color:#fff",
-      picked_up:  "background:#6b7280;color:#fff",
-      delivered:  "background:#6b7280;color:#fff",
-      cancelled:  "background:#ef4444;color:#fff"
-    }[order.status] || "";
+      new:        'background:#f59e0b;color:#fff',
+      accepted:   'background:#3b82f6;color:#fff',
+      preparing:  'background:#8b5cf6;color:#fff',
+      ready:      'background:#10b981;color:#fff',
+      picked_up:  'background:#6b7280;color:#fff',
+      delivered:  'background:#6b7280;color:#fff',
+      cancelled:  'background:#ef4444;color:#fff'
+    }[order.status] || '';
 
-    const platformIcon = order.platform === "swiggy"
-      ? "🧡 Swiggy"
-      : order.platform === "zomato"
-      ? "❤️ Zomato"
-      : "📦 Online";
+    const platformIcon = order.platform === 'swiggy'
+      ? '🧡 Swiggy'
+      : order.platform === 'zomato'
+      ? '❤️ Zomato'
+      : '📦 Online';
 
     const itemsHtml = (order.items || [])
       .map((i) => `<li>${i.quantity}× ${i.name} -- ₹${(i.price * i.quantity).toFixed(2)}</li>`)
-      .join("");
+      .join('');
 
     const actions = {
       new:       `<button onclick="RestroSuite.aggregators._ui.accept('${order.id}')">Accept</button>
@@ -347,24 +347,40 @@
       accepted:  `<button onclick="RestroSuite.aggregators._ui.markPreparing('${order.id}')">Start Preparing</button>`,
       preparing: `<button onclick="RestroSuite.aggregators._ui.markReady('${order.id}')">Mark Ready</button>`,
       ready:     `<button onclick="RestroSuite.aggregators._ui.markPickedUp('${order.id}')">Picked Up</button>`
-    }[order.status] || "";
+    }[order.status] || '';
 
     return `
 <div class="online-order-card" data-order-id="${order.id}" data-status="${order.status}">
   <div class="order-header">
     <span class="platform-badge">${platformIcon}</span>
     <span class="order-id">#${order.platform_order_id}</span>
-    <span class="status-badge" style="${badge}">${order.status.replace("_", " ").toUpperCase()}</span>
+    <span class="status-badge" style="${badge}">${order.status.replace('_', ' ').toUpperCase()}</span>
     <span class="order-total">₹${Number(order.total).toFixed(2)}</span>
   </div>
   <div class="customer-info">
-    👤 ${order.customer_name || "Guest"} ${order.customer_phone ? "· " + order.customer_phone : ""}
+    👤 ${order.customer_name || 'Guest'} ${order.customer_phone ? '· ' + order.customer_phone : ''}
   </div>
   <ul class="order-items">${itemsHtml}</ul>
-  ${order.notes ? `<p class="order-notes">📝 ${order.notes}</p>` : ""}
+  ${order.notes ? `<p class="order-notes">📝 ${order.notes}</p>` : ''}
   <div class="order-actions">${actions}</div>
 </div>`.trim();
   }
 
-  return { create, renderOrderCard, STATUS, PLATFORMS };
+  function renderAggregatorPollBtn() {
+    return '<button aria-label="Poll aggregators for new online orders"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>';
+  }
+
+  function renderAggregatorAcceptBtn(orderId) {
+    return `<button aria-label="Accept online order ${orderId}"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></button>`;
+  }
+
+  function renderAggregatorRejectBtn(orderId) {
+    return `<button aria-label="Reject online order ${orderId}"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i></button>`;
+  }
+
+  function renderAggregatorReadyBtn(orderId) {
+    return `<button aria-label="Mark order ${orderId} as ready for pickup"><i class="fa-solid fa-bell-concierge" aria-hidden="true"></i></button>`;
+  }
+
+  return { create, renderOrderCard, renderAggregatorPollBtn, renderAggregatorAcceptBtn, renderAggregatorRejectBtn, renderAggregatorReadyBtn, STATUS, PLATFORMS };
 });
