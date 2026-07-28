@@ -2074,8 +2074,12 @@
       })
       .then(function() {
         // Preload heavy tab modules quickly after shell (was 2.5s — too late for first-open freezes)
-        if (window.requestIdleCallback) requestIdleCallback(preloadRest, { timeout: 1200 });
-        else setTimeout(preloadRest, 600);
+        // Also load late-features bundle compiled separately to avoid large critical bundle
+        if (window.requestIdleCallback) {
+          requestIdleCallback(function() { loadScript('assets/dist/late-features.bundle.js').catch(function(){}); preloadRest(); }, { timeout: 1200 });
+        } else {
+          setTimeout(function() { loadScript('assets/dist/late-features.bundle.js').catch(function(){}); preloadRest(); }, 600);
+        }
       })
       .catch(function(e) {
         console.error('[boot] critical scripts failed', e);
