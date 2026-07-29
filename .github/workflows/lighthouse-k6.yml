@@ -15,15 +15,20 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Lighthouse
-        run: npm install -g lighthouse
+      - name: Install Chromium and Lighthouse
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y chromium-browser chromium
+          npm install -g lighthouse
 
       - name: Run Lighthouse
+        env:
+          CHROME_PATH: /usr/bin/chromium-browser
         run: |
           mkdir -p artifacts /tmp/chrome-temp
           export TMPDIR=/tmp/chrome-temp
-          # Use additional chrome flags to avoid sandbox / shm issues on GitHub runners
-          lighthouse "https://restrosuite.codearc.co.in" --output=json --output-path=artifacts/lighthouse.json --chrome-flags="--no-sandbox --disable-dev-shm-usage --disable-setuid-sandbox"
+          # Use explicit chrome path and flags to avoid sandbox / shm issues on GitHub runners
+          lighthouse "https://restrosuite.codearc.co.in" --output=json --output-path=artifacts/lighthouse.json --chrome-path=$CHROME_PATH --chrome-flags="--no-sandbox --disable-dev-shm-usage --disable-setuid-sandbox"
 
       - name: Upload Lighthouse artifact
         uses: actions/upload-artifact@v4
