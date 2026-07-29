@@ -19,7 +19,9 @@ jobs:
         uses: treosh/lighthouse-ci-action@v9
         with:
           urls: 'https://restrosuite.codearc.co.in'
-          args: '--output=json --output-path=artifacts/lighthouse.json --chrome-flags="--no-sandbox --disable-dev-shm-usage --disable-setuid-sandbox"'
+          uploadArtifacts: true
+          artifactName: 'lighthouse-report'
+          runs: 1
 
       - name: Upload Lighthouse artifact
         uses: actions/upload-artifact@v4
@@ -34,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run k6 load test
-        uses: grafana/k6-action@v2
+        uses: grafana/k6-action@v3
         with:
           args: run --vus 50 --duration 30s --out json=./k6-output/result.json ./ci/k6-script.js
 
