@@ -42,10 +42,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install k6 CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl gnupg
+          curl -s https://dl.k6.io/key.gpg | sudo apt-key add -
+          echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
       - name: Run k6 load test
-        uses: grafana/k6-action@v3
-        with:
-          args: run --vus 50 --duration 30s --out json=./k6-output/result.json ./ci/k6-script.js
+        run: |
+          mkdir -p k6-output
+          k6 run --vus 50 --duration 30s --out json=./k6-output/result.json ./ci/k6-script.js
 
       - name: Upload k6 results
         uses: actions/upload-artifact@v4
