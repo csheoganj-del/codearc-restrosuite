@@ -61,29 +61,33 @@ async function main() {
   //   super-admin.js   — large, rarely needed on POS boot; lazy-loaded
   //   employees-ui.js  — large; only needed on HR tab open
   //   growth-hub-shell — marketing only; never on POS critical path
+  // Split: keep only immediate boot-critical modules here. Heavy feature modules are built into a separate late-features bundle
   const sources = [
-    // Feedback first — must be defined before pos-ui.js
-    'assets/modules/rs-action-feedback.js',
-    // ESC/POS encoder — used by receipt.js which follows
-    'assets/escpos-encoder.js',
-    // Core data/UI modules (POS boot critical path)
-    'assets/modules/bill-identity.js',
-    'assets/modules/inventory-ledger.js',
-    'assets/modules/bills-history.js',
-    'assets/modules/inventory-ui.js',
-    'assets/modules/reports-ui.js',
-    'assets/modules/gateway-monitor.js',
-    'assets/modules/kds-ui.js',
-    'assets/modules/qr-orders-ui.js',
-    'assets/modules/tax-helpers.js',
-    'assets/modules/pos-ui.js',
-    // Print / receipt layer
-    'assets/print-bridge.js',
-    'assets/receipt.js',
-    // WA send queue (used by pos-ui on bill dispatch)
-    'assets/modules/wa-send-queue.js',
-    // Competitive-ops telemetry (tiny; non-blocking)
-    'assets/competitive-ops.js',
+   // Feedback first — must be defined before pos-ui.js
+   'assets/modules/rs-action-feedback.js',
+   // ESC/POS encoder — used by receipt.js which follows
+   'assets/escpos-encoder.js',
+   // Core, minimal data/UI modules (POS boot critical path)
+   'assets/modules/bill-identity.js',
+   'assets/modules/inventory-ledger.js',
+   'assets/modules/inventory-ui.js',
+   'assets/modules/kds-ui.js',
+   'assets/modules/tax-helpers.js',
+   'assets/modules/pos-ui.js',
+   // Print / receipt layer
+   'assets/print-bridge.js',
+   'assets/receipt.js',
+   // WA send queue (used by pos-ui on bill dispatch)
+   'assets/modules/wa-send-queue.js',
+  ];
+
+  // Modules moved out of the critical bundle into a late-features bundle
+  const lateSources = [
+   'assets/modules/bills-history.js',
+   'assets/modules/reports-ui.js',
+   'assets/modules/gateway-monitor.js',
+   'assets/modules/qr-orders-ui.js',
+   'assets/competitive-ops.js'
   ];
 
   // Concatenate IIFEs with section markers (esbuild bundle:false — they have
@@ -101,7 +105,7 @@ async function main() {
   const mapFile = outFile + '.map';
 
   fs.writeFileSync(tmp, concatenated);
-
+ 
   const buildResult = await esbuild.build({
     entryPoints: [tmp],
     bundle:       false,   // IIFEs — no module graph to resolve
@@ -114,9 +118,38 @@ async function main() {
     charset:      'utf8',
     logLevel:     'info',
   });
-
+ 
   // Cleanup temp source file
   try { fs.unlinkSync(tmp); } catch (_) {}
+
+  // ── Build late-features bundle (concatenate and minify lateSources) ─────
+  try {
+   const lateTmp = path.join(outDir, '_late-src.js');
+   if (lateSources && lateSources.length) {
+     const lateConcat = lateSources
+       .map((rel) => {
+         const p = path.join(root, rel);
+         if (!fs.existsSync(p)) { throw new Error('[build-critical] Missing late source: ' + rel); }
+         return `\n/* === ${rel} === */\n` + fs.readFileSync(p, 'utf8') + '\n';
+       })
+       .join('\n');
+     fs.writeFileSync(lateTmp, lateConcat);
+     const lateOut = path.join(outDir, 'late-features.bundle.js');
+     // Transform (minify) using esbuild.transform
+     const lateSrc = fs.readFileSync(lateTmp, 'utf8');
+     const lateResult = await esbuild.transform(lateSrc, {
+       loader: 'js',
+       minify: true,
+       sourcemap: true,
+       target: ['es2019']
+     });
+     fs.writeFileSync(lateOut, lateResult.code, 'utf8');
+     try { fs.unlinkSync(lateTmp); } catch (_) {}
+     console.log('[build-critical] late-features.bundle.js built (' + lateSources.length + ' modules)');
+   }
+  } catch (err) {
+   console.warn('[build-critical] late-features build failed:', err && err.message);
+  }
 
   // ── Content hash for cache-busting ────────────────────────────────────────
   // Write a short hex hash of the bundle alongside the file so that

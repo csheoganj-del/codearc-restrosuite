@@ -1,16 +1,16 @@
 (function (root, factory) {
   const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) {module.exports = api;}
   if (root) {
     root.RestroSuite = root.RestroSuite || {};
     root.RestroSuite.inventory = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  "use strict";
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
 
   function expiryTime(batch) {
-    const parsed = Date.parse(batch && batch.expiryDate ? batch.expiryDate : "2099-12-31");
-    return Number.isNaN(parsed) ? Date.parse("2099-12-31") : parsed;
+    const parsed = Date.parse(batch && batch.expiryDate ? batch.expiryDate : '2099-12-31');
+    return Number.isNaN(parsed) ? Date.parse('2099-12-31') : parsed;
   }
 
   function deductFefo(batches, requiredQuantity, createFallbackBatch) {
@@ -32,7 +32,7 @@
     });
 
     if (remaining > 0) {
-      if (typeof createFallbackBatch === "function") {
+      if (typeof createFallbackBatch === 'function') {
         // Caller provided a factory for tracking the shortfall as a negative batch
         const fallback = createFallbackBatch(remaining);
         updated.push({ ...fallback, qty: -remaining });
@@ -47,5 +47,21 @@
     };
   }
 
-  return { deductFefo };
+  function renderInventoryAddBtn() {
+    return '<button aria-label="Add new inventory stock item"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>';
+  }
+
+  function renderInventoryLowBtn() {
+    return '<button aria-label="Show low stock and reorder alerts"><i class="fa-solid fa-bell" aria-hidden="true"></i></button>';
+  }
+
+  function renderInventoryAuditBtn() {
+    return '<button aria-label="Start stock count and audit session"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></button>';
+  }
+
+  function renderInventoryBatchBtn() {
+    return '<button aria-label="Manage purchase orders and receive batches"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></button>';
+  }
+
+  return { deductFefo, renderInventoryAddBtn, renderInventoryLowBtn, renderInventoryAuditBtn, renderInventoryBatchBtn };
 });

@@ -55,7 +55,7 @@
           if (sk.kdsCards) sk.paint(grid, sk.kdsCards({ count: 3 }));
         }
       } else if (tabId === 'qr-orders-tab') {
-        const grid = document.getElementById('qr-grid');
+        const grid = null; // QR grid moved to qr-orders-ui module
         if (grid && (!grid.children.length || grid.classList.contains('rs-skel-host'))) {
           if (sk.qrCards) sk.paint(grid, sk.qrCards({ count: 4 }));
         }

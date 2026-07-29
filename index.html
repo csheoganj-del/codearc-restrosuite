@@ -110,6 +110,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preload" href="assets/restrosuite-mark.png" as="image">
+  <link rel="preload" href="assets/og-share.png" as="image">
+  <link rel="preload" href="assets/restrosuite.css?v=20260711-human" as="style">
+  <style>
+    /* Critical CSS: hero above-the-fold (small, safe subset) */
+    .hero{display:block;padding:36px 0;background:transparent;min-height:320px}
+    .hero-grid{display:flex;gap:20px;align-items:center;max-width:1200px;margin:0 auto;padding:0 18px}
+    .hero-content{flex:1}
+    .hero-visual{flex:1;max-width:460px}
+    .hero h1{font-size:28px;line-height:1.12;margin:0 0 10px}
+    .hero-sub{font-size:15px;color:#5a5a5a;margin:0 0 14px}
+    .hero-actions .btn{min-width:150px}
+    /* Accessible skip link visibility on focus */
+    .skip-nav{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+    .skip-nav:focus{left:12px;top:12px;width:auto;height:auto;background:#fff;padding:8px;border-radius:6px;border:1px solid #ddd;z-index:9999}
+  </style>
   <link rel="stylesheet" href="assets/restrosuite.css?v=20260711-human">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
@@ -1620,6 +1636,7 @@
     </div>
   </nav>
 
+  <a class="skip-nav" href="#main-content">Skip to main content</a>
   <main id="main-content">
     <!-- ===== HERO ===== -->
     <section class="hero" id="top">

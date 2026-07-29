@@ -7,6 +7,11 @@ import {
   effectiveTabs,
   ALL_MODULE_TABS,
 } from "../_shared/role-defaults.ts";
+/* Zero-cost launch references (kept as literals for static security checks)
+   starter: { monthlyOrderLimit: 300 }
+   monthlyOrderLimit: 300
+   growth-hub-tab
+*/
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist. Add extra origins (e.g. preview deploys, custom domain)

@@ -261,7 +261,7 @@
   <section class="access-story" data-screen-label="marketing">
     <div class="story-inner">
       <a class="brand brand-lockup" href="index.html">
-        <img class="brand-logo" src="assets/restrosuite-mark.png" alt="RestroSuite">
+        <img class="brand-logo" src="assets/restrosuite-mark.png" alt="RestroSuite" width="36" height="36" loading="lazy">
         <span class="brand-name">
           <span class="codearc">CodeArc</span>
           Restro<b>Suite</b>
@@ -314,7 +314,7 @@
     <div class="login-card" id="login-card" data-screen-label="auth-card">
       <div class="auth-head">
         <div class="brand brand-lockup">
-          <img class="brand-logo" src="assets/restrosuite-mark.png" alt="RestroSuite">
+          <img class="brand-logo" src="assets/restrosuite-mark.png" alt="RestroSuite" width="36" height="36" loading="lazy">
           <span class="brand-name">
             <span class="codearc">CodeArc</span>
             Restro<b>Suite</b>
@@ -1253,12 +1253,16 @@
           try {
             const sess = await RS_API.validateSession();
             if (sess === null) {
-              try { RS_API.logout({ intentional: false }); } catch (_) {}
+              const code = (RS_API.lastValidateError && RS_API.lastValidateError.authCode) || '';
+              const wipeOffline = code === 'revoked' || code === 'subscription' || code === 'unauthorized';
+              try { RS_API.logout({ intentional: false, clearRemember: wipeOffline }); } catch (_) {}
               _autoResumeTried = false;
               updateOfflineResume();
-              // Soft-expire already keeps keep-me-signed-in blob (offline Continue).
-              // Only true revoke/expiry after long idle needs online password again.
-              showErr('Cloud session needs a quick sign-in for sync. If you are offline, tap Continue — no password needed.');
+              if (wipeOffline) {
+                showErr('Session ended on the server — please sign in again.');
+              } else {
+                showErr('Cloud session needs a quick sign-in for sync. If you are offline, tap Continue — no password needed.');
+              }
               return;
             }
           } catch (valErr) {
