@@ -15,13 +15,20 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run Lighthouse (action)
-        uses: treosh/lighthouse-ci-action@v9
-        with:
-          urls: 'https://restrosuite.codearc.co.in'
-          uploadArtifacts: true
-          artifactName: 'lighthouse-report'
-          runs: 1
+      - name: Prepare artifacts dir
+        run: mkdir -p artifacts
+
+      - name: Install Chromium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+
+      - name: Run Lighthouse (npx)
+        run: |
+          npx -y lighthouse https://restrosuite.codearc.co.in \
+            --output=json \
+            --output-path=artifacts/lighthouse.json \
+            --chrome-flags="--no-sandbox --disable-dev-shm-usage --disable-setuid-sandbox"
 
       - name: Upload Lighthouse artifact
         uses: actions/upload-artifact@v4
