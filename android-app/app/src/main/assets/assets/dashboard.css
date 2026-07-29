@@ -1363,6 +1363,31 @@ body > .dropdown-menu.is-portaled .dropdown-item.active {
   font-size: 11px; color: var(--text-soft); gap: 4px 10px;
 }
 .totals-meta b { color: var(--text); font-weight: 700; }
+
+/* Soft-disabled actions (still receive click → toast with reason) */
+.btn.rs-action-disabled,
+button.rs-action-disabled,
+[role="button"].rs-action-disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  filter: grayscale(0.15);
+}
+
+/* Hide cart GST unless taxes are ON and cart has items (desktop was stuck showing GST ₹0). */
+html.rs-hide-cart-tax .totals-meta #t-gst-wrap,
+html.rs-hide-cart-tax .totals-meta #t-gst,
+html.rs-hide-cart-tax .totals-meta > span[title="Tax"],
+html.rs-hide-cart-tax .totals-meta > span[title="GST"],
+html:not(.rs-taxes-on) .totals-meta #t-gst-wrap,
+html:not(.rs-taxes-on) .totals-meta #t-gst,
+html:not(.rs-taxes-on) .totals-meta > span[title="Tax"],
+html:not(.rs-taxes-on) .totals-meta > span[title="GST"],
+html:not(.rs-cart-has-items) .totals-meta #t-gst-wrap,
+html:not(.rs-cart-has-items) .totals-meta > span[title="Tax"],
+html:not(.rs-cart-has-items) .totals-meta > span[title="GST"] {
+  display: none !important;
+}
+
 .totals-grand { display: flex; justify-content: space-between; align-items: center; padding-top: 5px; border-top: 1px dashed var(--stroke-2); }
 .totals-grand span:first-child { font-weight: 700; font-size: 13px; color: var(--text); }
 .totals-grand .amt { font-family: var(--font-display); font-weight: 800; font-size: 22px; color: var(--orange); letter-spacing: -.02em; }

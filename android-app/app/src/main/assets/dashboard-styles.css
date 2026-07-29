@@ -7945,3 +7945,18 @@ body.product-guide-open { overflow: hidden; }
     padding: 12px !important;
   }
 }
+
+/* Ultra-compact sub-7-inch & mobile refinement (Wave 14) */
+@media screen and (max-width: 600px) {
+  .modal-card {
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+  .cart-qty-btn {
+    min-width: 28px;
+    min-height: 28px;
+  }
+  .pos-action-btn, .btn-primary, .btn-secondary {
+    touch-action: manipulation;
+  }
+}
