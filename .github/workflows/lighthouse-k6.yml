@@ -28,7 +28,7 @@ jobs:
           npx -y lighthouse https://restrosuite.codearc.co.in \
             --output=json \
             --output-path=artifacts/lighthouse.json \
-            --chrome-flags="--no-sandbox --disable-dev-shm-usage --disable-setuid-sandbox"
+                      --chrome-flags="--headless=chrome --no-sandbox --disable-dev-shm-usage --disable-setuid-sandbox"
 
       - name: Upload Lighthouse artifact
         uses: actions/upload-artifact@v4
