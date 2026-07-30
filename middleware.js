@@ -91,7 +91,14 @@ export default async function middleware(request) {
     return response;
   }
 
-  const html = (await response.text()).replace(
+  // CSP blocks inline event handlers (onload=...), so the common
+  // media="print" onload="this.media='all'" font/icon pattern never flips to
+  // screen — icons and brand fonts disappear. Force those sheets to apply.
+  let html = (await response.text())
+    .replace(/\s+media=(["'])print\1\s+onload=(["'])this\.media\s*=\s*(['"])all\3\2/gi, "")
+    .replace(/\s+onload=(["'])this\.media\s*=\s*(['"])all\2\1\s+media=(["'])print\3/gi, "");
+
+  html = html.replace(
     /<script(?![^>]*\bsrc\s*=)(?![^>]*\bnonce\s*=)([^>]*)>/gi,
     `<script nonce="${nonce}"$1>`
   );
