@@ -160,7 +160,7 @@ async function verifyAdminSession(req: Request) {
 
     const { data: tenant, error: tenantError } = await supabaseAdmin
       .from("saas_tenants")
-      .select("id, status, allowed_tabs, plan_code, subscription_status")
+      .select("id, status, allowed_tabs, plan_code, subscription_status, auth_version")
       .eq("id", String(payload.tenant_id || ""))
       .maybeSingle();
     if (tenantError || !tenant || tenant.status !== "approved" || !activeSubscription(tenant.subscription_status)) {
@@ -177,6 +177,9 @@ async function verifyAdminSession(req: Request) {
     const userId = String(payload.user_id || "");
     if (!userId) {
       if (payload.legacy_owner !== true) return { ok: false, error: "Invalid administrator session." };
+      if (Number(payload.auth_version) !== Number(tenant.auth_version)) {
+        return { ok: false, error: "Session was revoked. Please log in again." };
+      }
       return {
         ok: true,
         tenantId: tenant.id,

@@ -514,6 +514,9 @@ test("onboarding is entitlement-aware and includes a permanent setup guide", () 
   assert.match(dashboard, /id="open-product-guide-btn"/);
   assert.match(dashboard, /id="tour-action"/);
   assert.match(onboarding, /function enabledFeatures/);
+  assert.match(onboarding, /CORE_ONBOARDING_TAB_IDS/);
+  assert.match(onboarding, /function coreOnboardingFeatures/);
+  assert.match(onboarding, /coreOnboardingFeatures\(\)/);
   assert.match(onboarding, /sessionStorage\.getItem\('allowed_tabs'\)/);
   assert.match(onboarding, /window\.getComputedStyle\(link\)\.display !== 'none'/);
   assert.match(onboarding, /function hasCompletedTour/);
@@ -537,6 +540,11 @@ test("credential recovery uses expiring one-time tokens and separates privileged
   assert.match(login, /id="open-recovery-btn"/);
   assert.match(login, /id="recovery-request-form"/);
   assert.match(login, /id="recovery-reset-form"/);
+  assert.match(login, /RS_API\.requestRecovery/);
+  assert.match(login, /RS_API\.resetPassword/);
+  assert.match(login, /searchParams\.get\(['"]recovery['"]\)|params\.get\(['"]recovery['"]\)/);
+  assert.doesNotMatch(login, /RS_API\.access\(\{\s*operation:\s*['"]request_recovery['"]/);
+  assert.doesNotMatch(login, /Password updated — you can sign in now\.'\);\s*\}, 700\)/);
   assert.match(guide, /Superadmin[\s\S]*SUPERADMIN_PASSWORD_HASH/);
   assert.match(tenantAccess, /request_recovery/);
   assert.match(tenantAccess, /reset_password/);
@@ -547,6 +555,11 @@ test("credential recovery uses expiring one-time tokens and separates privileged
   assert.match(tenantAccess, /\.is\("used_at", null\)/);
   assert.match(tenantAccess, /auth_version: Number\(tenant\.auth_version \|\| 1\) \+ 1/);
   assert.match(tenantAdmin, /updates\.auth_version = Number\(currentTenant\.auth_version \|\| 1\) \+ 1/);
+  const tenantData = read("supabase/functions/tenant-data/index.ts");
+  const tenantUsers = read("supabase/functions/tenant-users/index.ts");
+  assert.match(tenantData, /auth_version/);
+  assert.match(tenantData, /Number\(payload\.auth_version\) !== Number\(tenant\.auth_version\)/);
+  assert.match(tenantUsers, /Number\(payload\.auth_version\) !== Number\(tenant\.auth_version\)/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.tenant_password_resets/);
   assert.match(migration, /FORCE ROW LEVEL SECURITY/);
   assert.match(guide, /Superadmin recovery is intentionally not exposed/);

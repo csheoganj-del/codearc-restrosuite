@@ -158,10 +158,19 @@
     tabId: '',
     label: 'Getting Started',
     icon: 'fa-compass',
-    subtitle: 'Your enabled RestroSuite workspace',
-    description: 'This tour only covers features enabled for your plan and staff role. Reopen Help anytime from the sidebar.',
-    firstAction: 'Finish the setup checklist (profile → menu → staff → one test bill), then explore features below.'
+    subtitle: 'Five essentials to go live',
+    description: 'A short first-run path: menu → POS bill → bills → staff → reports. Everything else stays in Help when you need it.',
+    firstAction: 'Finish profile setup, then walk the five steps below. Open Help anytime for the full catalog.'
   };
+
+  /** First-run auto tour — keep calm; full catalog remains in Help → Product Guide. */
+  const CORE_ONBOARDING_TAB_IDS = Object.freeze([
+    'editor-tab',
+    'pos-tab',
+    'bills-tab',
+    'employees-tab',
+    'reports-tab',
+  ]);
 
   const UPDATES_HISTORY = [
     {
@@ -357,6 +366,16 @@
 
   function enabledFeatures() {
     return FEATURES.filter(isFeatureVisible);
+  }
+
+  function coreOnboardingFeatures() {
+    const byId = new Map(FEATURES.map((feature) => [feature.tabId, feature]));
+    const core = CORE_ONBOARDING_TAB_IDS
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .filter(isFeatureVisible);
+    if (core.length >= 3) {return core;}
+    return enabledFeatures().slice(0, 5);
   }
 
   function tourUserScope() {
@@ -1127,8 +1146,8 @@
   }
 
   function startTour() {
-    // Full Getting Started tour — first-time onboarding only (or Help → Tour).
-    steps = [WELCOME_STEP, ...enabledFeatures()];
+    // Calm first-run tour (core modules only). Help → Product Guide lists everything.
+    steps = [WELCOME_STEP, ...coreOnboardingFeatures()];
     if (steps.length < 2) {return;}
     activeTourKind = 'onboarding';
     activeUpdateTourVersion = '';

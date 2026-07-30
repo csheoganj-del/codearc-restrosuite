@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const https = require('https');
 
 const root = path.join(__dirname, '..');
 
@@ -74,8 +75,9 @@ test('optional live HTTP smoke when BASE_URL set', async (t) => {
     return;
   }
   const url = base.replace(/\/+$/, '') + '/login.html';
+  const client = String(url).startsWith('https:') ? https : http;
   const body = await new Promise((resolve, reject) => {
-    const req = http.get(url, { timeout: 8000 }, (res) => {
+    const req = client.get(url, { timeout: 8000 }, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => resolve({ status: res.statusCode, data }));

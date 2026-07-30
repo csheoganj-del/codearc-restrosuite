@@ -603,7 +603,7 @@ async function verifyTenantSession(req: Request) {
 
     const { data: tenant, error } = await supabaseAdmin
       .from("saas_tenants")
-      .select("id, status, allowed_tabs, plan_code, subscription_status")
+      .select("id, status, allowed_tabs, plan_code, subscription_status, auth_version")
       .eq("id", String(payload.tenant_id || ""))
       .maybeSingle();
 
@@ -653,6 +653,9 @@ async function verifyTenantSession(req: Request) {
 
     if (payload.role !== "admin" || payload.legacy_owner !== true) {
       return { ok: false, error: "Invalid tenant session." };
+    }
+    if (Number(payload.auth_version) !== Number(tenant.auth_version)) {
+      return { ok: false, error: "Session was revoked. Please log in again." };
     }
 
     return {
