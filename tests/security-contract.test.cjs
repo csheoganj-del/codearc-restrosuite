@@ -298,6 +298,27 @@ test("visual system uses a restrained SaaS palette and consistent radius", () =>
   assert.doesNotMatch(dashboardCss, /fonts\.googleapis\.com\/css2\?family=Inter/);
 });
 
+test("web vitals RUM and multi-page perf gates are wired", () => {
+  const rum = read("assets/modules/web-vitals-rum.js");
+  const measure = read("scripts/measure-web-vitals.cjs");
+  const perfCi = read("scripts/perf-ci.cjs");
+  const index = read("index.html");
+  const login = read("login.html");
+  const dashboard = read("dashboard.html");
+
+  assert.match(rum, /largest-contentful-paint/);
+  assert.match(rum, /layout-shift/);
+  assert.match(rum, /rs_rum_vitals_v1/);
+  assert.match(measure, /cls/);
+  assert.match(measure, /MAX_CLS/);
+  assert.match(perfCi, /login\.html/);
+  assert.match(index, /web-vitals-rum\.js/);
+  assert.match(login, /web-vitals-rum\.js/);
+  assert.match(login, /rs-skip-link/);
+  assert.match(dashboard, /rs-skip-link/);
+  assert.match(read("assets/restrosuite.css"), /prefers-reduced-motion/);
+});
+
 test("starter nav keeps first-week sidebar calm", () => {
   const ops = read("assets/modules/ops-mode.js");
   const css = read("assets/dashboard.css");

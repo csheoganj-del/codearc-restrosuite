@@ -21,24 +21,26 @@ async function main() {
     run(process.execPath, [path.join(root, 'scripts', 'minify-assets.cjs')], root);
   }
 
-  const url = pathToFileURL(path.join(outDir, 'index.html')).toString() + '?home=1';
+  const indexUrl = pathToFileURL(path.join(outDir, 'index.html')).toString() + '?home=1';
+  const loginUrl = pathToFileURL(path.join(outDir, 'login.html')).toString();
 
   const maxLcp = process.env.MAX_LCP_MS || '3500';
   const maxFcp = process.env.MAX_FCP_MS || '2000';
   const maxTtfb = process.env.MAX_TTFB_MS || '800';
+  const maxCls = process.env.MAX_CLS || '0.1';
 
   const r = spawnSync(
     process.execPath,
-    [path.join(root, 'scripts', 'measure-web-vitals.cjs'), url],
+    [path.join(root, 'scripts', 'measure-web-vitals.cjs'), indexUrl, loginUrl],
     {
       cwd: root,
       stdio: 'inherit',
       env: {
         ...process.env,
-        PERF_URL: url,
         MAX_LCP_MS: String(maxLcp),
         MAX_FCP_MS: String(maxFcp),
         MAX_TTFB_MS: String(maxTtfb),
+        MAX_CLS: String(maxCls),
       },
     }
   );

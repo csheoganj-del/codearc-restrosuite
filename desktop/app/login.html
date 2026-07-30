@@ -163,7 +163,12 @@
   .link-btn { background: none; border: none; color: var(--text-soft); font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
   .link-btn:hover { color: var(--orange); }
   .remember { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-soft); cursor: pointer; }
-  .remember input { accent-color: var(--orange); width: 15px; height: 15px; }
+  .remember input { accent-color: var(--orange); width: 15px; height: 15px; min-width: 18px; min-height: 18px; }
+  @media (max-width: 640px) {
+    .btn.btn-lg, .btn.btn-block { min-height: 48px; }
+    .form-input { min-height: 48px; font-size: 16px; } /* 16px avoids iOS zoom */
+    .tab-btn { min-height: 44px; }
+  }
 
   .alert { border-radius: var(--r-sm); padding: 12px 15px; font-size: 13.5px; font-weight: 500; margin-bottom: 18px; display: none; align-items: center; gap: 10px; }
   .alert.show { display: flex; }
@@ -255,7 +260,7 @@
 </style>
 </head>
 <body class="noise">
-
+<a class="rs-skip-link" href="#login-card">Skip to sign in</a>
 <div class="access-top">
   <a class="back-home" href="index.html"><i class="fa-solid fa-arrow-left"></i> Back to overview</a>
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme"><i class="fa-solid fa-sun"></i></button>
@@ -1904,6 +1909,7 @@
     }catch(_){}
   })();
 </script>
+<script src="assets/modules/web-vitals-rum.js"></script>
 <script src="pwa.js"></script>
 </body>
 </html>

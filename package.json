@@ -19,7 +19,7 @@
     "lint:ci": "eslint \"assets/modules/**/*.js\" \"src/dashboard/**/*.js\" \"gateway-modules/**/*.js\" \"scripts/**/*.cjs\" whatsapp-gateway.js ngrok-service.js middleware.js service-worker.js",
     "perf:vitals": "node scripts/measure-web-vitals.cjs",
     "perf:ci": "node scripts/perf-ci.cjs",
-    "perf:prod": "node scripts/measure-web-vitals.cjs https://restrosuite.codearc.co.in/index.html?home=1",
+    "perf:prod": "node scripts/measure-web-vitals.cjs https://restrosuite.codearc.co.in/index.html?home=1 https://restrosuite.codearc.co.in/login.html",
     "a11y:ci": "node scripts/a11y-ci.cjs",
     "loadtest": "node scripts/loadtest.cjs",
     "check": "node scripts/check-role-defaults.cjs && node scripts/check-project.cjs && node scripts/check-free-tier.cjs",

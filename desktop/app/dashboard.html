@@ -88,7 +88,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v230-20260729-auto';
+    var builtin = 'v231-20260730-auto';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -366,6 +366,7 @@
 </style>
 </head>
 <body>
+<a class="rs-skip-link" href="#app">Skip to console</a>
 <div id="rs-boot-loader"><div class="rs-boot-spinner"></div><span id="rs-boot-label" class="rs-boot-label">Loading RestroSuite&hellip;</span></div>
 <script>
 /* Stamp body role classes before any deferred scripts paint the wrong shell */
