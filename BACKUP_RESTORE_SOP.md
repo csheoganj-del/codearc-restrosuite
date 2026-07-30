@@ -6,7 +6,7 @@ Backups protect restaurant operations from mistakes, imports, and accidental dat
 
 - Manual JSON export from dashboard.
 - Automated database backups via script: `npm run backup` (saves compressed ZIP snapshots of all core tables to `backups/` directory).
-- Nightly GitHub Action: `.github/workflows/nightly-backup.yml` (requires `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` secrets; artifacts retained 90 days).
+- Nightly GitHub Action: `.github/workflows/nightly-backup.yml` (requires `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` secrets; artifacts retained 90 days). After each backup it runs a **non-destructive restore preview drill** on the fresh archive.
 - Supabase database backups when the project plan supports it.
 - WhatsApp gateway session backup when the optional gateway is enabled.
 - Growth Hub backup snapshot records for readiness tracking.

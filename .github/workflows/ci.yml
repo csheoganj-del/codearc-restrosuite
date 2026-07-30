@@ -51,6 +51,14 @@ jobs:
       - name: Free-tier limits check
         run: npm run check:free-tier
 
+      - name: Launch readiness (offline gates)
+        run: npm run check:launch
+        env:
+          SKIP_LIVE_LAUNCH_CHECK: "1"
+
+      - name: DR structure drill
+        run: npm run drill:backup:structure
+
   e2e-browser:
     name: Playwright browser smoke
     runs-on: ubuntu-latest

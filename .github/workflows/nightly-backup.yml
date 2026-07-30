@@ -55,3 +55,12 @@ jobs:
             echo "::error::No backup archive was produced -- treat this as a disaster-recovery incident, not a skipped job."
             exit 1
           fi
+
+      - name: Non-destructive restore preview drill
+        run: |
+          ZIP="$(ls -1t backups/restrosuite-backup-*.zip | head -1)"
+          echo "Drilling archive: $ZIP"
+          node scripts/backup-restore-drill.cjs "$ZIP"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

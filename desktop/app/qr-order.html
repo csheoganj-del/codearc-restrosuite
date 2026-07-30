@@ -21,7 +21,7 @@
       --brand-2: #FF6A2A;
       --ink: #141210;
       --ink2: #3D3A36;
-      --muted: #5E5952;
+      --muted: #4A453F;
       --line: rgba(15,14,13,.09);
       --surf: #FFFFFF;
       --bg: #F4F1EB;
@@ -529,9 +529,17 @@
     .block-ico.warn { background: #FEF3C7; color: #B45309; }
     .block-t { font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 6px; letter-spacing: -.02em; }
     .block-m { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.45; margin-bottom: 14px; }
+    .skip-link {
+      position: absolute; left: 8px; top: 8px; z-index: 100;
+      padding: 8px 12px; border-radius: 8px; background: var(--brand); color: #fff;
+      font-weight: 700; font-size: 13px; text-decoration: none;
+      transform: translateY(-120%); transition: transform .2s var(--ease);
+    }
+    .skip-link:focus { transform: translateY(0); outline: 2px solid #fff; outline-offset: 2px; }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#portal">Skip to order</a>
   <div class="home" id="portal">
     <div class="top">
       <div class="chip" id="session-pill"><span class="d"></span><span id="session-pill-txt">Ready</span></div>
@@ -545,7 +553,7 @@
     </div>
 
     <header class="brand">
-      <img src="assets/restrosuite-mark.png" alt="" width="46" height="46" onerror="this.style.display='none'">
+      <img src="assets/restrosuite-mark.png" alt="RestroSuite" width="46" height="46" onerror="this.style.display='none'">
       <div class="brand-txt">
         <div class="brand-name" id="brand-logo">Loading…</div>
         <div class="brand-row">

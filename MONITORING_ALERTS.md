@@ -11,6 +11,8 @@ Start with free monitoring and upgrade only when revenue or scale requires it.
 - QR order endpoint responds.
 - Tenant login endpoint responds.
 - Free-tier usage is below limits.
+- Nightly backup GitHub Action succeeded (or was manually run) within the last 48 hours.
+- Nightly restore **preview** drill step passed (non-destructive).
 
 ## Suggested Free Monitors
 

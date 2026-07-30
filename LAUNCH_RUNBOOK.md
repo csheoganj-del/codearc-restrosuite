@@ -109,10 +109,17 @@ Launch only when:
 - `npm test` passes.
 - `npm run check` passes.
 - `npm run check:free-tier` passes.
+- `npm run drill:backup:structure` passes.
+- `npm run a11y:ci` passes.
+- `npm run perf:ci` passes (lab landing).
+- `npm run check:prod-assets` passes against production.
+- `npm run perf:prod` is within soft budgets (or investigated if not).
 - Production tenant login works.
+- Production password recovery email delivers (`PUBLIC_APP_URL` + `EMAIL_RELAY_*`).
 - Production QR order works.
 - RLS blocks cross-tenant access.
 - Support, refund, backup, and policy workflows are ready.
+- Nightly backup workflow has produced at least one artifact in the last 7 days.
 
 ## Rollback
 

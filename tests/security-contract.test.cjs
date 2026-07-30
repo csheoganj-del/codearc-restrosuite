@@ -496,10 +496,15 @@ test("production launch runbooks cover deployment, QA, support, billing, backups
   const backup = read("BACKUP_RESTORE_SOP.md");
   const monitoring = read("MONITORING_ALERTS.md");
   const demo = read("CLIENT_DEMO_SCRIPT.md");
+  const vercel = read("vercel.json");
+  const nightly = read(".github/workflows/nightly-backup.yml");
 
   assert.match(launch, /Supabase Setup/);
   assert.match(launch, /Vercel Setup/);
   assert.match(launch, /Go\/No-Go Gate/);
+  assert.match(launch, /drill:backup:structure/);
+  assert.match(launch, /check:prod-assets/);
+  assert.match(launch, /perf:prod/);
   assert.match(qa, /Growth Hub/);
   assert.match(qa, /Mobile and Android/);
   assert.match(support, /Priority Levels/);
@@ -513,6 +518,12 @@ test("production launch runbooks cover deployment, QA, support, billing, backups
   assert.match(monitoring, /Supabase quota/);
   assert.match(demo, /12-Minute Demo Flow/);
   assert.match(demo, /zero-cost pilot/);
+  assert.match(vercel, /Content-Security-Policy/);
+  assert.match(vercel, /Strict-Transport-Security/);
+  assert.match(vercel, /X-Frame-Options/);
+  assert.match(vercel, /Referrer-Policy/);
+  assert.match(nightly, /backup-restore-drill/);
+  assert.match(nightly, /Non-destructive restore preview drill/);
 });
 
 test("nested POS controls expose split payment and touch customization", () => {
