@@ -165,87 +165,87 @@
 
   const UPDATES_HISTORY = [
     {
-      version: "v216-20260725-shift-ux-guide",
-      date: "2026-07-25",
-      title: "Shift-first billing + clear action guides",
-      summary: "Print & Pay, Hold, refunds, and cash drawer require an open shift and explain why when blocked. After install, a short guide shows what changed.",
+      version: 'v216-20260725-shift-ux-guide',
+      date: '2026-07-25',
+      title: 'Shift-first billing + clear action guides',
+      summary: 'Print & Pay, Hold, refunds, and cash drawer require an open shift and explain why when blocked. After install, a short guide shows what changed.',
       highlights: [
-        "Open shift first: Print & Pay shows a clear modal when shift is closed (Open shift CTA).",
-        "Hold and Void/Refund use the same shift gate so the Z-report stays accurate.",
-        "Cash drawer and pay-in/pay-out prompt to open shift instead of failing silently.",
-        "Print & Pay explains empty cart, short cash, and unbalanced split — no dead button.",
+        'Open shift first: Print & Pay shows a clear modal when shift is closed (Open shift CTA).',
+        'Hold and Void/Refund use the same shift gate so the Z-report stays accurate.',
+        'Cash drawer and pay-in/pay-out prompt to open shift instead of failing silently.',
+        'Print & Pay explains empty cart, short cash, and unbalanced split — no dead button.',
         "After this update: What's New opens automatically with an optional guided tour."
       ],
-      tour: "shift-ux"
+      tour: 'shift-ux'
     },
     {
-      version: "v36-20260708",
-      date: "2026-07-08",
-      title: "Logical Numbering & Update Reliability Fix",
-      summary: "This update replaces timestamp-style visible numbers with short daily sequences, keeps update notes current, and widens the POS guest name and phone fields.",
+      version: 'v36-20260708',
+      date: '2026-07-08',
+      title: 'Logical Numbering & Update Reliability Fix',
+      summary: 'This update replaces timestamp-style visible numbers with short daily sequences, keeps update notes current, and widens the POS guest name and phone fields.',
       highlights: [
-        "Visible bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable daily numbers.",
-        "The update dialog no longer reuses old release notes for patch-only code updates.",
-        "The POS cart guest name and phone fields now have full-width room and mobile-safe wrapping."
+        'Visible bills, KOTs, QR orders, held drafts, purchase orders, and tickets now use readable daily numbers.',
+        'The update dialog no longer reuses old release notes for patch-only code updates.',
+        'The POS cart guest name and phone fields now have full-width room and mobile-safe wrapping.'
       ]
     },
     {
-      version: "v22-20260621",
-      date: "2026-06-21",
-      title: "POS Active Cart Persistence & Stability",
-      summary: "This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.",
+      version: 'v22-20260621',
+      date: '2026-06-21',
+      title: 'POS Active Cart Persistence & Stability',
+      summary: 'This update fixes POS active cart resetting on layout switches, resolves infinite loops when resetting tables, and bumps version naming for clarity.',
       highlights: [
-        "Active Cart Persistence: Cart items are saved to drafts when switching layouts or changing tables.",
-        "Recursion Guard: Implemented safety flags to prevent stack overflow loop crashes on table resets.",
-        "Semantic Release Naming: Updated the versioning system to clean semantic v-format strings."
+        'Active Cart Persistence: Cart items are saved to drafts when switching layouts or changing tables.',
+        'Recursion Guard: Implemented safety flags to prevent stack overflow loop crashes on table resets.',
+        'Semantic Release Naming: Updated the versioning system to clean semantic v-format strings.'
       ]
     },
     {
-      version: "2026.06.20-onboarding",
-      date: "2026-06-20",
-      title: "Onboarding Usability & Tour Update",
+      version: '2026.06.20-onboarding',
+      date: '2026-06-20',
+      title: 'Onboarding Usability & Tour Update',
       summary: "This update resolves tooltip layout overlapping, makes the 'What's New' history button responsive, and fixes settings tab setup task redirects.",
       highlights: [
-        "Collision-Free Tooltips: Tooltip card dynamically shifts to the side with more space (left/right) to keep highlighted elements fully visible.",
+        'Collision-Free Tooltips: Tooltip card dynamically shifts to the side with more space (left/right) to keep highlighted elements fully visible.',
         "What's New Button: Resolved the click event handler on the What's New history button.",
-        "Redirect & Input Focus: Setup task checklist buttons now route directly to settings sub-sections and auto-focus fields.",
-        "Mobile View Centering: Centered tooltip cards on narrow viewports using translate transforms."
+        'Redirect & Input Focus: Setup task checklist buttons now route directly to settings sub-sections and auto-focus fields.',
+        'Mobile View Centering: Centered tooltip cards on narrow viewports using translate transforms.'
       ]
     },
     {
-      version: "2026.06.19-dues",
-      date: "2026-06-19",
-      title: "Customer Dues & QR Printing Update",
-      summary: "This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.",
+      version: '2026.06.19-dues',
+      date: '2026-06-19',
+      title: 'Customer Dues & QR Printing Update',
+      summary: 'This update introduces customer credit (dues) management, QR code generation/printing for tables, and persistent POS drafts.',
       highlights: [
         "Credit Payment: cashiers can now select 'Due' as a payment method for registered customers.",
-        "CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.",
-        "POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.",
-        "Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.",
-        "Persistent POS Drafts: parked/held orders are saved to the database and survive reloads."
+        'CRM Dues Tracking: customer profiles in CRM now display outstanding dues and allow quick settlements.',
+        'POS Customer Selector: easily assign customers to POS orders for loyalty and dues tracking.',
+        'Table QR Printing: generate and print QR codes directly from the Floor & Tables toolbar.',
+        'Persistent POS Drafts: parked/held orders are saved to the database and survive reloads.'
       ]
     },
     {
-      version: "2026.06.19-restrosuite",
-      date: "2026-06-19",
-      title: "RestroSuite dashboard reliability update",
-      summary: "This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness.",
+      version: '2026.06.19-restrosuite',
+      date: '2026-06-19',
+      title: 'RestroSuite dashboard reliability update',
+      summary: 'This update improves billing clarity, import/export feedback, logo consistency, update safety, and background sync smoothness.',
       highlights: [
-        "Bills now use date-wise numbers like RS-260619-001.",
-        "Bill, tax, menu, inventory, and tenant exports use date-wise filenames.",
-        "Import and export work now shows a clear progress/status bar.",
-        "The dashboard checks for updates in the background and prompts with release notes."
+        'Bills now use date-wise numbers like RS-260619-001.',
+        'Bill, tax, menu, inventory, and tenant exports use date-wise filenames.',
+        'Import and export work now shows a clear progress/status bar.',
+        'The dashboard checks for updates in the background and prompts with release notes.'
       ]
     },
     {
-      version: "2026.06.18",
-      date: "2026-06-18",
-      title: "Menu Import/Export & KDS Optimization",
-      summary: "Introduced bulk menu importing via Excel templates and enhanced kitchen display responsiveness.",
+      version: '2026.06.18',
+      date: '2026-06-18',
+      title: 'Menu Import/Export & KDS Optimization',
+      summary: 'Introduced bulk menu importing via Excel templates and enhanced kitchen display responsiveness.',
       highlights: [
-        "Bulk menu setup using Excel templates.",
-        "KDS screen responsiveness improvements and color coding.",
-        "Multi-station kitchen routing."
+        'Bulk menu setup using Excel templates.',
+        'KDS screen responsiveness improvements and color coding.',
+        'Multi-station kitchen routing.'
       ]
     }
   ];
@@ -335,6 +335,9 @@
 
   let steps = [];
   let currentStep = 0;
+  /** 'onboarding' | 'update' — used so Finish/Skip marks the right completion flag */
+  let activeTourKind = 'onboarding';
+  let activeUpdateTourVersion = '';
 
   function allowedTabIds() {
     try {
@@ -347,7 +350,7 @@
 
   function isFeatureVisible(feature) {
     const allowlist = allowedTabIds();
-    if (allowlist.length && !allowlist.includes(feature.tabId)) return false;
+    if (allowlist.length && !allowlist.includes(feature.tabId)) {return false;}
     const link = document.querySelector(`.sidebar-link[data-tab="${feature.tabId}"]`);
     return Boolean(link && window.getComputedStyle(link).display !== 'none');
   }
@@ -356,11 +359,56 @@
     return FEATURES.filter(isFeatureVisible);
   }
 
-  function tourStorageKey() {
+  function tourUserScope() {
     const tenant = sessionStorage.getItem('tenant_id') || 'default';
     const user = sessionStorage.getItem('tenant_user_id') || sessionStorage.getItem('logged_in_user') || 'user';
-    const signature = enabledFeatures().map(feature => feature.tabId).sort().join(',');
-    return `restrosuite_tour_done:${tenant}:${user}:${signature}`;
+    return { tenant, user };
+  }
+
+  // Stable per user — do not include enabled-feature signature (it changes when
+  // sidebar tabs hydrate and caused the tour to reopen on every login).
+  function tourCompletionStorageKey() {
+    const { tenant, user } = tourUserScope();
+    return `restrosuite_tour_done:${tenant}:${user}`;
+  }
+
+  function hasCompletedTour() {
+    try {
+      if (localStorage.getItem(tourCompletionStorageKey())) {return true;}
+      // Legacy keys included a feature signature — honour any prior dismissal.
+      const { tenant, user } = tourUserScope();
+      const legacyPrefix = `restrosuite_tour_done:${tenant}:${user}:`;
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith(legacyPrefix)) {return true;}
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function tourSessionSkipKey() {
+    const { tenant, user } = tourUserScope();
+    return `restrosuite_tour_skip_session:${tenant}:${user}`;
+  }
+
+  function shouldAutoOpenOnboardingTour() {
+    if (hasCompletedTour()) {return false;}
+    try {
+      if (sessionStorage.getItem(tourSessionSkipKey()) === '1') {return false;}
+    } catch (_) {}
+    return true;
+  }
+
+  function prepareDontShowCheckbox() {
+    const cb = document.getElementById('tour-dont-show');
+    const label = document.getElementById('tour-dont-show-label');
+    if (!cb) {return;}
+    cb.checked = true;
+    if (label) {
+      label.textContent = activeTourKind === 'update'
+        ? "Don't show this update tour again"
+        : "Don't show Getting Started again";
+    }
   }
 
   function readJson(key, fallback) {
@@ -374,7 +422,7 @@
 
   function readSettingsSnapshot() {
     try {
-      if (window.RS_SETTINGS && typeof window.RS_SETTINGS === 'object') return window.RS_SETTINGS;
+      if (window.RS_SETTINGS && typeof window.RS_SETTINGS === 'object') {return window.RS_SETTINGS;}
     } catch (_) {}
     return readJson('rs_v2:settings', {}) || {};
   }
@@ -408,14 +456,14 @@
     try {
       if (window.RS_DB && typeof RS_DB.list === 'function') {
         const rows = await RS_DB.list(name);
-        if (Array.isArray(rows)) return rows;
-        if (rows && typeof rows === 'object') return Object.values(rows);
+        if (Array.isArray(rows)) {return rows;}
+        if (rows && typeof rows === 'object') {return Object.values(rows);}
       }
     } catch (_) {}
     if (fallbackKey) {
       const raw = readJson(fallbackKey, null);
-      if (Array.isArray(raw)) return raw;
-      if (raw && typeof raw === 'object') return Object.values(raw);
+      if (Array.isArray(raw)) {return raw;}
+      if (raw && typeof raw === 'object') {return Object.values(raw);}
     }
     return [];
   }
@@ -425,10 +473,10 @@
     try {
       if (window.RS && typeof RS.getSettings === 'function') {
         const s = await RS.getSettings();
-        if (s && typeof s === 'object') settings = s;
+        if (s && typeof s === 'object') {settings = s;}
       } else if (window.RS_DB && typeof RS_DB.getSettings === 'function') {
         const s = await RS_DB.getSettings();
-        if (s && typeof s === 'object') settings = s;
+        if (s && typeof s === 'object') {settings = s;}
       }
     } catch (_) {}
 
@@ -557,7 +605,7 @@
     const link = document.querySelector(`.sidebar-link[data-tab="${tabId}"]`)
       || document.querySelector(`.mobile-bottom-nav [data-tab="${tabId}"]`)
       || document.querySelector(`.more-sheet-link[data-tab="${tabId}"]`);
-    if (link) link.click();
+    if (link) {link.click();}
   }
 
   function escGuide(s) {
@@ -569,7 +617,7 @@
   }
 
   function injectGuide() {
-    if (document.getElementById('product-guide-modal')) return;
+    if (document.getElementById('product-guide-modal')) {return;}
     const modal = document.createElement('div');
     modal.id = 'product-guide-modal';
     modal.className = 'product-guide-modal';
@@ -665,9 +713,9 @@
 
   function runTask(task) {
     closeGuide();
-    if (!task) return;
-    if (typeof task.action === 'function') task.action();
-    else if (task.tabId) activateTab(task.tabId);
+    if (!task) {return;}
+    if (typeof task.action === 'function') {task.action();}
+    else if (task.tabId) {activateTab(task.tabId);}
   }
 
   async function renderGuide(search = '') {
@@ -682,7 +730,7 @@
     const progressBar = document.getElementById('guide-progress-bar');
 
     if (summary) {
-      summary.innerHTML = `<div class="pg-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking live workspace data…</div>`;
+      summary.innerHTML = '<div class="pg-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking live workspace data…</div>';
     }
 
     let tasks = [];
@@ -704,11 +752,11 @@
         ? 'All set — use this guide to train new staff anytime.'
         : `${completed} of ${tasks.length} done · progress updates from your live data`;
     }
-    if (progressLabel) progressLabel.textContent = `${percent}%`;
+    if (progressLabel) {progressLabel.textContent = `${percent}%`;}
     if (progressBar) {
       progressBar.setAttribute('aria-valuenow', String(percent));
       const fill = progressBar.querySelector('.pg-bar-fill') || progressBar.querySelector('span');
-      if (fill) fill.style.width = `${percent}%`;
+      if (fill) {fill.style.width = `${percent}%`;}
     }
 
     if (nextCta) {
@@ -744,7 +792,7 @@
 
     if (summary) {
       if (!tasks.length) {
-        summary.innerHTML = `<div class="pg-empty-inline">No setup steps for this role.</div>`;
+        summary.innerHTML = '<div class="pg-empty-inline">No setup steps for this role.</div>';
       } else {
         summary.innerHTML = tasks.map((task, index) => {
           const state = task.done ? 'is-done' : (nextTask && task.id === nextTask.id ? 'is-next' : '');
@@ -786,14 +834,14 @@
     }
 
     const features = allFeatures.filter(feature => {
-      if (guideFilterGroup !== 'all' && (feature.group || 'Other') !== guideFilterGroup) return false;
-      if (!query) return true;
+      if (guideFilterGroup !== 'all' && (feature.group || 'Other') !== guideFilterGroup) {return false;}
+      if (!query) {return true;}
       const hay = `${feature.label} ${feature.subtitle} ${feature.description} ${feature.firstAction} ${feature.group || ''}`.toLowerCase();
       return hay.includes(query);
     });
 
     const countEl = document.getElementById('guide-feature-count');
-    if (countEl) countEl.textContent = `${allFeatures.length} enabled`;
+    if (countEl) {countEl.textContent = `${allFeatures.length} enabled`;}
 
     if (grid) {
       grid.innerHTML = features.length ? features.map(feature => `
@@ -835,7 +883,7 @@
     }
     injectGuide();
     const modal = document.getElementById('product-guide-modal');
-    if (!modal) return;
+    if (!modal) {return;}
     // Already open — refresh content, don't require a second click
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -852,7 +900,7 @@
 
   function closeGuide() {
     const modal = document.getElementById('product-guide-modal');
-    if (!modal) return;
+    if (!modal) {return;}
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('product-guide-open');
@@ -860,7 +908,7 @@
 
   function buildDots() {
     const container = document.getElementById('tour-dots');
-    if (!container) return;
+    if (!container) {return;}
     container.innerHTML = steps.map((step, index) =>
       `<button type="button" class="tour-dot ${index === currentStep ? 'is-active' : ''}" data-tour-index="${index}" aria-label="Go to ${step.label}"></button>`
     ).join('');
@@ -871,11 +919,17 @@
 
   function positionSpotlight(target) {
     const spotlight = document.getElementById('onboarding-spotlight');
-    if (!spotlight) return;
+    const backdrop = document.getElementById('onboarding-backdrop');
+    if (!spotlight) {return;}
     if (!target) {
       spotlight.style.display = 'none';
+      // Welcome / no-target: dim via backdrop so the card stays above a real layer
+      if (backdrop) {backdrop.style.background = 'rgba(8, 8, 11, 0.45)';}
       return;
     }
+    // Spotlight ring provides the dim cutout — keep backdrop transparent so it
+    // never paints over the card while still capturing outside clicks.
+    if (backdrop) {backdrop.style.background = 'transparent';}
     const rect = target.getBoundingClientRect();
     const pad = 8;
     Object.assign(spotlight.style, {
@@ -889,7 +943,7 @@
 
   function positionCard(target) {
     const card = document.getElementById('onboarding-card');
-    if (!card) return;
+    if (!card) {return;}
     const mobile = window.innerWidth <= 768;
     if (mobile) {
       card.style.left = '50%';
@@ -898,7 +952,7 @@
       card.style.bottom = card.style.top === 'auto' ? '76px' : 'auto';
       return;
     }
-    
+
     card.style.transform = 'none';
     card.style.bottom = 'auto';
     const width = card.offsetWidth || 380;
@@ -908,11 +962,11 @@
       card.style.top = `${Math.max(20, (window.innerHeight - height) / 2)}px`;
       return;
     }
-    
+
     const rect = target.getBoundingClientRect();
     const spaceLeft = rect.left;
     const spaceRight = window.innerWidth - rect.right;
-    
+
     // Choose the side with more available space
     if (spaceLeft > spaceRight) {
       // Try to place to the left of the target
@@ -948,9 +1002,9 @@
   function tourTarget(step) {
     if (step.targetSelector) {
       const el = document.querySelector(step.targetSelector);
-      if (el) return el;
+      if (el) {return el;}
     }
-    if (!step.tabId) return null;
+    if (!step.tabId) {return null;}
     if (window.innerWidth <= 768) {
       return document.querySelector(`.mobile-bottom-nav [data-tab="${step.tabId}"]`)
         || document.getElementById('mobile-more-btn');
@@ -962,7 +1016,7 @@
     currentStep = Math.max(0, Math.min(index, steps.length - 1));
     const step = steps[currentStep];
     const last = currentStep === steps.length - 1;
-    if (step.tabId) activateTab(step.tabId);
+    if (step.tabId) {activateTab(step.tabId);}
     document.getElementById('tour-step-label').textContent = step.label;
     document.getElementById('tour-step-icon').textContent = `${currentStep + 1}/${steps.length}`;
     document.getElementById('tour-feature-icon').innerHTML = `<i class="fa-solid ${step.icon}"></i>`;
@@ -971,7 +1025,9 @@
     document.getElementById('tour-desc').textContent = step.description;
     document.getElementById('tour-action').innerHTML = `<strong>Start here:</strong> ${step.firstAction}`;
     const next = document.getElementById('tour-next-btn');
-    next.textContent = last ? 'Finish setup tour' : 'Next';
+    next.textContent = last
+      ? (activeTourKind === 'update' ? 'Finish tour' : 'Finish setup tour')
+      : 'Next';
     next.classList.toggle('is-finish', last);
     const previous = document.getElementById('tour-prev-btn');
     previous.disabled = currentStep === 0;
@@ -990,14 +1046,68 @@
     }, 100);
   }
 
+  function wireTourControls() {
+    if (wireTourControls._done) {return;}
+    wireTourControls._done = true;
+    const next = document.getElementById('tour-next-btn');
+    const prev = document.getElementById('tour-prev-btn');
+    const skip = document.getElementById('tour-skip-btn');
+    const card = document.getElementById('onboarding-card');
+    if (next) {
+      next.onclick = (event) => {
+        try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+        window.tourNavigate(1);
+      };
+    }
+    if (prev) {
+      prev.onclick = (event) => {
+        try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+        window.tourNavigate(-1);
+      };
+    }
+    if (skip) {
+      skip.onclick = (event) => {
+        try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+        endTour();
+      };
+    }
+    if (card) {
+      // Clicks inside the card must never hit the full-screen backdrop under it
+      card.addEventListener('click', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+      });
+      card.addEventListener('pointerdown', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+      });
+    }
+  }
+
   function openTourOverlay() {
     const overlay = document.getElementById('onboarding-overlay');
-    if (!overlay) return null;
+    if (!overlay) {return null;}
     const backdrop = document.getElementById('onboarding-backdrop');
+    // Escape #app stacking contexts so higher body-level layers cannot eat clicks
+    try {
+      if (overlay.parentElement !== document.body) {
+        document.body.appendChild(overlay);
+      }
+    } catch (_) {}
     document.body.classList.add('onboarding-active');
+    closeGuide();
     overlay.style.display = 'block';
+    overlay.style.zIndex = '2147482500';
     overlay.style.pointerEvents = 'auto';
-    if (backdrop) backdrop.style.pointerEvents = 'auto';
+    if (backdrop) {
+      backdrop.style.pointerEvents = 'auto';
+      backdrop.style.zIndex = '1';
+    }
+    const card = document.getElementById('onboarding-card');
+    if (card) {
+      card.style.pointerEvents = 'auto';
+      card.style.zIndex = '3';
+    }
+    prepareDontShowCheckbox();
+    wireTourControls();
     requestAnimationFrame(() => overlay.classList.add('is-visible'));
     return overlay;
   }
@@ -1005,7 +1115,7 @@
   function closeTourOverlayImmediate() {
     const overlay = document.getElementById('onboarding-overlay');
     const backdrop = document.getElementById('onboarding-backdrop');
-    if (backdrop) backdrop.style.pointerEvents = 'none';
+    if (backdrop) {backdrop.style.pointerEvents = 'none';}
     if (overlay) {
       overlay.classList.remove('is-visible');
       // Drop hit-testing immediately so Print & Pay is never covered by an invisible shield
@@ -1017,59 +1127,132 @@
   }
 
   function startTour() {
+    // Full Getting Started tour — first-time onboarding only (or Help → Tour).
     steps = [WELCOME_STEP, ...enabledFeatures()];
-    if (steps.length < 2) return;
+    if (steps.length < 2) {return;}
+    activeTourKind = 'onboarding';
+    activeUpdateTourVersion = '';
     currentStep = 0;
     closeGuide();
-    if (!openTourOverlay()) return;
+    if (!openTourOverlay()) {return;}
     goToStep(0);
   }
 
-  function resolveUpdateTourSteps() {
-    // Prefer latest release tour flag from history / app-update feed
+  function stepsForTourKey(tourKey) {
+    const key = String(tourKey || '').toLowerCase().trim();
+    if (key === 'shift-ux') {return SHIFT_UX_TOUR_STEPS;}
+    if (key === 'dues') {return DUES_TOUR_STEPS;}
+    return null;
+  }
+
+  function latestReleaseWithTour() {
     const head = UPDATES_HISTORY[0] || {};
-    const tourKey = String(head.tour || '').toLowerCase();
-    if (tourKey === 'shift-ux' || String(head.version || '').indexOf('shift-ux') >= 0) {
-      return SHIFT_UX_TOUR_STEPS;
+    let tourKey = String(head.tour || '').toLowerCase().trim();
+    if (!tourKey) {
+      const ver = String(head.version || '').toLowerCase();
+      if (ver.indexOf('shift-ux') >= 0) {tourKey = 'shift-ux';}
+      else if (ver.indexOf('dues') >= 0) {tourKey = 'dues';}
     }
-    if (tourKey === 'dues' || String(head.version || '').indexOf('dues') >= 0) {
-      return DUES_TOUR_STEPS;
-    }
-    // Default UX tour for modern releases with UI changes
-    return SHIFT_UX_TOUR_STEPS.length ? SHIFT_UX_TOUR_STEPS : DUES_TOUR_STEPS;
+    const tourSteps = stepsForTourKey(tourKey);
+    if (!tourSteps || !tourSteps.length) {return null;}
+    return {
+      version: String(head.version || window.__RESTROSUITE_ASSET_VERSION__ || ''),
+      tourKey,
+      steps: tourSteps,
+    };
   }
 
-  function startUpdateTour() {
-    steps = resolveUpdateTourSteps();
-    if (!steps || !steps.length) return;
+  function resolveUpdateTourSteps(tourKey) {
+    if (tourKey) {
+      const keyed = stepsForTourKey(tourKey);
+      if (keyed && keyed.length) {return keyed;}
+    }
+    const latest = latestReleaseWithTour();
+    return latest ? latest.steps : null;
+  }
+
+  function updateTourSeenKey(version) {
+    return 'restrosuite_update_tour_seen:' + String(version || '');
+  }
+
+  function hasSeenUpdateTour(version) {
+    if (!version) {return false;}
+    try {
+      return localStorage.getItem(updateTourSeenKey(version)) === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function markUpdateTourSeen(version) {
+    if (!version) {return;}
+    try {
+      localStorage.setItem(updateTourSeenKey(version), '1');
+    } catch (_) {}
+  }
+
+  function startUpdateTour(tourKey) {
+    // Feature tour for a specific release only — never the full Getting Started tour.
+    const latest = latestReleaseWithTour();
+    steps = resolveUpdateTourSteps(tourKey) || (latest && latest.steps) || null;
+    if (!steps || !steps.length) {return;}
+    activeTourKind = 'update';
+    activeUpdateTourVersion =
+      (latest && latest.version) ||
+      window.__RESTROSUITE_ASSET_VERSION__ ||
+      (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+      '';
     currentStep = 0;
     closeGuide();
-    if (!openTourOverlay()) return;
+    if (!openTourOverlay()) {return;}
     goToStep(0);
   }
 
-  function endTour() {
+  function endTour(opts) {
+    const completed = !!(opts && opts.completed);
+    const cb = document.getElementById('tour-dont-show');
+    // Finish always persists. Close/Skip respects "Don't show again" (checked by default).
+    const persist = completed || !cb || cb.checked;
     try {
-      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
-      const isUpdateTour =
-        steps === DUES_TOUR_STEPS ||
-        steps === SHIFT_UX_TOUR_STEPS ||
-        (Array.isArray(steps) && steps[0] && steps[0].label === 'Open shift first');
-      if (isUpdateTour) {
-        localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
+      if (persist) {
+        if (activeTourKind === 'update') {
+          const ver =
+            activeUpdateTourVersion ||
+            window.__RESTROSUITE_ASSET_VERSION__ ||
+            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+            '';
+          markUpdateTourSeen(ver);
+        } else {
+          localStorage.setItem(tourCompletionStorageKey(), '1');
+        }
+      } else if (activeTourKind === 'update') {
+        try {
+          sessionStorage.removeItem('rs_update_applied_at');
+          const ver =
+            activeUpdateTourVersion ||
+            window.__RESTROSUITE_ASSET_VERSION__ ||
+            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+            '';
+          if (ver) {sessionStorage.setItem('restrosuite_update_tour_skip_session:' + ver, '1');}
+        } catch (_) {}
       } else {
-        localStorage.setItem(tourStorageKey(), '1');
+        try { sessionStorage.setItem(tourSessionSkipKey(), '1'); } catch (_) {}
       }
+      try { sessionStorage.removeItem('rs_update_applied_at'); } catch (_) {}
     } catch (error) {
       console.warn('[Onboarding] Tour completion could not be stored:', error);
     }
+    activeTourKind = 'onboarding';
+    activeUpdateTourVersion = '';
     closeTourOverlayImmediate();
   }
 
   function openUpdateHistoryModal() {
-    if (typeof window.RSModal === 'undefined') return;
+    if (typeof window.RSModal === 'undefined') {return;}
     const justUpdated = sessionStorage.getItem('rs_update_applied_at');
     const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
+    const releaseTour = latestReleaseWithTour();
+    const showStartTourCta = Boolean(justUpdated && releaseTour && !hasSeenUpdateTour(releaseTour.version));
 
     window.RSModal.open({
       title: justUpdated ? 'RestroSuite was updated' : 'What\'s new',
@@ -1084,7 +1267,11 @@
             </div>
             <div style="font-family:var(--font-body),sans-serif;">
               <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:var(--text);">New Version Installed: ${currentVer}</h4>
-              <p style="margin:0; font-size:12px; color:var(--text-soft); line-height:1.4;">We've added new features to your screen. Let's take a quick 30-second tour to see what changed!</p>
+              <p style="margin:0; font-size:12px; color:var(--text-soft); line-height:1.4;">${
+                showStartTourCta
+                  ? "We've added new features. Take a quick tour of what changed — or reopen Help anytime."
+                  : 'Release notes for this install. No guided tour for this patch.'
+              }</p>
             </div>
           </div>
         ` : ''}
@@ -1092,6 +1279,7 @@
           ${UPDATES_HISTORY.map(up => {
             const shortVer = String(up.version || '').split('-')[0];
             const isActive = up.version === currentVer || shortVer === String(currentVer).split('-')[0];
+            const tourKey = String(up.tour || '').trim();
             return `
             <div style="border:1px solid var(--stroke-2);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--glass) 35%,var(--panel));">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
@@ -1104,12 +1292,9 @@
               </ul>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">
                 ${
-                  up.tour === 'shift-ux' ||
-                  up.version === 'v216-20260725-shift-ux-guide' ||
-                  up.version === '2026.06.20-onboarding' ||
-                  up.version === '2026.06.19-dues'
+                  tourKey
                     ? `
-                  <button type="button" class="btn btn-sm btn-primary start-update-tour-btn" data-tour="${String(up.tour || 'shift-ux').replace(/"/g, '')}"><i class="fa-solid fa-compass"></i> Feature tour</button>
+                  <button type="button" class="btn btn-sm btn-primary start-update-tour-btn" data-tour="${tourKey.replace(/"/g, '')}"><i class="fa-solid fa-compass"></i> Feature tour</button>
                 `
                     : ''
                 }
@@ -1129,12 +1314,13 @@
       `,
       foot: `
         <button class="btn btn-ghost" style="flex:1;" data-close-history>Close</button>
-        ${justUpdated ? `<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>` : ''}
+        ${showStartTourCta ? '<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>' : ''}
       `,
       onMount(modal, close) {
         modal.querySelector('[data-close-history]').onclick = () => {
           if (justUpdated) {
             sessionStorage.removeItem('rs_update_applied_at');
+            if (releaseTour) {markUpdateTourSeen(releaseTour.version);}
           }
           close();
         };
@@ -1143,8 +1329,9 @@
             if (justUpdated) {
               sessionStorage.removeItem('rs_update_applied_at');
             }
+            const key = tourBtn.getAttribute('data-tour') || '';
             close();
-            startUpdateTour();
+            startUpdateTour(key);
           };
         });
         const startAppliedTour = modal.querySelector('#modal-start-applied-tour');
@@ -1152,7 +1339,7 @@
           startAppliedTour.onclick = () => {
             sessionStorage.removeItem('rs_update_applied_at');
             close();
-            startUpdateTour();
+            startUpdateTour(releaseTour && releaseTour.tourKey);
           };
         }
         modal.querySelectorAll('.rollback-btn').forEach(btn => {
@@ -1178,8 +1365,11 @@
 
   window.tourNavigate = direction => {
     if (direction > 0 && currentStep === steps.length - 1) {
-      endTour();
-      setTimeout(openGuide, 300);
+      const wasOnboarding = activeTourKind !== 'update';
+      endTour({ completed: true });
+      if (wasOnboarding) {
+        setTimeout(openGuide, 300);
+      }
       return;
     }
     goToStep(currentStep + direction);
@@ -1202,13 +1392,13 @@
       event.preventDefault();
       window.tourNavigate(-1);
     } else if (event.key === 'Escape') {
-      if (overlayOpen) endTour();
-      else closeGuide();
+      if (overlayOpen) {endTour();}
+      else {closeGuide();}
     }
   });
 
   window.addEventListener('resize', () => {
-    if (!document.getElementById('onboarding-overlay')?.classList.contains('is-visible')) return;
+    if (!document.getElementById('onboarding-overlay')?.classList.contains('is-visible')) {return;}
     const target = tourTarget(steps[currentStep]);
     positionSpotlight(target);
     positionCard(target);
@@ -1229,13 +1419,13 @@
   function shouldPromptForProfile() {
     const role = (sessionStorage.getItem('logged_in_role') || '').toLowerCase();
     // Only the person who can actually fix it should be blocked by it.
-    if (role && role !== 'admin' && role !== 'manager' && role !== 'owner' && role !== 'superadmin') return false;
-    if (sessionStorage.getItem('logged_in_role') === 'superadmin') return false;
-    if (detectHasBusinessProfile()) return false;
+    if (role && role !== 'admin' && role !== 'manager' && role !== 'owner' && role !== 'superadmin') {return false;}
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') {return false;}
+    if (detectHasBusinessProfile()) {return false;}
     // "Skip for now" only defers for this browser session -- it comes back
     // next login until it's actually filled in, per "first step ... for
     // smooth working" -- this is necessary setup, not a one-time nag.
-    if (sessionStorage.getItem(profilePromptStorageKey())) return false;
+    if (sessionStorage.getItem(profilePromptStorageKey())) {return false;}
     return true;
   }
 
@@ -1248,11 +1438,11 @@
 
   function closeProfilePromptModal() {
     const modal = document.getElementById('rs-profile-prompt-modal');
-    if (modal) modal.remove();
+    if (modal) {modal.remove();}
   }
 
   function showProfileCompletionModal() {
-    if (document.getElementById('rs-profile-prompt-modal')) return;
+    if (document.getElementById('rs-profile-prompt-modal')) {return;}
     const modal = document.createElement('div');
     modal.id = 'rs-profile-prompt-modal';
     modal.setAttribute('role', 'dialog');
@@ -1336,7 +1526,7 @@
           localStorage.setItem('rs_v2:settings', JSON.stringify(updated));
         }
         sessionStorage.removeItem(profilePromptStorageKey());
-        if (window.RS && typeof RS.toast === 'function') RS.toast('Outlet profile saved', 'fa-circle-check');
+        if (window.RS && typeof RS.toast === 'function') {RS.toast('Outlet profile saved', 'fa-circle-check');}
         closeProfilePromptModal();
       } catch (err) {
         errorEl.textContent = 'Could not save -- ' + (err && err.message ? err.message : 'please try again.');
@@ -1361,11 +1551,14 @@
   async function init() {
     injectGuide();
     const backdrop = document.getElementById('onboarding-backdrop');
-    if (backdrop) {
-      backdrop.addEventListener('click', () => {
+    if (backdrop && !backdrop.dataset.rsTourBound) {
+      backdrop.dataset.rsTourBound = '1';
+      backdrop.addEventListener('click', (event) => {
+        if (event.target !== backdrop) {return;}
         endTour();
       });
     }
+    wireTourControls();
 
     // Dynamic release note sync
     let latestRelease = null;
@@ -1373,7 +1566,7 @@
       const isFile = location.protocol === 'file:';
       const url = isFile ? 'app-update.json' : `app-update.json?v=${Date.now()}`;
       const res = await fetch(url);
-      if (res.ok) latestRelease = await res.json();
+      if (res.ok) {latestRelease = await res.json();}
     } catch(e) {}
 
     if (latestRelease && latestRelease.version) {
@@ -1382,15 +1575,15 @@
         UPDATES_HISTORY.unshift({
           version: latestRelease.version,
           date: latestRelease.date || new Date().toLocaleDateString('en-CA'),
-          title: latestRelease.title || "Custom Update",
-          summary: latestRelease.summary || "This update contains hotfixes and stability improvements.",
-          highlights: latestRelease.highlights || ["System stability and codebase security updates."],
+          title: latestRelease.title || 'Custom Update',
+          summary: latestRelease.summary || 'This update contains hotfixes and stability improvements.',
+          highlights: latestRelease.highlights || ['System stability and codebase security updates.'],
           tour: latestRelease.tour || '',
         });
       } else if (latestRelease.tour) {
         // Keep tour key from live feed on matching history row
         const row = UPDATES_HISTORY.find((u) => u.version === latestRelease.version);
-        if (row && !row.tour) row.tour = latestRelease.tour;
+        if (row && !row.tour) {row.tour = latestRelease.tour;}
       }
 
       // Desktop content reload (?rs_content=) or web Save & Update sets this so we can show guide
@@ -1410,60 +1603,79 @@
           sessionStorage.setItem('rs_update_applied_at', new Date().toISOString());
           sessionStorage.setItem('rs_update_show_guide', '1');
         }
-        if (next) localStorage.setItem(seenKey, next);
+        if (next) {localStorage.setItem(seenKey, next);}
       } catch (_) {}
     }
 
     // What's New button click listener is now bound directly inside injectGuide()
 
-    setTimeout(() => {
-      if (sessionStorage.getItem('logged_in_role') === 'superadmin') return;
+    schedulePostLoginOnboarding();
+  }
 
-      // Step one of onboarding a new client: a complete business profile.
-      // Takes priority over the tour/update modal -- no point touring a
-      // dashboard that can't bill or print correctly yet.
-      try {
-        if (shouldPromptForProfile()) {
-          showProfileCompletionModal();
-          return;
-        }
-        checkAndPromptProfileCompletion();
-      } catch (error) { /* profile prompt is best-effort, never block the tour */ }
+  let postLoginOnboardingRan = false;
 
-      try {
-        // After UI/UX update: auto-open What's New with Start Tour (not silent badge only)
-        const justUpdated =
-          sessionStorage.getItem('rs_update_applied_at') ||
-          sessionStorage.getItem('rs_update_show_guide') === '1';
-        if (justUpdated) {
-          try { sessionStorage.removeItem('rs_update_show_guide'); } catch (_) {}
-          const currentVer =
-            window.__RESTROSUITE_ASSET_VERSION__ ||
-            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
-            '';
-          if (currentVer) {
-            try {
-              localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'pending');
-            } catch (_) {}
-          }
+  function runPostLoginOnboarding() {
+    if (postLoginOnboardingRan) {return;}
+    postLoginOnboardingRan = true;
+
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') {return;}
+
+    // Step one of onboarding a new client: a complete business profile.
+    // Takes priority over the tour/update modal -- no point touring a
+    // dashboard that can't bill or print correctly yet.
+    try {
+      if (shouldPromptForProfile()) {
+        showProfileCompletionModal();
+        return;
+      }
+      checkAndPromptProfileCompletion();
+    } catch (error) { /* profile prompt is best-effort, never block the tour */ }
+
+    try {
+      // Update with a feature tour → only that update tour (never full Getting Started).
+      const justUpdated =
+        sessionStorage.getItem('rs_update_applied_at') ||
+        sessionStorage.getItem('rs_update_show_guide') === '1';
+      if (justUpdated) {
+        try { sessionStorage.removeItem('rs_update_show_guide'); } catch (_) {}
+        const release = latestReleaseWithTour();
+        const skipUpdate =
+          release &&
+          (hasSeenUpdateTour(release.version) ||
+            sessionStorage.getItem('restrosuite_update_tour_skip_session:' + release.version) === '1');
+        if (release && !skipUpdate) {
           if (typeof window.RS !== 'undefined' && typeof window.RS.toast === 'function') {
-            window.RS.toast('RestroSuite updated — review what changed', 'fa-wand-magic-sparkles');
+            window.RS.toast('New features — short tour', 'fa-wand-magic-sparkles');
           }
-          // Keep rs_update_applied_at so the modal shows "was updated" + Start Tour
           setTimeout(() => {
             try {
-              openUpdateHistoryModal();
+              sessionStorage.removeItem('rs_update_applied_at');
+              startUpdateTour(release.tourKey);
             } catch (e) {
-              console.warn('[Onboarding] post-update guide failed', e);
+              console.warn('[Onboarding] update tour failed', e);
             }
           }, 400);
           return;
         }
-        if (!localStorage.getItem(tourStorageKey())) startTour();
-      } catch (error) {
-        startTour();
+        // Patch / notes-only update: clear flag, no tour nag
+        try { sessionStorage.removeItem('rs_update_applied_at'); } catch (_) {}
+        if (release) {markUpdateTourSeen(release.version);}
       }
-    }, 1400);
+      if (shouldAutoOpenOnboardingTour()) {startTour();}
+    } catch (error) {
+      console.warn('[Onboarding] post-login tour check failed', error);
+    }
+  }
+
+  function schedulePostLoginOnboarding() {
+    const run = () => setTimeout(runPostLoginOnboarding, 400);
+    if (document.documentElement?.dataset?.rsHydrated === '1') {
+      run();
+      return;
+    }
+    document.addEventListener('rs:hydrated', run, { once: true });
+    // Fallback when hydration never fires (offline / partial load).
+    setTimeout(run, 2400);
   }
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {

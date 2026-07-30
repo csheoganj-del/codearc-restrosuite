@@ -335,6 +335,9 @@
 
   let steps = [];
   let currentStep = 0;
+  /** 'onboarding' | 'update' — used so Finish/Skip marks the right completion flag */
+  let activeTourKind = 'onboarding';
+  let activeUpdateTourVersion = '';
 
   function allowedTabIds() {
     try {
@@ -356,11 +359,56 @@
     return FEATURES.filter(isFeatureVisible);
   }
 
-  function tourStorageKey() {
+  function tourUserScope() {
     const tenant = sessionStorage.getItem('tenant_id') || 'default';
     const user = sessionStorage.getItem('tenant_user_id') || sessionStorage.getItem('logged_in_user') || 'user';
-    const signature = enabledFeatures().map(feature => feature.tabId).sort().join(',');
-    return `restrosuite_tour_done:${tenant}:${user}:${signature}`;
+    return { tenant, user };
+  }
+
+  // Stable per user — do not include enabled-feature signature (it changes when
+  // sidebar tabs hydrate and caused the tour to reopen on every login).
+  function tourCompletionStorageKey() {
+    const { tenant, user } = tourUserScope();
+    return `restrosuite_tour_done:${tenant}:${user}`;
+  }
+
+  function hasCompletedTour() {
+    try {
+      if (localStorage.getItem(tourCompletionStorageKey())) {return true;}
+      // Legacy keys included a feature signature — honour any prior dismissal.
+      const { tenant, user } = tourUserScope();
+      const legacyPrefix = `restrosuite_tour_done:${tenant}:${user}:`;
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith(legacyPrefix)) {return true;}
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function tourSessionSkipKey() {
+    const { tenant, user } = tourUserScope();
+    return `restrosuite_tour_skip_session:${tenant}:${user}`;
+  }
+
+  function shouldAutoOpenOnboardingTour() {
+    if (hasCompletedTour()) {return false;}
+    try {
+      if (sessionStorage.getItem(tourSessionSkipKey()) === '1') {return false;}
+    } catch (_) {}
+    return true;
+  }
+
+  function prepareDontShowCheckbox() {
+    const cb = document.getElementById('tour-dont-show');
+    const label = document.getElementById('tour-dont-show-label');
+    if (!cb) {return;}
+    cb.checked = true;
+    if (label) {
+      label.textContent = activeTourKind === 'update'
+        ? "Don't show this update tour again"
+        : "Don't show Getting Started again";
+    }
   }
 
   function readJson(key, fallback) {
@@ -871,11 +919,17 @@
 
   function positionSpotlight(target) {
     const spotlight = document.getElementById('onboarding-spotlight');
+    const backdrop = document.getElementById('onboarding-backdrop');
     if (!spotlight) {return;}
     if (!target) {
       spotlight.style.display = 'none';
+      // Welcome / no-target: dim via backdrop so the card stays above a real layer
+      if (backdrop) {backdrop.style.background = 'rgba(8, 8, 11, 0.45)';}
       return;
     }
+    // Spotlight ring provides the dim cutout — keep backdrop transparent so it
+    // never paints over the card while still capturing outside clicks.
+    if (backdrop) {backdrop.style.background = 'transparent';}
     const rect = target.getBoundingClientRect();
     const pad = 8;
     Object.assign(spotlight.style, {
@@ -971,7 +1025,9 @@
     document.getElementById('tour-desc').textContent = step.description;
     document.getElementById('tour-action').innerHTML = `<strong>Start here:</strong> ${step.firstAction}`;
     const next = document.getElementById('tour-next-btn');
-    next.textContent = last ? 'Finish setup tour' : 'Next';
+    next.textContent = last
+      ? (activeTourKind === 'update' ? 'Finish tour' : 'Finish setup tour')
+      : 'Next';
     next.classList.toggle('is-finish', last);
     const previous = document.getElementById('tour-prev-btn');
     previous.disabled = currentStep === 0;
@@ -990,14 +1046,68 @@
     }, 100);
   }
 
+  function wireTourControls() {
+    if (wireTourControls._done) {return;}
+    wireTourControls._done = true;
+    const next = document.getElementById('tour-next-btn');
+    const prev = document.getElementById('tour-prev-btn');
+    const skip = document.getElementById('tour-skip-btn');
+    const card = document.getElementById('onboarding-card');
+    if (next) {
+      next.onclick = (event) => {
+        try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+        window.tourNavigate(1);
+      };
+    }
+    if (prev) {
+      prev.onclick = (event) => {
+        try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+        window.tourNavigate(-1);
+      };
+    }
+    if (skip) {
+      skip.onclick = (event) => {
+        try { event.preventDefault(); event.stopPropagation(); } catch (_) {}
+        endTour();
+      };
+    }
+    if (card) {
+      // Clicks inside the card must never hit the full-screen backdrop under it
+      card.addEventListener('click', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+      });
+      card.addEventListener('pointerdown', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+      });
+    }
+  }
+
   function openTourOverlay() {
     const overlay = document.getElementById('onboarding-overlay');
     if (!overlay) {return null;}
     const backdrop = document.getElementById('onboarding-backdrop');
+    // Escape #app stacking contexts so higher body-level layers cannot eat clicks
+    try {
+      if (overlay.parentElement !== document.body) {
+        document.body.appendChild(overlay);
+      }
+    } catch (_) {}
     document.body.classList.add('onboarding-active');
+    closeGuide();
     overlay.style.display = 'block';
+    overlay.style.zIndex = '2147482500';
     overlay.style.pointerEvents = 'auto';
-    if (backdrop) {backdrop.style.pointerEvents = 'auto';}
+    if (backdrop) {
+      backdrop.style.pointerEvents = 'auto';
+      backdrop.style.zIndex = '1';
+    }
+    const card = document.getElementById('onboarding-card');
+    if (card) {
+      card.style.pointerEvents = 'auto';
+      card.style.zIndex = '3';
+    }
+    prepareDontShowCheckbox();
+    wireTourControls();
     requestAnimationFrame(() => overlay.classList.add('is-visible'));
     return overlay;
   }
@@ -1017,52 +1127,123 @@
   }
 
   function startTour() {
+    // Full Getting Started tour — first-time onboarding only (or Help → Tour).
     steps = [WELCOME_STEP, ...enabledFeatures()];
     if (steps.length < 2) {return;}
+    activeTourKind = 'onboarding';
+    activeUpdateTourVersion = '';
     currentStep = 0;
     closeGuide();
     if (!openTourOverlay()) {return;}
     goToStep(0);
   }
 
-  function resolveUpdateTourSteps() {
-    // Prefer latest release tour flag from history / app-update feed
+  function stepsForTourKey(tourKey) {
+    const key = String(tourKey || '').toLowerCase().trim();
+    if (key === 'shift-ux') {return SHIFT_UX_TOUR_STEPS;}
+    if (key === 'dues') {return DUES_TOUR_STEPS;}
+    return null;
+  }
+
+  function latestReleaseWithTour() {
     const head = UPDATES_HISTORY[0] || {};
-    const tourKey = String(head.tour || '').toLowerCase();
-    if (tourKey === 'shift-ux' || String(head.version || '').indexOf('shift-ux') >= 0) {
-      return SHIFT_UX_TOUR_STEPS;
+    let tourKey = String(head.tour || '').toLowerCase().trim();
+    if (!tourKey) {
+      const ver = String(head.version || '').toLowerCase();
+      if (ver.indexOf('shift-ux') >= 0) {tourKey = 'shift-ux';}
+      else if (ver.indexOf('dues') >= 0) {tourKey = 'dues';}
     }
-    if (tourKey === 'dues' || String(head.version || '').indexOf('dues') >= 0) {
-      return DUES_TOUR_STEPS;
-    }
-    // Default UX tour for modern releases with UI changes
-    return SHIFT_UX_TOUR_STEPS.length ? SHIFT_UX_TOUR_STEPS : DUES_TOUR_STEPS;
+    const tourSteps = stepsForTourKey(tourKey);
+    if (!tourSteps || !tourSteps.length) {return null;}
+    return {
+      version: String(head.version || window.__RESTROSUITE_ASSET_VERSION__ || ''),
+      tourKey,
+      steps: tourSteps,
+    };
   }
 
-  function startUpdateTour() {
-    steps = resolveUpdateTourSteps();
+  function resolveUpdateTourSteps(tourKey) {
+    if (tourKey) {
+      const keyed = stepsForTourKey(tourKey);
+      if (keyed && keyed.length) {return keyed;}
+    }
+    const latest = latestReleaseWithTour();
+    return latest ? latest.steps : null;
+  }
+
+  function updateTourSeenKey(version) {
+    return 'restrosuite_update_tour_seen:' + String(version || '');
+  }
+
+  function hasSeenUpdateTour(version) {
+    if (!version) {return false;}
+    try {
+      return localStorage.getItem(updateTourSeenKey(version)) === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function markUpdateTourSeen(version) {
+    if (!version) {return;}
+    try {
+      localStorage.setItem(updateTourSeenKey(version), '1');
+    } catch (_) {}
+  }
+
+  function startUpdateTour(tourKey) {
+    // Feature tour for a specific release only — never the full Getting Started tour.
+    const latest = latestReleaseWithTour();
+    steps = resolveUpdateTourSteps(tourKey) || (latest && latest.steps) || null;
     if (!steps || !steps.length) {return;}
+    activeTourKind = 'update';
+    activeUpdateTourVersion =
+      (latest && latest.version) ||
+      window.__RESTROSUITE_ASSET_VERSION__ ||
+      (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+      '';
     currentStep = 0;
     closeGuide();
     if (!openTourOverlay()) {return;}
     goToStep(0);
   }
 
-  function endTour() {
+  function endTour(opts) {
+    const completed = !!(opts && opts.completed);
+    const cb = document.getElementById('tour-dont-show');
+    // Finish always persists. Close/Skip respects "Don't show again" (checked by default).
+    const persist = completed || !cb || cb.checked;
     try {
-      const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
-      const isUpdateTour =
-        steps === DUES_TOUR_STEPS ||
-        steps === SHIFT_UX_TOUR_STEPS ||
-        (Array.isArray(steps) && steps[0] && steps[0].label === 'Open shift first');
-      if (isUpdateTour) {
-        localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, '1');
+      if (persist) {
+        if (activeTourKind === 'update') {
+          const ver =
+            activeUpdateTourVersion ||
+            window.__RESTROSUITE_ASSET_VERSION__ ||
+            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+            '';
+          markUpdateTourSeen(ver);
+        } else {
+          localStorage.setItem(tourCompletionStorageKey(), '1');
+        }
+      } else if (activeTourKind === 'update') {
+        try {
+          sessionStorage.removeItem('rs_update_applied_at');
+          const ver =
+            activeUpdateTourVersion ||
+            window.__RESTROSUITE_ASSET_VERSION__ ||
+            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
+            '';
+          if (ver) {sessionStorage.setItem('restrosuite_update_tour_skip_session:' + ver, '1');}
+        } catch (_) {}
       } else {
-        localStorage.setItem(tourStorageKey(), '1');
+        try { sessionStorage.setItem(tourSessionSkipKey(), '1'); } catch (_) {}
       }
+      try { sessionStorage.removeItem('rs_update_applied_at'); } catch (_) {}
     } catch (error) {
       console.warn('[Onboarding] Tour completion could not be stored:', error);
     }
+    activeTourKind = 'onboarding';
+    activeUpdateTourVersion = '';
     closeTourOverlayImmediate();
   }
 
@@ -1070,6 +1251,8 @@
     if (typeof window.RSModal === 'undefined') {return;}
     const justUpdated = sessionStorage.getItem('rs_update_applied_at');
     const currentVer = window.__RESTROSUITE_ASSET_VERSION__ || (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) || 'v36-20260708';
+    const releaseTour = latestReleaseWithTour();
+    const showStartTourCta = Boolean(justUpdated && releaseTour && !hasSeenUpdateTour(releaseTour.version));
 
     window.RSModal.open({
       title: justUpdated ? 'RestroSuite was updated' : 'What\'s new',
@@ -1084,7 +1267,11 @@
             </div>
             <div style="font-family:var(--font-body),sans-serif;">
               <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:var(--text);">New Version Installed: ${currentVer}</h4>
-              <p style="margin:0; font-size:12px; color:var(--text-soft); line-height:1.4;">We've added new features to your screen. Let's take a quick 30-second tour to see what changed!</p>
+              <p style="margin:0; font-size:12px; color:var(--text-soft); line-height:1.4;">${
+                showStartTourCta
+                  ? "We've added new features. Take a quick tour of what changed — or reopen Help anytime."
+                  : 'Release notes for this install. No guided tour for this patch.'
+              }</p>
             </div>
           </div>
         ` : ''}
@@ -1092,6 +1279,7 @@
           ${UPDATES_HISTORY.map(up => {
             const shortVer = String(up.version || '').split('-')[0];
             const isActive = up.version === currentVer || shortVer === String(currentVer).split('-')[0];
+            const tourKey = String(up.tour || '').trim();
             return `
             <div style="border:1px solid var(--stroke-2);border-radius:12px;padding:14px 16px;background:color-mix(in srgb,var(--glass) 35%,var(--panel));">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
@@ -1104,12 +1292,9 @@
               </ul>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;">
                 ${
-                  up.tour === 'shift-ux' ||
-                  up.version === 'v216-20260725-shift-ux-guide' ||
-                  up.version === '2026.06.20-onboarding' ||
-                  up.version === '2026.06.19-dues'
+                  tourKey
                     ? `
-                  <button type="button" class="btn btn-sm btn-primary start-update-tour-btn" data-tour="${String(up.tour || 'shift-ux').replace(/"/g, '')}"><i class="fa-solid fa-compass"></i> Feature tour</button>
+                  <button type="button" class="btn btn-sm btn-primary start-update-tour-btn" data-tour="${tourKey.replace(/"/g, '')}"><i class="fa-solid fa-compass"></i> Feature tour</button>
                 `
                     : ''
                 }
@@ -1129,12 +1314,13 @@
       `,
       foot: `
         <button class="btn btn-ghost" style="flex:1;" data-close-history>Close</button>
-        ${justUpdated ? '<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>' : ''}
+        ${showStartTourCta ? '<button class="btn btn-primary" style="flex:1.5; background:var(--orange); border-color:var(--orange); color:#fff;" id="modal-start-applied-tour"><i class="fa-solid fa-compass"></i> Start Tour Now</button>' : ''}
       `,
       onMount(modal, close) {
         modal.querySelector('[data-close-history]').onclick = () => {
           if (justUpdated) {
             sessionStorage.removeItem('rs_update_applied_at');
+            if (releaseTour) {markUpdateTourSeen(releaseTour.version);}
           }
           close();
         };
@@ -1143,8 +1329,9 @@
             if (justUpdated) {
               sessionStorage.removeItem('rs_update_applied_at');
             }
+            const key = tourBtn.getAttribute('data-tour') || '';
             close();
-            startUpdateTour();
+            startUpdateTour(key);
           };
         });
         const startAppliedTour = modal.querySelector('#modal-start-applied-tour');
@@ -1152,7 +1339,7 @@
           startAppliedTour.onclick = () => {
             sessionStorage.removeItem('rs_update_applied_at');
             close();
-            startUpdateTour();
+            startUpdateTour(releaseTour && releaseTour.tourKey);
           };
         }
         modal.querySelectorAll('.rollback-btn').forEach(btn => {
@@ -1178,8 +1365,11 @@
 
   window.tourNavigate = direction => {
     if (direction > 0 && currentStep === steps.length - 1) {
-      endTour();
-      setTimeout(openGuide, 300);
+      const wasOnboarding = activeTourKind !== 'update';
+      endTour({ completed: true });
+      if (wasOnboarding) {
+        setTimeout(openGuide, 300);
+      }
       return;
     }
     goToStep(currentStep + direction);
@@ -1361,11 +1551,14 @@
   async function init() {
     injectGuide();
     const backdrop = document.getElementById('onboarding-backdrop');
-    if (backdrop) {
-      backdrop.addEventListener('click', () => {
+    if (backdrop && !backdrop.dataset.rsTourBound) {
+      backdrop.dataset.rsTourBound = '1';
+      backdrop.addEventListener('click', (event) => {
+        if (event.target !== backdrop) {return;}
         endTour();
       });
     }
+    wireTourControls();
 
     // Dynamic release note sync
     let latestRelease = null;
@@ -1416,54 +1609,73 @@
 
     // What's New button click listener is now bound directly inside injectGuide()
 
-    setTimeout(() => {
-      if (sessionStorage.getItem('logged_in_role') === 'superadmin') {return;}
+    schedulePostLoginOnboarding();
+  }
 
-      // Step one of onboarding a new client: a complete business profile.
-      // Takes priority over the tour/update modal -- no point touring a
-      // dashboard that can't bill or print correctly yet.
-      try {
-        if (shouldPromptForProfile()) {
-          showProfileCompletionModal();
-          return;
-        }
-        checkAndPromptProfileCompletion();
-      } catch (error) { /* profile prompt is best-effort, never block the tour */ }
+  let postLoginOnboardingRan = false;
 
-      try {
-        // After UI/UX update: auto-open What's New with Start Tour (not silent badge only)
-        const justUpdated =
-          sessionStorage.getItem('rs_update_applied_at') ||
-          sessionStorage.getItem('rs_update_show_guide') === '1';
-        if (justUpdated) {
-          try { sessionStorage.removeItem('rs_update_show_guide'); } catch (_) {}
-          const currentVer =
-            window.__RESTROSUITE_ASSET_VERSION__ ||
-            (UPDATES_HISTORY[0] && UPDATES_HISTORY[0].version) ||
-            '';
-          if (currentVer) {
-            try {
-              localStorage.setItem('restrosuite_update_tour_seen:' + currentVer, 'pending');
-            } catch (_) {}
-          }
+  function runPostLoginOnboarding() {
+    if (postLoginOnboardingRan) {return;}
+    postLoginOnboardingRan = true;
+
+    if (sessionStorage.getItem('logged_in_role') === 'superadmin') {return;}
+
+    // Step one of onboarding a new client: a complete business profile.
+    // Takes priority over the tour/update modal -- no point touring a
+    // dashboard that can't bill or print correctly yet.
+    try {
+      if (shouldPromptForProfile()) {
+        showProfileCompletionModal();
+        return;
+      }
+      checkAndPromptProfileCompletion();
+    } catch (error) { /* profile prompt is best-effort, never block the tour */ }
+
+    try {
+      // Update with a feature tour → only that update tour (never full Getting Started).
+      const justUpdated =
+        sessionStorage.getItem('rs_update_applied_at') ||
+        sessionStorage.getItem('rs_update_show_guide') === '1';
+      if (justUpdated) {
+        try { sessionStorage.removeItem('rs_update_show_guide'); } catch (_) {}
+        const release = latestReleaseWithTour();
+        const skipUpdate =
+          release &&
+          (hasSeenUpdateTour(release.version) ||
+            sessionStorage.getItem('restrosuite_update_tour_skip_session:' + release.version) === '1');
+        if (release && !skipUpdate) {
           if (typeof window.RS !== 'undefined' && typeof window.RS.toast === 'function') {
-            window.RS.toast('RestroSuite updated — review what changed', 'fa-wand-magic-sparkles');
+            window.RS.toast('New features — short tour', 'fa-wand-magic-sparkles');
           }
-          // Keep rs_update_applied_at so the modal shows "was updated" + Start Tour
           setTimeout(() => {
             try {
-              openUpdateHistoryModal();
+              sessionStorage.removeItem('rs_update_applied_at');
+              startUpdateTour(release.tourKey);
             } catch (e) {
-              console.warn('[Onboarding] post-update guide failed', e);
+              console.warn('[Onboarding] update tour failed', e);
             }
           }, 400);
           return;
         }
-        if (!localStorage.getItem(tourStorageKey())) {startTour();}
-      } catch (error) {
-        startTour();
+        // Patch / notes-only update: clear flag, no tour nag
+        try { sessionStorage.removeItem('rs_update_applied_at'); } catch (_) {}
+        if (release) {markUpdateTourSeen(release.version);}
       }
-    }, 1400);
+      if (shouldAutoOpenOnboardingTour()) {startTour();}
+    } catch (error) {
+      console.warn('[Onboarding] post-login tour check failed', error);
+    }
+  }
+
+  function schedulePostLoginOnboarding() {
+    const run = () => setTimeout(runPostLoginOnboarding, 400);
+    if (document.documentElement?.dataset?.rsHydrated === '1') {
+      run();
+      return;
+    }
+    document.addEventListener('rs:hydrated', run, { once: true });
+    // Fallback when hydration never fires (offline / partial load).
+    setTimeout(run, 2400);
   }
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {

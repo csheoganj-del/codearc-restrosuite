@@ -10,6 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"></noscript>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,7 +23,9 @@
 <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
 <meta name="theme-color" content="#FF4F00">
 <title>RestroSuite Console</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 <link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
   // Production: log only. Visual banner only on localhost / ?debug=1 / superadmin flag.
@@ -83,7 +88,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v222-20260726-floor-click-notify';
+    var builtin = 'v230-20260729-auto';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -417,13 +422,13 @@
       <a class="sidebar-link" data-tab="pos-tab" title="Point of Sale"><i class="fa-solid fa-cash-register"></i><span>Point of Sale</span></a>
       <a class="sidebar-link" data-tab="qr-orders-tab" title="QR table orders"><i class="fa-solid fa-qrcode"></i><span>QR Orders</span><span class="badge-count" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="kds-tab" title="Kitchen Display System"><i class="fa-solid fa-fire-burner"></i><span>Kitchen</span><span class="badge-count" style="display:none">0</span></a>
-      <a class="sidebar-link superadmin-only" data-tab="tokens-tab" style="display:none" title="Token display"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
+      <a class="sidebar-link" data-tab="tokens-tab" title="Token display"><i class="fa-solid fa-bullhorn"></i><span>Token Display</span></a>
       <a class="sidebar-link" data-tab="floor-tab" title="Floor plan &amp; tables"><i class="fa-solid fa-chair"></i><span>Floor &amp; Tables</span></a>
       <a class="sidebar-link" data-tab="aggregator-tab" title="Aggregator / online orders"><i class="fa-solid fa-motorcycle"></i><span>Online Orders</span><span class="badge-count" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="bills-tab" title="Bills history"><i class="fa-solid fa-file-invoice-dollar"></i><span>Bills</span></a>
 
       <div class="sb-section">Manage</div>
-      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" title="Kitchen Setup | Menu | Recipe | Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
+      <a class="sidebar-link klc-setup-link" href="#" id="klc-sidebar-setup" data-klc-nav="setup" data-role-gate="editor-tab,inventory-tab" title="Kitchen Setup | Menu | Recipe | Stock"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span><span class="badge-count" id="klc-setup-badge" style="display:none">0</span></a>
       <a class="sidebar-link" data-tab="inventory-tab" title="Inventory stock"><i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span></a>
       <a class="sidebar-link" data-tab="editor-tab" title="Menu editor"><i class="fa-solid fa-utensils"></i><span>Menu Editor</span></a>
       <a class="sidebar-link" data-tab="employees-tab" title="Staff"><i class="fa-solid fa-user-tie"></i><span>Employees</span></a>
@@ -546,9 +551,9 @@
                     </label>
                     <label class="pos-display-label">Card size
                       <div class="pos-size-control pos-size-control-panel">
-                        <button type="button" id="btn-grid-dec" title="Smaller cards"><i class="fa-solid fa-minus"></i></button>
+                        <button type="button" id="btn-grid-dec" title="Smaller cards" aria-label="Decrease card size"><i class="fa-solid fa-minus"></i></button>
                         <input type="range" id="pos-grid-slider" min="110" max="250" value="158" title="Card size" aria-label="Menu card size">
-                        <button type="button" id="btn-grid-inc" title="Larger cards"><i class="fa-solid fa-plus"></i></button>
+                        <button type="button" id="btn-grid-inc" title="Larger cards" aria-label="Increase card size"><i class="fa-solid fa-plus"></i></button>
                       </div>
                     </label>
                   </div>
@@ -1289,7 +1294,7 @@
                     <option value="all">All</option>
                   </select>
                   <button type="button" id="btn-resolve-all-incidents" class="btn btn-ghost btn-sm" title="Mark all open incidents as resolved" style="padding: 4px 8px; font-size: 11px; color: #16a34a; border-color: rgba(34,197,94,0.35);"><i class="fa-solid fa-check-double"></i> Resolve all</button>
-                  <button type="button" id="btn-refresh-app-incidents" class="btn btn-ghost btn-sm" title="Refresh incidents" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
+                  <button type="button" id="btn-refresh-app-incidents" class="btn btn-ghost btn-sm" title="Refresh incidents" aria-label="Refresh incidents" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
                 </div>
               </div>
               <p style="font-size:11.5px;color:var(--text-mute);margin:0 0 12px;line-height:1.45">
@@ -1306,7 +1311,7 @@
             <div class="panel panel-pad" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0; box-sizing: border-box;">
               <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--stroke); padding-bottom: 8px; margin-bottom: 12px;">
                 <h3 style="font-size: 14px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-terminal" style="color: var(--green)"></i> Live Gateway Log</h3>
-                <button id="btn-refresh-saas-logs" class="btn btn-ghost btn-sm" title="Refresh logs" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
+                <button id="btn-refresh-saas-logs" class="btn btn-ghost btn-sm" title="Refresh logs" aria-label="Refresh SaaS logs" style="padding: 4px 8px; font-size: 11px;"><i class="fa-solid fa-rotate"></i></button>
               </div>
               <div class="terminal" id="saas-notification-logs-container" style="flex: 1; height: 495px; min-height: 450px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 12px; font-family: 'SF Mono', ui-monospace, Menlo, monospace; font-size: 11.5px; border-radius: 8px; word-break: break-all; white-space: pre-wrap;"></div>
             </div>
@@ -1348,7 +1353,7 @@
   <a class="mnav-link logout superadmin-only" style="display:none;"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></a>
 </nav>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- SUPER-ADMIN: CREATE TENANT MODAL -->
 <div class="modal-backdrop" id="create-tenant-modal" style="z-index:200001;overflow-y:auto;align-items:flex-start;padding:20px 0">
@@ -1361,7 +1366,7 @@
           <p style="font-size:12px;color:var(--text-mute);margin:2px 0 0">Manually register a tenant workspace</p>
         </div>
       </div>
-      <button id="close-create-tenant-modal" style="background:none;border:none;cursor:pointer;color:var(--text-mute);font-size:20px;padding:4px;margin-left:auto"><i class="fa-solid fa-xmark"></i></button>
+      <button id="close-create-tenant-modal" aria-label="Close create tenant" style="background:none;border:none;cursor:pointer;color:var(--text-mute);font-size:20px;padding:4px;margin-left:auto"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1651,14 +1656,14 @@
   <!-- Legacy mobile more sheet retired (features-shell RSModal "All sections" is canonical).
        Kept hidden for any residual ID lookups (kitchen-link-coach). -->
   <div id="mobile-more-sheet" hidden aria-hidden="true" style="display:none!important;pointer-events:none!important;visibility:hidden!important;">
-    <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup" tabindex="-1" aria-hidden="true" style="display:none"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
+    <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup" data-role-gate="editor-tab,inventory-tab" tabindex="-1" aria-hidden="true" style="display:none"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
   </div>
 
-  <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:100000;pointer-events:none;">
+  <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:2147482500;pointer-events:none;">
     <!-- Backdrop only receives clicks while tour is open (.is-visible). Inline auto here used to block Print & Pay when opacity:0. -->
-    <div id="onboarding-backdrop" style="position:absolute;inset:0;pointer-events:none;"></div>
-    <div id="onboarding-spotlight"></div>
-    <aside id="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <div id="onboarding-backdrop" style="position:absolute;inset:0;z-index:1;pointer-events:none;background:rgba(8,8,11,0.45);"></div>
+    <div id="onboarding-spotlight" style="z-index:2;pointer-events:none;"></div>
+    <aside id="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="tour-title" style="z-index:3;pointer-events:auto;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">
         <span id="tour-step-badge"><span id="tour-step-icon">1/1</span><span id="tour-step-label">Setup</span></span>
         <button id="tour-skip-btn" type="button" aria-label="Close setup tour" onclick="window.endOnboardingTour && window.endOnboardingTour()">&times;</button>
@@ -1673,6 +1678,10 @@
       <p id="tour-desc" style="margin:0 0 12px;color:var(--text-soft);font-size:13px;line-height:1.55;"></p>
       <div id="tour-action" style="padding:11px 12px;border:1px solid var(--stroke);border-radius:10px;background:var(--orange-tint);color:var(--text);font-size:12.5px;line-height:1.45;margin-bottom:14px;"></div>
       <div id="tour-dots" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-bottom:14px;"></div>
+      <label id="tour-dont-show-wrap" class="tour-dont-show" for="tour-dont-show">
+        <input type="checkbox" id="tour-dont-show" checked>
+        <span id="tour-dont-show-label">Don't show Getting Started again</span>
+      </label>
       <div style="display:flex;gap:10px;">
         <button id="tour-prev-btn" type="button" onclick="window.tourNavigate && window.tourNavigate(-1)">Back</button>
         <button id="tour-next-btn" type="button" onclick="window.tourNavigate && window.tourNavigate(1)">Next</button>
@@ -1691,11 +1700,15 @@
 <script src="config.js"></script>
 <script src="assets/supabase-config.js"></script>
 <script src="assets/doppio-api.js"></script>
+<script src="assets/role-defaults.js"></script>
 <script src="assets/db.js?v=20260618-realdata"></script>
 <!-- Shared skeleton loading language (before critical.bundle paints Bills/KDS) -->
 <link rel="stylesheet" href="assets/modules/rs-skel.css">
 <script src="assets/modules/rs-skel.js"></script>
 <script src="assets/modules/rs-action-feedback.js"></script>
+<link rel="stylesheet" href="assets/modules/product-polish-18.css">
+<script src="assets/modules/product-polish-18.js"></script>
+<script src="assets/modules/lan-sync.js"></script>
 <!-- Single-path boot: POS/print/bills/KDS/QR/inventory UI modules load ONCE via
      assets/dist/critical.bundle.js (see async boot below). Do not also tag them here. -->
 <script src="assets/modules/settings-defaults.js"></script>

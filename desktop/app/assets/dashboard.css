@@ -1363,6 +1363,31 @@ body > .dropdown-menu.is-portaled .dropdown-item.active {
   font-size: 11px; color: var(--text-soft); gap: 4px 10px;
 }
 .totals-meta b { color: var(--text); font-weight: 700; }
+
+/* Soft-disabled actions (still receive click → toast with reason) */
+.btn.rs-action-disabled,
+button.rs-action-disabled,
+[role="button"].rs-action-disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  filter: grayscale(0.15);
+}
+
+/* Hide cart GST unless taxes are ON and cart has items (desktop was stuck showing GST ₹0). */
+html.rs-hide-cart-tax .totals-meta #t-gst-wrap,
+html.rs-hide-cart-tax .totals-meta #t-gst,
+html.rs-hide-cart-tax .totals-meta > span[title="Tax"],
+html.rs-hide-cart-tax .totals-meta > span[title="GST"],
+html:not(.rs-taxes-on) .totals-meta #t-gst-wrap,
+html:not(.rs-taxes-on) .totals-meta #t-gst,
+html:not(.rs-taxes-on) .totals-meta > span[title="Tax"],
+html:not(.rs-taxes-on) .totals-meta > span[title="GST"],
+html:not(.rs-cart-has-items) .totals-meta #t-gst-wrap,
+html:not(.rs-cart-has-items) .totals-meta > span[title="Tax"],
+html:not(.rs-cart-has-items) .totals-meta > span[title="GST"] {
+  display: none !important;
+}
+
 .totals-grand { display: flex; justify-content: space-between; align-items: center; padding-top: 5px; border-top: 1px dashed var(--stroke-2); }
 .totals-grand span:first-child { font-weight: 700; font-size: 13px; color: var(--text); }
 .totals-grand .amt { font-family: var(--font-display); font-weight: 800; font-size: 22px; color: var(--orange); letter-spacing: -.02em; }
@@ -2976,6 +3001,9 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 #onboarding-overlay {
   opacity: 0;
   transition: opacity 0.25s ease;
+  /* Must sit above product-guide (100200), drawers, and POS chrome or
+     an invisible higher layer eats Next / Close clicks. */
+  z-index: 2147482500 !important;
   /* Critical: never let an invisible overlay steal POS clicks.
      Children with pointer-events:auto would still receive events if the
      parent only set pointer-events:none in inline HTML — force off until open. */
@@ -2992,11 +3020,19 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   pointer-events: none !important;
 }
 
+#onboarding-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(8, 8, 11, 0.45);
+  pointer-events: auto;
+}
+
 /* Spotlight ring overlay */
 #onboarding-spotlight {
   position: absolute;
-  z-index: 100100;
-  pointer-events: none;
+  z-index: 2;
+  pointer-events: none !important;
   border-radius: 12px;
   box-shadow: 0 0 0 9999px rgba(8, 8, 11, 0.58); /* Dim dashboard */
   border: 3px solid var(--orange, #FF4F00);
@@ -3006,7 +3042,7 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
 /* Tooltip card for onboarding steps */
 #onboarding-card {
   position: absolute;
-  z-index: 100110;
+  z-index: 3;
   width: 380px;
   max-width: calc(100vw - 40px);
   padding: 24px;
@@ -3014,9 +3050,18 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   border: 1px solid var(--stroke-2);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  pointer-events: all;
+  pointer-events: auto !important;
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
+}
+
+#onboarding-card button,
+#onboarding-card label,
+#onboarding-card input,
+#onboarding-card a {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 1;
 }
 
 #tour-step-badge {
@@ -3097,6 +3142,40 @@ label.fl { font-size: 12.5px; font-weight: 600; color: var(--text); display: blo
   background: var(--green);
   border-color: var(--green);
   box-shadow: var(--shadow-sm);
+}
+
+.tour-dont-show {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--stroke-2, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--glass, #f8fafc) 70%, var(--panel-solid, #fff));
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tour-dont-show input[type="checkbox"] {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--orange, #FF4F00);
+  cursor: pointer;
+}
+
+.tour-dont-show span {
+  font-size: 12.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--text-soft, #64748b);
+}
+
+.tour-dont-show:hover span {
+  color: var(--text, #1e293b);
 }
 
 /* Premium Product Guide Modal */

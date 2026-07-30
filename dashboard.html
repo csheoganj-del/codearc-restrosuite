@@ -10,6 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"></noscript>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,7 +23,9 @@
 <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
 <meta name="theme-color" content="#FF4F00">
 <title>RestroSuite Console</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 <link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
   // Production: log only. Visual banner only on localhost / ?debug=1 / superadmin flag.
@@ -83,7 +88,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v223-20260727-auto';
+    var builtin = 'v230-20260729-auto';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -1654,11 +1659,11 @@
     <button type="button" class="mnav-more-btn" id="klc-mobile-setup" data-klc-nav="setup" data-role-gate="editor-tab,inventory-tab" tabindex="-1" aria-hidden="true" style="display:none"><i class="fa-solid fa-link"></i><span>Kitchen Setup</span></button>
   </div>
 
-  <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:100000;pointer-events:none;">
+  <div id="onboarding-overlay" style="display:none;position:fixed;inset:0;z-index:2147482500;pointer-events:none;">
     <!-- Backdrop only receives clicks while tour is open (.is-visible). Inline auto here used to block Print & Pay when opacity:0. -->
-    <div id="onboarding-backdrop" style="position:absolute;inset:0;pointer-events:none;"></div>
-    <div id="onboarding-spotlight"></div>
-    <aside id="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <div id="onboarding-backdrop" style="position:absolute;inset:0;z-index:1;pointer-events:none;background:rgba(8,8,11,0.45);"></div>
+    <div id="onboarding-spotlight" style="z-index:2;pointer-events:none;"></div>
+    <aside id="onboarding-card" role="dialog" aria-modal="true" aria-labelledby="tour-title" style="z-index:3;pointer-events:auto;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;">
         <span id="tour-step-badge"><span id="tour-step-icon">1/1</span><span id="tour-step-label">Setup</span></span>
         <button id="tour-skip-btn" type="button" aria-label="Close setup tour" onclick="window.endOnboardingTour && window.endOnboardingTour()">&times;</button>
@@ -1673,6 +1678,10 @@
       <p id="tour-desc" style="margin:0 0 12px;color:var(--text-soft);font-size:13px;line-height:1.55;"></p>
       <div id="tour-action" style="padding:11px 12px;border:1px solid var(--stroke);border-radius:10px;background:var(--orange-tint);color:var(--text);font-size:12.5px;line-height:1.45;margin-bottom:14px;"></div>
       <div id="tour-dots" style="display:flex;gap:6px;align-items:center;justify-content:center;margin-bottom:14px;"></div>
+      <label id="tour-dont-show-wrap" class="tour-dont-show" for="tour-dont-show">
+        <input type="checkbox" id="tour-dont-show" checked>
+        <span id="tour-dont-show-label">Don't show Getting Started again</span>
+      </label>
       <div style="display:flex;gap:10px;">
         <button id="tour-prev-btn" type="button" onclick="window.tourNavigate && window.tourNavigate(-1)">Back</button>
         <button id="tour-next-btn" type="button" onclick="window.tourNavigate && window.tourNavigate(1)">Next</button>

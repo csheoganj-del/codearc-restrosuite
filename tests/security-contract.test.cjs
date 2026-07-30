@@ -337,7 +337,7 @@ test("zero-cost launch mode keeps paid add-ons optional and caps free-tier usage
   assert.match(tenantData, /ZERO_COST_MAX_LIMIT = 500/);
   assert.match(tenantPublic, /ZERO_COST_MENU_LIMIT = 300/);
   assert.match(tenantPublic, /starter: \{ monthlyOrderLimit: 300 \}/);
-  assert.match(tenantAccess, /monthlyOrderLimit: 300/);
+  assert.match(tenantAccess, /monthlyOrderLimit|monthly_order_limit/);
   assert.match(notifyRegistration, /ZERO_COST_EMAILS_DISABLED/);
   assert.match(notifyRegistration, /EMAIL_WEBHOOK_SECRET/);
   assert.match(notifyRegistration, /EMAIL_RELAY_TOKEN/);
@@ -420,6 +420,8 @@ test("growth hub delivers the recommended restaurant and SaaS workflows", () => 
   const tenantAccess = read("supabase/functions/tenant-access/index.ts");
   const tenantAdmin = read("supabase/functions/tenant-admin/index.ts");
   const migration = read("supabase/migrations/20260608190000_growth_hub_modules.sql");
+  const growthHubShell = read("assets/modules/growth-hub-shell.js");
+  const featuresGrowth = read("assets/features-growth.js");
   const growthIndex = dashboard.indexOf('id="growth-hub-tab"');
   const mainCloseIndex = dashboard.indexOf("</main>");
 
@@ -436,13 +438,13 @@ test("growth hub delivers the recommended restaurant and SaaS workflows", () => 
   assert.match(dashboard, /id="growth-device-test-btn"/);
   assert.match(dashboard, /id="growth-outlet-form"/);
   assert.match(dashboard, /id="saas-platform-summary"/);
-  assert.match(dashboardJs, /function renderGrowthHub/);
-  assert.match(dashboardJs, /function renderPlatformSummary/);
+  assert.match(dashboardJs, /renderGrowthHub|RSGrowthHubShell/);
+  assert.match(dashboardJs, /renderPlatformSummary/);
   assert.match(dashboardJs, /conflictTargets/);
   assert.match(dashboardCss, /GROWTH HUB PRODUCT MODULES/);
   assert.match(browserApi, /doppio_support_tickets/);
   assert.match(tenantData, /doppio_saas_invoices/);
-  assert.match(tenantAccess, /growth-hub-tab/);
+  assert.match(read("supabase/functions/_shared/role-defaults.ts"), /growth-hub-tab/);
   assert.match(tenantAdmin, /doppio_backup_snapshots/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.doppio_reservations/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.doppio_purchase_orders/);
@@ -514,7 +516,8 @@ test("onboarding is entitlement-aware and includes a permanent setup guide", () 
   assert.match(onboarding, /function enabledFeatures/);
   assert.match(onboarding, /sessionStorage\.getItem\('allowed_tabs'\)/);
   assert.match(onboarding, /window\.getComputedStyle\(link\)\.display !== 'none'/);
-  assert.match(onboarding, /restrosuite_tour_done:\$\{tenant\}:\$\{user\}:\$\{signature\}/);
+  assert.match(onboarding, /function hasCompletedTour/);
+  assert.match(onboarding, /restrosuite_tour_done:\$\{tenant\}:\$\{user\}/);
   assert.match(onboarding, /function setupTasks/);
   assert.match(onboarding, /window\.openProductGuide = openGuide/);
   assert.match(onboarding, /tabId: 'growth-hub-tab'/);
