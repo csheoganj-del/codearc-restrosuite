@@ -10,19 +10,19 @@
  *   2. The deployed /api/config endpoint (LIVE_CONFIG_URL, defaults to production)
  * Set SKIP_LIVE_LAUNCH_CHECK=1 to skip network checks (e.g. offline CI).
  */
-const fs = require("node:fs");
-const path = require("node:path");
+const fs = require('node:fs');
+const path = require('node:path');
 
-const root = path.resolve(__dirname, "..");
+const root = path.resolve(__dirname, '..');
 const failures = [];
 const warnings = [];
 
-const PROD_ORIGIN = process.env.PROD_ORIGIN || "https://restrosuite.codearc.co.in";
+const PROD_ORIGIN = process.env.PROD_ORIGIN || 'https://restrosuite.codearc.co.in';
 const LIVE_CONFIG_URL = process.env.LIVE_CONFIG_URL || `${PROD_ORIGIN}/api/config`;
 const LIVE_HEALTH_URL = process.env.LIVE_HEALTH_URL || `${PROD_ORIGIN}/api/health`;
 
 function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), "utf8");
+  return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
 function fail(message) {
@@ -34,15 +34,15 @@ function warn(message) {
 }
 
 function normalizeSupabaseUrl(value) {
-  return String(value || "")
+  return String(value || '')
     .trim()
-    .replace(/\/+$/, "")
-    .replace(/\/(rest|auth|storage|functions)\/v1$/, "")
-    .replace(/\/+$/, "");
+    .replace(/\/+$/, '')
+    .replace(/\/(rest|auth|storage|functions)\/v1$/, '')
+    .replace(/\/+$/, '');
 }
 
 // ── 1. Frontend must use runtime config, never hardcoded credentials ─────────
-const frontendFiles = ["login.html", "assets/dashboard.js", "script.js", "home.html", "dashboard.html"];
+const frontendFiles = ['login.html', 'assets/dashboard.js', 'script.js', 'home.html', 'dashboard.html'];
 const jwtPattern = /eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}/;
 const projectUrlPattern = /https:\/\/[a-z0-9]{16,}\.supabase\.co/;
 
@@ -60,56 +60,56 @@ for (const file of frontendFiles) {
   }
 }
 
-for (const file of ["login.html", "script.js"]) {
+for (const file of ['login.html', 'script.js']) {
   const source = read(file);
-  if (!source.includes("window.__SUPABASE_URL__") || !source.includes("window.__SUPABASE_ANON_KEY__")) {
+  if (!source.includes('window.__SUPABASE_URL__') || !source.includes('window.__SUPABASE_ANON_KEY__')) {
     fail(`${file} does not read runtime config (window.__SUPABASE_URL__ / window.__SUPABASE_ANON_KEY__).`);
   }
 }
 
-const apiSource = read("assets/doppio-api.js");
-if (!apiSource.includes("/api/config")) {
-  fail("assets/doppio-api.js does not fetch /api/config.");
+const apiSource = read('assets/doppio-api.js');
+if (!apiSource.includes('/api/config')) {
+  fail('assets/doppio-api.js does not fetch /api/config.');
 }
 
 // ── 2. Runtime config plumbing must exist ─────────────────────────────────────
-if (!fs.existsSync(path.join(root, "config.js"))) {
-  fail("Missing config.js runtime loader.");
-} else if (!read("config.js").includes("/api/config")) {
-  fail("config.js does not fetch /api/config.");
+if (!fs.existsSync(path.join(root, 'config.js'))) {
+  fail('Missing config.js runtime loader.');
+} else if (!read('config.js').includes('/api/config')) {
+  fail('config.js does not fetch /api/config.');
 }
-if (!fs.existsSync(path.join(root, "api", "config.js"))) {
-  fail("Missing api/config.js Vercel function.");
+if (!fs.existsSync(path.join(root, 'api', 'config.js'))) {
+  fail('Missing api/config.js Vercel function.');
 } else {
-  const apiConfig = read("api/config.js");
-  if (!apiConfig.includes("process.env.SUPABASE_URL") || !apiConfig.includes("process.env.SUPABASE_ANON_KEY")) {
-    fail("api/config.js does not read SUPABASE_URL / SUPABASE_ANON_KEY env vars.");
+  const apiConfig = read('api/config.js');
+  if (!apiConfig.includes('process.env.SUPABASE_URL') || !apiConfig.includes('process.env.SUPABASE_ANON_KEY')) {
+    fail('api/config.js does not read SUPABASE_URL / SUPABASE_ANON_KEY env vars.');
   }
 }
 
 // ── 3. Edge Functions present + gateway JWT verification disabled ────────────
 const requiredFunctions = [
-  "tenant-access",
-  "tenant-admin",
-  "tenant-data",
-  "tenant-public",
-  "tenant-users",
-  "app-observability",
-  "notify-registration",
+  'tenant-access',
+  'tenant-admin',
+  'tenant-data',
+  'tenant-public',
+  'tenant-users',
+  'app-observability',
+  'notify-registration',
 ];
-const supabaseConfig = read("supabase/config.toml");
+const supabaseConfig = read('supabase/config.toml');
 for (const functionName of requiredFunctions) {
-  const functionPath = path.join(root, "supabase", "functions", functionName, "index.ts");
-  if (!fs.existsSync(functionPath)) fail(`Missing Edge Function: ${functionName}.`);
-  const escaped = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const functionPath = path.join(root, 'supabase', 'functions', functionName, 'index.ts');
+  if (!fs.existsSync(functionPath)) {fail(`Missing Edge Function: ${functionName}.`);}
+  const escaped = functionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (!new RegExp(`\\[functions\\.${escaped}\\][\\s\\S]*?verify_jwt\\s*=\\s*false`).test(supabaseConfig)) {
     fail(`supabase/config.toml must explicitly disable gateway JWT verification for ${functionName}.`);
   }
 }
 
 // CORS hardening contract: no suffix-matched origins in authenticated functions.
-for (const functionName of ["tenant-access", "tenant-admin", "tenant-data", "tenant-users", "app-observability"]) {
-  const source = read(path.join("supabase", "functions", functionName, "index.ts"));
+for (const functionName of ['tenant-access', 'tenant-admin', 'tenant-data', 'tenant-users', 'app-observability']) {
+  const source = read(path.join('supabase', 'functions', functionName, 'index.ts'));
   if (source.includes('origin.endsWith(".vercel.app")')) {
     fail(`${functionName} uses a suffix-matched CORS origin — exact-match allowlist required.`);
   }
@@ -117,34 +117,34 @@ for (const functionName of ["tenant-access", "tenant-admin", "tenant-data", "ten
 
 // ── 4. Core schema reproducibility ───────────────────────────────────────────
 const coreTables = [
-  "doppio_business_profile",
-  "doppio_menu",
-  "doppio_inventory",
-  "doppio_bills",
-  "doppio_pending_orders",
-  "doppio_shifts",
-  "doppio_shift_events",
-  "doppio_employees",
-  "doppio_leave_requests",
-  "doppio_attendance",
-  "doppio_crm",
-  "doppio_inventory_batches",
-  "doppio_notifications",
-  "doppio_custom_recipes",
-  "doppio_inventory_thresholds",
-  "doppio_pos_popularity",
-  "doppio_draft_orders",
+  'doppio_business_profile',
+  'doppio_menu',
+  'doppio_inventory',
+  'doppio_bills',
+  'doppio_pending_orders',
+  'doppio_shifts',
+  'doppio_shift_events',
+  'doppio_employees',
+  'doppio_leave_requests',
+  'doppio_attendance',
+  'doppio_crm',
+  'doppio_inventory_batches',
+  'doppio_notifications',
+  'doppio_custom_recipes',
+  'doppio_inventory_thresholds',
+  'doppio_pos_popularity',
+  'doppio_draft_orders',
 ];
 const sqlFiles = [
-  "supabase_migration.sql",
-  ...fs.readdirSync(path.join(root, "supabase", "migrations"))
-    .filter((name) => name.endsWith(".sql"))
-    .map((name) => path.join("supabase", "migrations", name)),
+  'supabase_migration.sql',
+  ...fs.readdirSync(path.join(root, 'supabase', 'migrations'))
+    .filter((name) => name.endsWith('.sql'))
+    .map((name) => path.join('supabase', 'migrations', name)),
 ];
-const sql = sqlFiles.map(read).join("\n");
+const sql = sqlFiles.map(read).join('\n');
 for (const table of coreTables) {
-  const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (!new RegExp(`CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:public\\.)?${escaped}\\b`, "i").test(sql)) {
+  const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (!new RegExp(`CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:public\\.)?${escaped}\\b`, 'i').test(sql)) {
     fail(`Core schema is not reproducible: missing CREATE TABLE for ${table}.`);
   }
 }
@@ -155,7 +155,7 @@ async function resolveLiveConfig() {
     return {
       url: normalizeSupabaseUrl(process.env.SUPABASE_URL),
       key: process.env.SUPABASE_ANON_KEY.trim(),
-      source: "environment variables",
+      source: 'environment variables',
     };
   }
   try {
@@ -163,10 +163,10 @@ async function resolveLiveConfig() {
     if (health.ok) {
       const h = await health.json();
       if (!h.checks || !h.checks.supabaseConfigured) {
-        warn(`Live /api/health reports supabaseConfigured=false — set SUPABASE_* on Vercel.`);
+        warn('Live /api/health reports supabaseConfigured=false — set SUPABASE_* on Vercel.');
       }
       if (h.checks && !h.checks.whatsappGatewayConfigured) {
-        warn(`WhatsApp gateway env not set on host (OTP/bills need WHATSAPP_GATEWAY_URL + TOKEN).`);
+        warn('WhatsApp gateway env not set on host (OTP/bills need WHATSAPP_GATEWAY_URL + TOKEN).');
       }
     } else {
       warn(`Live /api/health returned HTTP ${health.status} (optional endpoint).`);
@@ -181,33 +181,33 @@ async function resolveLiveConfig() {
     return null;
   }
   const cfg = await response.json();
-  const rawUrl = String(cfg.supabaseUrl || "");
-  if (/\/(rest|auth|storage|functions)\/v1\/?$/.test(rawUrl.replace(/\/+$/, ""))) {
+  const rawUrl = String(cfg.supabaseUrl || '');
+  if (/\/(rest|auth|storage|functions)\/v1\/?$/.test(rawUrl.replace(/\/+$/, ''))) {
     warn(`Live SUPABASE_URL env var includes an API path suffix ("${rawUrl}"). ` +
-      "The deployed api/config.js must normalize it (fix the Vercel env var to the bare project URL).");
+      'The deployed api/config.js must normalize it (fix the Vercel env var to the bare project URL).');
   }
   return {
     url: normalizeSupabaseUrl(rawUrl),
-    key: String(cfg.supabaseAnonKey || "").trim(),
+    key: String(cfg.supabaseAnonKey || '').trim(),
     source: LIVE_CONFIG_URL,
   };
 }
 
 function validateAnonKey(url, key) {
   try {
-    const payload = JSON.parse(Buffer.from(key.split(".")[1], "base64url").toString("utf8"));
-    const projectRef = new URL(url).hostname.split(".")[0];
-    if (payload.iss !== "supabase") fail("Live anon key has a malformed issuer.");
-    if (payload.role !== "anon") fail("Live key must be the public anon key (role=anon).");
-    if (payload.ref !== projectRef) fail("Live anon key does not match the Supabase project URL.");
-    if (payload.exp && payload.exp * 1000 < Date.now()) fail("Live anon key is expired.");
+    const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+    const projectRef = new URL(url).hostname.split('.')[0];
+    if (payload.iss !== 'supabase') {fail('Live anon key has a malformed issuer.');}
+    if (payload.role !== 'anon') {fail('Live key must be the public anon key (role=anon).');}
+    if (payload.ref !== projectRef) {fail('Live anon key does not match the Supabase project URL.');}
+    if (payload.exp && payload.exp * 1000 < Date.now()) {fail('Live anon key is expired.');}
   } catch {
-    fail("Live anon key is not a valid Supabase JWT.");
+    fail('Live anon key is not a valid Supabase JWT.');
   }
 }
 
 async function checkLiveBackend() {
-  if (process.env.SKIP_LIVE_LAUNCH_CHECK === "1") return;
+  if (process.env.SKIP_LIVE_LAUNCH_CHECK === '1') {return;}
 
   let config;
   try {
@@ -217,7 +217,7 @@ async function checkLiveBackend() {
     return;
   }
   if (!config || !config.url || !config.key) {
-    if (config) fail(`Live configuration from ${config.source} is incomplete.`);
+    if (config) {fail(`Live configuration from ${config.source} is incomplete.`);}
     return;
   }
 
@@ -236,25 +236,25 @@ async function checkLiveBackend() {
 
   for (const functionName of requiredFunctions) {
     try {
-      if (functionName === "notify-registration") {
+      if (functionName === 'notify-registration') {
         const response = await fetch(`${config.url}/functions/v1/${functionName}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
         });
-        if (response.status === 404) fail(`Live Edge Function is not deployed: ${functionName}.`);
+        if (response.status === 404) {fail(`Live Edge Function is not deployed: ${functionName}.`);}
         continue;
       }
       const response = await fetch(`${config.url}/functions/v1/${functionName}`, {
-        method: "OPTIONS",
+        method: 'OPTIONS',
         headers: {
           Origin: PROD_ORIGIN,
-          "Access-Control-Request-Method": "POST",
-          "Access-Control-Request-Headers": "authorization,apikey,content-type",
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'authorization,apikey,content-type',
         },
       });
-      if (response.status === 404) fail(`Live Edge Function is not deployed: ${functionName}.`);
-      else if (!response.ok) fail(`Live Edge Function preflight failed for ${functionName} (${response.status}).`);
+      if (response.status === 404) {fail(`Live Edge Function is not deployed: ${functionName}.`);}
+      else if (!response.ok) {fail(`Live Edge Function preflight failed for ${functionName} (${response.status}).`);}
     } catch (error) {
       fail(`Could not verify live Edge Function ${functionName}: ${error.message}`);
     }
@@ -263,54 +263,72 @@ async function checkLiveBackend() {
 
 // ── 5b. PWA / install assets must ship with the web shell ───────────────────
 const pwaAssets = [
-  "assets/restrosuite-mark.png",
-  "assets/restrosuite-mark-512.png",
-  "assets/restrosuite-maskable-512.png",
-  "assets/screenshot-pos.png",
-  "assets/screenshot-cart.png",
-  "assets/license-config.js",
-  "assets/license-guard.js",
+  'assets/restrosuite-mark.png',
+  'assets/restrosuite-mark-512.png',
+  'assets/restrosuite-maskable-512.png',
+  'assets/screenshot-pos.png',
+  'assets/screenshot-cart.png',
+  'assets/license-config.js',
+  'assets/license-guard.js',
 ];
 for (const file of pwaAssets) {
-  if (!fs.existsSync(path.join(root, file))) fail(`Missing PWA/launch asset: ${file}`);
+  if (!fs.existsSync(path.join(root, file))) {fail(`Missing PWA/launch asset: ${file}`);}
 }
-if (fs.existsSync(path.join(root, "manifest.webmanifest"))) {
-  const manifest = read("manifest.webmanifest");
-  for (const needle of ["restrosuite-mark-512.png", "restrosuite-maskable-512.png", "screenshot-pos.png", '"purpose": "maskable"']) {
-    if (!manifest.includes(needle)) fail(`manifest.webmanifest missing required entry: ${needle}`);
+if (fs.existsSync(path.join(root, 'manifest.webmanifest'))) {
+  const manifest = read('manifest.webmanifest');
+  for (const needle of ['restrosuite-mark-512.png', 'restrosuite-maskable-512.png', 'screenshot-pos.png', '"purpose": "maskable"']) {
+    if (!manifest.includes(needle)) {fail(`manifest.webmanifest missing required entry: ${needle}`);}
   }
 } else {
-  fail("Missing manifest.webmanifest");
+  fail('Missing manifest.webmanifest');
 }
 
 // ── 5c. CRM columns migration must exist for cloud customer saves ────────────
-const crmMigration = path.join(root, "supabase", "migrations", "20260709160000_crm_customer_fields.sql");
+const crmMigration = path.join(root, 'supabase', 'migrations', '20260709160000_crm_customer_fields.sql');
 if (!fs.existsSync(crmMigration)) {
-  fail("Missing CRM migration 20260709160000_crm_customer_fields.sql");
+  fail('Missing CRM migration 20260709160000_crm_customer_fields.sql');
 } else {
-  const crmSql = fs.readFileSync(crmMigration, "utf8");
-  for (const col of ["email", "dues", "marketing_opt_in"]) {
-    if (!crmSql.includes(col)) fail(`CRM migration missing column: ${col}`);
+  const crmSql = fs.readFileSync(crmMigration, 'utf8');
+  for (const col of ['email', 'dues', 'marketing_opt_in']) {
+    if (!crmSql.includes(col)) {fail(`CRM migration missing column: ${col}`);}
   }
 }
 
 // ── 5d. Tab-scoped sessions (no shared localStorage live auth keys) ──────────
-const doppioApi = read("assets/doppio-api.js");
-if (!doppioApi.includes("rs_remembered_session_v1") || !doppioApi.includes("hydrateRememberedSessionOnce")) {
-  fail("assets/doppio-api.js must use tab-scoped sessions with a remember-me blob.");
+const doppioApi = read('assets/doppio-api.js');
+if (!doppioApi.includes('rs_remembered_session_v1') || !doppioApi.includes('hydrateRememberedSessionOnce')) {
+  fail('assets/doppio-api.js must use tab-scoped sessions with a remember-me blob.');
 }
 if (/function ssGet\(k\)\{\s*return SS\.getItem\(k\) \|\| LS_SESS\.getItem\(k\);/.test(doppioApi)) {
-  fail("assets/doppio-api.js ssGet still falls back to localStorage (cross-tab session leak).");
+  fail('assets/doppio-api.js ssGet still falls back to localStorage (cross-tab session leak).');
+}
+
+// ── 5e. Credential recovery must call real tenant-access APIs ────────────────
+const loginHtml = read('login.html');
+if (!loginHtml.includes('RS_API.requestRecovery') || !loginHtml.includes('RS_API.resetPassword')) {
+  fail('login.html must wire requestRecovery and resetPassword (no fake OTP reset).');
+}
+if (!loginHtml.includes("get('recovery')") && !loginHtml.includes('get("recovery")')) {
+  fail('login.html must handle ?recovery= deep-links from email.');
+}
+
+// ── 5f. DR structure scripts must stay in the tree ───────────────────────────
+for (const rel of ['scripts/backup-db.js', 'scripts/restore-db.js', 'scripts/backup-restore-drill.cjs']) {
+  if (!fs.existsSync(path.join(root, rel))) {fail(`Missing DR script: ${rel}`);}
+}
+const drillSrc = read('scripts/backup-restore-drill.cjs');
+if (!drillSrc.includes('--structure')) {
+  fail('backup-restore-drill.cjs must support --structure for CI.');
 }
 
 async function main() {
   await checkLiveBackend();
-  for (const message of warnings) console.warn(`Launch check warning: ${message}`);
+  for (const message of warnings) {console.warn(`Launch check warning: ${message}`);}
   if (failures.length) {
-    for (const message of failures) console.error(`Launch check failed: ${message}`);
+    for (const message of failures) {console.error(`Launch check failed: ${message}`);}
     process.exit(1);
   }
-  console.log(warnings.length ? "Launch checks passed (with warnings)." : "Launch checks passed.");
+  console.log(warnings.length ? 'Launch checks passed (with warnings).' : 'Launch checks passed.');
 }
 
 main();

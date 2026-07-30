@@ -10,22 +10,25 @@
   <link rel="icon" href="assets/restrosuite-mark.png?v=7" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@450;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,450;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,450&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="config.js"></script>
   <style>
     :root {
-      --brand: #FF4F00;
-      --brand-2: #FF7A3D;
-      --ink: #0F0E0D;
+      /* Align with assets/restrosuite.css brand tokens */
+      --orange: #FF4F00;
+      --brand: var(--orange);
+      --brand-2: #FF6A2A;
+      --ink: #141210;
       --ink2: #3D3A36;
       --muted: #5E5952;
       --line: rgba(15,14,13,.09);
       --surf: #FFFFFF;
       --bg: #F4F1EB;
-      --ok: #0F9F6E;
-      --warn: #C27803;
-      --bad: #DC2626;
+      --ok: #1F8A5B;
+      --warn: #C47B16;
+      --bad: #C43C2E;
+      --font-body: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
       --safe-t: env(safe-area-inset-top, 0px);
       --safe-b: env(safe-area-inset-bottom, 0px);
       --ease: cubic-bezier(.22,1,.36,1);
@@ -34,7 +37,7 @@
     html, body {
       height: 100%;
       -webkit-tap-highlight-color: transparent;
-      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-family: var(--font-body);
       color: var(--ink);
       background: var(--bg);
     }

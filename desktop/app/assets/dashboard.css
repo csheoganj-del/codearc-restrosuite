@@ -69,6 +69,28 @@
 .app.collapsed .sb-section { text-align: center; font-size: 0; padding: 8px 0 4px; }
 .app.collapsed .sb-section::after { content: "···"; font-size: 9px; letter-spacing: 2px; color: var(--text-faint); }
 
+/* First-week calm nav — advanced modules tucked until owner expands */
+html.rs-starter-nav .sidebar-link[data-starter-adv="1"],
+html.rs-starter-nav #klc-sidebar-setup[data-starter-adv="1"] {
+  display: none !important;
+}
+html.rs-starter-nav .rs-starter-nav-expand {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; margin: 10px 2px 4px; padding: 10px 12px;
+  border-radius: 12px; border: 1px dashed var(--stroke-hi);
+  background: var(--glass-2); color: var(--text-soft);
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+  font-family: var(--font-body); text-align: left;
+  transition: var(--t);
+}
+html.rs-starter-nav .rs-starter-nav-expand:hover {
+  color: var(--text); border-color: var(--orange); background: var(--orange-tint);
+}
+html.rs-starter-nav .rs-starter-nav-expand i { color: var(--orange); width: 16px; text-align: center; }
+.app.collapsed html.rs-starter-nav .rs-starter-nav-expand span,
+html.rs-starter-nav.app.collapsed .rs-starter-nav-expand span { display: none; }
+.app.collapsed .rs-starter-nav-expand { justify-content: center; padding: 10px; }
+
 /* Nav list */
 .sb-nav {
   display: flex; flex-direction: column; gap: 1px;

@@ -80,6 +80,17 @@ jobs:
       - name: Accessibility gate (axe)
         run: npm run a11y:ci
 
+      - name: DR structure drill
+        run: npm run drill:backup:structure
+
+      - name: Production Web Vitals (field probe)
+        run: npm run perf:prod
+        continue-on-error: true
+        env:
+          MAX_LCP_MS: "4500"
+          MAX_FCP_MS: "3500"
+          MAX_TTFB_MS: "1500"
+
       - name: Run Playwright smoke
         run: npm run test:e2e:browser
         env:

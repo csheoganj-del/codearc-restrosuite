@@ -276,6 +276,8 @@ test("dashboard captures and displays application incidents for superadmin", () 
 test("visual system uses a restrained SaaS palette and consistent radius", () => {
   const dashboardCss = read("dashboard-styles.css");
   const publicCss = read("styles.css");
+  const brandCss = read("assets/restrosuite.css");
+  const qr = read("qr-order.html");
   assert.match(dashboardCss, /--primary-brand: #111827/);
   assert.match(dashboardCss, /--accent-caramel: #F97316/);
   assert.match(dashboardCss, /--tracking-base: 0/);
@@ -287,6 +289,21 @@ test("visual system uses a restrained SaaS palette and consistent radius", () =>
   assert.doesNotMatch(publicCss, /--primary-brand: #2C1B18/);
   // Tight tracking is intentional for headings; require the design token exists
   assert.match(dashboardCss, /--tracking-base:\s*0/);
+  assert.match(brandCss, /--font-body:\s*'DM Sans'/);
+  assert.match(brandCss, /--orange:\s*#FF4F00/);
+  assert.match(qr, /DM Sans/);
+  assert.match(qr, /--font-body/);
+  assert.doesNotMatch(qr, /family=Inter/);
+});
+
+test("starter nav keeps first-week sidebar calm", () => {
+  const ops = read("assets/modules/ops-mode.js");
+  const css = read("assets/dashboard.css");
+  assert.match(ops, /STARTER_CORE_TABS/);
+  assert.match(ops, /function applyStarterNav/);
+  assert.match(ops, /rs_full_nav_v1/);
+  assert.match(css, /html\.rs-starter-nav/);
+  assert.match(css, /rs-starter-nav-expand/);
 });
 
 test("mobile and Android app shells share a professional native layout", () => {

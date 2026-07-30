@@ -328,6 +328,114 @@
     try {
       paintModeChip(mode);
     } catch (_) {}
+
+    try {
+      applyStarterNav();
+    } catch (_) {}
+  }
+
+  /** First-week calm sidebar: core modules only until owner expands. */
+  const STARTER_CORE_TABS = Object.freeze([
+    'pos-tab',
+    'bills-tab',
+    'editor-tab',
+    'employees-tab',
+    'reports-tab',
+    'growth-hub-tab',
+  ]);
+
+  function starterTenantKey() {
+    try {
+      return sessionStorage.getItem('tenant_id')
+        || sessionStorage.getItem('tenant_slug')
+        || 'default';
+    } catch (_) {
+      return 'default';
+    }
+  }
+
+  function starterFullNavKey() {
+    return 'rs_full_nav_v1:' + starterTenantKey();
+  }
+
+  function starterFirstSeenKey() {
+    return 'rs_starter_first_seen_v1:' + starterTenantKey();
+  }
+
+  function markStarterFirstSeen() {
+    try {
+      const key = starterFirstSeenKey();
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, String(Date.now()));
+      }
+    } catch (_) {}
+  }
+
+  function wantsStarterNav() {
+    try {
+      if (document.documentElement.classList.contains('rs-role-superadmin')) {return false;}
+      if (document.body && document.body.classList.contains('rs-role-superadmin')) {return false;}
+      if (localStorage.getItem(starterFullNavKey()) === '1') {return false;}
+      markStarterFirstSeen();
+      const first = Number(localStorage.getItem(starterFirstSeenKey()) || Date.now());
+      const ageMs = Date.now() - (Number.isFinite(first) ? first : Date.now());
+      // Calm nav for the first 14 days unless owner expands
+      return ageMs < (14 * 24 * 60 * 60 * 1000);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function expandFullNav(persist) {
+    try {
+      if (persist !== false) {localStorage.setItem(starterFullNavKey(), '1');}
+    } catch (_) {}
+    document.documentElement.classList.remove('rs-starter-nav');
+    document.querySelectorAll('[data-starter-adv="1"]').forEach(function (el) {
+      el.removeAttribute('data-starter-adv');
+    });
+    const btn = document.getElementById('rs-starter-nav-expand');
+    if (btn) {btn.remove();}
+  }
+
+  function applyStarterNav() {
+    const nav = document.querySelector('.sidebar .sb-nav');
+    if (!nav) {return;}
+
+    if (!wantsStarterNav()) {
+      expandFullNav(false);
+      document.documentElement.classList.remove('rs-starter-nav');
+      const stale = document.getElementById('rs-starter-nav-expand');
+      if (stale) {stale.remove();}
+      return;
+    }
+
+    document.documentElement.classList.add('rs-starter-nav');
+    const core = new Set(STARTER_CORE_TABS);
+    nav.querySelectorAll('a.sidebar-link[data-tab]').forEach(function (el) {
+      if (el.classList.contains('superadmin-only') || el.classList.contains('brandadmin-only')) {return;}
+      const tab = el.getAttribute('data-tab') || '';
+      if (core.has(tab)) {
+        el.removeAttribute('data-starter-adv');
+        return;
+      }
+      el.setAttribute('data-starter-adv', '1');
+    });
+    // Kitchen Setup is advanced until owner expands
+    const klc = document.getElementById('klc-sidebar-setup');
+    if (klc) {klc.setAttribute('data-starter-adv', '1');}
+
+    let btn = document.getElementById('rs-starter-nav-expand');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'rs-starter-nav-expand';
+      btn.className = 'rs-starter-nav-expand';
+      btn.innerHTML = '<i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Show all modules</span>';
+      btn.title = 'Reveal QR, Floor, KDS, Inventory, and the rest';
+      btn.addEventListener('click', function () { expandFullNav(true); });
+      nav.appendChild(btn);
+    }
   }
 
   function paintModeChip(mode) {
@@ -403,6 +511,9 @@
     clearSentMap: clearSentMap,
     applyUi: applyUi,
     applyPosOnlyModeUI: applyPosOnlyModeUI,
+    applyStarterNav: applyStarterNav,
+    expandFullNav: expandFullNav,
+    wantsStarterNav: wantsStarterNav,
   };
 
   global.RSOpsMode = api;

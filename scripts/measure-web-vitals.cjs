@@ -19,9 +19,10 @@ async function main() {
     process.exit(2);
   }
 
-  const maxLcp = num(process.env.MAX_LCP_MS, 3500);
-  const maxFcp = num(process.env.MAX_FCP_MS, 2000);
-  const maxTtfb = num(process.env.MAX_TTFB_MS, 800);
+  const isRemote = /^https?:\/\//i.test(url);
+  const maxLcp = num(process.env.MAX_LCP_MS, isRemote ? 4000 : 3500);
+  const maxFcp = num(process.env.MAX_FCP_MS, isRemote ? 3000 : 2000);
+  const maxTtfb = num(process.env.MAX_TTFB_MS, isRemote ? 1200 : 800);
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
