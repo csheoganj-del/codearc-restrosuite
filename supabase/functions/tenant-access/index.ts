@@ -107,6 +107,7 @@ async function checkRateLimit(req: Request, action: string) {
     login: { limit: 10, windowSeconds: 15 * 60 },
     register: { limit: 5, windowSeconds: 60 * 60 },
     request_recovery: { limit: 5, windowSeconds: 60 * 60 },
+    verify_recovery_otp: { limit: 20, windowSeconds: 60 * 60 },
     reset_password: { limit: 10, windowSeconds: 60 * 60 },
   };
   const rule = rules[action];
@@ -132,6 +133,14 @@ async function checkRateLimit(req: Request, action: string) {
 
 function randomBase64Url(byteLength = 18) {
   return encodeBase64Url(crypto.getRandomValues(new Uint8Array(byteLength)));
+}
+
+function randomOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function normalizePhoneDigits(raw: string) {
+  return String(raw || "").replace(/\D/g, "");
 }
 
 async function hashPassword(password: string) {
@@ -304,7 +313,7 @@ function escapeHtml(value: unknown) {
     .replaceAll("'", "&#39;");
 }
 
-async function sendRecoveryEmail(email: string, tenant: Record<string, unknown>, token: string) {
+async function sendRecoveryEmail(email: string, tenant: Record<string, unknown>, token: string, otpCode: string) {
   if (ZERO_COST_EMAILS_DISABLED || !EMAIL_RELAY_URL) {
     console.warn("Credential recovery email skipped because email delivery is not configured.");
     return false;
@@ -318,14 +327,18 @@ async function sendRecoveryEmail(email: string, tenant: Record<string, unknown>,
     },
     body: JSON.stringify({
       to: email,
-      subject: "RestroSuite credential recovery",
+      subject: "RestroSuite password reset code",
       html: `
         <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#1f2937">
           <h2>Reset your RestroSuite password</h2>
           <p>A credential recovery request was received for <strong>${escapeHtml(tenant.name || "your outlet")}</strong>.</p>
           <p><strong>Outlet ID:</strong> ${escapeHtml(tenant.slug)}<br><strong>Username:</strong> ${escapeHtml(tenant.username)}</p>
-          <p><a href="${resetUrl}" style="display:inline-block;background:#f97316;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Set a new password</a></p>
-          <p>This link expires in 30 minutes and can be used once. If you did not request it, ignore this email.</p>
+          <p style="font-size:28px;letter-spacing:8px;font-weight:800;margin:24px 0">${escapeHtml(otpCode)}</p>
+          <p>Enter this same code in the app (email or WhatsApp — one code works for both). Valid for 10 minutes.</p>
+          <p>Or use this one-time link:<br>
+            <a href="${resetUrl}" style="display:inline-block;background:#FF4F00;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700">Set a new password</a>
+          </p>
+          <p>If you did not request it, ignore this email.</p>
         </div>
       `,
     }),
@@ -338,62 +351,207 @@ async function sendRecoveryEmail(email: string, tenant: Record<string, unknown>,
   return true;
 }
 
+async function sendRecoveryWhatsApp(phone: string, otpCode: string) {
+  const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("NGROK_GATEWAY_URL") || "").replace(/\/+$/, "");
+  const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
+  if (!gatewayUrl || !gatewayToken) {
+    console.warn("Credential recovery WhatsApp skipped — gateway not configured.");
+    return false;
+  }
+  const message = [
+    "*RestroSuite*",
+    "Password reset code",
+    "",
+    `Your code is: *${otpCode}*`,
+    "",
+    "Same code works for email and WhatsApp.",
+    "Valid for 10 minutes.",
+    "Never share this code. RestroSuite staff will never ask for it.",
+    "",
+    "— CodeArc Tech Labs",
+  ].join("\n");
+  const gwRes = await fetch(`${gatewayUrl}/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${gatewayToken}` },
+    body: JSON.stringify({ phone, message }),
+  });
+  if (!gwRes.ok) {
+    const gwErr = await gwRes.text();
+    throw new Error(`WhatsApp gateway failed: ${gwErr.slice(0, 200)}`);
+  }
+  return true;
+}
+
 async function handleRequestRecovery(payload: Record<string, unknown>, req: Request) {
   const slug = normalizeSlug(String(payload.slug || ""));
   const email = normalizeEmail(String(payload.email || ""));
+  const phone = normalizePhoneDigits(String(payload.phone || ""));
+  const challengeId = crypto.randomUUID();
   const generic = {
     success: true,
-    message: "If the outlet ID and registered owner email match, a recovery link will be sent shortly.",
+    challenge_id: challengeId,
+    message: "If the details match a registered owner account, the same OTP was sent to email and/or WhatsApp.",
   };
-  if (!email) return jsonResponse(generic, 200, req);
+  if (!email && phone.length < 10) {
+    return jsonResponse(generic, 200, req);
+  }
 
   let query = supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, username, email, status")
-    .eq("email", email)
+    .select("id, name, slug, username, email, phone, status")
     .eq("status", "approved")
-    .limit(5);
-  if (slug) query = query.eq("slug", slug);
-  const { data: tenants, error } = await query;
+    .limit(20);
+  if (slug) {
+    query = query.eq("slug", slug);
+  } else if (email) {
+    query = query.eq("email", email);
+  } else if (phone.length >= 10) {
+    query = query.ilike("phone", `%${phone.slice(-10)}%`);
+  } else {
+    return jsonResponse(generic, 200, req);
+  }
+
+  const { data: candidates, error } = await query;
   if (error) {
     console.error("recovery lookup failed:", error);
     return jsonResponse(generic, 200, req);
   }
-  if (!tenants || tenants.length === 0) {
+
+  const tenants = (candidates || []).filter((tenant) => {
+    const tenantEmail = normalizeEmail(String(tenant.email || ""));
+    const tenantPhone = normalizePhoneDigits(String(tenant.phone || ""));
+    const emailOk = email ? tenantEmail === email : true;
+    const phoneOk = phone.length >= 10
+      ? (tenantPhone === phone || tenantPhone.endsWith(phone) || phone.endsWith(tenantPhone))
+      : true;
+    if (email && phone.length >= 10) return emailOk || phoneOk;
+    if (email) return emailOk;
+    return phoneOk;
+  });
+
+  if (!tenants.length) {
     return jsonResponse(generic, 200, req);
   }
 
   const clientAddress = (req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown").split(",")[0].trim();
   const ipHash = await sha256Hex(clientAddress);
   await supabaseAdmin.from("tenant_password_resets").delete().lt("expires_at", new Date().toISOString());
-  for (const tenant of tenants) {
-    const rawToken = randomBase64Url(32);
-    const tokenHash = await sha256Hex(rawToken);
-    await supabaseAdmin.from("tenant_password_resets").delete().eq("tenant_id", tenant.id).is("used_at", null);
-    const { error: insertError } = await supabaseAdmin.from("tenant_password_resets").insert({
-      tenant_id: tenant.id,
-      token_hash: tokenHash,
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      requested_ip_hash: ipHash,
-    });
-    if (insertError) {
-      console.error("recovery token insert failed:", insertError);
-      continue;
-    }
+
+  // One shared OTP for the first matched outlet (usually unique by email/phone).
+  const tenant = tenants[0];
+  const otpCode = randomOtp();
+  const rawToken = randomBase64Url(32);
+  const tokenHash = await sha256Hex(rawToken);
+  const otpHash = await otpCodeHash(challengeId, String(tenant.id), otpCode, "recovery");
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+  await supabaseAdmin.from("tenant_password_resets").delete().eq("tenant_id", tenant.id).is("used_at", null);
+  const deliverEmailTo = email || normalizeEmail(String(tenant.email || ""));
+  const deliverPhoneTo = phone.length >= 10
+    ? phone
+    : normalizePhoneDigits(String(tenant.phone || ""));
+
+  let deliveredEmail = false;
+  let deliveredWhatsapp = false;
+
+  const { error: insertError } = await supabaseAdmin.from("tenant_password_resets").insert({
+    tenant_id: tenant.id,
+    token_hash: tokenHash,
+    challenge_id: challengeId,
+    otp_hash: otpHash,
+    otp_attempts: 0,
+    expires_at: expiresAt,
+    requested_ip_hash: ipHash,
+    delivered_email: false,
+    delivered_whatsapp: false,
+  });
+  if (insertError) {
+    console.error("recovery token insert failed:", insertError);
+    return jsonResponse(generic, 200, req);
+  }
+
+  if (deliverEmailTo) {
     try {
-      await sendRecoveryEmail(email, tenant, rawToken);
+      deliveredEmail = await sendRecoveryEmail(deliverEmailTo, tenant, rawToken, otpCode);
     } catch (deliveryError) {
       console.error("recovery email failed:", deliveryError);
     }
   }
-  return jsonResponse(generic, 200, req);
+  if (deliverPhoneTo.length >= 10) {
+    try {
+      deliveredWhatsapp = await sendRecoveryWhatsApp(deliverPhoneTo, otpCode);
+    } catch (deliveryError) {
+      console.error("recovery WhatsApp failed:", deliveryError);
+    }
+  }
+
+  await supabaseAdmin.from("tenant_password_resets").update({
+    delivered_email: deliveredEmail,
+    delivered_whatsapp: deliveredWhatsapp,
+  }).eq("challenge_id", challengeId);
+
+  return jsonResponse({
+    ...generic,
+    channels: {
+      email: deliveredEmail,
+      whatsapp: deliveredWhatsapp,
+    },
+  }, 200, req);
+}
+
+async function handleVerifyRecoveryOtp(payload: Record<string, unknown>, req: Request) {
+  const challengeId = String(payload.challenge_id || "").trim();
+  const code = String(payload.otp_code || payload.code || "").replace(/\D/g, "");
+  if (!challengeId || code.length !== 6) {
+    return jsonResponse({ error: "Enter the 6-digit code from email or WhatsApp." }, 400, req);
+  }
+
+  const { data: reset, error } = await supabaseAdmin
+    .from("tenant_password_resets")
+    .select("id, tenant_id, token_hash, otp_hash, otp_attempts, expires_at, used_at")
+    .eq("challenge_id", challengeId)
+    .maybeSingle();
+
+  if (error || !reset || reset.used_at || !reset.otp_hash || Date.now() > new Date(reset.expires_at).getTime()) {
+    return jsonResponse({ error: "This code is invalid or has expired. Request a new one." }, 400, req);
+  }
+  if (Number(reset.otp_attempts || 0) >= 5) {
+    return jsonResponse({ error: "Too many incorrect attempts. Request a new code." }, 429, req);
+  }
+
+  const expected = await otpCodeHash(challengeId, String(reset.tenant_id), code, "recovery");
+  if (!timingSafeEqualString(expected, String(reset.otp_hash))) {
+    await supabaseAdmin.from("tenant_password_resets")
+      .update({ otp_attempts: Number(reset.otp_attempts || 0) + 1 })
+      .eq("id", reset.id);
+    return jsonResponse({ error: "Incorrect code. Check email or WhatsApp and try again." }, 400, req);
+  }
+
+  // Issue a one-time reset token (raw). Store only the hash we already have —
+  // return a fresh token by rotating token_hash so the raw value is known once.
+  const rawToken = randomBase64Url(32);
+  const tokenHash = await sha256Hex(rawToken);
+  const { error: rotateError } = await supabaseAdmin.from("tenant_password_resets")
+    .update({ token_hash: tokenHash, otp_attempts: 0 })
+    .eq("id", reset.id)
+    .is("used_at", null);
+  if (rotateError) {
+    console.error("recovery otp token rotate failed:", rotateError);
+    return jsonResponse({ error: "Could not verify code. Please request a new one." }, 500, req);
+  }
+
+  return jsonResponse({
+    success: true,
+    reset_token: rawToken,
+    message: "Code verified. Set your new password.",
+  }, 200, req);
 }
 
 async function handleResetPassword(payload: Record<string, unknown>, req: Request) {
   const token = String(payload.token || "").trim();
   const password = String(payload.password || "");
   if (!token || password.length < 10) {
-    return jsonResponse({ error: "A valid recovery link and a password of at least 10 characters are required." }, 400, req);
+    return jsonResponse({ error: "A valid recovery code/link and a password of at least 10 characters are required." }, 400, req);
   }
   const tokenHash = await sha256Hex(token);
   const { data: reset, error } = await supabaseAdmin
@@ -402,7 +560,7 @@ async function handleResetPassword(payload: Record<string, unknown>, req: Reques
     .eq("token_hash", tokenHash)
     .maybeSingle();
   if (error || !reset || reset.used_at || Date.now() > new Date(reset.expires_at).getTime()) {
-    return jsonResponse({ error: "This recovery link is invalid or has expired." }, 400, req);
+    return jsonResponse({ error: "This recovery session is invalid or has expired." }, 400, req);
   }
 
   const now = new Date().toISOString();
@@ -413,7 +571,7 @@ async function handleResetPassword(payload: Record<string, unknown>, req: Reques
     .is("used_at", null)
     .select("id")
     .maybeSingle();
-  if (claimError || !claimed) return jsonResponse({ error: "This recovery link has already been used." }, 409, req);
+  if (claimError || !claimed) return jsonResponse({ error: "This recovery code has already been used." }, 409, req);
 
   const { data: tenant, error: tenantError } = await supabaseAdmin
     .from("saas_tenants")
@@ -421,7 +579,7 @@ async function handleResetPassword(payload: Record<string, unknown>, req: Reques
     .eq("id", reset.tenant_id)
     .maybeSingle();
   if (tenantError || !tenant) {
-    return jsonResponse({ error: "Password reset failed. Please request a new link." }, 500, req);
+    return jsonResponse({ error: "Password reset failed. Please request a new code." }, 500, req);
   }
   const { error: updateError } = await supabaseAdmin
     .from("saas_tenants")
@@ -432,7 +590,7 @@ async function handleResetPassword(payload: Record<string, unknown>, req: Reques
     .eq("id", reset.tenant_id);
   if (updateError) {
     console.error("password recovery update failed:", updateError);
-    return jsonResponse({ error: "Password reset failed. Please request a new link." }, 500, req);
+    return jsonResponse({ error: "Password reset failed. Please request a new code." }, 500, req);
   }
   const { data: ownerUser } = await supabaseAdmin
     .from("tenant_users")
@@ -1021,6 +1179,10 @@ serve(async (req) => {
 
     if (action === "request_recovery") {
       return await handleRequestRecovery(payload, req);
+    }
+
+    if (action === "verify_recovery_otp") {
+      return await handleVerifyRecoveryOtp(payload, req);
     }
 
     if (action === "reset_password") {

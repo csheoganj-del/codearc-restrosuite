@@ -582,28 +582,40 @@ test("onboarding is entitlement-aware and includes a permanent setup guide", () 
   assert.match(dashboardCss, /@media \(max-width: 720px\)/);
 });
 
-test("credential recovery uses expiring one-time tokens and separates privileged recovery", () => {
+test("credential recovery uses shared email/WhatsApp OTP and one-time reset tokens", () => {
   const login = read("login.html");
   const tenantAccess = read("supabase/functions/tenant-access/index.ts");
   const tenantAdmin = read("supabase/functions/tenant-admin/index.ts");
   const migration = read("supabase/migrations/20260609130000_secure_credential_recovery.sql");
+  const otpMigration = read("supabase/migrations/20260730120000_recovery_shared_otp.sql");
   const guide = read("CREDENTIAL_RECOVERY.md");
+  const api = read("assets/doppio-api.js");
 
   assert.match(login, /id="open-recovery-btn"/);
   assert.match(login, /id="recovery-request-form"/);
+  assert.match(login, /id="recovery-otp-form"/);
   assert.match(login, /id="recovery-reset-form"/);
+  assert.match(login, /id="recovery-phone"/);
   assert.match(login, /RS_API\.requestRecovery/);
+  assert.match(login, /RS_API\.verifyRecoveryOtp/);
   assert.match(login, /RS_API\.resetPassword/);
   assert.match(login, /searchParams\.get\(['"]recovery['"]\)|params\.get\(['"]recovery['"]\)/);
   assert.doesNotMatch(login, /RS_API\.access\(\{\s*operation:\s*['"]request_recovery['"]/);
   assert.doesNotMatch(login, /Password updated — you can sign in now\.'\);\s*\}, 700\)/);
   assert.match(guide, /Superadmin[\s\S]*SUPERADMIN_PASSWORD_HASH/);
+  assert.match(guide, /same code/i);
+  assert.match(guide, /WhatsApp/);
+  assert.match(api, /verifyRecoveryOtp/);
+  assert.match(api, /action:'verify_recovery_otp'/);
   assert.match(tenantAccess, /request_recovery/);
+  assert.match(tenantAccess, /verify_recovery_otp/);
   assert.match(tenantAccess, /reset_password/);
+  assert.match(tenantAccess, /sendRecoveryWhatsApp/);
   assert.match(tenantAccess, /\.eq\("email", email\)/);
-  assert.match(tenantAccess, /if \(slug\) query = query\.eq\("slug", slug\)/);
-  assert.match(tenantAccess, /30 \* 60 \* 1000/);
+  assert.match(tenantAccess, /if \(slug\)/);
+  assert.match(tenantAccess, /10 \* 60 \* 1000/);
   assert.match(tenantAccess, /token_hash: tokenHash/);
+  assert.match(tenantAccess, /otp_hash/);
   assert.match(tenantAccess, /\.is\("used_at", null\)/);
   assert.match(tenantAccess, /auth_version: Number\(tenant\.auth_version \|\| 1\) \+ 1/);
   assert.match(tenantAdmin, /updates\.auth_version = Number\(currentTenant\.auth_version \|\| 1\) \+ 1/);
@@ -614,6 +626,8 @@ test("credential recovery uses expiring one-time tokens and separates privileged
   assert.match(tenantUsers, /Number\(payload\.auth_version\) !== Number\(tenant\.auth_version\)/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.tenant_password_resets/);
   assert.match(migration, /FORCE ROW LEVEL SECURITY/);
+  assert.match(otpMigration, /otp_hash/);
+  assert.match(otpMigration, /challenge_id/);
   assert.match(guide, /Superadmin recovery is intentionally not exposed/);
 });
 

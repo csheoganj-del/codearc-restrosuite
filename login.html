@@ -528,12 +528,12 @@
 <div class="recovery-modal" id="recovery-modal" aria-hidden="true">
   <section class="recovery-card" role="dialog" aria-modal="true">
     <div class="recovery-head">
-      <div><h3 id="recovery-title">Recover access</h3><p id="recovery-subtitle">We’ll email a single-use reset link to your registered owner email. The link expires in 30 minutes.</p></div>
+      <div><h3 id="recovery-title">Recover access</h3><p id="recovery-subtitle">We’ll send the same one-time code to your registered email and WhatsApp. Enter either — one code works for both. Valid for 10 minutes.</p></div>
       <button type="button" class="recovery-close" id="close-recovery-btn" aria-label="Close">&times;</button>
     </div>
     <div class="recovery-tabs">
       <button class="rtab active" data-rstep="email" type="button">1 · Request</button>
-      <button class="rtab" data-rstep="sent" type="button">2 · Check email</button>
+      <button class="rtab" data-rstep="otp" type="button">2 · Enter code</button>
       <button class="rtab" data-rstep="reset" type="button">3 · New password</button>
     </div>
 
@@ -545,25 +545,40 @@
         </div>
       </div>
       <div class="form-group" id="rec-email-group">
-        <label for="recovery-email">Registered owner email</label>
+        <label for="recovery-email">Registered owner email <span class="opt">(or WhatsApp below)</span></label>
         <div class="input-wrap"><i class="fa-solid fa-envelope lead"></i>
-          <input type="email" id="recovery-email" class="form-input" placeholder="owner@example.com" autocomplete="email" required>
+          <input type="email" id="recovery-email" class="form-input" placeholder="owner@example.com" autocomplete="email">
         </div>
       </div>
-      <button type="submit" class="btn btn-primary btn-block btn-lg">Send reset link <i class="fa-solid fa-paper-plane"></i></button>
+      <div class="form-group" id="rec-phone-group">
+        <label for="recovery-phone">Registered WhatsApp <span class="opt">(or email above)</span></label>
+        <div class="input-wrap"><i class="fa-brands fa-whatsapp lead" style="color:#25D366"></i>
+          <input type="tel" id="recovery-phone" class="form-input" placeholder="e.g. 9876543210" autocomplete="tel" inputmode="tel">
+        </div>
+        <p style="font-size:12px;color:var(--text-mute);margin-top:6px">Provide email, WhatsApp, or both. The same OTP is sent on every channel we can deliver.</p>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">Send OTP <i class="fa-solid fa-paper-plane"></i></button>
     </form>
 
-    <div id="recovery-sent-panel" class="rform" data-rform="sent" role="status">
+    <form id="recovery-otp-form" class="rform" data-rform="otp">
       <p style="font-size:14px;color:var(--text-soft);margin-bottom:14px;line-height:1.5">
-        If <b id="recovery-email-echo" style="color:var(--text)">your email</b> matches a registered owner account, a reset link is on the way.
-        Open the email and tap <strong>Set a new password</strong>. The link works once and expires in 30 minutes.
+        If the details match, the <strong>same 6-digit code</strong> was sent to
+        <b id="recovery-channel-echo" style="color:var(--text)">your email and/or WhatsApp</b>.
+        Enter it below — either channel works.
       </p>
-      <p style="font-size:13px;color:var(--text-mute);margin-bottom:18px;line-height:1.45">
-        Nothing arrived? Check spam, confirm the owner email, then request again. Staff passwords are reset by an outlet administrator under Employees → Staff Access.
-      </p>
-      <button type="button" class="btn btn-primary btn-block btn-lg" id="recovery-sent-done">Back to sign in <i class="fa-solid fa-arrow-right"></i></button>
-      <p class="resend" style="margin-top:14px">Need another link? <button type="button" class="link-btn" id="resend-code">Request again</button> <span id="resend-timer" style="display:none;color:var(--text-mute);font-size:12px"></span></p>
-    </div>
+      <input type="hidden" id="recovery-challenge-id" value="">
+      <div class="otp-row" id="recovery-otp-row">
+        <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="Digit 1">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 5">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 6">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:10px">Verify code <i class="fa-solid fa-shield-halved"></i></button>
+      <p class="resend" style="margin-top:14px">Didn't get it? <button type="button" class="link-btn" id="resend-code">Request again</button> <span id="resend-timer" style="display:none;color:var(--text-mute);font-size:12px"></span></p>
+      <p style="font-size:12px;color:var(--text-mute);margin-top:12px;line-height:1.45">Prefer the email link? Open <strong>Set a new password</strong> in the recovery email — it skips this step.</p>
+    </form>
 
     <form id="recovery-reset-form" class="rform" data-rform="reset">
       <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px;line-height:1.45">Choose a new password for this outlet. Existing owner sessions will be signed out.</p>
@@ -1734,10 +1749,11 @@
     };
   });
 
-  // recovery modal — email link flow (matches tenant-access request_recovery / reset_password)
+  // recovery modal — shared OTP (email + WhatsApp) + optional email link
   const modal=document.getElementById('recovery-modal');
-  let recoveryStep = 'email'; // email | sent | reset
+  let recoveryStep = 'email'; // email | otp | reset
   let _recoveryToken = '';
+  let _recoveryChallengeId = '';
 
   function clearRecoveryQuery(){
     try{
@@ -1747,6 +1763,10 @@
       const qs=url.searchParams.toString();
       window.history.replaceState({}, '', url.pathname + (qs ? '?'+qs : '') + url.hash);
     }catch(_){}
+  }
+
+  function clearRecoveryOtpInputs(){
+    document.querySelectorAll('#recovery-otp-row input').forEach(i=>{ i.value=''; });
   }
 
   function openModal(opts){
@@ -1761,10 +1781,14 @@
     }
     recoveryStep = 'email';
     _recoveryToken = '';
+    _recoveryChallengeId = '';
     const tokEl=document.getElementById('recovery-token');
     if(tokEl) tokEl.value='';
+    const chEl=document.getElementById('recovery-challenge-id');
+    if(chEl) chEl.value='';
+    clearRecoveryOtpInputs();
     rstep('email');
-    setTimeout(()=>{ const f=modal.querySelector('#recovery-email, #recovery-slug, input'); if(f)f.focus(); }, 50);
+    setTimeout(()=>{ const f=modal.querySelector('#recovery-email, #recovery-phone, #recovery-slug, input'); if(f)f.focus(); }, 50);
   }
   function closeModal(){
     modal.classList.remove('active');
@@ -1775,7 +1799,6 @@
   document.getElementById('open-recovery-btn').onclick = () => openModal();
   document.getElementById('close-recovery-btn').onclick = closeModal;
   modal.onclick = e => { if(e.target===modal) closeModal(); };
-  document.getElementById('recovery-sent-done')?.addEventListener('click', ()=>{ closeModal(); showTab('login'); });
 
   document.addEventListener('keydown', e => {
     if(e.key==='Escape' && modal.classList.contains('active')) closeModal();
@@ -1791,14 +1814,14 @@
   });
 
   function rstep(which){
-    const order = {email:0, sent:1, reset:2};
+    const order = {email:0, otp:1, reset:2};
     document.querySelectorAll('.rtab').forEach(t=>{
       const isTarget = t.dataset.rstep===which;
       t.classList.toggle('active', isTarget);
       const reachable = order[t.dataset.rstep] <= order[recoveryStep];
-      // Reset step is only reachable with a valid recovery token from the email link
       const allowReset = t.dataset.rstep !== 'reset' || !!_recoveryToken;
-      const ok = reachable && allowReset;
+      const allowOtp = t.dataset.rstep !== 'otp' || !!_recoveryChallengeId || order[recoveryStep] >= 1;
+      const ok = reachable && allowReset && allowOtp;
       t.disabled = !ok;
       t.style.opacity = ok ? '' : '0.45';
       t.style.cursor = ok ? '' : 'not-allowed';
@@ -1806,15 +1829,32 @@
     document.querySelectorAll('.rform').forEach(f=>f.classList.toggle('on',f.dataset.rform===which));
   }
   document.querySelectorAll('.rtab').forEach(t=>t.onclick=()=>{
-    const order={email:0,sent:1,reset:2};
+    const order={email:0,otp:1,reset:2};
     if(t.dataset.rstep==='reset' && !_recoveryToken) return;
     if(order[t.dataset.rstep]<=order[recoveryStep]) rstep(t.dataset.rstep);
   });
 
+  function recoveryChannelEcho(emailVal, phoneVal, channels){
+    const parts=[];
+    if(emailVal) parts.push(emailVal);
+    if(phoneVal) parts.push('WhatsApp '+phoneVal);
+    const echo=document.getElementById('recovery-channel-echo');
+    if(echo) echo.textContent = parts.length ? parts.join(' and ') : 'your email and/or WhatsApp';
+    if(channels && (channels.email === false && channels.whatsapp === false)){
+      // Still show OTP step (anti-enumeration); hint gently
+      return;
+    }
+  }
+
   async function submitRecoveryRequest(){
     const emailVal=document.getElementById('recovery-email').value.trim();
+    const phoneVal=(document.getElementById('recovery-phone').value||'').replace(/\D/g,'');
     const slugVal=document.getElementById('recovery-slug').value.trim();
-    if(!emailVal){ document.getElementById('recovery-email').focus(); return false; }
+    if(!emailVal && phoneVal.length < 10){
+      showErr('Enter your registered owner email and/or WhatsApp number.');
+      (emailVal ? document.getElementById('recovery-phone') : document.getElementById('recovery-email')).focus();
+      return false;
+    }
     if(!window.RS_API || !RS_API.configured){
       showErr('Cloud recovery is unavailable right now. Email support@codearc.co.in or try again shortly.');
       return false;
@@ -1823,13 +1863,20 @@
       showErr('Recovery is not available in this build. Update the app or contact support.');
       return false;
     }
-    await RS_API.requestRecovery({ slug: slugVal || undefined, email: emailVal });
-    const echo=document.getElementById('recovery-email-echo');
-    if(echo) echo.textContent=emailVal;
-    recoveryStep='sent';
-    rstep('sent');
+    const result = await RS_API.requestRecovery({
+      slug: slugVal || undefined,
+      email: emailVal || undefined,
+      phone: phoneVal.length >= 10 ? phoneVal : undefined,
+    });
+    _recoveryChallengeId = String((result && result.challenge_id) || '').trim();
+    const chEl=document.getElementById('recovery-challenge-id');
+    if(chEl) chEl.value=_recoveryChallengeId;
+    recoveryChannelEcho(emailVal, phoneVal, result && result.channels);
+    clearRecoveryOtpInputs();
+    recoveryStep='otp';
+    rstep('otp');
     startResendCooldown();
-    document.getElementById('recovery-sent-done')?.focus();
+    setTimeout(()=>document.querySelector('#recovery-otp-row input')?.focus(), 50);
     return true;
   }
 
@@ -1846,11 +1893,63 @@
     }
   };
 
+  // OTP digit inputs
+  (function wireRecoveryOtpInputs(){
+    const inputs=[...document.querySelectorAll('#recovery-otp-row input')];
+    inputs.forEach((input, idx)=>{
+      input.addEventListener('input', ()=>{
+        input.value = input.value.replace(/\D/g,'').slice(0,1);
+        if(input.value && idx < inputs.length-1) inputs[idx+1].focus();
+      });
+      input.addEventListener('keydown', e=>{
+        if(e.key==='Backspace' && !input.value && idx>0) inputs[idx-1].focus();
+      });
+      input.addEventListener('paste', e=>{
+        const text=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+        if(!text) return;
+        e.preventDefault();
+        text.split('').forEach((ch,i)=>{ if(inputs[i]) inputs[i].value=ch; });
+        inputs[Math.min(text.length, inputs.length)-1]?.focus();
+      });
+    });
+  })();
+
+  document.getElementById('recovery-otp-form').onsubmit=async e=>{
+    e.preventDefault();
+    const code=[...document.querySelectorAll('#recovery-otp-row input')].map(i=>i.value).join('');
+    const challengeId=(_recoveryChallengeId || document.getElementById('recovery-challenge-id')?.value || '').trim();
+    if(code.length!==6){ showErr('Enter the 6-digit code from email or WhatsApp.'); return; }
+    if(!challengeId){ showErr('Request a new code first.'); recoveryStep='email'; rstep('email'); return; }
+    if(!window.RS_API || !RS_API.configured || typeof RS_API.verifyRecoveryOtp !== 'function'){
+      showErr('Cloud recovery is unavailable right now. Email support@codearc.co.in.');
+      return;
+    }
+    const btn=e.target.querySelector('button[type="submit"]'); const orig=btn.innerHTML;
+    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Verifying…'; btn.disabled=true;
+    try{
+      const result = await RS_API.verifyRecoveryOtp({ challenge_id: challengeId, otp_code: code });
+      const token = String((result && result.reset_token) || '').trim();
+      if(!token){ showErr('Could not verify code. Request a new one.'); return; }
+      _recoveryToken = token;
+      const tokEl=document.getElementById('recovery-token');
+      if(tokEl) tokEl.value=token;
+      recoveryStep='reset';
+      rstep('reset');
+      setTimeout(()=>document.getElementById('recovery-new-password')?.focus(), 50);
+    }catch(err){
+      showErr((err && err.message) || 'Incorrect or expired code. Try again or request a new one.');
+      clearRecoveryOtpInputs();
+      document.querySelector('#recovery-otp-row input')?.focus();
+    }finally{
+      btn.innerHTML=orig; btn.disabled=false;
+    }
+  };
+
   document.getElementById('recovery-reset-form').onsubmit=async e=>{
     e.preventDefault();
     const a=document.getElementById('recovery-new-password').value, b=document.getElementById('recovery-confirm-password').value;
     const token=(_recoveryToken || document.getElementById('recovery-token')?.value || '').trim();
-    if(!token){ showErr('Open the reset link from your email to set a new password.'); return; }
+    if(!token){ showErr('Verify the OTP or open the reset link from your email first.'); return; }
     if(a.length<10){showErr('New password must be at least 10 characters.');return;}
     if(a!==b){showErr('Passwords do not match.');document.getElementById('recovery-confirm-password').focus();return;}
     if(!window.RS_API || !RS_API.configured || typeof RS_API.resetPassword !== 'function'){
@@ -1862,6 +1961,7 @@
     try{
       await RS_API.resetPassword({ token, password: a });
       _recoveryToken='';
+      _recoveryChallengeId='';
       const tokEl=document.getElementById('recovery-token');
       if(tokEl) tokEl.value='';
       clearRecoveryQuery();
@@ -1869,7 +1969,7 @@
       showTab('login');
       showOk('Password updated — you can sign in now. Other devices were signed out.');
     }catch(err){
-      showErr((err && err.message) || 'Could not reset password. Request a new link and try again.');
+      showErr((err && err.message) || 'Could not reset password. Request a new code and try again.');
     }finally{
       btn.innerHTML=orig; btn.disabled=false;
     }

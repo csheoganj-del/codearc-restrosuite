@@ -547,7 +547,8 @@
       return post('tenant-access', { action:'register', ...payload }, ANON, 'Registration failed');
     },
 
-    async requestRecovery({ slug, email }){ return post('tenant-access', { action:'request_recovery', slug, email }, ANON, 'Recovery request failed'); },
+    async requestRecovery({ slug, email, phone }){ return post('tenant-access', { action:'request_recovery', slug, email, phone }, ANON, 'Recovery request failed'); },
+    async verifyRecoveryOtp({ challenge_id, otp_code, code }){ return post('tenant-access', { action:'verify_recovery_otp', challenge_id, otp_code: otp_code || code }, ANON, 'OTP verification failed'); },
     async resetPassword({ token, password }){ return post('tenant-access', { action:'reset_password', token, password }, ANON, 'Password reset failed'); },
 
     /** Last validateSession auth failure: { authCode, message, status } or null */

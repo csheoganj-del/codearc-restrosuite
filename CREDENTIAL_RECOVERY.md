@@ -3,19 +3,23 @@
 ## Outlet owner or administrator
 
 1. Open `login.html`.
-2. Select **Forgot outlet ID, username, or password?**
-3. Enter the registered owner email. The outlet ID is optional if it was forgotten.
-4. Open the email and use the single-use link within 30 minutes.
-5. Set a password of at least 10 characters.
+2. Select **Forgot password?**
+3. Enter the registered owner **email** and/or **WhatsApp** number. Outlet ID is optional if forgotten.
+4. RestroSuite generates **one OTP** and sends that **same code** to every channel it can deliver (email and WhatsApp).
+5. Enter the 6-digit code (from either channel — both are valid).
+6. Set a password of at least 10 characters.
 
-The email also reminds the owner of the outlet ID and username. A successful reset revokes existing owner sessions.
+The recovery email also includes outlet ID, username, the OTP, and an optional one-time link that skips the code step. Codes and links expire in **10 minutes** and can be used once. A successful reset revokes existing owner sessions.
 
-Email recovery requires these Supabase Edge Function secrets:
+Email + WhatsApp recovery requires these Supabase Edge Function secrets on `tenant-access`:
 
 - `PUBLIC_APP_URL`
 - `EMAIL_RELAY_URL`
 - `EMAIL_RELAY_TOKEN` when required by the relay
 - `ZERO_COST_EMAILS_DISABLED=false`
+- `WHATSAPP_GATEWAY_URL` (or `NGROK_GATEWAY_URL`)
+- `WHATSAPP_GATEWAY_TOKEN` (or `GATEWAY_TOKEN`)
+- `OTP_SECRET` (same secret used for registration OTP hashing)
 
 ## Staff member
 
