@@ -27,7 +27,10 @@ npm run backup
 ## Disaster-recovery drill (run monthly, non-destructive)
 
 ```bash
-# Preview the latest archive (or create one first)
+# CI / no credentials — verifies backup & restore scripts stay wired
+npm run drill:backup:structure
+
+# Preview the latest archive (or create one first) — needs SUPABASE_URL + SERVICE_ROLE_KEY
 npm run drill:backup
 npm run drill:backup:create
 
@@ -35,9 +38,9 @@ npm run drill:backup:create
 node scripts/backup-restore-drill.cjs path/to/restrosuite-backup-....zip
 ```
 
-The drill checks credentials, opens the zip, lists table dumps, and runs
-`restore-db.js` in **preview-only** mode (no writes). Treat a failed drill as
-an ops incident.
+`drill:backup:structure` runs in GitHub Actions on every push. The full drill checks
+credentials, opens the zip, lists table dumps, and runs `restore-db.js` in
+**preview-only** mode (no writes). Treat a failed drill as an ops incident.
 
 ## Restore Safety
 

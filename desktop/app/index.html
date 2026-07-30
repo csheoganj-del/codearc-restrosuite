@@ -433,28 +433,30 @@
       padding: 14px 16px 4px;
     }
 
-    /* Hero */
+    /* Hero — brand first, one headline, one sub, one CTA group, one visual */
     .hero { padding: 150px 0 90px; }
-     .hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
-    .hero-flag {
-      display: inline-flex; align-items: center; gap: 9px; margin-bottom: 26px;
-      padding: 7px 7px 7px 14px; border-radius: 999px;
-      background: var(--surface-2); border: 1px solid var(--border-2); font-size: 13px; color: var(--text-dim);
-      animation: fadeUp .6s both;
+    .hero-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; }
+    .hero-brand {
+      font-family: var(--font-display, 'Fraunces', Georgia, serif);
+      font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -.02em;
+      line-height: 1.05; margin: 0 0 14px; color: var(--text);
+      animation: fadeUp .55s both;
     }
-    .hero-flag b { color: var(--accent); }
-    .hero-flag .pill { background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+    .hero-brand b { color: var(--accent, var(--orange)); font-weight: 700; }
+    .hero-brand .codearc {
+      display: block; font-family: var(--font-body, 'DM Sans', system-ui, sans-serif);
+      font-size: 0.38em; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-mute, var(--text-dim)); margin-bottom: 6px;
+    }
     .hero h1 {
-      font-size: clamp(34px, 4.8vw, 54px); line-height: 1.12; letter-spacing: -.02em;
-      margin-bottom: 20px; animation: fadeUp .5s .05s both; text-wrap: balance;
-      font-weight: 700;
+      font-size: clamp(26px, 3.4vw, 36px); line-height: 1.2; letter-spacing: -.015em;
+      margin-bottom: 16px; animation: fadeUp .5s .05s both; text-wrap: balance;
+      font-weight: 700; color: var(--text);
     }
     .hero h1 .grad { color: var(--accent); }
-    .hero-sub { font-size: 17px; color: var(--text-dim); max-width: 520px; margin-bottom: 28px; animation: fadeUp .5s .1s both; line-height: 1.55; }
+    .hero-sub { font-size: 16px; color: var(--text-dim); max-width: 480px; margin-bottom: 24px; animation: fadeUp .5s .1s both; line-height: 1.55; }
     .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; animation: fadeUp .5s .15s both; }
-    .hero-trust { display: flex; align-items: center; gap: 18px; margin-top: 26px; flex-wrap: wrap; animation: fadeUp .5s .2s both; }
-    .hero-trust .t-item { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); }
-    .hero-trust .t-item i { color: var(--green); }
+    .hero-secondary-link { display: inline-flex; margin-top: 14px; animation: fadeUp .5s .18s both; }
 
     /* ============================================================
        Hero constellation v208 — LIVE same-as-art (CodeArc)
@@ -1483,7 +1485,8 @@
       .hero-sub { font-size: 15.5px; }
       .hero-actions { gap: 10px; }
       .hero-actions .btn-lg { padding: 13px 20px; font-size: 14.5px; }
-      .hero-trust { gap: 12px; flex-wrap: wrap; }
+      .hero-brand { font-size: clamp(26px, 8vw, 34px); }
+      .hero h1 { font-size: clamp(22px, 6.5vw, 28px); }
       .hero-visual { min-height: 0; }
       /* Mobile constellation — 2-column slots, zero pile-up */
       .hero-constellation.live {
@@ -1631,12 +1634,9 @@
     <section class="hero" id="top">
       <div class="container hero-grid">
         <div class="hero-content">
-          <div class="hero-flag">
-            <span class="pill">CodeArc</span>
-            <span>For cafes, tiffin counters &amp; small restaurants in India</span>
-          </div>
-          <h1>Bill the table, fire the kitchen, send the receipt — even when Wi‑Fi dies.</h1>
-          <p class="hero-sub">RestroSuite is the POS we use for real service: counter billing, kitchen display, floor plan, and WhatsApp bills. Runs on the phone or PC you already own. Free while we are in launch.</p>
+          <p class="hero-brand"><span class="codearc">CodeArc</span>Restro<b>Suite</b></p>
+          <h1>Bill when Wi‑Fi dies.</h1>
+          <p class="hero-sub">Offline-first POS for Indian cafes and counters — kitchen display, floor plan, and WhatsApp receipts on the devices you already own.</p>
           <div class="hero-actions">
             <a class="btn btn-primary btn-lg" href="login.html?tab=register" id="hero-cta-buy">
               Create free outlet
@@ -1648,11 +1648,6 @@
           <a class="hero-secondary-link" href="#demo">
             Try a sample bill first <i class="fa-solid fa-arrow-right" aria-hidden="true" style="font-size:11px"></i>
           </a>
-          <div class="hero-trust">
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> No card to sign up</div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Offline billing</div>
-            <div class="t-item"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> WhatsApp receipts</div>
-          </div>
         </div>
 
         <div class="hero-visual" id="hero-visual" aria-label="RestroSuite live console — POS, Kitchen, Floor, Bills and WhatsApp connected">
@@ -1759,7 +1754,7 @@
 
     <div class="logo-strip container human-strip">
       <p class="human-strip-line">
-        Made in India by <b>CodeArc</b> · free during launch ·
+        Made in India by <b>CodeArc</b> · free during launch · offline billing · WhatsApp receipts ·
         <a href="mailto:support@codearc.co.in">support@codearc.co.in</a>
       </p>
     </div>

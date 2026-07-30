@@ -278,15 +278,16 @@ test("visual system uses a restrained SaaS palette and consistent radius", () =>
   const publicCss = read("styles.css");
   const brandCss = read("assets/restrosuite.css");
   const qr = read("qr-order.html");
-  assert.match(dashboardCss, /--primary-brand: #111827/);
-  assert.match(dashboardCss, /--accent-caramel: #F97316/);
+  assert.match(dashboardCss, /--primary-brand: #1A1714/);
+  assert.match(dashboardCss, /--accent-caramel: #FF4F00/);
   assert.match(dashboardCss, /--tracking-base: 0/);
   assert.match(dashboardCss, /WORLD-CLASS SAAS UI REFINEMENT LAYER/);
   assert.match(dashboardCss, /body::before\s*\{\s*display: none;/);
-  assert.match(publicCss, /--primary-brand: #111827/);
+  assert.match(publicCss, /--primary-brand: #1A1714/);
   assert.match(publicCss, /--border-radius: 8px/);
   assert.match(publicCss, /CODEARC SAAS DESIGN REFINEMENT LAYER/);
   assert.doesNotMatch(publicCss, /--primary-brand: #2C1B18/);
+  assert.doesNotMatch(publicCss, /--primary-brand: #111827/);
   // Tight tracking is intentional for headings; require the design token exists
   assert.match(dashboardCss, /--tracking-base:\s*0/);
   assert.match(brandCss, /--font-body:\s*'DM Sans'/);
@@ -294,6 +295,7 @@ test("visual system uses a restrained SaaS palette and consistent radius", () =>
   assert.match(qr, /DM Sans/);
   assert.match(qr, /--font-body/);
   assert.doesNotMatch(qr, /family=Inter/);
+  assert.doesNotMatch(dashboardCss, /fonts\.googleapis\.com\/css2\?family=Inter/);
 });
 
 test("starter nav keeps first-week sidebar calm", () => {
@@ -506,6 +508,7 @@ test("production launch runbooks cover deployment, QA, support, billing, backups
   assert.match(billing, /verified webhooks/);
   assert.match(backup, /Restore Safety/);
   assert.match(backup, /Tenant Reset Safety/);
+  assert.match(backup, /drill:backup:structure/);
   assert.match(monitoring, /Alert Conditions/);
   assert.match(monitoring, /Supabase quota/);
   assert.match(demo, /12-Minute Demo Flow/);

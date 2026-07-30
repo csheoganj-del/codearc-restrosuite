@@ -46,9 +46,9 @@
   --bg-grad: linear-gradient(180deg, #1A1816 0%, #141210 100%);
 
   --text: #F5F1EA;
-  --text-soft: #C4BBB0;
-  --text-mute: #8F867B;
-  --text-faint: #6A6259;
+  --text-soft: #D4CBC0;
+  --text-mute: #A89F93;
+  --text-faint: #8A8176;
 
   --glass: rgba(255,248,240,0.04);
   --glass-2: rgba(255,248,240,0.07);
@@ -85,9 +85,9 @@
   --bg-grad: linear-gradient(180deg, #F7F4EE 0%, #F0EBE3 100%);
 
   --text: #1A1714;
-  --text-soft: #4A453F;
-  --text-mute: #6E675F;
-  --text-faint: #9A9288;
+  --text-soft: #3F3A35;
+  --text-mute: #5C564F;
+  --text-faint: #6E675F;
 
   --glass: rgba(255,255,255,0.72);
   --glass-2: rgba(255,255,255,0.88);

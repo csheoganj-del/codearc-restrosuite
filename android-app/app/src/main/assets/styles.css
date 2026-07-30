@@ -1222,13 +1222,13 @@ footer {
    CODEARC SAAS DESIGN REFINEMENT LAYER
    ========================================== */
 :root {
-  --primary-brand: #111827;
+  --primary-brand: #1A1714;
   --border-radius: 8px;
 }
 
 body {
-  background: #F6F7F9;
-  color: #111827;
+  background: #F3EFE8;
+  color: #1A1714;
 }
 
 header {
@@ -1238,7 +1238,7 @@ header {
 }
 
 .logo {
-  border-color: #111827;
+  border-color: #1A1714;
   background: #FFFFFF;
   border-radius: 6px;
   box-shadow: none;
@@ -1246,7 +1246,7 @@ header {
 
 .logo-doppio,
 .logo-cafe {
-  color: #111827;
+  color: #1A1714;
   letter-spacing: 0;
 }
 
@@ -1294,7 +1294,7 @@ nav a:hover {
 
 .btn-dark,
 .menu-item-order-btn {
-  background: #111827;
+  background: #1A1714;
   color: #FFFFFF;
 }
 
@@ -1305,7 +1305,7 @@ nav a:hover {
 }
 
 .hero {
-  background: #111827;
+  background: #1A1714;
 }
 
 .hero-tag {
@@ -1361,12 +1361,12 @@ footer h4 {
 
 .promo-card-dark,
 footer {
-  background: #111827;
+  background: #1A1714;
 }
 
 .promo-card-light,
 .interactive-menu {
-  background: #F6F7F9;
+  background: #F3EFE8;
 }
 
 .menu-search-input,

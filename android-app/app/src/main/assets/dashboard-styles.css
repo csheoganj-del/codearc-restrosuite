@@ -1,32 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
  
 :root {
-  /* Modern Restaurant SaaS Palette */
-  --primary-brand: #111827;
-  --primary-brand-rgb: 17, 24, 39;
-  --accent-caramel: #F97316;
-  --accent-caramel-hover: #EA580C;
+  /* Aligned to assets/restrosuite.css brand tokens */
+  --primary-brand: #1A1714;
+  --primary-brand-rgb: 26, 23, 20;
+  --accent-caramel: #FF4F00;
+  --accent-caramel-hover: #D94300;
   --accent-latte: #FFFFFF;
-  --bg-cream-light: #F6F7F9; /* Layer 0: calm SaaS canvas */
-  --bg-tan-warm: #FFFFFF;     /* Layer 1 sidebar background */
+  --bg-cream-light: #F3EFE8;
+  --bg-tan-warm: #FFFFFF;
   --bg-card: #FFFFFF;
   --white: #FFFFFF;
   
   /* Text colors */
-  --text-dark: #111827;
-  --text-light: #F8F9FA;
-  --text-muted: #6B7280;
-  --text-soft: #9CA3AF;
+  --text-dark: #1A1714;
+  --text-light: #F5F1EA;
+  --text-muted: #5C564F;
+  --text-soft: #6E675F;
   
   /* Status Colors */
-  --success-color: #22C55E;  /* Modern Emerald Green */
-  --warning-color: #F59E0B;  /* Modern Amber Yellow */
-  --danger-color: #EF4444;   /* Modern Rose Red */
-  --info-color: #3B82F6;     /* Modern Royal Blue */
+  --success-color: #1F8A5B;
+  --warning-color: #C47B16;
+  --danger-color: #C43C2E;
+  --info-color: #5B6C8F;
   
   /* Gradients */
-  --coffee-gradient: #111827;
-  --caramel-gradient: #F97316;
+  --coffee-gradient: #1A1714;
+  --caramel-gradient: #FF4F00;
   --cream-gradient: #FFFFFF;
   --gold-glow-gradient: rgba(249, 115, 22, 0.08);
   
@@ -6192,7 +6192,7 @@ body::before {
 }
 
 .brand-doppio {
-  color: #111827;
+  color: #1A1714;
 }
 
 .brand-cafe {
@@ -6209,7 +6209,7 @@ body::before {
 .user-pill .avatar,
 .avatar {
   border-radius: 8px !important;
-  background: #111827 !important;
+  background: #1A1714 !important;
   box-shadow: none !important;
 }
 
@@ -6226,7 +6226,7 @@ body::before {
 
 .sidebar-link.active {
   background: rgba(255, 107, 0, 0.10);
-  color: #111827;
+  color: #1A1714;
   letter-spacing: 0;
 }
 
@@ -6343,7 +6343,7 @@ textarea,
 .staff-secondary-btn {
   background: #FFFFFF !important;
   border-color: #D1D5DB !important;
-  color: #111827 !important;
+  color: #1A1714 !important;
 }
 
 .glass-modal {
@@ -6434,7 +6434,7 @@ textarea,
     border-radius: 8px !important;
     background: #F9FAFB !important;
     border: 1px solid #E5E7EB !important;
-    color: #111827 !important;
+    color: #1A1714 !important;
     box-shadow: none !important;
   }
 
@@ -6444,7 +6444,7 @@ textarea,
   }
 
   #mobile-profile-btn {
-    background: #111827 !important;
+    background: #1A1714 !important;
     color: #FFFFFF !important;
   }
 
@@ -6495,7 +6495,7 @@ textarea,
 
   .mobile-nav-link.active {
     background: #FFF7ED !important;
-    color: #111827 !important;
+    color: #1A1714 !important;
   }
 
   .mobile-nav-link.active i {
@@ -6617,7 +6617,7 @@ textarea,
     border-radius: 8px !important;
     background: #F9FAFB !important;
     border: 1px solid #E5E7EB !important;
-    color: #111827 !important;
+    color: #1A1714 !important;
     font-size: 12px !important;
     font-weight: 700 !important;
     line-height: 1.2 !important;
@@ -6641,7 +6641,7 @@ textarea,
   body.dark-theme .mobile-top-header,
   body.dark-theme .mobile-bottom-nav,
   body.dark-theme .more-nav-sheet {
-    background: #111827 !important;
+    background: #1A1714 !important;
     border-color: #374151 !important;
   }
 
@@ -6726,7 +6726,7 @@ button {
 
 .growth-hub-header h2 {
   margin: 2px 0 4px;
-  color: #111827;
+  color: #1A1714;
   font-size: 22px;
   letter-spacing: 0;
 }
@@ -6769,7 +6769,7 @@ button {
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  color: #111827;
+  color: #1A1714;
   font-size: 14px;
   font-weight: 800;
 }
@@ -6792,7 +6792,7 @@ button {
   padding: 8px 10px;
   border: 1px solid #D1D5DB;
   border-radius: 8px;
-  color: #111827;
+  color: #1A1714;
   font-size: 12px;
 }
 
@@ -6817,7 +6817,7 @@ button {
 }
 
 .growth-item strong {
-  color: #111827;
+  color: #1A1714;
 }
 
 .growth-item span {
@@ -6935,7 +6935,7 @@ body.dark-theme .saas-snapshot-card {
 }
 
 body.dark-theme .saas-snapshot-card:hover {
-  background: #111827;
+  background: #1A1714;
   border-color: rgba(252, 128, 25, 0.5) !important;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 }
@@ -7780,7 +7780,7 @@ body.product-guide-open { overflow: hidden; }
   justify-content: center;
   cursor: pointer;
   font-size: 18px;
-  color: var(--text-dark, #111827);
+  color: var(--text-dark, #1A1714);
   transition: background-color .15s ease, box-shadow .15s ease;
 }
 .sidebar-hamburger:hover,
@@ -7943,5 +7943,20 @@ body.product-guide-open { overflow: hidden; }
   .tab-panel,
   .section-inner {
     padding: 12px !important;
+  }
+}
+
+/* Ultra-compact sub-7-inch & mobile refinement (Wave 14) */
+@media screen and (max-width: 600px) {
+  .modal-card {
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+  .cart-qty-btn {
+    min-width: 28px;
+    min-height: 28px;
+  }
+  .pos-action-btn, .btn-primary, .btn-secondary {
+    touch-action: manipulation;
   }
 }
