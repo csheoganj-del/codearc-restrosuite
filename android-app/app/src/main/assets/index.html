@@ -110,8 +110,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"></noscript>
   <link rel="stylesheet" href="assets/restrosuite.css?v=20260711-human">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
   <style>
@@ -161,6 +166,7 @@
     }
     .dl-recommend strong { display: block; font-size: 14.5px; letter-spacing: -.02em; }
     .dl-recommend span { font-size: 12.5px; color: var(--text-soft); }
+    .dl-recommend .btn span { color: inherit; }
     .dl-trust {
       display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 10px;
       margin: 0 auto 22px; max-width: 720px;
@@ -200,7 +206,7 @@
       position: absolute; top: 12px; right: 12px;
       font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
       padding: 4px 9px; border-radius: 999px;
-      background: var(--orange); color: #fff;
+      background: var(--orange); color: #141210;
     }
     .dl-card-top { display: flex; align-items: flex-start; gap: 12px; padding-right: 72px; }
     .dl-ic {
@@ -1193,7 +1199,7 @@
     .rs-pos-sandbox .req-pill {
       margin-left: auto; font-size: 10px; font-weight: 800;
       padding: 2px 8px; border-radius: 999px;
-      background: rgba(255,79,0,.12); color: #FF4F00;
+      background: rgba(255,79,0,.12); color: #B23600;
       border: 1px solid rgba(255,79,0,.25);
     }
     .rs-pos-sandbox .req-pill.ok {
@@ -1811,17 +1817,14 @@
               <div class="dl-ic windows"><i class="fa-brands fa-windows" aria-hidden="true"></i></div>
               <div><h3>Windows</h3><div class="platform">Counter PC · desktop</div></div>
             </div>
-            <p>App for the counter PC. Portable runs without install; Setup adds a Start Menu shortcut.</p>
-            <div class="dl-stats" data-dl-stats><span>EXE</span></div>
+            <p>Full installer for the counter PC — Start Menu shortcut, silent auto-updates. Do not use portable EXEs.</p>
+            <div class="dl-stats" data-dl-stats><span>Setup EXE</span></div>
             <div class="dl-actions">
-              <a class="btn btn-primary" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Portable.exe" data-dl-href data-dl-primary>
-                <i class="fa-solid fa-download" aria-hidden="true"></i> Portable EXE
-              </a>
-              <a class="btn btn-ghost" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.4/RestroSuite-Windows-Setup.exe" data-dl-setup>
-                Setup installer
+              <a class="btn btn-primary" href="https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Setup.exe" data-dl-href data-dl-primary data-dl-setup>
+                <i class="fa-solid fa-download" aria-hidden="true"></i> Download Setup
               </a>
             </div>
-            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Windows may show a safety prompt — click <b>More info → Run anyway</b>.</p>
+            <p class="dl-tip"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Windows may show a safety prompt — click <b>More info → Run anyway</b>. Prefer install to <b>Program Files</b> when asked.</p>
           </article>
 
           <article class="dl-card" role="listitem" data-dl-id="mac-dmg" data-dl-platform="mac">
@@ -2106,7 +2109,7 @@
           border-color:var(--accent-line);
           position:relative;overflow:hidden;text-align:center;">
           <div style="position:relative;">
-            <div style="display:inline-flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:7px 18px;font-size:13px;font-weight:700;color:var(--accent);margin-bottom:18px;">
+            <div style="display:inline-flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:7px 18px;font-size:13px;font-weight:700;color:#B23600;margin-bottom:18px;">
               Launch period
             </div>
             <div style="font-family:var(--font-display);font-size:clamp(48px,6vw,72px);font-weight:800;letter-spacing:-.04em;color:var(--text);line-height:1;margin-bottom:6px;">&#8377;0</div>
@@ -3570,7 +3573,7 @@
           windows: {
             id: 'windows-exe',
             title: 'You’re on Windows — install the desktop app',
-            sub: 'Portable EXE for the counter PC (Setup optional)',
+            sub: 'Windows Setup installer for the counter PC',
             btn: 'Download Windows app',
             icon: 'fa-brands fa-windows',
             color: '#0078d4'
@@ -3663,10 +3666,11 @@
           var byId = {};
           items.forEach(function (item) { if (item && item.id) byId[item.id] = item; });
 
-          // Alias portable → windows-exe card primary
-          if (byId['windows-portable'] && !byId['windows-exe']) {
-            byId['windows-exe'] = byId['windows-portable'];
+          // Prefer Setup; never promote portable as the primary Windows download
+          if (byId['windows-setup']) {
+            byId['windows-exe'] = byId['windows-setup'];
           }
+
 
           Object.keys(byId).forEach(function (id) {
             var item = byId[id];

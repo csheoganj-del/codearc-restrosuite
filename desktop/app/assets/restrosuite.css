@@ -3,8 +3,6 @@
    One brand orange. Warm paper light / charcoal dark.
    Solid surfaces over glass haze. Motion only for feedback.
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
-
 :root {
   /* —— Brand (canonical — use these everywhere) —— */
   --orange: #FF4F00;
@@ -177,6 +175,7 @@ img { max-width: 100%; display: block; }
 }
 .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -0.02em; color: var(--text); }
 .brand-name b { color: var(--orange); font-weight: 700; }
+:root[data-theme="light"] .brand-name b { color: #B23600; }
 .brand-name .codearc { color: var(--text-mute); font-weight: 600; font-size: 0.72em; letter-spacing: 0.06em; text-transform: uppercase; display: block; line-height: 1; margin-bottom: 2px; font-family: var(--font-body); }
 .brand-logo { width: 36px; height: 36px; object-fit: contain; flex: none; display: block; }
 
@@ -193,7 +192,7 @@ img { max-width: 100%; display: block; }
 .btn i { font-size: 0.95em; }
 .btn-primary {
   background: var(--orange);
-  color: #fff;
+  color: #141210;
   box-shadow: none;
 }
 .btn-primary:hover { background: var(--orange-deep); box-shadow: var(--shadow-sm); }

@@ -39,6 +39,9 @@ jobs:
       - name: ESLint (strict rules — no-var, curly, eqeqeq, no-undef, etc.)
         run: npm run lint:ci
 
+      - name: Dependency audit (high)
+        run: npm audit --audit-level=high
+
       - name: Run test suite
         run: npm test
 
@@ -70,6 +73,12 @@ jobs:
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+
+      - name: Performance gate (static build)
+        run: npm run perf:ci
+
+      - name: Accessibility gate (axe)
+        run: npm run a11y:ci
 
       - name: Run Playwright smoke
         run: npm run test:e2e:browser

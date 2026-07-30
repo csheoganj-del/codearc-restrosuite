@@ -19,7 +19,7 @@
       --brand-2: #FF7A3D;
       --ink: #0F0E0D;
       --ink2: #3D3A36;
-      --muted: #7A746C;
+      --muted: #5E5952;
       --line: rgba(15,14,13,.09);
       --surf: #FFFFFF;
       --bg: #F4F1EB;
@@ -642,7 +642,7 @@
     </div>
 
     <p class="foot" id="waiter-switch" style="display:none"></p>
-    <p class="foot" data-i18n="powered">Powered by RestroSuite</p>
+    <p class="foot" data-i18n="powered">Powered by CodeArc RestroSuite</p>
   </div>
 
   <div class="overlay center" id="session-block" aria-hidden="true">
@@ -694,7 +694,7 @@
     </div>
   </div>
 
-  <div class="toast" id="toast" role="status"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script>
   function escHtml(v) {
@@ -742,7 +742,7 @@
         payEmpty: 'Nothing due',
         payMeta2: 'Due',
         s1: 'Order', s2: 'Kitchen', s3: 'Served',
-        powered: 'Powered by RestroSuite',
+        powered: 'Powered by CodeArc RestroSuite',
         svcSheet: 'Need something?',
         trackSheet: 'Your orders',
         paySheet: 'Bill',
@@ -887,7 +887,7 @@
         '<div style="text-align:center;padding:80px 24px;font-family:system-ui;max-width:320px;margin:0 auto">' +
         '<div style="font-size:40px;margin-bottom:10px">📱</div>' +
         '<h2 style="margin:0 0 6px;font-size:20px">Scan table QR</h2>' +
-        '<p style="color:#8A847C;font-size:14px;line-height:1.45">Open only from your table QR code.</p></div>';
+        '<p style="color:var(--muted);font-size:14px;line-height:1.45">Open only from your table QR code.</p></div>';
       return;
     }
 

@@ -1,14 +1,14 @@
 {
-  "version": "v223-20260727-auto",
-  "date": "2026-07-27",
-  "title": "Live update v222-20260726-floor-click-notify",
+  "version": "v231-20260730-auto",
+  "date": "2026-07-30",
+  "title": "Live update v231-20260730-auto",
   "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
   "highlights": [
-    "Automatic content release v222-20260726-floor-click-notify",
+    "Automatic content release v231-20260730-auto",
     "Desktop EXE picks this up via content updater (no new installer required)",
     "Restart RestroSuite after Update now if prompted"
   ],
   "tour": "settle-skel-tabs",
-  "contentStamp": "530afa439e35",
-  "buildId": "530afa439e35"
+  "contentStamp": "a7dcc38d28b3",
+  "buildId": "a7dcc38d28b3"
 }

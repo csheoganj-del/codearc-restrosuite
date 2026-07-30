@@ -17,6 +17,10 @@
     "lint": "eslint \"assets/modules/**/*.js\" \"src/dashboard/**/*.js\" \"gateway-modules/**/*.js\" \"scripts/**/*.cjs\" whatsapp-gateway.js ngrok-service.js middleware.js service-worker.js 2>&1 || echo \"Lint completed with warnings/errors (see above)\"",
     "lint:fix": "eslint --fix \"assets/modules/**/*.js\" \"src/dashboard/**/*.js\" \"gateway-modules/**/*.js\" \"scripts/**/*.cjs\" whatsapp-gateway.js ngrok-service.js middleware.js service-worker.js 2>&1 || echo \"Lint-fix completed (see above)\"",
     "lint:ci": "eslint \"assets/modules/**/*.js\" \"src/dashboard/**/*.js\" \"gateway-modules/**/*.js\" \"scripts/**/*.cjs\" whatsapp-gateway.js ngrok-service.js middleware.js service-worker.js",
+    "perf:vitals": "node scripts/measure-web-vitals.cjs",
+    "perf:ci": "node scripts/perf-ci.cjs",
+    "a11y:ci": "node scripts/a11y-ci.cjs",
+    "loadtest": "node scripts/loadtest.cjs",
     "check": "node scripts/check-role-defaults.cjs && node scripts/check-project.cjs && node scripts/check-free-tier.cjs",
     "check:launch": "node scripts/check-launch.cjs",
     "check:prod-assets": "node scripts/check-prod-assets.cjs",
@@ -50,7 +54,6 @@
     "cors": "2.8.6",
     "express": "5.2.1",
     "lines-and-columns": "2.0.4",
-    "node-notifier": "10.0.1",
     "nodemailer": "9.0.1",
     "pino": "9.14.0",
     "qrcode": "1.5.4",
@@ -59,8 +62,16 @@
     "unzipper": "0.12.3",
     "ws": "8.21.0"
   },
+  "overrides": {
+    "brace-expansion": "5.0.8",
+    "hyperid": {
+      "uuid": "11.1.1"
+    }
+  },
   "devDependencies": {
     "@playwright/test": "1.61.1",
+    "autocannon": "8.0.0",
+    "axe-core": "4.12.1",
     "esbuild": "0.28.1",
     "eslint": "10.6.0",
     "jsdom": "29.1.1"
