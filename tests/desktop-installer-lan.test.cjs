@@ -29,4 +29,5 @@ test('LAN client automatically retries on disconnect and offline transition', ()
   assert.match(client, /Math\.min\(Math\.round\(reconnectDelay \* 1\.7\), 30000\)/);
   assert.match(client, /window\.addEventListener\('offline'/);
   assert.match(client, /scheduleReconnect\(\);/);
+  assert.match(client, /reconnectTimer\.unref\(\)/);
 });

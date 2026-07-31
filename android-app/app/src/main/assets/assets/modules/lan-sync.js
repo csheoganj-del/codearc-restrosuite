@@ -81,6 +81,11 @@
       reconnectTimer = null;
       boot();
     }, wait);
+    // Node-based smoke harnesses expose unref(); browsers return a numeric ID.
+    // Do not let a dormant recovery timer hold an Electron/test process open.
+    if (reconnectTimer && typeof reconnectTimer.unref === 'function') {
+      reconnectTimer.unref();
+    }
     reconnectDelay = Math.min(Math.round(reconnectDelay * 1.7), 30000);
   }
 
