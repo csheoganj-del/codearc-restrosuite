@@ -532,6 +532,7 @@ function startLanDiscovery(getPort, discoveryPort) {
   const listenPort = Number(discoveryPort) || DISCOVERY_PORT;
   const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
   let closed = false;
+  let closePromise = null;
   let settleReady;
   const ready = new Promise((resolve) => { settleReady = resolve; });
   socket.on('error', (error) => {
@@ -559,9 +560,16 @@ function startLanDiscovery(getPort, discoveryPort) {
   return {
     ready,
     close() {
-      if (closed) return;
+      if (closePromise) return closePromise;
       closed = true;
-      try { socket.close(); } catch (_) {}
+      closePromise = new Promise((resolve) => {
+        try {
+          socket.close(resolve);
+        } catch (_) {
+          resolve();
+        }
+      });
+      return closePromise;
     },
   };
 }

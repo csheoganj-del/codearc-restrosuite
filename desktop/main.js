@@ -205,9 +205,10 @@ function startLocalServer() {
         }
         reject(err);
       });
-      // Bind all interfaces so kitchen tablets on the same Wi‑Fi can open
+      // Bind all interfaces so kitchen displays on the same Wi‑Fi can open
       // http://POS_LAN_IP:port for LAN KOT sync when internet is down.
-      // (Still only local network — firewall may prompt once on Windows.)
+      // The Windows installer creates private-network-only firewall rules for
+      // this executable and the complete 8001–8020 fallback range.
       const host = config.lanBindHost != null ? String(config.lanBindHost) : '0.0.0.0';
       srv.listen(candidate, host, () => {
         PORT = candidate;

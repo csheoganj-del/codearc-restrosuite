@@ -17,6 +17,8 @@
   let lastHub = null;
   let bootRun = 0;
   let nativeDiscoveryAt = 0;
+  let reconnectTimer = null;
+  let reconnectDelay = 1500;
   const seenKeys = {};
 
   function toast(msg, icon) {
@@ -70,6 +72,29 @@
       if (base) { localStorage.setItem(HUB_KEY, String(base).replace(/\/$/, '')); }
       if (id && token) { localStorage.setItem(tokenKey(id), token); }
     } catch (_) {}
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer || !lanKitchenEnabled()) { return; }
+    const wait = reconnectDelay;
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      boot();
+    }, wait);
+    // Node-based smoke harnesses expose unref(); browsers return a numeric ID.
+    // Do not let a dormant recovery timer hold an Electron/test process open.
+    if (reconnectTimer && typeof reconnectTimer.unref === 'function') {
+      reconnectTimer.unref();
+    }
+    reconnectDelay = Math.min(Math.round(reconnectDelay * 1.7), 30000);
+  }
+
+  function markConnected() {
+    reconnectDelay = 1500;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
   }
 
   function requestNativeDiscovery() {
@@ -391,12 +416,13 @@
       '<div style="display:grid;grid-template-columns:' + (qr ? '220px minmax(240px,1fr)' : '1fr') + ';gap:20px;align-items:start">' +
         (qr ? '<img src="' + esc(qr) + '" alt="Secure LAN pairing QR code" style="width:220px;height:220px;border:1px solid var(--stroke-2);border-radius:12px">' : '') +
         '<div>' +
-          '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Secure kitchen pairing</div>' +
+          '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Kitchen screens connect automatically</div>' +
           addressBlock +
           '<ol style="padding-left:20px;line-height:1.55;margin:14px 0">' +
             '<li>Connect the kitchen tablet to the same Wi-Fi.</li>' +
-            '<li>Scan this QR code, or copy the secure link.</li>' +
-            '<li>Sign in once and open Kitchen. It keeps working if internet drops.</li>' +
+            '<li><b>RestroSuite Android:</b> open the app; it discovers and connects by itself.</li>' +
+            '<li><b>Phone, tablet or TV browser:</b> open this link once and bookmark it.</li>' +
+            '<li>After the first sign-in it remembers the secure LAN and reconnects automatically.</li>' +
           '</ol>' +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
             '<span data-lan-status style="padding:6px 9px;border-radius:999px;background:#ecfdf5;color:#065f46;font-size:12px;font-weight:700">' +
@@ -404,7 +430,7 @@
             '<span style="padding:6px 9px;border-radius:999px;background:var(--glass);font-size:12px;font-weight:700">' +
               queued + ' KOT' + (queued === 1 ? '' : 's') + ' cached</span>' +
           '</div>' +
-          '<div style="font-size:11px;color:var(--text-soft);margin-top:12px">The copied link contains a private pairing key. Share it only with your kitchen tablet.</div>' +
+          '<div style="font-size:11px;color:var(--text-soft);margin-top:12px">Windows networking was configured automatically during RestroSuite installation. The copied link contains a private pairing key; share it only with kitchen devices.</div>' +
         '</div>' +
       '</div>';
     if (global.RSModal) {
@@ -488,7 +514,9 @@
         } catch (_) {}
       });
       es.onerror = function () {
-        /* auto-reconnect by browser; chip stays */
+        // EventSource retries by itself. Also run the bounded recovery loop so
+        // IP/port changes and a restarted POS are recovered without staff action.
+        scheduleReconnect();
       };
     } catch (_) {}
   }
@@ -531,6 +559,10 @@
   async function boot() {
     const run = ++bootRun;
     if (!lanKitchenEnabled()) {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       if (es) {
         try { es.close(); } catch (_) {}
         es = null;
@@ -542,11 +574,13 @@
     const hub = await findHub();
     if (run !== bootRun) { return; }
     if (hub) {
+      markConnected();
       paintLanChip(true, hub);
       await pullSnapshot(hub);
       startStream(hub);
     } else {
       paintLanChip(false, null);
+      scheduleReconnect();
     }
   }
 
@@ -704,6 +738,12 @@
   window.addEventListener('online', function () {
     // Cloud will drain; re-attach LAN if still useful
     setTimeout(boot, 800);
+  });
+  window.addEventListener('offline', function () {
+    // Start local recovery immediately. Saved hubs reconnect without staff action;
+    // the Android bridge also starts zero-touch Wi-Fi discovery when needed.
+    reconnectDelay = 500;
+    setTimeout(boot, 0);
   });
   if (document.readyState !== 'loading') { setTimeout(boot, 600); }
   else { document.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 600); }); }
