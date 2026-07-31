@@ -258,7 +258,12 @@ function createServer(opts) {
 
   // LAN kitchen hub — same Wi‑Fi devices share KOTs without internet
   try {
-    attachLanHub(app, { port: Number(config.port) || 8001 });
+    attachLanHub(app, {
+      port: Number(config.port) || 8001,
+      getPort: opts.getPort,
+      stateFile: opts.lanStateFile,
+      credentialsFile: opts.lanCredentialsFile,
+    });
   } catch (e) {
     console.warn('[desktop] LAN hub attach failed', e && e.message);
   }
