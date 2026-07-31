@@ -89,3 +89,22 @@ test('gateway runtime honors the durable port and fails fast on bind errors', ()
   assert.match(watchdog, /runPm2\(\['restart', 'restrosuite-gateway'/);
   assert.match(watchdog, /'--only',\s*'restrosuite-gateway'/);
 });
+
+test('role refresh cannot fight operating mode over Kitchen tab visibility', () => {
+  const dashboard = read('assets/dashboard.js');
+  const opsMode = read('assets/modules/ops-mode.js');
+  assert.match(opsMode, /id = 'rs-ops-mode-visibility-style'/);
+  assert.match(
+    opsMode,
+    /html\.rs-billing-only-mode \[data-tab="kds-tab"\][\s\S]*display:none!important/
+  );
+  assert.match(
+    opsMode,
+    /html\.rs-kitchen-printer-mode \[data-tab="kds-tab"\][\s\S]*display:none!important/
+  );
+  const roleFilter = dashboard.slice(
+    dashboard.indexOf('function applyStaffRoleTabFiltering'),
+    dashboard.indexOf('applyStaffRoleTabFiltering(staffRole')
+  );
+  assert.match(roleFilter, /applyPosOnlyModeUI\(\)/);
+});

@@ -2644,6 +2644,9 @@
       if (roleStyle) roleStyle.remove();
       $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab], [data-role-gate]').forEach(link => { link.style.display = ''; });
       $$('.sb-section').forEach((sec) => { sec.style.display = ''; });
+      // Operating mode owns Kitchen visibility. Re-apply it after role access
+      // clears stale inline styles so the two systems never fight.
+      try { applyPosOnlyModeUI(); } catch (_) {}
       return;
     }
     const roleStyleId = 'rs-role-filter-style';
@@ -2731,6 +2734,10 @@
     if (activeTab && !tabs.includes(activeTab.id) && tabs.length && typeof activateTab === 'function') {
       activateTab(tabs[0]);
     }
+    // The 8-second role validation poll may restore allowed links. Operating
+    // mode is the final authority for Kitchen availability (Billing only and
+    // Kitchen printer modes keep KDS hidden).
+    try { applyPosOnlyModeUI(); } catch (_) {}
   }
   applyStaffRoleTabFiltering(staffRole, allowedTabs);
   // Re-apply after hydration: some nav elements (mobile "More" sheet links,
