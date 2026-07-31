@@ -161,6 +161,30 @@ function createServer(opts) {
     }
   }
 
+  async function validateLanSession({ tenantId, sessionToken }) {
+    if (!supabaseUrl || !supabaseAnonKey || !tenantId || !sessionToken) return false;
+    const upstream = await fetch(supabaseUrl + '/functions/v1/tenant-access', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+        Authorization: 'Bearer ' + supabaseAnonKey,
+        Origin: String(config.productionOrigin || 'https://restrosuite.codearc.co.in').replace(/\/+$/, ''),
+      },
+      body: JSON.stringify({
+        action: 'validate_session',
+        session_token: sessionToken,
+      }),
+    });
+    if (!upstream.ok) return false;
+    const payload = await upstream.json().catch(() => null);
+    return !!(
+      payload &&
+      payload.session &&
+      String(payload.session.tenant_id || '') === String(tenantId)
+    );
+  }
+
   app.all('/functions/v1/:fnName', (req, res) => {
     const fn = encodeURIComponent(req.params.fnName);
     return proxyToSupabase(req, res, '/functions/v1/' + fn);
@@ -263,6 +287,7 @@ function createServer(opts) {
       getPort: opts.getPort,
       stateFile: opts.lanStateFile,
       credentialsFile: opts.lanCredentialsFile,
+      validateSession: validateLanSession,
     });
   } catch (e) {
     console.warn('[desktop] LAN hub attach failed', e && e.message);

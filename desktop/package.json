@@ -1,7 +1,7 @@
 {
   "name": "restrosuite-desktop",
   "productName": "RestroSuite Desktop",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "private": true,
   "description": "RestroSuite desktop app (Windows + macOS) -- offline-first restaurant POS. Closes to system tray; distinct PC-badged icon vs PWA.",
   "author": "RestroSuite",

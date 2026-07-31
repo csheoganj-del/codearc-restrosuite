@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private View splashView;
     private WebAppInterface jsInterface;
+    private LanDiscoveryBridge lanDiscoveryBridge;
     private LicenseManager licenseManager;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
@@ -200,6 +201,8 @@ public class MainActivity extends AppCompatActivity {
         licenseManager = new LicenseManager(this);
         myWebView.addJavascriptInterface(new LicenseBridge(licenseManager, this), "AndroidLicense");
         myWebView.addJavascriptInterface(new PlatformBridge(), "AndroidPlatform");
+        lanDiscoveryBridge = new LanDiscoveryBridge(myWebView);
+        myWebView.addJavascriptInterface(lanDiscoveryBridge, "AndroidLan");
 
         myWebView.setDownloadListener(new DownloadListener() {
             @Override
@@ -622,7 +625,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onAvailable(Network network) {
                 runOnUiThread(() -> {
-                    triggerNetworkStateToWeb(true);
+                    triggerNetworkStateToWeb(isNetworkConnected());
                     // If we were on lock/error/local and come online, offer remote refresh
                     if (usingLocalShell || isLockOrErrorUrl()) {
                         // Soft: only auto-switch if currently locked; local shell stays until user retries
@@ -632,7 +635,17 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onLost(Network network) {
-                runOnUiThread(() -> triggerNetworkStateToWeb(false));
+                runOnUiThread(() -> triggerNetworkStateToWeb(isNetworkConnected()));
+            }
+
+            @Override
+            public void onCapabilitiesChanged(
+                    @NonNull Network network,
+                    @NonNull NetworkCapabilities capabilities
+            ) {
+                runOnUiThread(() -> triggerNetworkStateToWeb(
+                        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                ));
             }
         };
 
@@ -651,8 +664,7 @@ public class MainActivity extends AppCompatActivity {
             if (activeNetwork == null) return false;
             NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
             return capabilities != null
-                    && (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    || capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED));
+                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
         } else {
             android.net.NetworkInfo activeInfo = connectivityManager.getActiveNetworkInfo();
             return activeInfo != null && activeInfo.isConnected();
@@ -779,6 +791,10 @@ public class MainActivity extends AppCompatActivity {
             appUpdateChecker = null;
         }
         if (jsInterface != null) jsInterface.shutdown();
+        if (lanDiscoveryBridge != null) {
+            lanDiscoveryBridge.shutdown();
+            lanDiscoveryBridge = null;
+        }
         if (connectivityManager != null && networkCallback != null) {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback);

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- HTTPS only for production origins; cleartext never allowed. -->
+<!-- HTTPS-only WebView and URLConnection traffic. The native LAN bridge uses a
+     constrained raw socket only after validating an RFC1918 discovery address. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>

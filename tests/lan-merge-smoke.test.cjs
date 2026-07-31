@@ -22,6 +22,12 @@ function loadLan() {
     addEventListener() {},
     location: { origin: 'http://127.0.0.1:8001', hostname: '127.0.0.1', port: '8001' },
     fetch: async () => ({ ok: false }),
+    RS_API: { session: () => ({ tenant_id: 'tenant-a', token: 'cloud-session-a' }) },
+    RSOpsMode: { usesKds: () => true },
+    AndroidLan: {
+      calls: [],
+      discover(...args) { this.calls.push(args); },
+    },
   };
   const sandbox = {
     window: root,
@@ -34,10 +40,15 @@ function loadLan() {
     setTimeout,
     clearTimeout,
     EventSource: function () {},
+    RS_API: root.RS_API,
+    RSOpsMode: root.RSOpsMode,
+    AndroidLan: root.AndroidLan,
   };
   vm.createContext(sandbox);
   vm.runInContext(src, sandbox);
-  return root.RSLanSync || sandbox.RSLanSync;
+  const lan = root.RSLanSync || sandbox.RSLanSync;
+  lan.__testRoot = root;
+  return lan;
 }
 
 test('merge prefers Ready over Pending (anti-chaos)', () => {
@@ -57,6 +68,28 @@ test('merge keeps preparing over older pending', () => {
     [{ orderId: 'A', status: 'Accepted' }]
   );
   assert.equal(merged[0].status, 'preparing');
+});
+
+test('native discovery silently provisions and remembers the LAN hub', () => {
+  const lan = loadLan();
+  assert.equal(lan.requestNativeDiscovery(), true);
+  assert.deepEqual(
+    Array.from(lan.__testRoot.AndroidLan.calls[0]),
+    ['tenant-a', 'cloud-session-a', '']
+  );
+  assert.equal(lan.acceptNativeHub(JSON.stringify({
+    base: 'http://192.168.1.20:8001',
+    tenantId: 'tenant-a',
+    token: 'lan-token-a',
+  })), true);
+  assert.equal(
+    lan.__testRoot.localStorage.getItem('rs_lan_hub_url_v1'),
+    'http://192.168.1.20:8001'
+  );
+  assert.equal(
+    lan.__testRoot.localStorage.getItem('rs_lan_token_v1:tenant-a'),
+    'lan-token-a'
+  );
 });
 
 test('lan hub status rank on server module', () => {
