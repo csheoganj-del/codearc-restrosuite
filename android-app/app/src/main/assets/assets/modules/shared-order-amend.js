@@ -8,7 +8,7 @@
   const RSAmend = (global.RSAmend = global.RSAmend || {});
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -18,7 +18,7 @@
       .replace(/"/g, '&quot;');
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
 
@@ -42,8 +42,8 @@
     if (/prepar|accepted|cook|kitchen|in.?prep/.test(st)) {
       return 'In kitchen preparation — ask staff to void; cannot delete from QR';
     }
-    if (/cancel|reject/.test(st)) return 'Order was cancelled';
-    if (/picked|deliver/.test(st)) return 'Order already out for delivery';
+    if (/cancel|reject/.test(st)) {return 'Order was cancelled';}
+    if (/picked|deliver/.test(st)) {return 'Order already out for delivery';}
     return 'This order can no longer be changed';
   }
 
@@ -77,7 +77,7 @@
     const fn =
       (global.CONFIG && global.CONFIG.functions && global.CONFIG.functions.tenantPublic) ||
       (su ? su + '/functions/v1/tenant-public' : '');
-    if (!fn) throw new Error('Config missing');
+    if (!fn) {throw new Error('Config missing');}
     const res = await fetch(fn, {
       method: 'POST',
       headers: {
@@ -112,9 +112,9 @@
    */
   async function amendViaStaffDb(orderRow, nextItems, meta) {
     const m = meta || {};
-    if (!orderRow || !orderRow.id) throw new Error('No order');
+    if (!orderRow || !orderRow.id) {throw new Error('No order');}
     const check = RSAmend.canAmendOrderLine(orderRow);
-    if (!check.ok) throw new Error(check.reason);
+    if (!check.ok) {throw new Error(check.reason);}
     const items = (nextItems || []).map((it) => ({
       id: it.id,
       name: it.name,
@@ -122,7 +122,7 @@
       price: Number(it.price) || 0,
       note: it.note || it.notes || '',
     }));
-    if (!items.length) throw new Error('Add at least one item');
+    if (!items.length) {throw new Error('Add at least one item');}
     const total = items.reduce((a, i) => a + i.price * i.qty, 0);
     const next = Object.assign({}, orderRow, {
       items,
@@ -190,7 +190,7 @@
 
   /** Listen for amendments and chime + toast on dashboard */
   function installDashboardListener() {
-    if (document.documentElement.dataset.rsAmendDash === '1') return;
+    if (document.documentElement.dataset.rsAmendDash === '1') {return;}
     document.documentElement.dataset.rsAmendDash = '1';
     document.addEventListener('rs:order-amended', (ev) => {
       const d = (ev && ev.detail) || {};
@@ -199,7 +199,7 @@
         'fa-bell'
       );
       try {
-        if (global.RSOps && typeof RSOps.playFloorChime === 'function') RSOps.playFloorChime();
+        if (global.RSOps && typeof RSOps.playFloorChime === 'function') {RSOps.playFloorChime();}
       } catch (_) {}
     });
   }

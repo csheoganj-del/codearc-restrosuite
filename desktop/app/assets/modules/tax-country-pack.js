@@ -119,13 +119,13 @@
   };
 
   function seedTaxRates() {
-    if (!global.RS_TAX_RATES) global.RS_TAX_RATES = [];
+    if (!global.RS_TAX_RATES) {global.RS_TAX_RATES = [];}
     const existing = new Set(
       (global.RS_TAX_RATES || []).map((r) => String(r.country) + ':' + String(r.rateCode || r.rate_code))
     );
     PACK.forEach((r) => {
       const key = r.country + ':' + r.rateCode;
-      if (existing.has(key)) return;
+      if (existing.has(key)) {return;}
       global.RS_TAX_RATES.push({
         id: r.rateCode + '_pack',
         country: r.country,
@@ -158,7 +158,7 @@
     const date = dateStr ? new Date(dateStr) : new Date();
     seedTaxRates();
     return (global.RS_TAX_RATES || []).filter((r) => {
-      if (String(r.country).toUpperCase() !== c) return false;
+      if (String(r.country).toUpperCase() !== c) {return false;}
       const from = new Date(r.validFrom || r.valid_from || '2000-01-01');
       const to = r.validTo || r.valid_to ? new Date(r.validTo || r.valid_to) : null;
       return date >= from && (!to || date <= to);
@@ -203,7 +203,7 @@
     const amt = Number(taxAmount) || 0;
     const p = profile || (global.RS_getTenantTaxProfile && RS_getTenantTaxProfile()) || {};
     const inter = !!(p.inter_state || p.igst_only);
-    if (inter) return { cgst: 0, sgst: 0, igst: amt };
+    if (inter) {return { cgst: 0, sgst: 0, igst: amt };}
     const half = Math.round((amt / 2) * 100) / 100;
     return { cgst: half, sgst: Math.round((amt - half) * 100) / 100, igst: 0 };
   }
@@ -237,12 +237,12 @@
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter(Boolean);
-    if (lines.length < 2) return 0;
+    if (lines.length < 2) {return 0;}
     seedTaxRates();
     let n = 0;
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].match(/("([^"]|"")*"|[^,]+)/g) || [];
-      if (parts.length < 4) continue;
+      if (parts.length < 4) {continue;}
       const clean = (s) => String(s || '').replace(/^"|"$/g, '').replace(/""/g, '"');
       const row = {
         id: clean(parts[1]) + '_import_' + Date.now() + '_' + i,
@@ -254,7 +254,7 @@
         validTo: clean(parts[5]) || null,
         itcAllowed: /true|1|yes/i.test(clean(parts[6] || '')),
       };
-      if (!row.country || !row.rateCode) continue;
+      if (!row.country || !row.rateCode) {continue;}
       // Replace same code
       global.RS_TAX_RATES = (global.RS_TAX_RATES || []).filter(
         (r) => !(String(r.country).toUpperCase() === row.country && String(r.rateCode || r.rate_code) === row.rateCode)
@@ -274,7 +274,7 @@
       if (!p.tax_system || p.tax_system === 'GST' || p.tax_system === 'VAT' || p.tax_system === 'Sales Tax') {
         // Prefer country-native name when outlet has not forced a custom label
         const settings = global.RS_SETTINGS || {};
-        if (!settings.set_tax_label) p.tax_system = meta.system;
+        if (!settings.set_tax_label) {p.tax_system = meta.system;}
       }
       p.tax_meta = meta;
       p.default_rate_code = defaultRateCode(p.country);

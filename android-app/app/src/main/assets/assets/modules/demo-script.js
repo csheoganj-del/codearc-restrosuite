@@ -33,7 +33,7 @@
   }
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
 
   function openDemoScript() {
@@ -80,7 +80,7 @@
           saveState(st2);
           paint();
           const tab = li.dataset.tab;
-          if (tab && global.RS && typeof RS.activateTab === 'function') RS.activateTab(tab);
+          if (tab && global.RS && typeof RS.activateTab === 'function') {RS.activateTab(tab);}
         };
       });
     }
@@ -88,7 +88,7 @@
 
     overlay.querySelector('#rs-demo-x').onclick = () => overlay.remove();
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.remove();
+      if (e.target === overlay) {overlay.remove();}
     });
     overlay.querySelector('#rs-demo-reset').onclick = () => {
       saveState({});
@@ -102,7 +102,7 @@
         toast('Demo complete — great show!', 'fa-circle-check');
         return;
       }
-      if (next.tab && global.RS && typeof RS.activateTab === 'function') RS.activateTab(next.tab);
+      if (next.tab && global.RS && typeof RS.activateTab === 'function') {RS.activateTab(next.tab);}
       toast('Next: ' + next.label, 'fa-arrow-right');
       overlay.remove();
     };
@@ -114,7 +114,7 @@
   // Hook Help button: long-press or second entry
   function wireHelp() {
     const btn = document.getElementById('open-product-guide-btn');
-    if (!btn || btn.dataset.demoWired) return;
+    if (!btn || btn.dataset.demoWired) {return;}
     btn.dataset.demoWired = '1';
     btn.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -124,7 +124,7 @@
     btn.setAttribute('title', (btn.getAttribute('title') || 'Help & Setup') + ' · Right-click for demo checklist');
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(wireHelp, 800));
-  else setTimeout(wireHelp, 800);
+  if (document.readyState === 'loading') {document.addEventListener('DOMContentLoaded', () => setTimeout(wireHelp, 800));}
+  else {setTimeout(wireHelp, 800);}
   document.addEventListener('rs:ready', () => setTimeout(wireHelp, 200));
 })(typeof window !== 'undefined' ? window : globalThis);

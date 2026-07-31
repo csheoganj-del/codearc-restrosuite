@@ -2664,6 +2664,7 @@
     }
     // Hard debounce — industry POS never double-finalizes payment
     let checkoutInFlight = false;
+    let checkoutAttemptInFlight = false;
 
     function confirmKotMissing() {
       return new Promise((resolve) => {
@@ -2705,7 +2706,7 @@
       });
     }
 
-    async function checkout(){
+    async function checkoutImpl(){
       if (checkoutInFlight) {
         return RS.toast('Checkout already in progress…', 'fa-spinner');
       }
@@ -3476,6 +3477,16 @@
         setCheckoutGate(true, '');
         RS.toast('Checkout failed: ' + (err && err.message ? err.message : 'try again'), 'fa-circle-exclamation');
       }
+    }
+
+    function checkout() {
+      if (checkoutAttemptInFlight) {
+        return Promise.resolve(RS.toast('Checkout already in progress…', 'fa-spinner'));
+      }
+      checkoutAttemptInFlight = true;
+      return checkoutImpl().finally(() => {
+        checkoutAttemptInFlight = false;
+      });
     }
 
     /* ---------------- KOT (mode-aware: full / kitchen printer / billing) ---------------- */

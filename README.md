@@ -2,7 +2,7 @@
 
 > Zero-cost restaurant SaaS — POS billing, KDS, inventory, CRM, WhatsApp receipts, and multi-tenant management on Vercel + Supabase.
 
-**Live site:** https://codearc-restrosuite.vercel.app  
+**Live site:** https://restrosuite.codearc.co.in  
 **Stack:** Vanilla JS · HTML/CSS · Supabase (Postgres + RLS + Edge Functions) · Vercel · Node.js WhatsApp Gateway · Android WebView wrapper
 
 ---

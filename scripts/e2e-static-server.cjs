@@ -25,7 +25,7 @@ const TYPES = {
 const server = http.createServer((req, res) => {
   try {
     let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
-    if (urlPath === '/') urlPath = '/index.html';
+    if (urlPath === '/') {urlPath = '/index.html';}
     // Clean URLs
     const clean = {
       '/login': '/login.html',
@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
       '/order': '/order.html',
       '/qr-order': '/qr-order.html',
     };
-    if (clean[urlPath]) urlPath = clean[urlPath];
+    if (clean[urlPath]) {urlPath = clean[urlPath];}
 
     const filePath = path.normalize(path.join(root, urlPath.replace(/^\//, '')));
     if (!filePath.startsWith(root)) {

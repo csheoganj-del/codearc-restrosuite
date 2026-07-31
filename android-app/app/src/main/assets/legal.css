@@ -73,7 +73,7 @@ body {
   font-weight: 700;
 }
 
-.legal-page a { color: #D94300; }
+.legal-page a { color: #B93800; text-decoration-thickness: 0.08em; text-underline-offset: 0.15em; }
 
 @media (max-width: 640px) {
   .legal-nav {

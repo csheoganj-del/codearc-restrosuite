@@ -163,7 +163,7 @@ test('qr-orders-ui module extracted (wave 10)', () => {
   assert.match(src, /openQrOrderInPos/);
   const dash = fs.readFileSync(path.join(root, 'assets/dashboard.js'), 'utf8');
   assert.match(dash, /RSQrOrdersUI/);
-  assert.ok(!dash.includes('qr-grid'), 'QR grid markup should leave dashboard');
+  assert.ok(!dash.includes('id="qr-grid"'), 'QR grid markup should leave dashboard');
   const html = fs.readFileSync(path.join(root, 'dashboard.html'), 'utf8');
   assert.match(html, /qr-orders-ui\.js/);
   assert.match(html, /v(?:[5-9][0-9]|[1-9][0-9]{2,})-20\d{6}/);

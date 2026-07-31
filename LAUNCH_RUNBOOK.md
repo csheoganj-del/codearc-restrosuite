@@ -42,7 +42,7 @@ Use this runbook before every production launch or major release. It assumes the
   - `EMAIL_WEBHOOK_SECRET`
   - `ADMIN_ALERT_EMAIL`
   - `ZERO_COST_EMAILS_DISABLED=false`
-  - `ALLOWED_ORIGIN=https://codearc-restrosuite.vercel.app`
+  - `ALLOWED_ORIGIN=https://restrosuite.codearc.co.in`
   - `RAZORPAY_WEBHOOK_SECRET`
   - `AGGREGATOR_WEBHOOK_SECRET`
 - Deploy these Edge Functions:

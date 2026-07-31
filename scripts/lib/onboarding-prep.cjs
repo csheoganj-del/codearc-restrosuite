@@ -4,7 +4,7 @@
 'use strict';
 
 async function openInvTab(page, invTab) {
-  if (!invTab) return;
+  if (!invTab) {return;}
   const btn = page.locator('[data-inv-tab="' + invTab + '"]').first();
   if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
     await btn.click().catch(() => {});
@@ -13,7 +13,7 @@ async function openInvTab(page, invTab) {
 }
 
 async function openEmpSeg(page, empSeg) {
-  if (!empSeg) return;
+  if (!empSeg) {return;}
   // Segment buttons inside employees tab
   const exact = page.locator('#employees-tab .seg button, #employees-tab button').filter({ hasText: empSeg }).first();
   if (await exact.isVisible({ timeout: 2500 }).catch(() => false)) {
@@ -26,14 +26,14 @@ async function openEmpSeg(page, empSeg) {
       const root = document.getElementById('employees-tab') || document;
       const btns = [...root.querySelectorAll('button, .seg button')];
       const b = btns.find((x) => (x.textContent || '').trim() === label);
-      if (b) b.click();
+      if (b) {b.click();}
     }, empSeg)
     .catch(() => {});
   await page.waitForTimeout(700);
 }
 
 async function openGrowthTile(page, title) {
-  if (!title) return;
+  if (!title) {return;}
   // Ensure hub grid rendered
   await page.waitForTimeout(500);
   const card = page.locator('#hub-grid .hub-card, .hub-card').filter({ hasText: title }).first();
@@ -46,22 +46,22 @@ async function openGrowthTile(page, title) {
     .evaluate((t) => {
       const cards = [...document.querySelectorAll('#hub-grid .hub-card, .hub-card')];
       const c = cards.find((el) => (el.textContent || '').includes(t));
-      if (c) c.click();
+      if (c) {c.click();}
     }, title)
     .catch(() => {});
   await page.waitForTimeout(1000);
 }
 
 async function runPrep(page, prep) {
-  if (!prep) return;
+  if (!prep) {return;}
   try {
     if (prep === 'scrollMarketingFeatures') {
       await page.evaluate(() => {
         const el =
           document.querySelector('#features, .features, [id*="feature"]') ||
           document.querySelector('a[href*="feature"]');
-        if (el) el.scrollIntoView({ block: 'start' });
-        else window.scrollTo(0, Math.min(900, document.body.scrollHeight));
+        if (el) {el.scrollIntoView({ block: 'start' });}
+        else {window.scrollTo(0, Math.min(900, document.body.scrollHeight));}
       });
       await page.waitForTimeout(600);
       return;
@@ -119,7 +119,7 @@ async function runPrep(page, prep) {
       await page
         .evaluate(() => {
           const d = document.querySelector('#cart-more-opts');
-          if (d) d.open = true;
+          if (d) {d.open = true;}
         })
         .catch(() => {});
       await page.locator('#cart-more-opts, #promo-input, #cart-tip-row').first().scrollIntoViewIfNeeded().catch(() => {});
@@ -280,7 +280,7 @@ async function runPrep(page, prep) {
         await help.click().catch(() => {});
         await page.waitForTimeout(900);
       }
-      return;
+
     }
   } catch (e) {
     process.stdout.write('(prep ' + prep + ' warn) ');
@@ -289,10 +289,10 @@ async function runPrep(page, prep) {
 
 /** After tab open: settings panel, inv sub-tab, emp segment, growth tile, then prep */
 async function applyStepUi(page, s) {
-  if (s.invTab) await openInvTab(page, s.invTab);
-  if (s.empSeg) await openEmpSeg(page, s.empSeg);
-  if (s.growthTile) await openGrowthTile(page, s.growthTile);
-  if (s.prep) await runPrep(page, s.prep);
+  if (s.invTab) {await openInvTab(page, s.invTab);}
+  if (s.empSeg) {await openEmpSeg(page, s.empSeg);}
+  if (s.growthTile) {await openGrowthTile(page, s.growthTile);}
+  if (s.prep) {await runPrep(page, s.prep);}
 }
 
 module.exports = { runPrep, applyStepUi, openInvTab, openEmpSeg, openGrowthTile };

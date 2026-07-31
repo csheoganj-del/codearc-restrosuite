@@ -13,8 +13,8 @@
 (function (global) {
   'use strict';
 
-  var SA_PREF_KEY = 'rs_security_shield_sa_v1';
-  var DEFAULTS = {
+  const SA_PREF_KEY = 'rs_security_shield_sa_v1';
+  const DEFAULTS = {
     enabled: true,
     blockContextMenu: true,
     blockDevShortcuts: true,
@@ -22,12 +22,12 @@
     warnOnDevtools: false,
   };
 
-  var cfg = Object.assign({}, DEFAULTS);
+  let cfg = Object.assign({}, DEFAULTS);
 
   function isSuperAdmin() {
     try {
-      var s = global.RS_API && typeof global.RS_API.session === 'function' && global.RS_API.session();
-      var role = String((s && s.role) || '').toLowerCase().trim();
+      const s = global.RS_API && typeof global.RS_API.session === 'function' && global.RS_API.session();
+      const role = String((s && s.role) || '').toLowerCase().trim();
       return role === 'superadmin' || role === 'super_admin';
     } catch (_) {
       return false;
@@ -37,9 +37,9 @@
   /** Superadmin-only local preference. null = use default (on). */
   function loadSaPref() {
     try {
-      var raw = localStorage.getItem(SA_PREF_KEY);
-      if (raw === '0' || raw === 'false' || raw === 'off') return false;
-      if (raw === '1' || raw === 'true' || raw === 'on') return true;
+      const raw = localStorage.getItem(SA_PREF_KEY);
+      if (raw === '0' || raw === 'false' || raw === 'off') { return false; }
+      if (raw === '1' || raw === 'true' || raw === 'on') { return true; }
     } catch (_) {}
     return null;
   }
@@ -52,8 +52,8 @@
 
   function hasDevBypass() {
     try {
-      if (new URLSearchParams(location.search).get('debug') === '1') return true;
-      if (sessionStorage.getItem('rs_debug_ui') === '1') return true;
+      if (new URLSearchParams(location.search).get('debug') === '1') { return true; }
+      if (sessionStorage.getItem('rs_debug_ui') === '1') { return true; }
     } catch (_) {}
     return false;
   }
@@ -65,10 +65,10 @@
    * - ?debug=1 / rs_debug_ui: off for that session (dev only)
    */
   function resolveEnabled() {
-    if (hasDevBypass()) return false;
-    if (!isSuperAdmin()) return true;
-    var pref = loadSaPref();
-    if (pref === null) return true;
+    if (hasDevBypass()) { return false; }
+    if (!isSuperAdmin()) { return true; }
+    const pref = loadSaPref();
+    if (pref === null) { return true; }
     return !!pref;
   }
 
@@ -86,38 +86,38 @@
   refreshEnabled();
 
   function isEditableTarget(t) {
-    if (!t || !t.tagName) return false;
-    var tag = String(t.tagName).toUpperCase();
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
-    if (t.isContentEditable) return true;
+    if (!t || !t.tagName) { return false; }
+    const tag = String(t.tagName).toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') { return true; }
+    if (t.isContentEditable) { return true; }
     return !!(t.closest && t.closest('input, textarea, select, [contenteditable="true"]'));
   }
 
   function onContextMenu(e) {
-    if (!resolveEnabled() || !cfg.blockContextMenu) return;
-    if (isEditableTarget(e.target)) return;
+    if (!resolveEnabled() || !cfg.blockContextMenu) { return; }
+    if (isEditableTarget(e.target)) { return; }
     e.preventDefault();
     e.stopPropagation();
   }
 
   function onKeyDown(e) {
-    if (!resolveEnabled() || !cfg.blockDevShortcuts) return;
-    var key = e.key || '';
-    var code = e.keyCode || e.which;
+    if (!resolveEnabled() || !cfg.blockDevShortcuts) { return; }
+    const key = e.key || '';
+    const code = e.keyCode || e.which;
     if (key === 'F12' || code === 123) {
       e.preventDefault();
       e.stopPropagation();
       return;
     }
     if (e.ctrlKey || e.metaKey) {
-      var k = key.toLowerCase();
+      const k = key.toLowerCase();
       if (e.shiftKey && (k === 'i' || k === 'j' || k === 'c' || k === 'k')) {
         e.preventDefault();
         e.stopPropagation();
         return;
       }
       if (k === 'u' || k === 's') {
-        if (k === 's' && isEditableTarget(e.target)) return;
+        if (k === 's' && isEditableTarget(e.target)) { return; }
         e.preventDefault();
         e.stopPropagation();
       }
@@ -125,15 +125,15 @@
   }
 
   function onSelectStart(e) {
-    if (!resolveEnabled() || !cfg.blockSelect) return;
-    if (isEditableTarget(e.target)) return;
-    if (e.target && e.target.closest && e.target.closest('.receipt-paper, .data-table, .rs-sales-report, pre, code')) return;
+    if (!resolveEnabled() || !cfg.blockSelect) { return; }
+    if (isEditableTarget(e.target)) { return; }
+    if (e.target && e.target.closest && e.target.closest('.receipt-paper, .data-table, .rs-sales-report, pre, code')) { return; }
     e.preventDefault();
   }
 
-  var installed = false;
+  let installed = false;
   function install() {
-    if (installed) return;
+    if (installed) { return; }
     installed = true;
     refreshEnabled();
     document.addEventListener('contextmenu', onContextMenu, true);
@@ -142,8 +142,8 @@
     document.addEventListener(
       'dragstart',
       function (e) {
-        if (!resolveEnabled()) return;
-        if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+        if (!resolveEnabled()) { return; }
+        if (e.target && e.target.tagName === 'IMG') { e.preventDefault(); }
       },
       true
     );
@@ -158,14 +158,14 @@
       cfg.enabled = true;
       return false;
     }
-    var next = !!on;
+    const next = !!on;
     saveSaPref(next);
     cfg.enabled = next;
     return true;
   }
 
   function configure(partial) {
-    var next = Object.assign({}, partial || {});
+    const next = Object.assign({}, partial || {});
     delete next.enabled; // never allow silent disable via configure
     cfg = Object.assign(cfg, next);
     refreshEnabled();
@@ -187,13 +187,13 @@
 
   // Auto-install on staff surfaces only (never on guest QR / public order pages)
   try {
-    var path = (location.pathname || '').toLowerCase();
-    var isStaff =
+    const path = (location.pathname || '').toLowerCase();
+    const isStaff =
       path.indexOf('dashboard') >= 0 ||
       path.indexOf('tokens') >= 0 ||
       path.indexOf('kds') >= 0 ||
       /\/(dashboard|tokens|kds)(\.html)?\/?$/.test(path);
-    var isGuest =
+    const isGuest =
       path.indexOf('qr-order') >= 0 ||
       path.indexOf('/order') >= 0 ||
       path.indexOf('order.html') >= 0 ||
@@ -201,7 +201,7 @@
       path.indexOf('home') >= 0 ||
       path === '/' ||
       path === '';
-    if (isStaff && !isGuest) install();
+    if (isStaff && !isGuest) { install(); }
   } catch (_) {
     /* fail open for staff apps that load this file explicitly */
   }

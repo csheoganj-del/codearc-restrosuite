@@ -5,10 +5,10 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function esc(s) {
@@ -53,17 +53,18 @@
     if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
       const res = await Promise.race([
         RS_API.data({ operation: 'sales_summary', days }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+        new Promise((_, rej) => { setTimeout(() => rej(new Error('timeout')), 6000); }),
       ]);
       const payload = res && res.ok != null ? res : (res && res.data) || res;
-      if (payload && payload.ok) serverSummary = payload;
+      if (payload && payload.ok) {serverSummary = payload;}
     }
   } catch (e) {
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
     console.warn('[Reports] sales_summary unavailable, using local bills', e && e.message);
   }
 
   const paidBills = BILLS.filter(b => {
-    if (b.status !== 'paid') return false;
+    if (b.status !== 'paid') {return false;}
     const t = b.dateTime ? new Date(b.dateTime).getTime() : (b.time ? new Date(b.time).getTime() : 0);
     return t >= cutoff;
   });
@@ -83,16 +84,16 @@
     if (b.taxSummary && typeof b.taxSummary === 'object') {
       Object.entries(b.taxSummary).forEach(([rate, obj]) => {
         const tax = (obj && obj.tax) ? obj.tax : 0;
-        if (rate==='5') gst5+=tax;
-        else if (rate==='12') gst12+=tax;
-        else if (rate==='18') gst18+=tax;
-        else if (rate==='28') gst28+=tax;
-        else gst5+=tax;
+        if (rate==='5') {gst5+=tax;}
+        else if (rate==='12') {gst12+=tax;}
+        else if (rate==='18') {gst18+=tax;}
+        else if (rate==='28') {gst28+=tax;}
+        else {gst5+=tax;}
       });
     } else {
       // Fallback estimate
       gst5 += Math.round((b.cgst||0) + (b.sgst||0));
-      if (!b.cgst && !b.sgst) gst5 += Math.round((b.amount||0)/1.05*0.05);
+      if (!b.cgst && !b.sgst) {gst5 += Math.round((b.amount||0)/1.05*0.05);}
     }
   });
   let totalGST = gst5+gst12+gst18+gst28;
@@ -113,13 +114,13 @@
     serverSummary.daily.forEach(row => {
       const t = row.day ? new Date(row.day).getTime() : 0;
       const age = Math.floor((now - t) / 86400000);
-      if (age >= 0 && age < days) dailySlots[days - 1 - age] += Number(row.revenue || 0);
+      if (age >= 0 && age < days) {dailySlots[days - 1 - age] += Number(row.revenue || 0);}
     });
   } else {
     paidBills.forEach(b => {
       const t = b.dateTime ? new Date(b.dateTime).getTime() : 0;
       const age = Math.floor((now-t)/86400000);
-      if (age>=0 && age<days) dailySlots[days-1-age] += (b.amount||b.total||0);
+      if (age>=0 && age<days) {dailySlots[days-1-age] += (b.amount||b.total||0);}
     });
   }
   const maxSlot = Math.max(...dailySlots,1);
@@ -143,7 +144,7 @@
   const payTotal = Object.values(payMap).reduce((a,v)=>a+v,0)||1;
   const payColors = {Cash:'var(--green)',UPI:'var(--violet)',Card:'var(--orange)',Due:'var(--red)',Stripe:'var(--blue-soft)',Online:'var(--violet-soft)'};
   const payEntries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
-  let acc=0;
+  const acc=0;
   const payMix = payEntries.map(([name,val])=>{
     const pct=Math.round(val/payTotal*100);
     return [name,pct,payColors[name]||'var(--amber)'];
@@ -155,7 +156,7 @@
   const catSales = {};
   paidBills.forEach(b => {
     (b._items||[]).forEach(it => {
-      if (!it||!it.name) return;
+      if (!it||!it.name) {return;}
       // Older bills didn't store the category on each line item -- fall back
       // to looking the item up in the current menu by name so it isn't
       // lumped under "Uncategorized" in the category breakdown.
@@ -179,8 +180,8 @@
   const itemMap = {};
   paidBills.forEach(b => {
     (b._items||[]).forEach(it => {
-      if (!it||!it.name) return;
-      if (!itemMap[it.name]) itemMap[it.name]={qty:0,rev:0};
+      if (!it||!it.name) {return;}
+      if (!itemMap[it.name]) {itemMap[it.name]={qty:0,rev:0};}
       itemMap[it.name].qty += (it.qty||1);
       itemMap[it.name].rev += (it.price||0)*(it.qty||1);
     });
@@ -188,7 +189,7 @@
   const topItems = Object.entries(itemMap).sort((a,b)=>b[1].rev-a[1].rev).slice(0,6);
 
   const tab = document.getElementById('reports-tab');
-  if (!tab) return;
+  if (!tab) {return;}
 
   tab.innerHTML = `
     <div class="toolbar-row" style="margin-bottom:4px">
@@ -209,12 +210,12 @@
     </div>
     ${
       !totalOrders
-        ? `<div class="sr-empty" style="margin:8px 0 16px;padding:28px;border:1px dashed var(--stroke);border-radius:var(--r-md)">
+        ? (() => { try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {} return `<div class="sr-empty" style="margin:8px 0 16px;padding:28px;border:1px dashed var(--stroke);border-radius:var(--r-md)">
             <i class="fa-solid fa-chart-pie" style="font-size:22px;opacity:.4;display:block;margin-bottom:8px"></i>
             <div style="font-weight:700;margin-bottom:4px">No sales in this period</div>
             <div style="font-size:13px;color:var(--text-soft);max-width:360px;margin:0 auto">Ring a sale on POS or widen the date range to see revenue, tax, and top items.</div>
-          </div>`
-        : ''
+          </div>`; })()
+        : (() => { try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {} return ''; })()
     }
 
     <div class="report-grid report-grid-charts">
@@ -239,7 +240,7 @@
                   <span class="bl${showLabel ? '' : ' is-muted'}">${showLabel ? _e(lab) : ''}</span>
                 </div>`;
               }).join('')
-            : `<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px;width:100%">No sales data for this period</div>`
+            : '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-mute);font-size:12px;width:100%">No sales data for this period</div>'
           }
         </div>
       </div>
@@ -301,7 +302,13 @@
 
   // GSTR CSV download — richer columns for accountant handoff
   const gstrBtn = document.getElementById('btn-download-gstr');
-  if (gstrBtn) gstrBtn.onclick = () => {
+  if (gstrBtn) {gstrBtn.onclick = () => {
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
+    if (!paidBills.length) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
+      toast('No paid bills in this period to export', 'fa-circle-exclamation');
+      return;
+    }
     const rows = [[
       'Bill No', 'DateTime', 'Customer', 'Phone', 'Place of Supply',
       'Taxable Value', 'GST 5%', 'GST 12%', 'GST 18%', 'GST 28%', 'Total Tax',
@@ -347,22 +354,23 @@
     a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
     a.download = 'GSTR_report_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     toast('GSTR CSV downloaded (' + paidBills.length + ' bills)', 'fa-file-arrow-down');
-  };
+  };}
   }
 
   global.RSReportsUI = { renderReports };
-  global._renderReports = (p) => renderReports(p);
+  global._renderReports = (p) => { try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {} renderReports(p); };
 
   function attach() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderReports = renderReports;
   }
-  if (global.RS) attach();
+  if (global.RS) {attach();}
   document.addEventListener('rs:ready', attach);
   document.addEventListener('rs:hydrated', () => {
     try {
-      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
       renderReports();
     } catch (_) {}
   });

@@ -1,9 +1,9 @@
 {
-  "version": "v222-20260726-floor-click-notify",
-  "title": "Live update v222-20260726-floor-click-notify",
-  "generatedAt": "2026-07-27T06:37:03.620Z",
+  "version": "v234-20260730-auto",
+  "title": "Live update v234-20260730-auto",
+  "generatedAt": "2026-07-30T11:39:16.467Z",
   "baseUrl": "https://restrosuite.codearc.co.in",
-  "fileCount": 129,
+  "fileCount": 130,
   "files": [
     "app-update.json",
     "assets/competitive-ops.js",
@@ -69,6 +69,7 @@
     "assets/modules/tax-helpers.js",
     "assets/modules/view-mode.js",
     "assets/modules/wa-send-queue.js",
+    "assets/modules/web-vitals-rum.js",
     "assets/modules/xlsx-lite.js",
     "assets/og-share.png",
     "assets/og-whatsapp.png",

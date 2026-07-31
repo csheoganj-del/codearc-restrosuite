@@ -36,7 +36,7 @@ const config = loadConfig();
 /** Mutable: may advance if preferred port is busy (EADDRINUSE). */
 let PORT = Number(config.port) || 8001;
 const PREFERRED_PORT = PORT;
-const PROD_ORIGIN = config.productionOrigin || 'https://codearc-restrosuite.vercel.app';
+const PROD_ORIGIN = config.productionOrigin || 'https://restrosuite.codearc.co.in';
 
 // Resolve the web-app root: packaged builds unpack it to resources/app-web,
 // dev runs serve it straight from ./app.

@@ -126,3 +126,17 @@ LICENSE_PRIVATE_KEY*
 test-results/
 playwright-report/
 
+# Local audit, extraction, and packaging workspaces
+scratch/
+scratch-*/
+gateway-hf/_space_build/
+eslint-report*.json
+assets/dist/_critical-src*.js
+*.bak
+.vscode/
+
+# Release binaries belong in GitHub Releases, not source history
+downloads/*.dmg
+downloads/desktop/*.exe
+downloads/desktop/*.blockmap
+

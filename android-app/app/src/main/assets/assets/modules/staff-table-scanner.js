@@ -11,17 +11,17 @@
 (function (global) {
   'use strict';
 
-  var STYLE_ID = 'rs-staff-scan-style';
-  var ROOT_ID = 'rs-staff-scan-root';
-  var streamRef = null;
-  var loopTimer = null;
-  var lastHit = '';
-  var lastHitAt = 0;
-  var frameN = 0;
-  var autoActTimer = null;
+  const STYLE_ID = 'rs-staff-scan-style';
+  const ROOT_ID = 'rs-staff-scan-root';
+  let streamRef = null;
+  let loopTimer = null;
+  let lastHit = '';
+  let lastHitAt = 0;
+  let frameN = 0;
+  let autoActTimer = null;
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon || 'fa-qrcode');
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon || 'fa-qrcode');}
   }
 
   function esc(s) {
@@ -33,21 +33,21 @@
   }
 
   function normTableKey(raw) {
-    var key = String(raw == null ? '' : raw)
+    let key = String(raw == null ? '' : raw)
       .trim()
       .toLowerCase();
-    if (!key) return '';
+    if (!key) {return '';}
     key = key.replace(/\btable\b|\btbl\b/g, '').replace(/[^a-z0-9]/g, '');
-    if (/^t\d+$/.test(key)) key = key.slice(1);
-    if (/^\d+$/.test(key)) key = String(parseInt(key, 10));
+    if (/^t\d+$/.test(key)) {key = key.slice(1);}
+    if (/^\d+$/.test(key)) {key = String(parseInt(key, 10));}
     return key;
   }
 
   function currentTenantSlug() {
     try {
       if (global.RS_API && typeof RS_API.session === 'function') {
-        var s = RS_API.session() || {};
-        if (s.slug || s.tenant_slug) return String(s.slug || s.tenant_slug);
+        const s = RS_API.session() || {};
+        if (s.slug || s.tenant_slug) {return String(s.slug || s.tenant_slug);}
       }
     } catch (_) {}
     try {
@@ -66,17 +66,17 @@
    * Accepts full URLs, path-only, or bare "table=5" fragments.
    */
   function parseTableQrPayload(raw) {
-    var text = String(raw || '').trim();
-    if (!text) return null;
+    const text = String(raw || '').trim();
+    if (!text) {return null;}
 
-    var tenant = '';
-    var table = '';
-    var token = '';
-    var mode = '';
+    let tenant = '';
+    let table = '';
+    let token = '';
+    let mode = '';
 
     try {
-      var url;
-      if (/^https?:\/\//i.test(text)) url = new URL(text);
+      let url;
+      if (/^https?:\/\//i.test(text)) {url = new URL(text);}
       else if (
         text.indexOf('?') >= 0 ||
         text.indexOf('tenant=') >= 0 ||
@@ -102,9 +102,9 @@
           '';
         // Only use short "t=" as table when it looks like a table id (digits), not a slug
         if (!table) {
-          var tParam = url.searchParams.get('t') || '';
-          if (/^\d{1,4}[A-Za-z]?$/.test(tParam) || /^table/i.test(tParam)) table = tParam;
-          else if (!tenant && tParam) tenant = tParam;
+          const tParam = url.searchParams.get('t') || '';
+          if (/^\d{1,4}[A-Za-z]?$/.test(tParam) || /^table/i.test(tParam)) {table = tParam;}
+          else if (!tenant && tParam) {tenant = tParam;}
         }
         token =
           url.searchParams.get('token') ||
@@ -114,13 +114,13 @@
         mode = url.searchParams.get('mode') || '';
         // Path forms: /order/table/5 , /t/5 , /qr-order.html already handled by query
         if (!table) {
-          var m = url.pathname.match(/(?:table|t|tbl)\/([^/?#]+)/i);
-          if (m) table = decodeURIComponent(m[1]);
+          const m = url.pathname.match(/(?:table|t|tbl)\/([^/?#]+)/i);
+          if (m) {table = decodeURIComponent(m[1]);}
         }
         // Hash routes: #/table/5
         if (!table && url.hash) {
-          var mh = url.hash.match(/(?:table|t|tbl)[/=]([^&/?#]+)/i);
-          if (mh) table = decodeURIComponent(mh[1]);
+          const mh = url.hash.match(/(?:table|t|tbl)[/=]([^&/?#]+)/i);
+          if (mh) {table = decodeURIComponent(mh[1]);}
         }
       }
     } catch (_) {}
@@ -131,16 +131,16 @@
     }
     // "Table 5" / "T-05" / "Table 01"
     if (!table) {
-      var m2 = text.match(/(?:table|tbl|t)[\s#:.-]*([0-9]{1,4}[A-Za-z]?)/i);
-      if (m2) table = m2[1];
+      const m2 = text.match(/(?:table|tbl|t)[\s#:.-]*([0-9]{1,4}[A-Za-z]?)/i);
+      if (m2) {table = m2[1];}
     }
     // Last path segment if numeric: .../01
     if (!table) {
-      var m3 = text.match(/\/(\d{1,4}[A-Za-z]?)(?:\?|#|$)/);
-      if (m3) table = m3[1];
+      const m3 = text.match(/\/(\d{1,4}[A-Za-z]?)(?:\?|#|$)/);
+      if (m3) {table = m3[1];}
     }
 
-    if (!table) return null;
+    if (!table) {return null;}
     return {
       tenant: tenant || currentTenantSlug(),
       table: String(table).trim(),
@@ -152,7 +152,7 @@
   }
 
   function findFloorTable(tableKey) {
-    var list =
+    const list =
       (global.RS && Array.isArray(RS.TABLES) && RS.TABLES) ||
       (global.TABLES && Array.isArray(global.TABLES) && global.TABLES) ||
       [];
@@ -165,21 +165,21 @@
 
   function guestOrderBaseUrl() {
     try {
-      var settings = global.RS_SETTINGS || {};
-      if (settings.set_public_order_base) return String(settings.set_public_order_base).replace(/\/$/, '');
+      const settings = global.RS_SETTINGS || {};
+      if (settings.set_public_order_base) {return String(settings.set_public_order_base).replace(/\/$/, '');}
     } catch (_) {}
-    var h = (location.hostname || '').toLowerCase();
-    if (h === 'localhost' || h === '127.0.0.1') return 'https://restrosuite.codearc.co.in';
+    const h = (location.hostname || '').toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1') {return 'https://restrosuite.codearc.co.in';}
     return location.origin;
   }
 
   function ensureStyle() {
     // Always refresh styles so animation updates ship without hard reload issues
-    var old = document.getElementById(STYLE_ID);
-    if (old) old.remove();
-    var s = document.createElement('style');
+    const old = document.getElementById(STYLE_ID);
+    if (old) {old.remove();}
+    const s = document.createElement('style');
     s.id = STYLE_ID;
-    var r = '#' + ROOT_ID;
+    const r = '#' + ROOT_ID;
     s.textContent = [
       '@keyframes rs-scan-line{0%{top:12%;opacity:.4}12%{opacity:1}50%{top:86%;opacity:1}62%{opacity:.4}100%{top:12%;opacity:.4}}',
       '@keyframes rs-scan-dot{0%,80%,100%{opacity:.25}40%{opacity:1}}',
@@ -299,12 +299,12 @@
   }
 
   function setScanUiState(root, state, message) {
-    if (!root) return;
-    var wrap = root.querySelector('.rs-scan-vid-wrap');
-    var status = root.querySelector('[data-status]');
-    var live = root.querySelector('[data-live]');
-    var label = root.querySelector('[data-status-text]');
-    var phText = root.querySelector('[data-ph-text]');
+    if (!root) {return;}
+    const wrap = root.querySelector('.rs-scan-vid-wrap');
+    const status = root.querySelector('[data-status]');
+    const live = root.querySelector('[data-live]');
+    const label = root.querySelector('[data-status-text]');
+    const phText = root.querySelector('[data-ph-text]');
     if (wrap) {
       wrap.classList.toggle('is-found', state === 'found');
       wrap.classList.toggle('is-idle', state === 'idle' || state === 'error');
@@ -314,15 +314,15 @@
       }
       if (state === 'error' || state === 'idle') {
         // keep is-live if video already playing
-        var v = wrap.querySelector('video');
-        if (!v || !v.srcObject || v.readyState < 2) wrap.classList.remove('is-live');
+        const v = wrap.querySelector('video');
+        if (!v || !v.srcObject || v.readyState < 2) {wrap.classList.remove('is-live');}
       }
     }
     if (status) {
       status.classList.toggle('is-found', state === 'found');
       status.classList.toggle('is-error', state === 'error');
     }
-    if (label && message != null) label.textContent = message;
+    if (label && message != null) {label.textContent = message;}
     if (phText && message && (state === 'error' || state === 'idle')) {
       phText.textContent = message;
     }
@@ -363,14 +363,14 @@
 
   function closeScanner() {
     stopCamera();
-    var root = document.getElementById(ROOT_ID);
-    if (root) root.remove();
+    const root = document.getElementById(ROOT_ID);
+    if (root) {root.remove();}
   }
 
   async function openTableInPosFromScan(parsed, opts) {
     opts = opts || {};
-    var key = parsed.tableKey || normTableKey(parsed.table);
-    var t = findFloorTable(key);
+    const key = parsed.tableKey || normTableKey(parsed.table);
+    let t = findFloorTable(key);
     if (!t) {
       t = { n: parsed.table, name: parsed.table, cap: 4, state: 'free' };
     }
@@ -402,13 +402,13 @@
   }
 
   function openWaiterKot(parsed) {
-    var slug = parsed.tenant || currentTenantSlug();
+    const slug = parsed.tenant || currentTenantSlug();
     if (!slug) {
       toast('Outlet slug missing — open POS instead', 'fa-circle-exclamation');
       openTableInPosFromScan(parsed, { seat: false });
       return;
     }
-    var url =
+    const url =
       guestOrderBaseUrl() +
       '/order.html?tenant=' +
       encodeURIComponent(slug) +
@@ -419,8 +419,8 @@
   }
 
   function showHit(root, parsed) {
-    var hit = root.querySelector('[data-hit]');
-    if (!hit) return;
+    const hit = root.querySelector('[data-hit]');
+    if (!hit) {return;}
     hit.classList.add('on');
     hit.innerHTML =
       '<i class="fa-solid fa-circle-check" style="color:#0F9F6E;margin-right:6px"></i>' +
@@ -432,12 +432,12 @@
   }
 
   async function handleDecoded(root, text) {
-    var now = Date.now();
-    if (text === lastHit && now - lastHitAt < 2200) return;
+    const now = Date.now();
+    if (text === lastHit && now - lastHitAt < 2200) {return;}
     lastHit = text;
     lastHitAt = now;
 
-    var parsed = parseTableQrPayload(text);
+    const parsed = parseTableQrPayload(text);
     if (!parsed) {
       setScanUiState(
         root,
@@ -446,13 +446,13 @@
       );
       // Still surface raw payload so staff can paste/debug
       try {
-        var manual = root.querySelector('[data-manual]');
-        if (manual && text && text.length < 400) manual.value = text;
+        const manual = root.querySelector('[data-manual]');
+        if (manual && text && text.length < 400) {manual.value = text;}
       } catch (_) {}
       return;
     }
 
-    var mySlug = currentTenantSlug();
+    const mySlug = currentTenantSlug();
     if (
       parsed.tenant &&
       mySlug &&
@@ -464,14 +464,14 @@
     showHit(root, parsed);
     setScanUiState(root, 'found', 'Table ' + parsed.table + ' locked — opening POS…');
     try {
-      if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+      if (navigator.vibrate) {navigator.vibrate([40, 40, 40]);}
     } catch (_) {}
 
     // Auto-open POS (Yono-style: detect → lock → act without extra taps)
-    if (autoActTimer) clearTimeout(autoActTimer);
+    if (autoActTimer) {clearTimeout(autoActTimer);}
     autoActTimer = setTimeout(async function () {
-      if (!document.getElementById(ROOT_ID) || !root._parsed) return;
-      if (root._parsed.tableKey !== parsed.tableKey) return;
+      if (!document.getElementById(ROOT_ID) || !root._parsed) {return;}
+      if (root._parsed.tableKey !== parsed.tableKey) {return;}
       try {
         closeScanner();
         await openTableInPosFromScan(parsed, { seat: false });
@@ -484,7 +484,7 @@
 
   function isIOS() {
     try {
-      var ua = navigator.userAgent || '';
+      const ua = navigator.userAgent || '';
       return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     } catch (_) {
       return false;
@@ -493,35 +493,35 @@
 
   function isSecureCameraContext() {
     try {
-      if (location.protocol === 'https:') return true;
-      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return true;
+      if (location.protocol === 'https:') {return true;}
+      if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {return true;}
     } catch (_) {}
     return false;
   }
 
   function ensureJsQr() {
     return new Promise(function (resolve) {
-      if (global.jsQR) return resolve(true);
+      if (global.jsQR) { resolve(true); return; }
       // Absolute-from-origin first (Safari caches / path quirks with relative)
-      var origin = '';
+      let origin = '';
       try {
         origin = location.origin || '';
       } catch (_) {}
-      var sources = [
+      const sources = [
         origin + '/assets/lib/jsQR.min.js',
         'assets/lib/jsQR.min.js',
         '../assets/lib/jsQR.min.js',
         'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js',
         'https://unpkg.com/jsqr@1.4.0/dist/jsQR.min.js',
       ];
-      var i = 0;
+      let i = 0;
       function tryNext() {
         if (i >= sources.length) {
           console.warn('[StaffScan] jsQR failed to load from all sources');
           return resolve(false);
         }
-        var src = sources[i++];
-        var s = document.createElement('script');
+        const src = sources[i++];
+        const s = document.createElement('script');
         s.src = src;
         s.async = true;
         s.onload = function () {
@@ -540,14 +540,14 @@
 
   function waitForVideoReady(video, timeoutMs) {
     return new Promise(function (resolve) {
-      var done = false;
-      var t = setTimeout(function () {
-        if (done) return;
+      let done = false;
+      const t = setTimeout(function () {
+        if (done) {return;}
         done = true;
         resolve(video.videoWidth > 0 && video.videoHeight > 0);
       }, timeoutMs || 4000);
       function ok() {
-        if (done) return;
+        if (done) {return;}
         if (video.videoWidth > 0 && video.videoHeight > 0) {
           done = true;
           clearTimeout(t);
@@ -563,8 +563,8 @@
   }
 
   async function startCamera(root) {
-    var video = root.querySelector('video');
-    if (!video) return;
+    const video = root.querySelector('video');
+    if (!video) {return;}
 
     // Safari only allows camera on HTTPS (Yono app is native — different rules)
     if (!isSecureCameraContext()) {
@@ -576,7 +576,7 @@
       return;
     }
 
-    var gum =
+    const gum =
       (navigator.mediaDevices && navigator.mediaDevices.getUserMedia
         ? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices)
         : null) ||
@@ -588,10 +588,10 @@
       return;
     }
 
-    var ios = isIOS();
+    const ios = isIOS();
     // iPhone Safari: advanced constraints often FAIL the whole open (Yono is native so works).
     // Use simplest constraints first on iOS.
-    var attempts = ios
+    const attempts = ios
       ? [
           { audio: false, video: { facingMode: 'environment' } },
           { audio: false, video: true },
@@ -611,9 +611,9 @@
           { audio: false, video: true },
         ];
 
-    var opened = false;
-    var lastErr = null;
-    for (var i = 0; i < attempts.length; i++) {
+    let opened = false;
+    let lastErr = null;
+    for (let i = 0; i < attempts.length; i++) {
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           streamRef = await navigator.mediaDevices.getUserMedia(attempts[i]);
@@ -633,7 +633,7 @@
     }
     if (!opened) {
       console.warn('[StaffScan] camera', lastErr);
-      var msg = 'Camera blocked — allow camera, then try again. Or type table # below.';
+      let msg = 'Camera blocked — allow camera, then try again. Or type table # below.';
       if (lastErr && /NotAllowed|Permission/i.test(String(lastErr.name || lastErr.message || ''))) {
         msg =
           'Camera permission denied. Settings → Safari → Camera → Allow, then reopen Scan.';
@@ -649,8 +649,8 @@
     // Optional hardware zoom — never required; skip soft-fail on iOS
     if (!ios) {
       try {
-        var track = streamRef.getVideoTracks()[0];
-        var caps = track.getCapabilities && track.getCapabilities();
+        const track = streamRef.getVideoTracks()[0];
+        const caps = track.getCapabilities && track.getCapabilities();
         if (caps && caps.zoom) {
           root._camTrack = track;
           root._zoomCaps = caps.zoom;
@@ -672,7 +672,7 @@
       } else {
         video.src = URL.createObjectURL(streamRef);
       }
-      var ready = await waitForVideoReady(video, 5000);
+      const ready = await waitForVideoReady(video, 5000);
       try {
         await video.play();
       } catch (playErr) {
@@ -689,8 +689,8 @@
           setTimeout(r, 300);
         });
       }
-      var wrapOk = root.querySelector('.rs-scan-vid-wrap');
-      if (wrapOk) wrapOk.classList.add('is-live');
+      const wrapOk = root.querySelector('.rs-scan-vid-wrap');
+      if (wrapOk) {wrapOk.classList.add('is-live');}
       setScanUiState(
         root,
         'scanning',
@@ -703,7 +703,7 @@
     }
 
     // Load decoder BEFORE loop (critical on Safari)
-    var hasJsQr = await ensureJsQr();
+    const hasJsQr = await ensureJsQr();
     if (!hasJsQr) {
       setScanUiState(
         root,
@@ -716,7 +716,7 @@
     }
 
     // BarcodeDetector is NOT on iPhone Safari — don't rely on it
-    var detector = null;
+    let detector = null;
     if (!ios) {
       try {
         if (global.BarcodeDetector) {
@@ -727,14 +727,14 @@
       }
     }
 
-    var canvas = root.querySelector('canvas');
+    const canvas = root.querySelector('canvas');
     // iOS Safari: display:none canvas can break drawImage — keep off-screen instead
     if (canvas) {
       canvas.style.cssText =
         'position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
       canvas.removeAttribute('hidden');
     }
-    var ctx = null;
+    let ctx = null;
     if (canvas && canvas.getContext) {
       try {
         ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -751,14 +751,14 @@
     }
 
     // Fewer zoom steps on old iPhones (CPU) — still far + mid + close
-    var zoomLevels = ios ? [1, 1.5, 2.2] : [1, 1.35, 1.75, 2.25, 2.8];
-    var zoomIdx = 0;
-    var missStreak = 0;
+    const zoomLevels = ios ? [1, 1.5, 2.2] : [1, 1.35, 1.75, 2.25, 2.8];
+    let zoomIdx = 0;
+    let missStreak = 0;
 
     function runJsQrOnImageData(img) {
-      if (!global.jsQR || !img) return null;
+      if (!global.jsQR || !img) {return null;}
       try {
-        var code = global.jsQR(img.data, img.width, img.height, {
+        const code = global.jsQR(img.data, img.width, img.height, {
           inversionAttempts: 'attemptBoth',
         });
         return code && code.data ? code.data : null;
@@ -768,37 +768,37 @@
     }
 
     function decodeWithJsQrMulti(digZoom) {
-      if (!ctx || !global.jsQR) return null;
-      if (video.readyState < 2) return null;
-      var w = video.videoWidth || 0;
-      var h = video.videoHeight || 0;
+      if (!ctx || !global.jsQR) {return null;}
+      if (video.readyState < 2) {return null;}
+      let w = video.videoWidth || 0;
+      let h = video.videoHeight || 0;
       // iOS: sometimes readyState is 4 but dimensions still 0 briefly
       if (w < 16 || h < 16) {
         w = video.clientWidth || 0;
         h = video.clientHeight || 0;
       }
-      if (w < 32 || h < 32) return null;
+      if (w < 32 || h < 32) {return null;}
 
-      var z = Math.max(1, digZoom || 1);
-      var cropW = Math.floor(w / z);
-      var cropH = Math.floor(h / z);
-      var sx = Math.floor((w - cropW) / 2);
-      var sy = Math.floor((h - cropH) / 2);
+      const z = Math.max(1, digZoom || 1);
+      const cropW = Math.floor(w / z);
+      const cropH = Math.floor(h / z);
+      const sx = Math.floor((w - cropW) / 2);
+      const sy = Math.floor((h - cropH) / 2);
 
       // iPhone 6s: one target size is faster and more reliable than 3
-      var targets = ios ? [480] : z > 1.5 ? [640, 480] : [640, 480, 360];
-      for (var ti = 0; ti < targets.length; ti++) {
-        var maxW = targets[ti];
-        var scale = cropW > maxW ? maxW / cropW : 1;
-        var cw = Math.max(32, Math.floor(cropW * scale));
-        var ch = Math.max(32, Math.floor(cropH * scale));
+      const targets = ios ? [480] : z > 1.5 ? [640, 480] : [640, 480, 360];
+      for (let ti = 0; ti < targets.length; ti++) {
+        const maxW = targets[ti];
+        const scale = cropW > maxW ? maxW / cropW : 1;
+        const cw = Math.max(32, Math.floor(cropW * scale));
+        const ch = Math.max(32, Math.floor(cropH * scale));
         try {
           canvas.width = cw;
           canvas.height = ch;
           ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
-          var img = ctx.getImageData(0, 0, cw, ch);
-          var hit = runJsQrOnImageData(img);
-          if (hit) return hit;
+          const img = ctx.getImageData(0, 0, cw, ch);
+          const hit = runJsQrOnImageData(img);
+          if (hit) {return hit;}
         } catch (drawErr) {
           console.warn('[StaffScan] draw/decode', drawErr);
         }
@@ -807,20 +807,20 @@
     }
 
     async function tick() {
-      if (!document.getElementById(ROOT_ID)) return;
+      if (!document.getElementById(ROOT_ID)) {return;}
       if (root._parsed) {
         loopTimer = setTimeout(tick, 500);
         return;
       }
       frameN++;
       try {
-        var decoded = null;
+        let decoded = null;
 
         // Skip BarcodeDetector on iOS — not available / not needed
         if (detector && !ios && video.readyState >= 2) {
           try {
-            var codes = await detector.detect(video);
-            if (codes && codes[0] && codes[0].rawValue) decoded = codes[0].rawValue;
+            const codes = await detector.detect(video);
+            if (codes && codes[0] && codes[0].rawValue) {decoded = codes[0].rawValue;}
           } catch (_) {}
         }
 
@@ -835,7 +835,7 @@
           if (missStreak >= 2) {
             zoomIdx = (zoomIdx + 1) % zoomLevels.length;
             missStreak = 0;
-            var z = zoomLevels[zoomIdx];
+            const z = zoomLevels[zoomIdx];
             if (z > 1.2) {
               setScanUiState(root, 'zooming', 'Auto-zoom ' + z.toFixed(1) + '× — hold steady');
             }
@@ -848,9 +848,9 @@
           missStreak = 0;
           await handleDecoded(root, decoded);
         } else if (frameN % 12 === 0) {
-          var zLabel =
+          const zLabel =
             zoomLevels[zoomIdx] > 1.05 ? ' · zoom ' + zoomLevels[zoomIdx].toFixed(1) + '×' : '';
-          var dim =
+          const dim =
             video.videoWidth > 0
               ? ''
               : ' · waiting for camera frame…';
@@ -861,7 +861,7 @@
           );
         }
       } catch (e) {
-        if (frameN % 30 === 0) console.warn('[StaffScan] tick', e);
+        if (frameN % 30 === 0) {console.warn('[StaffScan] tick', e);}
       }
       // iOS: slightly slower loop keeps UI smooth on 6s-class CPUs
       loopTimer = setTimeout(tick, ios ? 320 : 220);
@@ -876,41 +876,41 @@
    */
   function decodeQrFromFile(file) {
     return new Promise(function (resolve) {
-      if (!file) return resolve(null);
+      if (!file) { resolve(null); return; }
       ensureJsQr().then(function (ok) {
-        if (!ok || !global.jsQR) return resolve(null);
-        var url = URL.createObjectURL(file);
-        var img = new Image();
+        if (!ok || !global.jsQR) {return resolve(null);}
+        const url = URL.createObjectURL(file);
+        const img = new Image();
         img.onload = function () {
           try {
-            var maxSide = 1400;
-            var iw = img.naturalWidth || img.width;
-            var ih = img.naturalHeight || img.height;
-            var scale = Math.min(1, maxSide / Math.max(iw, ih));
-            var cw = Math.max(32, Math.floor(iw * scale));
-            var ch = Math.max(32, Math.floor(ih * scale));
-            var c = document.createElement('canvas');
+            const maxSide = 1400;
+            const iw = img.naturalWidth || img.width;
+            const ih = img.naturalHeight || img.height;
+            const scale = Math.min(1, maxSide / Math.max(iw, ih));
+            const cw = Math.max(32, Math.floor(iw * scale));
+            const ch = Math.max(32, Math.floor(ih * scale));
+            const c = document.createElement('canvas');
             c.width = cw;
             c.height = ch;
-            var cx = c.getContext('2d');
+            const cx = c.getContext('2d');
             cx.drawImage(img, 0, 0, cw, ch);
             // Try full image + center crops (photo may have QR small in frame)
-            var crops = [
+            const crops = [
               [0, 0, cw, ch],
               [cw * 0.15, ch * 0.15, cw * 0.7, ch * 0.7],
               [cw * 0.25, ch * 0.25, cw * 0.5, ch * 0.5],
             ];
-            for (var i = 0; i < crops.length; i++) {
-              var cr = crops[i];
-              var c2 = document.createElement('canvas');
-              var tw = Math.max(32, Math.floor(cr[2]));
-              var th = Math.max(32, Math.floor(cr[3]));
+            for (let i = 0; i < crops.length; i++) {
+              const cr = crops[i];
+              const c2 = document.createElement('canvas');
+              const tw = Math.max(32, Math.floor(cr[2]));
+              const th = Math.max(32, Math.floor(cr[3]));
               c2.width = Math.min(800, tw);
               c2.height = Math.min(800, th);
-              var cx2 = c2.getContext('2d');
+              const cx2 = c2.getContext('2d');
               cx2.drawImage(c, cr[0], cr[1], cr[2], cr[3], 0, 0, c2.width, c2.height);
-              var data = cx2.getImageData(0, 0, c2.width, c2.height);
-              var code = global.jsQR(data.data, data.width, data.height, {
+              const data = cx2.getImageData(0, 0, c2.width, c2.height);
+              const code = global.jsQR(data.data, data.width, data.height, {
                 inversionAttempts: 'attemptBoth',
               });
               if (code && code.data) {
@@ -941,8 +941,8 @@
     lastHitAt = 0;
     frameN = 0;
 
-    var ios = isIOS();
-    var root = document.createElement('div');
+    const ios = isIOS();
+    const root = document.createElement('div');
     root.id = ROOT_ID;
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
@@ -1003,17 +1003,17 @@
 
     root.querySelector('[data-close]').onclick = closeScanner;
     root.addEventListener('click', function (e) {
-      if (e.target === root) closeScanner();
+      if (e.target === root) {closeScanner();}
     });
 
     // --- Photo capture (iOS-reliable) ---
-    var snapInput = root.querySelector('[data-snap]');
+    const snapInput = root.querySelector('[data-snap]');
     if (snapInput) {
       snapInput.addEventListener('change', async function () {
-        var file = snapInput.files && snapInput.files[0];
-        if (!file) return;
+        const file = snapInput.files && snapInput.files[0];
+        if (!file) {return;}
         setScanUiState(root, 'scanning', 'Reading photo…');
-        var text = await decodeQrFromFile(file);
+        const text = await decodeQrFromFile(file);
         snapInput.value = '';
         if (!text) {
           setScanUiState(
@@ -1029,13 +1029,13 @@
     }
 
     // --- Live camera ---
-    var liveBtn = root.querySelector('[data-live-cam]');
+    const liveBtn = root.querySelector('[data-live-cam]');
     if (liveBtn) {
       liveBtn.onclick = function () {
         stopCamera();
         setScanUiState(root, 'scanning', 'Starting live camera…');
-        var ph = root.querySelector('[data-ph-text]');
-        if (ph) ph.textContent = 'Starting camera…';
+        const ph = root.querySelector('[data-ph-text]');
+        if (ph) {ph.textContent = 'Starting camera…';}
         startCamera(root);
       };
     }
@@ -1046,9 +1046,9 @@
     }
 
     function requireParsed() {
-      if (root._parsed) return root._parsed;
-      var manual = (root.querySelector('[data-manual]').value || '').trim();
-      var p = parseTableQrPayload(manual);
+      if (root._parsed) {return root._parsed;}
+      const manual = (root.querySelector('[data-manual]').value || '').trim();
+      const p = parseTableQrPayload(manual);
       if (p) {
         showHit(root, p);
         setScanUiState(root, 'found', 'Table ' + p.table + ' ready');
@@ -1059,8 +1059,8 @@
     }
 
     root.querySelector('[data-manual-go]').onclick = async function () {
-      var p = requireParsed();
-      if (!p) return;
+      const p = requireParsed();
+      if (!p) {return;}
       // On manual entry, open POS immediately (staff already typed the number)
       if (autoActTimer) {
         clearTimeout(autoActTimer);
@@ -1077,8 +1077,8 @@
     });
 
     root.querySelector('[data-act="pos"]').onclick = async function () {
-      var p = requireParsed();
-      if (!p) return;
+      const p = requireParsed();
+      if (!p) {return;}
       if (autoActTimer) {
         clearTimeout(autoActTimer);
         autoActTimer = null;
@@ -1087,8 +1087,8 @@
       await openTableInPosFromScan(p, { seat: false });
     };
     root.querySelector('[data-act="seat"]').onclick = async function () {
-      var p = requireParsed();
-      if (!p) return;
+      const p = requireParsed();
+      if (!p) {return;}
       if (autoActTimer) {
         clearTimeout(autoActTimer);
         autoActTimer = null;
@@ -1097,8 +1097,8 @@
       await openTableInPosFromScan(p, { seat: true });
     };
     root.querySelector('[data-act="kot"]').onclick = function () {
-      var p = requireParsed();
-      if (!p) return;
+      const p = requireParsed();
+      if (!p) {return;}
       if (autoActTimer) {
         clearTimeout(autoActTimer);
         autoActTimer = null;
@@ -1107,10 +1107,10 @@
       openWaiterKot(p);
     };
     root.querySelector('[data-act="hub"]').onclick = function () {
-      var p = requireParsed();
-      if (!p) return;
-      var slug = p.tenant || currentTenantSlug();
-      var url =
+      const p = requireParsed();
+      if (!p) {return;}
+      const slug = p.tenant || currentTenantSlug();
+      const url =
         guestOrderBaseUrl() +
         '/qr-order.html?tenant=' +
         encodeURIComponent(slug) +
@@ -1120,7 +1120,7 @@
       window.open(url, '_blank', 'noopener');
     };
 
-    if (typeof opts.onOpen === 'function') opts.onOpen();
+    if (typeof opts.onOpen === 'function') {opts.onOpen();}
   }
 
   global.RSStaffTableScanner = {

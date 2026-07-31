@@ -337,12 +337,22 @@
       // Kitchen/Cashier/Waiter login can never land on a tab outside its
       // role's allowed list (audit findings #1 and #2).
       const roleInfo = window.RS_ROLE;
-      if (roleInfo && Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length) {
-        const permitted = roleInfo.allowedTabs.slice();
-        // Managers may open Settings (Plan & Billing / Danger Zone are
-        // additionally gated inside the Settings screen itself).
-        if (roleInfo.staffRole === 'manager') permitted.push('settings-tab');
-        if (!permitted.includes(id)) id = permitted[0];
+      const rRole = String((roleInfo && roleInfo.staffRole) || roleRaw || '').toLowerCase();
+      const unrestricted = ['owner', 'admin', 'superadmin', 'brand_admin'].includes(rRole);
+      if (roleInfo && !unrestricted) {
+        // null allowedTabs = unrestricted (owner). [] or missing list = fail-closed for staff.
+        let permitted = Array.isArray(roleInfo.allowedTabs)
+          ? roleInfo.allowedTabs.slice()
+          : (roleInfo.allowedTabs == null ? null : []);
+        if (permitted === null && rRole === 'manager') {
+          // manager defaults when map not hydrated yet
+          permitted = (window.RS_ROLE && window.RS_ROLE.ROLE_TAB_MAP && window.RS_ROLE.ROLE_TAB_MAP.manager) || ['pos-tab'];
+        }
+        if (Array.isArray(permitted)) {
+          if (rRole === 'manager') permitted.push('settings-tab');
+          if (!permitted.length) permitted = ['pos-tab'];
+          if (!permitted.includes(id)) id = permitted[0] || 'pos-tab';
+        }
       }
     }
 
@@ -400,7 +410,7 @@
   }
 
   // Early role-home map (must exist before hydrate may call loadSavedTab)
-  const ROLE_HOME_TAB_EARLY = {
+  const ROLE_HOME_TAB_EARLY = Object.assign({
     cashier: 'pos-tab',
     waiter: 'floor-tab',
     captain: 'floor-tab',
@@ -408,7 +418,7 @@
     inventory: 'inventory-tab',
     manager: 'pos-tab',
     customer_display: 'tokens-tab',
-  };
+  }, (window.RS_ROLE_DEFAULTS && window.RS_ROLE_DEFAULTS.ROLE_HOME_TAB) || {});
 
   // Load saved active tab on startup (hash wins; else role home)
   function loadSavedTab() {
@@ -1188,8 +1198,77 @@
     if (window.RS_DB) {
       try {
         let rows;
+        // ANTI-CHAOS: never wipe local Ready/served with stale cloud Pending
+        // when internet returns after verbal/manual kitchen work.
         if (forceCloud && RS_DB.isCloud && RS_DB.listCloud && RS_DB.writeLocal) {
-          rows = await RS_DB.listCloud('pending_orders');
+          const localRows = (typeof RS_DB.listLocal === 'function'
+            ? await RS_DB.listLocal('pending_orders')
+            : await RS_DB.list('pending_orders').catch(() => [])) || [];
+          let cloudRows = [];
+          try {
+            cloudRows = (await RS_DB.listCloud('pending_orders')) || [];
+          } catch (cloudErr) {
+            console.warn('[sync] listCloud pending_orders failed — keeping local', cloudErr && cloudErr.message);
+            cloudRows = [];
+          }
+          if (window.RSLanSync && typeof RSLanSync.mergeRows === 'function') {
+            rows = RSLanSync.mergeRows(localRows, cloudRows);
+          } else {
+            rows = cloudRows.length ? cloudRows : localRows;
+            // Prefer higher status from local when same orderId
+            const rank = (s) => {
+              const x = String(s || '').toLowerCase();
+              if (/ready|served|complete|done|closed|settled|paid|cancel/.test(x)) return 80;
+              if (/prepar/.test(x)) return 50;
+              if (/accept/.test(x)) return 40;
+              return 20;
+            };
+            const by = new Map();
+            cloudRows.forEach((r) => {
+              const k = String(r.orderId || r.id || '');
+              if (k) by.set(k, r);
+            });
+            localRows.forEach((r) => {
+              const k = String(r.orderId || r.id || '');
+              if (!k) return;
+              const prev = by.get(k);
+              if (!prev || rank(r.status) >= rank(prev.status)) by.set(k, Object.assign({}, prev || {}, r, {
+                status: !prev || rank(r.status) >= rank(prev.status) ? r.status : prev.status,
+              }));
+            });
+            rows = Array.from(by.values());
+          }
+          // Match bills + auto-close stale offline tickets so kitchen never re-cooks
+          try {
+            let bills = [];
+            if (typeof RS_DB.listLocal === 'function') {
+              bills = (await RS_DB.listLocal('bills').catch(() => [])) || [];
+            } else {
+              bills = (await RS_DB.list('bills').catch(() => [])) || [];
+            }
+            if (window.RSLanSync && typeof RSLanSync.reconcileAfterReconnect === 'function') {
+              const rec = RSLanSync.reconcileAfterReconnect(rows, bills, { staleMs: 12 * 60 * 1000, reviewMs: 5 * 60 * 1000 });
+              rows = rec.rows || rows;
+              const closed = (rec.closedByBill || 0) + (rec.closedStale || 0);
+              if (closed > 0 || rec.review > 0) {
+                window.__rsReconnectOrderNote = {
+                  at: Date.now(),
+                  closedByBill: rec.closedByBill || 0,
+                  closedStale: rec.closedStale || 0,
+                  review: rec.review || 0,
+                };
+                // Persist closed tickets so next cloud push keeps Ready
+                const dirty = rows.filter((r) => r && (r.reconcileReason === 'bill_exists' || r.reconcileReason === 'stale_offline'));
+                for (const r of dirty) {
+                  try {
+                    if (r.id != null) await RS_DB.put('pending_orders', r.id, r);
+                  } catch (_) {}
+                }
+              }
+            }
+          } catch (recErr) {
+            console.warn('[sync] reconcileAfterReconnect failed', recErr);
+          }
           await RS_DB.writeLocal('pending_orders', rows || []);
         } else {
           rows = await RS_DB.list('pending_orders');
@@ -1205,23 +1284,78 @@
         if (!usesKds) {
           replaceArr(KDS, []);
         } else {
-          const activeKds = rows.filter(r => r.status === 'Accepted' || r.status === 'preparing' || r.status === 'Pending Review');
-          const mappedKds = activeKds.map(r => ({
-            id: r.id,
-            tok: formatDisplayOrderId(r),
-            type: `${r.orderType} | ${r.tableNumber}`,
-            start: parseOrderTimestamp(r.dateTime) || Date.now(),
-            prepMinutes: r.prepMinutes,
-            prepStartedAt: r.prepStartedAt,
-            items: (r.items || []).map(it => [String(it.qty), it.name, it.notes || ''])
-          }));
+          // Hide finished / kitchen-handled / auto-closed tickets (no re-cook chaos).
+          const prevIds = new Set((Array.isArray(KDS) ? KDS : []).map((k) => String(k.id || k.tok || '')));
+          const activeKds = rows.filter((r) => {
+            const st = String(r.status || '');
+            if (!/^(Accepted|preparing|Pending Review)$/i.test(st)) return false;
+            if (r.kitchenHandled || r.manualFulfilled) return false;
+            if (r.reconcileReason === 'stale_offline' || r.reconcileReason === 'bill_exists') return false;
+            return true;
+          });
+          const mappedKds = activeKds.map((r) => {
+            const start = parseOrderTimestamp(r.dateTime) || Date.now();
+            const ageMs = Date.now() - start;
+            const recovered = !!(r.recoveredOffline || r.reconcileReason === 'review');
+            return {
+              id: r.id,
+              tok: formatDisplayOrderId(r),
+              type: `${r.orderType} | ${r.tableNumber}`,
+              start,
+              prepMinutes: r.prepMinutes,
+              prepStartedAt: r.prepStartedAt,
+              items: (r.items || []).map((it) => [String(it.qty), it.name, it.notes || '']),
+              fromBacklog: forceCloud && (ageMs > 5 * 60 * 1000 || prevIds.has(String(r.id || '')) || recovered),
+              recoveredOffline: recovered,
+              reconcileNote: r.reconcileNote || '',
+            };
+          });
+          // New-ticket chime only for truly new young tickets (not reconnect dump)
+          try {
+            const fresh = mappedKds.filter((k) => !prevIds.has(String(k.id || '')) && !k.fromBacklog && !k.recoveredOffline);
+            if (fresh.length && window.RSServiceAlerts && typeof RSServiceAlerts.playChime === 'function') {
+              RSServiceAlerts.playChime(false);
+            }
+          } catch (_) {}
+          // One clear message so kitchen/waiter are not confused
+          try {
+            const note = window.__rsReconnectOrderNote;
+            if (forceCloud && note && note.at && Date.now() - note.at < 8000) {
+              const closed = (note.closedByBill || 0) + (note.closedStale || 0);
+              if (closed > 0) {
+                toast(
+                  closed + ' old kitchen ticket' + (closed === 1 ? '' : 's') +
+                    ' auto-closed (already done offline) — do not re-cook',
+                  'fa-circle-check'
+                );
+              } else if (note.review > 0) {
+                toast(
+                  note.review + ' recovered ticket' + (note.review === 1 ? '' : 's') +
+                    ' — confirm if kitchen already cooked',
+                  'fa-circle-info'
+                );
+              }
+              window.__rsReconnectOrderNote = null;
+            }
+          } catch (_) {}
           replaceArr(KDS, mappedKds);
         }
 
-        // 2. Update QR_ORDERS  -  keep dateTime so UI can live-refresh relative ages
-        const activeQr = rows.filter(r => r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing' || r.status === 'served' || r.status === 'Ready');
-        const mappedQr = activeQr.map(r => {
+        // 2. Update QR_ORDERS — hide auto-closed; mark recovered for waiters
+        const activeQr = rows.filter((r) => {
+          const st = String(r.status || '');
+          if (r.kitchenHandled && /ready|served/i.test(st) && r.reconcileReason) return false;
+          return (
+            st === 'Pending Review' ||
+            st === 'Accepted' ||
+            st === 'preparing' ||
+            st === 'served' ||
+            st === 'Ready'
+          );
+        });
+        const mappedQr = activeQr.map((r) => {
           const ts = parseOrderTimestamp(r.dateTime);
+          const recovered = !!(r.recoveredOffline || r.reconcileReason === 'review');
           return {
             id: r.id,
             orderId: r.orderId,
@@ -1232,17 +1366,26 @@
             dateTime: r.dateTime || null,
             start: ts || Date.now(),
             time: getRelativeTime(r.dateTime),
-            status: r.status === 'Pending Review' ? 'pending' : ((r.status === 'preparing' || r.status === 'Accepted') ? 'preparing' : 'served'),
-            items: (r.items || []).map(it => ({
+            status:
+              r.status === 'Pending Review'
+                ? recovered
+                  ? 'preparing'
+                  : 'pending'
+                : r.status === 'preparing' || r.status === 'Accepted'
+                  ? 'preparing'
+                  : 'served',
+            recoveredOffline: recovered,
+            reconcileNote: r.reconcileNote || '',
+            items: (r.items || []).map((it) => ({
               id: it.id,
               name: it.name || 'Item',
               qty: Number(it.qty || 1),
               price: Number(it.price || 0),
               taxCategory: it.taxCategory || it.tax_category,
               notes: it.notes || '',
-              cat: it.cat || it.category || it.station || ''
+              cat: it.cat || it.category || it.station || '',
             })),
-            total: r.total
+            total: r.total,
           };
         });
         replaceArr(QR_ORDERS, mappedQr);
@@ -2270,11 +2413,13 @@
   // -- Role-based tab access map ----------------------------------------------
   // Each role key maps to the sidebar data-tab values that staff can see.
   // 'owner' and any unrecognised role -> full access (no filtering).
-  const ROLE_TAB_MAP = {
+  // Canonical maps from assets/role-defaults.js (shared with edge functions)
+  const RD = window.RS_ROLE_DEFAULTS || {};
+  const ROLE_TAB_MAP = RD.ROLE_TAB_MAP || RD.ROLE_DEFAULT_TABS || {
     manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab',
                  'inventory-tab','editor-tab','customers-tab','reports-tab',
                  'analytics-tab','employees-tab', 'growth-hub-tab',
-                 'aggregator-tab', 'tax-tab', 'online-orders-tab'],
+                 'aggregator-tab', 'tax-tab'],
     cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
     waiter:    ['pos-tab','floor-tab','kds-tab'],
     captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
@@ -2283,7 +2428,7 @@
     customer_display: ['tokens-tab'],
   };
 
-  const ROLE_LABELS = {
+  const ROLE_LABELS = Object.assign({
     owner:     'Outlet Owner',
     manager:   'Manager',
     cashier:   'Cashier',
@@ -2292,14 +2437,15 @@
     kitchen:          'Kitchen Staff',
     customer_display: 'Customer Display',
     inventory: 'Inventory Manager',
-  };
+  }, RD.ROLE_LABELS || {});
 
   /** Role-first home tab  -  reduces cognitive load for staff logins */
-  const ROLE_HOME_TAB = ROLE_HOME_TAB_EARLY;
+  const ROLE_HOME_TAB = Object.assign({}, ROLE_HOME_TAB_EARLY, RD.ROLE_HOME_TAB || {});
 
-  // Resolve current staff role (session meta -> sessionStorage fallback)
-  const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || 'owner')
-    .toLowerCase().trim();
+  // Resolve current staff role (session meta -> sessionStorage fallback).
+  // Never default restricted shells to "owner" (that opened full nav by accident).
+  const staffRole = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '')
+    .toLowerCase().trim() || (sess && sess.token ? 'cashier' : 'owner');
   // Roles that get the full, unrestricted dashboard.
   const UNRESTRICTED_ROLES = ['owner', 'admin', 'superadmin', 'brand_admin'];
   // Prefer the backend-computed allowed_tabs from the session (it already
@@ -2312,13 +2458,17 @@
       ? sessionTabs.map(String) : null;
     let tabs = fromSession || ROLE_TAB_MAP[role] || ['pos-tab'];
     // Settings → Lock reports for staff (default ON): strip reports/analytics from non-managers
+    // unless Team access explicitly granted those tabs for this user.
     try {
       const lockReports =
         typeof window.RS_featureOn === 'function'
           ? window.RS_featureOn('set_lock_reports_for_staff', window.RS_SETTINGS, true)
           : window.RS_SETTINGS?.set_lock_reports_for_staff !== false &&
             window.RS_SETTINGS?.set_lock_reports_for_staff !== 'false';
-      if (lockReports && role !== 'manager') {
+      const explicitReports = !!(fromSession && (
+        fromSession.includes('reports-tab') || fromSession.includes('analytics-tab')
+      ));
+      if (lockReports && role !== 'manager' && !explicitReports) {
         tabs = tabs.filter((t) => t !== 'reports-tab' && t !== 'analytics-tab');
       }
     } catch (_) {}
@@ -2480,12 +2630,20 @@
   // taking effect after the next login.
   function applyStaffRoleTabFiltering(role, tabs) {
     if (isSuper || isBrandAdmin) return;
+    function roleGateAllows(el, allowed) {
+      const raw = el.getAttribute('data-role-gate') || '';
+      if (!raw) return null; // null = no gate attribute
+      if (!allowed) return true; // unrestricted
+      const need = raw.split(',').map((s) => s.trim()).filter(Boolean);
+      return need.some((t) => allowed.includes(t));
+    }
     if (!tabs) {
       // Unrestricted (owner or unrecognised role) -- make sure nothing is
       // left hidden from a previous, more restrictive role.
       const roleStyle = document.getElementById('rs-role-filter-style');
       if (roleStyle) roleStyle.remove();
-      $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab]').forEach(link => { link.style.display = ''; });
+      $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab], [data-role-gate]').forEach(link => { link.style.display = ''; });
+      $$('.sb-section').forEach((sec) => { sec.style.display = ''; });
       return;
     }
     const roleStyleId = 'rs-role-filter-style';
@@ -2504,34 +2662,68 @@
       : `.sidebar-link[data-tab], .mnav-link[data-tab], .mnav-more-btn[data-tab], .more-sheet-link[data-tab] { display: none !important; }`;
     // Hide sidebar links not in allowed list
     $$('.sidebar-link').forEach(link => {
+      const gate = roleGateAllows(link, tabs);
+      if (gate === false) { link.style.display = 'none'; return; }
+      if (gate === true) { link.style.display = ''; return; }
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Hide mobile bottom nav links not in allowed list
     $$('.mnav-link').forEach(link => {
+      const gate = roleGateAllows(link, tabs);
+      if (gate === false) { link.style.display = 'none'; return; }
+      if (gate === true) { link.style.display = ''; return; }
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Hide mobile "More" sheet entries not in allowed list (built later by
     // features-shell, so this also re-runs on rs:hydrated below)
-    $$('.mnav-more-btn[data-tab], .more-sheet-link[data-tab]').forEach(link => {
+    $$('.mnav-more-btn[data-tab], .more-sheet-link[data-tab], .mnav-more-btn[data-role-gate], [data-klc-nav="setup"]').forEach(link => {
+      const gate = roleGateAllows(link, tabs);
+      if (gate === false) { link.style.display = 'none'; return; }
+      if (gate === true) { link.style.display = ''; return; }
       const tabId = link.dataset.tab || '';
       if (!tabId) return;
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
+    // Explicit Kitchen Setup (coach modal) — never show for POS-only staff
+    const klc = document.getElementById('klc-sidebar-setup');
+    if (klc) {
+      const ok = roleGateAllows(klc, tabs);
+      klc.style.display = ok === false ? 'none' : (ok === true || tabs.includes('editor-tab') || tabs.includes('inventory-tab') ? '' : 'none');
+    }
+    const klcMob = document.getElementById('klc-mobile-setup');
+    if (klcMob) {
+      const ok = tabs.includes('editor-tab') || tabs.includes('inventory-tab');
+      klcMob.style.display = ok ? '' : 'none';
+    }
+    // Hide empty sidebar section labels (e.g. Manage when only Kitchen Setup was visible)
+    $$('.sb-nav .sb-section').forEach((sec) => {
+      let n = sec.nextElementSibling;
+      let any = false;
+      while (n && !n.classList.contains('sb-section')) {
+        if (n.classList.contains('sidebar-link') && n.style.display !== 'none' && getComputedStyle(n).display !== 'none') any = true;
+        n = n.nextElementSibling;
+      }
+      sec.style.display = any ? '' : 'none';
+    });
     // Update user pill role label
     const userRoleEl = document.querySelector('.user-pill .ur');
     if (userRoleEl) userRoleEl.textContent = ROLE_LABELS[role] || role;
-    // Hide settings entry points from non-managers (only owner/admin/manager
-    // may open Settings; this covers both the sidebar link and the gear
-    // button in the sidebar footer, which previously was never gated)
-    if (role !== 'manager') {
+    // Settings + Help + support call: owner/admin unrestricted (tabs=null); managers get them;
+    // cashiers/waiters never. Always set both directions so live promote works.
+    {
+      const canSettings = !tabs || role === 'manager' || role === 'owner' || role === 'admin';
       const settingsLink = document.querySelector('.sidebar-link[data-tab="settings-tab"]');
-      if (settingsLink) settingsLink.style.display = 'none';
+      if (settingsLink) settingsLink.style.display = canSettings ? '' : 'none';
       const settingsGear = document.getElementById('open-settings');
-      if (settingsGear) settingsGear.style.display = 'none';
+      if (settingsGear) settingsGear.style.display = canSettings ? '' : 'none';
+      const helpBtn = document.getElementById('open-product-guide-btn');
+      if (helpBtn) helpBtn.style.display = canSettings ? '' : 'none';
+      const supportWrap = document.getElementById('tb-support-wrap');
+      if (supportWrap) supportWrap.style.display = canSettings ? '' : 'none';
     }
     // If the tab the user is currently sitting on just got revoked, move
     // them somewhere they can still see rather than leaving a dead screen up.
@@ -2549,23 +2741,89 @@
     applyStaffRoleTabFiltering(cur.staffRole || staffRole, cur.allowedTabs || allowedTabs);
   });
 
-  // Live role/permission update -- called from setupSupabaseRealtime()'s
-  // tenant_users subscription when an admin changes this user's role or
-  // allowed tabs, so it takes effect immediately instead of needing a
-  // fresh login.
-  function applyLiveRoleUpdate(newRole, newAllowedTabsColumn) {
+  // Live role/permission update -- realtime (tenant_users) + validate poll.
+  // Admin can increase/decrease tabs without forcing staff to re-login.
+  function applyLiveRoleUpdate(newRole, newAllowedTabsColumn, opts) {
     if (isSuper || isBrandAdmin) return;
     const resolvedRole = String(newRole || staffRole).toLowerCase().trim();
     // Prefer an explicit per-user allowed_tabs override (set in Team & Roles);
     // otherwise fall back to the role's default tab set.
     const resolvedTabs = resolveAllowedTabs(resolvedRole, newAllowedTabsColumn);
+    const prev = window.RS_ROLE || {};
+    const prevRole = String(prev.staffRole || staffRole || '').toLowerCase().trim();
+    const prevTabs = Array.isArray(prev.allowedTabs) ? prev.allowedTabs.slice().sort().join('|') : '';
+    const nextTabs = Array.isArray(resolvedTabs) ? resolvedTabs.slice().sort().join('|') : (resolvedTabs == null ? '__all__' : '');
+    const changed = prevRole !== resolvedRole || prevTabs !== nextTabs;
     sessionStorage.setItem('logged_in_role', resolvedRole);
     sessionStorage.setItem('allowed_tabs', JSON.stringify(resolvedTabs || []));
     applyStaffRoleTabFiltering(resolvedRole, resolvedTabs);
     window.RS_ROLE = { staffRole: resolvedRole, allowedTabs: resolvedTabs, ROLE_TAB_MAP, ROLE_LABELS };
-    toast('Your access permissions were just updated', 'fa-user-shield');
+    // Keep keep-me-signed-in blob in sync so next cold start has new tabs
+    try {
+      if (window.RS_API && typeof RS_API.applyLocalRoleTabs === 'function') {
+        const payload = {
+          role: resolvedRole,
+          user_id: sessionStorage.getItem('tenant_user_id') || '',
+        };
+        // null = unrestricted (owner); do not overwrite with empty list
+        if (resolvedTabs != null) payload.allowed_tabs = resolvedTabs;
+        RS_API.applyLocalRoleTabs(payload);
+      }
+    } catch (_) {}
+    // Re-run Kitchen Setup visibility (coach otherwise force-shows the link)
+    try {
+      if (window.RSKitchenLinkCoach && typeof RSKitchenLinkCoach.refreshSetupNav === 'function') {
+        RSKitchenLinkCoach.refreshSetupNav();
+      }
+    } catch (_) {}
+    if (changed) {
+      // Debounce toasts (poll every 8s must not spam if something re-normalizes tabs)
+      const now = Date.now();
+      if (!window.__rsRoleToastAt || now - window.__rsRoleToastAt > 12000) {
+        window.__rsRoleToastAt = now;
+        toast(
+          opts && opts.silent ? 'Access updated — modules refreshed' : 'Your access permissions were just updated',
+          'fa-user-shield'
+        );
+      }
+    }
+    return changed;
   }
   window.RS_applyLiveRoleUpdate = applyLiveRoleUpdate;
+
+  // Fallback when Supabase realtime RLS drops tenant_users events: soft-poll
+  // validate_session (returns fresh role + allowed_tabs without kicking offline).
+  if (!window.__rsRolePollTimer && !isSuper && !isBrandAdmin) {
+    const pollRole = async () => {
+      if (document.hidden) return;
+      if (!window.RS_API || !RS_API.configured || typeof RS_API.validateSession !== 'function') return;
+      try {
+        const sess = await RS_API.validateSession();
+        if (sess === null && navigator.onLine) {
+          // Revoked/suspended → wipe offline resume. Soft expire → keep blob for offline POS.
+          const code = (RS_API.lastValidateError && RS_API.lastValidateError.authCode) || '';
+          const wipeOffline = code === 'revoked' || code === 'subscription' || code === 'unauthorized';
+          try {
+            RS_API.logout({ intentional: false, clearRemember: wipeOffline });
+          } catch (_) {}
+          location.href = 'login?stay=1';
+          return;
+        }
+        if (sess && sess.role && sess.role !== 'superadmin') {
+          applyLiveRoleUpdate(sess.role, sess.allowed_tabs, { silent: true });
+        }
+      } catch (_) {
+        /* offline / network — keep local tabs */
+      }
+    };
+    window.__rsRolePollTimer = setInterval(pollRole, 8000);
+    // First poll soon after boot so Floor/KDS grants appear without full reload
+    setTimeout(pollRole, 1500);
+    setTimeout(pollRole, 4000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) pollRole();
+    });
+  }
 
   // Expose role helpers globally for other modules
   window.RS_ROLE = { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };
@@ -3154,8 +3412,9 @@
     if(window.RS_API && RS_API.configured){
       RS_API.validateSession().then(sess => {
         if(sess === null){
-          // Expired / revoked only — do not mark as user Sign out (that blocked re-open)
-          try { RS_API.logout({ intentional: false }); } catch (e) {}
+          const code = (RS_API.lastValidateError && RS_API.lastValidateError.authCode) || '';
+          const wipeOffline = code === 'revoked' || code === 'subscription' || code === 'unauthorized';
+          try { RS_API.logout({ intentional: false, clearRemember: wipeOffline }); } catch (e) {}
           location.href = 'login?stay=1';
         }
       }).catch(() => {

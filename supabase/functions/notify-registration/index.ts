@@ -344,7 +344,7 @@ function buildApprovalEmailHtml(record: Record<string, string>): string {
 
     <p style="font-size: 14px; line-height: 1.6;">You can access your store management dashboard portal using the link below:</p>
     <div style="text-align: center; margin: 24px 0;">
-      <a href="https://codearc-restrosuite.vercel.app/login" style="background: #22c55e; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Login Portal</a>
+      <a href="https://restrosuite.codearc.co.in/login" style="background: #22c55e; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Access Login Portal</a>
     </div>
 
     <p style="font-size: 14px; line-height: 1.6;">Please log in to review your outlet configuration, tax parameters, menu settings, and employee rosters to commence operations.</p>
@@ -384,7 +384,7 @@ function buildAdminNewRegistrationEmailHtml(record: Record<string, string>): str
     </div>
 
     <div style="text-align:center;margin:24px 0;">
-      <a href="https://codearc-restrosuite.vercel.app/login" style="background:#3b82f6;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:13px;display:inline-block;">Open Super Admin Dashboard →</a>
+      <a href="https://restrosuite.codearc.co.in/login" style="background:#3b82f6;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:13px;display:inline-block;">Open Super Admin Dashboard →</a>
     </div>
     <p style="font-size:11px;color:#999;text-align:center;">Automated notification from CodeArc RestroSuite.</p>
   </div>`;

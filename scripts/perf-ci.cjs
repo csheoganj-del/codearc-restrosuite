@@ -21,8 +21,13 @@ async function main() {
     run(process.execPath, [path.join(root, 'scripts', 'minify-assets.cjs')], root);
   }
 
-  const indexUrl = pathToFileURL(path.join(outDir, 'index.html')).toString() + '?home=1';
-  const loginUrl = pathToFileURL(path.join(outDir, 'login.html')).toString();
+  const targets = [
+    pathToFileURL(path.join(outDir, 'index.html')).toString() + '?home=1',
+    pathToFileURL(path.join(outDir, 'login.html')).toString(),
+    pathToFileURL(path.join(outDir, 'order.html')).toString() + '?slug=demo',
+    pathToFileURL(path.join(outDir, 'qr-order.html')).toString(),
+    pathToFileURL(path.join(outDir, 'install.html')).toString(),
+  ];
 
   const maxLcp = process.env.MAX_LCP_MS || '3500';
   const maxFcp = process.env.MAX_FCP_MS || '2000';
@@ -31,7 +36,7 @@ async function main() {
 
   const r = spawnSync(
     process.execPath,
-    [path.join(root, 'scripts', 'measure-web-vitals.cjs'), indexUrl, loginUrl],
+    [path.join(root, 'scripts', 'measure-web-vitals.cjs'), ...targets],
     {
       cwd: root,
       stdio: 'inherit',

@@ -96,13 +96,12 @@ async function main() {
     })
     .join('\n');
 
-  const tmp     = path.join(outDir, '_critical-src.js');
+  const tmp     = path.join(outDir, `_critical-src-${process.pid}.js`);
   const outFile = path.join(outDir, 'critical.bundle.js');
-  const mapFile = outFile + '.map';
 
   fs.writeFileSync(tmp, concatenated);
 
-  const buildResult = await esbuild.build({
+  const buildOptions = {
     entryPoints: [tmp],
     bundle:       false,   // IIFEs — no module graph to resolve
     minify:       true,
@@ -113,7 +112,31 @@ async function main() {
     legalComments: 'none',
     charset:      'utf8',
     logLevel:     'info',
-  });
+  };
+
+  // Windows Defender, search indexing, or a running desktop shell can briefly
+  // retain a generated bundle. Retry only that transient sharing violation.
+  let buildResult;
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    try {
+      buildResult = await esbuild.build(buildOptions);
+      break;
+    } catch (error) {
+      const detail = String(error && (error.message || error));
+      const transientWindowsLock =
+        process.platform === 'win32' &&
+        /user-mapped section open|EBUSY|EPERM|resource busy/i.test(detail);
+      if (!transientWindowsLock || attempt === 6) {throw error;}
+      const retryDelayMs = attempt * 250;
+      console.warn(
+        `[build-critical] Output temporarily locked; retrying in ${retryDelayMs}ms ` +
+        `(${attempt}/6).`
+      );
+      await new Promise((resolve) => {
+        setTimeout(resolve, retryDelayMs);
+      });
+    }
+  }
 
   // Cleanup temp source file
   try { fs.unlinkSync(tmp); } catch (_) {}
@@ -215,7 +238,9 @@ async function main() {
       const result = await esbuild.transform(original, {
         loader:    'js',
         minify:    true,
-        sourcemap: 'inline',
+        // Standalone deploy assets must not embed multi-megabyte source maps.
+        // The critical bundle keeps its separate map; pass 2 emits production JS only.
+        sourcemap: false,
         target:    ['es2019'],
       });
       const afterLen = Buffer.byteLength(result.code, 'utf8');

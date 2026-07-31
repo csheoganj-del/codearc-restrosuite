@@ -12,7 +12,7 @@ const tsPath = path.join(root, 'supabase', 'functions', '_shared', 'role-default
 const jsPath = path.join(root, 'assets', 'role-defaults.js');
 
 function read(p) {
-  if (!fs.existsSync(p)) throw new Error('Missing file: ' + p);
+  if (!fs.existsSync(p)) {throw new Error('Missing file: ' + p);}
   return fs.readFileSync(p, 'utf8');
 }
 
@@ -24,7 +24,7 @@ function extractRoleTabs(src) {
   let m;
   while ((m = re.exec(src))) {
     const role = m[1];
-    let body = m[2].trim();
+    const body = m[2].trim();
     // admin: [...ALL_MODULE_TABS] or admin: ALL_MODULE_TABS.slice()
     if (/ALL_MODULE_TABS/.test(body)) {
       map[role] = ['__ALL__'];
@@ -33,7 +33,7 @@ function extractRoleTabs(src) {
     const tabs = [];
     const tre = /['"]([a-z0-9_-]+)['"]/g;
     let t;
-    while ((t = tre.exec(body))) tabs.push(t[1]);
+    while ((t = tre.exec(body))) {tabs.push(t[1]);}
     map[role] = tabs.sort();
   }
   return map;
@@ -41,11 +41,11 @@ function extractRoleTabs(src) {
 
 function extractAllModuleTabs(src) {
   const m = src.match(/ALL_MODULE_TABS[^=]*=\s*\[([\s\S]*?)\]/);
-  if (!m) return [];
+  if (!m) {return [];}
   const tabs = [];
   const tre = /['"]([a-z0-9_-]+)['"]/g;
   let t;
-  while ((t = tre.exec(m[1]))) tabs.push(t[1]);
+  while ((t = tre.exec(m[1]))) {tabs.push(t[1]);}
   return tabs.sort();
 }
 

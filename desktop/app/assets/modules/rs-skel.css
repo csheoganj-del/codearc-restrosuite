@@ -2,9 +2,20 @@
    RestroSuite — RSSkel shared shimmer surfaces
    ============================================================ */
 
+/* Do NOT set pointer-events:none on the host element.
+   paint() leaves rs-skel-host on the tab root; real buttons are painted
+   inside via innerHTML without clearing the class — that made whole Floor
+   (and similar tabs) look fine but silently ignore every click.
+   Only shimmer placeholders are non-interactive. */
 .rs-skel-host {
-  pointer-events: none;
   user-select: none;
+}
+.rs-skel-host .rs-skel-bar,
+.rs-skel-host .rs-skel-card,
+.rs-skel-host .rs-skel-floor-tile,
+.rs-skel-host .rs-skel-row,
+.rs-skel-host .rs-skel-cell {
+  pointer-events: none;
 }
 
 .rs-skel-bar {

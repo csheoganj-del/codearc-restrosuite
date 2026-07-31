@@ -33,7 +33,7 @@ function ensureDir(d) {
 }
 
 function latestFile(dir, re) {
-  if (!fs.existsSync(dir)) return null;
+  if (!fs.existsSync(dir)) {return null;}
   const files = fs
     .readdirSync(dir)
     .filter((f) => re.test(f))
@@ -48,7 +48,7 @@ function latestFile(dir, re) {
 
 function copyStable(src, destName, destDir) {
   const dir = destDir || OUT;
-  if (!src || !fs.existsSync(src.path || src)) return null;
+  if (!src || !fs.existsSync(src.path || src)) {return null;}
   const from = src.path || src;
   ensureDir(dir);
   const to = path.join(dir, destName);
@@ -66,9 +66,9 @@ function copyStable(src, destName, destDir) {
 }
 
 function formatBytes(n) {
-  if (n < 1024) return n + ' B';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
-  if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  if (n < 1024) {return n + ' B';}
+  if (n < 1024 * 1024) {return (n / 1024).toFixed(0) + ' KB';}
+  if (n < 1024 * 1024 * 1024) {return (n / (1024 * 1024)).toFixed(1) + ' MB';}
   return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
@@ -118,21 +118,21 @@ function publishDesktopFeed(desktopDir, desktopPkg) {
 
   if (yml) {
     const m = copyStable(yml, 'latest.yml', DESKTOP_OUT);
-    if (m) published.push(m);
+    if (m) {published.push(m);}
   }
 
   let nsisMeta = null;
   if (nsis) {
     // Keep original electron-builder filename so latest.yml paths resolve
     nsisMeta = copyStable(nsis, nsis.name, DESKTOP_OUT);
-    if (nsisMeta) published.push(nsisMeta);
+    if (nsisMeta) {published.push(nsisMeta);}
     // Also publish a stable public name for the downloads page
     copyStable(nsis, 'RestroSuite-Windows-Setup.exe', OUT);
   }
 
   if (blockmap) {
     const m = copyStable(blockmap, blockmap.name, DESKTOP_OUT);
-    if (m) published.push(m);
+    if (m) {published.push(m);}
   }
 
   let portableMeta = null;
@@ -140,12 +140,12 @@ function publishDesktopFeed(desktopDir, desktopPkg) {
     portableMeta = copyStable(portable, portable.name, DESKTOP_OUT);
     // Stable public name
     const stable = copyStable(portable, 'RestroSuite-Windows-Portable.exe', OUT);
-    if (stable) portableMeta = Object.assign({}, portableMeta || {}, {
+    if (stable) {portableMeta = Object.assign({}, portableMeta || {}, {
       stableUrl: stable.absoluteUrl,
       size: stable.size,
       sizeLabel: stable.sizeLabel,
       updatedAt: stable.updatedAt,
-    });
+    });}
   }
 
   // If latest.yml missing but we have an NSIS build, write a minimal feed so
@@ -153,7 +153,7 @@ function publishDesktopFeed(desktopDir, desktopPkg) {
   if (!yml && nsis && desktopPkg.version) {
     const minimal =
       `version: ${desktopPkg.version}\n` +
-      `files:\n` +
+      'files:\n' +
       `  - url: ${nsis.name}\n` +
       `    size: ${nsis.size}\n` +
       `path: ${nsis.name}\n` +
@@ -179,24 +179,24 @@ function publishDesktopFeed(desktopDir, desktopPkg) {
   if (macArm) {
     macArmMeta = copyStable(macArm, macArm.name, DESKTOP_OUT);
     copyStable(macArm, 'RestroSuite-Mac-AppleSilicon.dmg', OUT);
-    if (macArmMeta) published.push(macArmMeta);
+    if (macArmMeta) {published.push(macArmMeta);}
   }
   if (macX64) {
     macX64Meta = copyStable(macX64, macX64.name, DESKTOP_OUT);
     copyStable(macX64, 'RestroSuite-Mac-Intel.dmg', OUT);
-    if (macX64Meta) published.push(macX64Meta);
+    if (macX64Meta) {published.push(macX64Meta);}
   }
   if (macYml) {
     const m = copyStable(macYml, 'latest-mac.yml', DESKTOP_OUT);
-    if (m) published.push(m);
+    if (m) {published.push(m);}
   }
   if (macZipArm) {
     const m = copyStable(macZipArm, macZipArm.name, DESKTOP_OUT);
-    if (m) published.push(m);
+    if (m) {published.push(m);}
   }
   if (macZipX64) {
     const m = copyStable(macZipX64, macZipX64.name, DESKTOP_OUT);
-    if (m) published.push(m);
+    if (m) {published.push(m);}
   }
 
   return {

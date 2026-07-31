@@ -19,7 +19,7 @@ function impactRank(impact) {
 
 function defaultUrls() {
   const root = path.resolve(__dirname, '..', 'publish-static');
-  const files = ['index.html?home=1', 'login.html', 'qr-order.html'];
+  const files = ['index.html?home=1', 'login.html', 'order.html?slug=demo', 'qr-order.html', 'install.html', 'feedback.html', 'status.html', 'privacy.html', 'terms.html', 'refund-policy.html'];
   return files.map((f) => {
     const [file, q] = f.split('?');
     const u = pathToFileURL(path.join(root, file)).toString();
@@ -42,7 +42,9 @@ async function settlePage(page) {
 }
 
 async function scanPage(browser, url, minImpactRank) {
-  const page = await browser.newPage();
+  // Axe is injected only in the isolated audit browser; bypass page CSP so a strict
+  // production policy cannot turn the accessibility gate into a false crash.
+  const page = await browser.newPage({ bypassCSP: true });
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 60000 });
     const finalUrl = await settlePage(page);
@@ -83,7 +85,7 @@ async function main() {
   const urls = parseCsv(process.env.A11Y_URLS);
   const targets = urls.length ? urls : defaultUrls();
 
-  const minImpact = process.env.A11Y_MIN_IMPACT || 'serious';
+  const minImpact = process.env.A11Y_MIN_IMPACT || 'moderate';
   const minImpactRank = impactRank(minImpact);
   if (!minImpactRank) {
     process.stderr.write(`Invalid A11Y_MIN_IMPACT="${minImpact}". Use minor|moderate|serious|critical.\n`);
@@ -104,8 +106,10 @@ async function main() {
       process.stdout.write(`A11Y violations (${minImpact}+): ${u}\n`);
       for (const v of page.violations) {
         const nodes = Array.isArray(v.nodes) ? v.nodes : [];
-        const sample = nodes[0] && nodes[0].target ? nodes[0].target.join(', ') : '';
-        process.stdout.write(`- ${v.id} [${v.impact}] ${v.help} (${nodes.length} nodes) ${sample}\n`);
+        const samples = nodes.slice(0, 20).map((node) =>
+          node && node.target ? node.target.join(', ') : ''
+        ).filter(Boolean).join(' | ');
+        process.stdout.write(`- ${v.id} [${v.impact}] ${v.help} (${nodes.length} nodes) ${samples}\n`);
       }
       process.stdout.write('\n');
     }

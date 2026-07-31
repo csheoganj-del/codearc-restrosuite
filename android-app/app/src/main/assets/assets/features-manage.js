@@ -2377,12 +2377,59 @@
         { key:'inventory', label:'Inventory Manager', color:'#b45309', icon:'fa-boxes-stacked', blurb:'Stock & menu — inventory, editor, reports' },
       ];
 
+      // Tabs an owner can grant/revoke per staff (live). Canonical list from role-defaults.js
+      const RD = window.RS_ROLE_DEFAULTS || {};
+      const STAFF_TAB_OPTIONS = RD.STAFF_TAB_OPTIONS || [
+        { id: 'pos-tab', label: 'POS / Billing', icon: 'fa-cash-register' },
+        { id: 'floor-tab', label: 'Floor / Tables', icon: 'fa-border-all' },
+        { id: 'kds-tab', label: 'Kitchen (KDS)', icon: 'fa-fire-burner' },
+        { id: 'qr-orders-tab', label: 'QR Orders', icon: 'fa-qrcode' },
+        { id: 'bills-tab', label: 'Bills history', icon: 'fa-receipt' },
+        { id: 'customers-tab', label: 'Customers', icon: 'fa-users' },
+        { id: 'inventory-tab', label: 'Inventory', icon: 'fa-boxes-stacked' },
+        { id: 'editor-tab', label: 'Menu editor', icon: 'fa-utensils' },
+        { id: 'reports-tab', label: 'Reports', icon: 'fa-chart-line' },
+        { id: 'analytics-tab', label: 'Analytics', icon: 'fa-chart-pie' },
+        { id: 'employees-tab', label: 'Team / HR', icon: 'fa-id-badge' },
+        { id: 'growth-hub-tab', label: 'Growth hub', icon: 'fa-rocket' },
+        { id: 'aggregator-tab', label: 'Online orders', icon: 'fa-store' },
+        { id: 'tax-tab', label: 'Tax', icon: 'fa-percent' },
+        { id: 'tokens-tab', label: 'Token display', icon: 'fa-tv' },
+      ];
+      const ROLE_DEFAULT_TABS = RD.ROLE_DEFAULT_TABS || {
+        manager:   ['pos-tab','floor-tab','qr-orders-tab','kds-tab','bills-tab','inventory-tab','editor-tab','customers-tab','reports-tab','analytics-tab','employees-tab','growth-hub-tab','aggregator-tab','tax-tab'],
+        cashier:   ['pos-tab','floor-tab','bills-tab','customers-tab'],
+        waiter:    ['pos-tab','floor-tab','kds-tab'],
+        captain:   ['pos-tab','floor-tab','kds-tab','qr-orders-tab'],
+        kitchen:   ['kds-tab'],
+        inventory: ['inventory-tab','editor-tab','reports-tab'],
+        customer_display: ['tokens-tab'],
+      };
+
       // Cache for loaded staff users
       let staffUsers = [];
       let staffUsage = {};
 
       function staffRoleMeta(key) {
         return STAFF_ROLES.find(r => r.key === key) || { key, label: key || 'Staff', color: '#888', icon: 'fa-user', blurb: '' };
+      }
+      function tabsForRole(role) {
+        if (RD.tabsForRole) return RD.tabsForRole(role);
+        return (ROLE_DEFAULT_TABS[role] || ROLE_DEFAULT_TABS.waiter).slice();
+      }
+      function renderTabPermissionGrid(selectedIds) {
+        const sel = new Set((selectedIds || []).map(String));
+        return `<div id="sle-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:220px;overflow:auto;padding:2px">
+          ${STAFF_TAB_OPTIONS.map(t => `
+            <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid var(--stroke-2);background:var(--glass);cursor:pointer;font-size:12.5px;font-weight:600">
+              <input type="checkbox" class="sle-tab" value="${t.id}" ${sel.has(t.id) ? 'checked' : ''} style="accent-color:var(--orange);width:15px;height:15px">
+              <i class="fa-solid ${t.icon}" style="color:var(--text-mute);width:14px;text-align:center;font-size:12px"></i>
+              <span>${t.label}</span>
+            </label>`).join('')}
+        </div>
+        <p style="font-size:11.5px;color:var(--text-mute);margin:8px 0 0;line-height:1.4">
+          Tick modules this person can open. Changes apply in real time on their open app (within ~15s) — no re-login needed.
+        </p>`;
       }
 
       function genStaffPassword() {
@@ -2515,9 +2562,9 @@
               <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Temp password</span><code id="sl-ok-pwd" style="font-size:13px;font-weight:700;letter-spacing:.02em">${safe(creds.password)}</code></div>
               <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Role</span><span style="font-size:13px;font-weight:600;color:${creds.roleColor || 'var(--text)'}">${safe(creds.roleLabel || '')}</span></div>
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label">WhatsApp number <span style="color:var(--text-mute);font-weight:500;font-size:11px">(optional — to send login)</span></label>
-              <input id="sl-ok-phone" class="form-control" inputmode="tel" placeholder="e.g. 9876543210" value="${safe(creds.phone || '')}" autocomplete="tel">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label for="sl-ok-phone" style="font-size:12.5px;font-weight:700">WhatsApp number <span style="font-weight:500;color:var(--text-mute)">(optional)</span></label>
+              <input id="sl-ok-phone" class="form-input" type="tel" inputmode="tel" placeholder="e.g. 9876543210" value="${safe(creds.phone || '')}" autocomplete="tel">
             </div>
             <div style="font-size:12px;color:var(--text-mute);line-height:1.45">
               Tip: Directory (team members) is for roster & payroll. <b>Logins</b> is only for app usernames.
@@ -2821,9 +2868,13 @@
               const meter = el.querySelector('#sl-pwd-meter');
               if (!meter || !pwdEl) return;
               const p = pwdEl.value || '';
-              if (p.length < 10) meter.innerHTML = '<span style="color:var(--red)">Too short — need at least 10 characters.</span>';
-              else if (p.length < 12) meter.innerHTML = '<span style="color:#b45309">OK — consider Generate for a stronger password.</span>';
-              else meter.innerHTML = '<span style="color:var(--ok,#1F8A5B)">Strong enough to share as a temporary password.</span>';
+              if (p.length < 10) {
+                meter.innerHTML = '<span style="color:var(--red)">Too short — need at least 10 characters.</span>';
+              } else if (p.length < 12) {
+                meter.innerHTML = 'Min 10 met — Generate can make it stronger.';
+              } else {
+                meter.innerHTML = '<span style="color:var(--ok,#1F8A5B)">Ready to share as a temporary password.</span>';
+              }
             };
 
             // Default role: Cashier
@@ -2922,22 +2973,40 @@
       function openEditStaffModal(loginPane, idx) {
         const u = staffUsers[idx]; if (!u) return;
         const curRole = u.role;
+        const curTabs = (Array.isArray(u.allowed_tabs) && u.allowed_tabs.length)
+          ? u.allowed_tabs.map(String)
+          : tabsForRole(curRole);
         const body = `
-          <div style="display:flex;flex-direction:column;gap:14px">
-            <div class="form-group">
-              <label class="form-label">Display name</label>
-              <input id="sle-dname" class="form-control" value="${safe(u.display_name||u.username)}">
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label class="sl-label" for="sle-dname" style="font-size:12.5px;font-weight:700">Display name</label>
+              <input id="sle-dname" class="form-input" type="text" value="${safe(u.display_name || u.username)}">
             </div>
-            <div class="form-group">
-              <label class="form-label">Role</label>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label style="font-size:12.5px;font-weight:700">Role template</label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                ${STAFF_ROLES.map(r=>`
-                  <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;border:1px solid ${r.key===curRole?'var(--orange)':'var(--stroke-2)'};cursor:pointer;background:${r.key===curRole?'var(--orange-tint)':'var(--glass)'}" class="sl-role-opt">
-                    <input type="radio" name="sle-role" value="${r.key}" ${r.key===curRole?'checked':''} style="display:none">
-                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:13px;width:16px;text-align:center"></i>
-                    <span style="font-size:13px;font-weight:600">${r.label}</span>
+                ${STAFF_ROLES.map(r => `
+                  <label class="sl-role-opt" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;border:1.5px solid ${r.key === curRole ? 'var(--orange)' : 'var(--stroke-2)'};cursor:pointer;background:${r.key === curRole ? 'rgba(255,79,0,.08)' : 'var(--glass)'};box-shadow:${r.key === curRole ? '0 0 0 1px var(--orange)' : 'none'}">
+                    <input type="radio" name="sle-role" value="${r.key}" ${r.key === curRole ? 'checked' : ''} style="position:absolute;opacity:0;pointer-events:none;width:0;height:0">
+                    <i class="fa-solid ${r.icon}" style="color:${r.color};font-size:15px;width:18px;text-align:center"></i>
+                    <span style="font-size:13px;font-weight:700">${r.label}</span>
                   </label>`).join('')}
               </div>
+              <p style="font-size:11.5px;color:var(--text-mute);margin:0">Changing role loads its default modules below — then fine-tune with checkboxes.</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                <label style="font-size:12.5px;font-weight:700">Module access</label>
+                <button type="button" class="btn btn-ghost btn-sm" id="sle-tabs-reset" style="font-size:11.5px"><i class="fa-solid fa-rotate-left"></i> Reset to role defaults</button>
+              </div>
+              <div class="sl-access-presets" id="sle-presets">
+                <button type="button" data-preset="billing">Billing only</button>
+                <button type="button" data-preset="floor_kds">Floor + KDS</button>
+                <button type="button" data-preset="kitchen">Kitchen only</button>
+                <button type="button" data-preset="manager">Full manager</button>
+              </div>
+              ${renderTabPermissionGrid(curTabs)}
+              <div class="sl-access-summary" id="sle-summary"></div>
             </div>
             <div id="sle-err" style="color:var(--red);font-size:12.5px;display:none"></div>
           </div>`;
@@ -2945,21 +3014,63 @@
         if (!window.RSModal) {
           const newRole = prompt('Role:\n'+STAFF_ROLES.map((r,i)=>`${i+1}. ${r.label}`).join('\n')+'\nEnter number:');
           const role = STAFF_ROLES[parseInt(newRole,10)-1]?.key; if (!role) return;
-          RS_API.staffUsers({ action:'update_user', user_id:u.id, role })
-            .then(() => { RS.toast('Role updated','fa-user-check'); loadStaffUsers(); })
+          RS_API.staffUsers({ action:'update_user', user_id:u.id, role, allowed_tabs: tabsForRole(role) })
+            .then(() => { RS.toast('Role updated — applies live on their device','fa-user-check'); loadStaffUsers(); })
             .catch(e => { console.warn(e); RS.toast(String(e.message || e), 'fa-circle-exclamation'); });
           return;
         }
 
         RSModal.open({
-          title: `Edit login — ${u.display_name || u.username}`,
+          title: `Edit access — ${u.display_name || u.username}`,
           icon: 'fa-user-gear',
           body,
           foot: `<button type="button" class="btn btn-ghost" id="sle-cancel">Cancel</button>
-                <button type="button" class="btn btn-primary" id="sle-save"><i class="fa-solid fa-check"></i> Save changes</button>`,
+                <button type="button" class="btn btn-primary" id="sle-save"><i class="fa-solid fa-check"></i> Save access</button>`,
           onMount: (modal, close) => {
             const el = modal;
             const closeModal = typeof close === 'function' ? close : () => {};
+            function applyRoleDefaultsToCheckboxes(role) {
+              const defaults = new Set(tabsForRole(role));
+              el.querySelectorAll('.sle-tab').forEach((cb) => {
+                cb.checked = defaults.has(cb.value);
+              });
+              updateAccessSummary();
+            }
+            function applyTabList(list) {
+              const set = new Set((list || []).map(String));
+              el.querySelectorAll('.sle-tab').forEach((cb) => {
+                cb.checked = set.has(cb.value);
+              });
+              updateAccessSummary();
+            }
+            function updateAccessSummary() {
+              const sum = el.querySelector('#sle-summary');
+              if (!sum) return;
+              const tabs = [...el.querySelectorAll('.sle-tab:checked')].map((c) => c.value);
+              const labels = {
+                'pos-tab': 'POS', 'floor-tab': 'Floor', 'kds-tab': 'Kitchen', 'bills-tab': 'Bills',
+                'qr-orders-tab': 'QR', 'customers-tab': 'Customers', 'inventory-tab': 'Inventory',
+                'editor-tab': 'Menu', 'reports-tab': 'Reports', 'employees-tab': 'Team',
+              };
+              const nice = tabs.map((t) => labels[t] || t.replace(/-tab$/, '')).join(' · ');
+              sum.innerHTML = tabs.length
+                ? 'They can open: <b>' + nice + '</b>. Changes apply on their open app within ~10s — no re-login.'
+                : 'Select at least one module.';
+            }
+            el.querySelectorAll('.sle-tab').forEach((cb) => cb.addEventListener('change', updateAccessSummary));
+            el.querySelectorAll('#sle-presets [data-preset]').forEach((btn) => {
+              btn.addEventListener('click', () => {
+                const key = btn.getAttribute('data-preset');
+                let tabs = window.RS_tabsForPreset ? RS_tabsForPreset(key) : null;
+                if (!tabs || !tabs.length) {
+                  if (key === 'manager') tabs = tabsForRole('manager');
+                  else if (key === 'billing') tabs = ['pos-tab', 'floor-tab', 'bills-tab', 'customers-tab'];
+                  else if (key === 'floor_kds') tabs = ['pos-tab', 'floor-tab', 'kds-tab'];
+                  else if (key === 'kitchen') tabs = ['kds-tab'];
+                }
+                applyTabList(tabs);
+              });
+            });
             el.querySelectorAll('.sl-role-opt').forEach(opt => {
               opt.addEventListener('click', () => {
                 el.querySelectorAll('.sl-role-opt').forEach(o => { o.style.borderColor = 'var(--stroke-2)'; o.style.background = 'var(--glass)'; o.style.boxShadow = 'none'; });
@@ -2967,22 +3078,51 @@
                 opt.style.background = 'var(--orange-tint, rgba(255,79,0,.08))';
                 opt.style.boxShadow = '0 0 0 1px var(--orange)';
                 const input = opt.querySelector('input');
-                if (input) input.checked = true;
+                if (input) {
+                  input.checked = true;
+                  applyRoleDefaultsToCheckboxes(input.value);
+                }
               });
             });
+            el.querySelector('#sle-tabs-reset')?.addEventListener('click', () => {
+              const role = el.querySelector('input[name="sle-role"]:checked')?.value || curRole;
+              applyRoleDefaultsToCheckboxes(role);
+            });
+            updateAccessSummary();
             el.querySelector('#sle-cancel').onclick = () => closeModal();
             el.querySelector('#sle-save').onclick = async () => {
               const errEl = el.querySelector('#sle-err');
               const dname = el.querySelector('#sle-dname').value.trim();
               const role  = el.querySelector('input[name="sle-role"]:checked')?.value;
+              const allowed_tabs = [...el.querySelectorAll('.sle-tab:checked')].map((c) => c.value);
               if (!dname) { errEl.textContent = 'Name required.'; errEl.style.display = 'block'; return; }
               if (!role)  { errEl.textContent = 'Select a role.'; errEl.style.display = 'block'; return; }
+              if (!allowed_tabs.length) {
+                errEl.textContent = 'Select at least one module they can open.';
+                errEl.style.display = 'block';
+                return;
+              }
+              const btn = el.querySelector('#sle-save');
+              if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving…'; }
               try {
-                await RS_API.staffUsers({ action: 'update_user', user_id: u.id, role, display_name: dname });
+                await RS_API.staffUsers({
+                  action: 'update_user',
+                  user_id: u.id,
+                  role,
+                  display_name: dname,
+                  allowed_tabs,
+                });
+                try {
+                  if (window.RS_ownerAudit) RS_ownerAudit('staff.access_update', (u.username || '') + ' → ' + allowed_tabs.join(','));
+                } catch (_) {}
                 closeModal();
-                RS.toast('Login updated', 'fa-user-check');
+                RS.toast('Access updated — live on their open app within ~10s', 'fa-user-shield');
                 loadStaffUsers();
-              } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+              } catch (e) {
+                errEl.textContent = e.message || String(e);
+                errEl.style.display = 'block';
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Save access'; }
+              }
             };
           }
         });
@@ -2992,16 +3132,17 @@
         const u = staffUsers[idx]; if (!u) return;
         const defaultPwd = genStaffPassword();
         const body = `
-          <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:16px">
             <div style="font-size:13px;color:var(--text-soft);line-height:1.45">
               Set a new temporary password for <b>${safe(u.display_name || u.username)}</b>. Share it once — ask them to change it after login.
             </div>
-            <div class="form-group" style="margin:0">
-              <label class="form-label" for="slp-pwd">New temporary password <span style="color:var(--text-mute);font-weight:500;font-size:11px">— min 10 characters</span></label>
-              <div style="display:flex;gap:8px">
-                <input id="slp-pwd" class="form-control" type="text" value="${safe(defaultPwd)}" autocomplete="new-password" spellcheck="false" style="font-family:ui-monospace,monospace;flex:1">
-                <button type="button" class="btn btn-ghost" id="slp-gen" style="white-space:nowrap"><i class="fa-solid fa-shuffle"></i> Generate</button>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label for="slp-pwd" style="font-size:12.5px;font-weight:700">New temporary password</label>
+              <div style="display:flex;gap:8px;align-items:stretch">
+                <input id="slp-pwd" class="form-input" type="text" value="${safe(defaultPwd)}" autocomplete="new-password" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;flex:1;min-width:0">
+                <button type="button" class="btn btn-ghost" id="slp-gen" style="white-space:nowrap;flex-shrink:0"><i class="fa-solid fa-shuffle"></i> Generate</button>
               </div>
+              <p style="font-size:11.5px;color:var(--text-mute);margin:0">Min 10 characters</p>
             </div>
             <div id="slp-err" role="alert" style="color:var(--red);font-size:12.5px;display:none"></div>
           </div>`;

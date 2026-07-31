@@ -55,7 +55,7 @@ async function dismiss(page) {
     .evaluate(() => {
       document.querySelectorAll('.dash-modal, .product-guide-modal, [role="dialog"]').forEach((el) => {
         const t = (el.textContent || '').toLowerCase();
-        if (t.includes('set up your outlet') || t.includes('fill this in later')) el.remove();
+        if (t.includes('set up your outlet') || t.includes('fill this in later')) {el.remove();}
       });
     })
     .catch(() => {});
@@ -65,7 +65,7 @@ async function login(page) {
   await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForTimeout(1000);
   const tab = page.locator('#tab-login-btn');
-  if (await tab.isVisible().catch(() => false)) await tab.click().catch(() => {});
+  if (await tab.isVisible().catch(() => false)) {await tab.click().catch(() => {});}
   await page.fill('#tenant-id', CREDS.outlet);
   await page.fill('#username', CREDS.user);
   await page.fill('#password', CREDS.pass);
@@ -77,7 +77,7 @@ async function login(page) {
   // licence soft path
   for (let i = 0; i < 6; i++) {
     const lock = page.locator('#rs-license-lock');
-    if (!(await lock.isVisible().catch(() => false))) break;
+    if (!(await lock.isVisible().catch(() => false))) {break;}
     await page.locator('#rs-license-retry').click().catch(() => {});
     await page.waitForTimeout(1500);
   }
@@ -92,7 +92,7 @@ async function activateTab(page, tabId) {
   }
   await page.evaluate(async (id) => {
     try {
-      if (window.RS && typeof RS.activateTab === 'function') await RS.activateTab(id);
+      if (window.RS && typeof RS.activateTab === 'function') {await RS.activateTab(id);}
     } catch (_) {}
   }, tabId);
   await page
@@ -196,7 +196,7 @@ async function main() {
     await page.waitForTimeout(1200);
     const menuCount = await page.evaluate(() => {
       try {
-        if (window.RS && Array.isArray(RS.MENU)) return RS.MENU.length;
+        if (window.RS && Array.isArray(RS.MENU)) {return RS.MENU.length;}
       } catch (_) {}
       return document.querySelectorAll('#editor-tab tr, #editor-tab .menu-item, #editor-tab tbody tr').length;
     });
@@ -216,7 +216,7 @@ async function main() {
     if (nTiles > 0) {
       await tiles.nth(0).click({ timeout: 2000 }).catch(() => {});
       await page.waitForTimeout(300);
-      if (nTiles > 1) await tiles.nth(1).click({ timeout: 2000 }).catch(() => {});
+      if (nTiles > 1) {await tiles.nth(1).click({ timeout: 2000 }).catch(() => {});}
       await page.waitForTimeout(500);
     }
     // payment cash
@@ -259,7 +259,7 @@ async function main() {
     const kot = page.locator('#btn-kot').first();
     const holdVis = await hold.isVisible({ timeout: 1500 }).catch(() => false);
     const kotVis = await kot.isVisible({ timeout: 1500 }).catch(() => false);
-    if (holdVis) await hold.click({ timeout: 3000 }).catch(() => {});
+    if (holdVis) {await hold.click({ timeout: 3000 }).catch(() => {});}
     await page.waitForTimeout(500);
     if (kotVis) {
       await tiles.nth(0).click({ timeout: 1000 }).catch(() => {});
@@ -333,7 +333,7 @@ async function main() {
     // B20 Sign out / re-login
     await page.evaluate(() => {
       try {
-        if (window.RS_DB && RS_DB.signOut) return RS_DB.signOut();
+        if (window.RS_DB && RS_DB.signOut) {return RS_DB.signOut();}
       } catch (_) {}
     });
     await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -364,7 +364,7 @@ async function main() {
     mp.setDefaultTimeout(45000);
     await mp.goto(BASE + '/login', { waitUntil: 'domcontentloaded', timeout: 90000 });
     await mp.waitForTimeout(800);
-    if (await mp.locator('#tab-login-btn').isVisible().catch(() => false)) await mp.locator('#tab-login-btn').click().catch(() => {});
+    if (await mp.locator('#tab-login-btn').isVisible().catch(() => false)) {await mp.locator('#tab-login-btn').click().catch(() => {});}
     await mp.fill('#tenant-id', CREDS.outlet);
     await mp.fill('#username', CREDS.user);
     await mp.fill('#password', CREDS.pass);
@@ -378,7 +378,7 @@ async function main() {
         await mp.locator('#rs-license-retry').click().catch(() => {});
         await mp.waitForTimeout(1500);
         locked = await mp.locator('#rs-license-lock').isVisible().catch(() => false);
-        if (!locked) break;
+        if (!locked) {break;}
       }
     }
     const onDash = mp.url().includes('dashboard');

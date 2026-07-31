@@ -22,7 +22,7 @@ const MODULES = [
 ];
 
 test.describe('Deploy health', () => {
-  test('wave modules return 200 and expose globals', async ({ request, baseURL }) => {
+  test('wave modules return 200 and expose globals', async ({ request }) => {
     test.setTimeout(120_000);
     const failures = [];
     for (const path of MODULES) {
@@ -37,9 +37,10 @@ test.describe('Deploy health', () => {
     expect(failures, failures.join('\n')).toEqual([]);
   });
 
-  test('dashboard HTML references wave 11–12 modules', async ({ page }) => {
-    await page.goto('/dashboard.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const html = await page.content();
+  test('dashboard HTML references wave 11–12 modules', async ({ request }) => {
+    const response = await request.get('/dashboard.html');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
     expect(html).toMatch(/pos-ui\.js/);
     expect(html).toMatch(/tax-helpers\.js|bills-history\.js/);
     // Version stamp present (v5x or v6x wave series)

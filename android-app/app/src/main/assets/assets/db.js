@@ -1327,8 +1327,43 @@
       for (const k in uiSettings) {
         out[k] = uiSettings[k];
       }
+      // Defense-in-depth: never keep PIN material in staff browser memory
+      try {
+        const role = String(
+          (window.RS_API && RS_API.session && RS_API.session()?.role) ||
+          sessionStorage.getItem('logged_in_role') || ''
+        ).toLowerCase();
+        const isAdmin = role === 'admin' || role === 'manager' || role === 'owner' || role === 'superadmin';
+        if (!isAdmin) {
+          if (out.admin_pin_hash) out.admin_pin_configured = true;
+          delete out.admin_pin_hash;
+          delete out.admin_pin;
+          delete out.pin_reset_code_hash;
+          delete out.master_pin_reset_hash;
+          if (out._raw && typeof out._raw === 'object') {
+            try {
+              const raw = JSON.parse(JSON.stringify(out._raw));
+              if (raw.feature_flags) {
+                let ff = raw.feature_flags;
+                if (typeof ff === 'string') { try { ff = JSON.parse(ff); } catch (_) { ff = {}; } }
+                if (ff && typeof ff === 'object') {
+                  delete ff.pin_reset_code_hash;
+                  delete ff.master_pin_reset_hash;
+                  delete ff.admin_pin_hash;
+                  if (ff.ui_settings && typeof ff.ui_settings === 'object') {
+                    delete ff.ui_settings.admin_pin_hash;
+                    delete ff.ui_settings.admin_pin;
+                  }
+                  raw.feature_flags = ff;
+                }
+              }
+              out._raw = raw;
+            } catch (_) {}
+          }
+        }
+      } catch (_) {}
       
-      out._raw = row; return out;
+      out._raw = out._raw || row; return out;
     },
     async setSettings(o){
       const body={}; for(const k in o){ if(SETTINGS_MAP[k]) body[SETTINGS_MAP[k]] = o[k]; }
@@ -1821,10 +1856,33 @@
           const msg = (e && e.message) || String(e);
           console.warn(`[RS_DB] Sync queue replay failed for ${entry.collection}:`, msg);
           failed++;
-          // Drop poison pills: permanent client errors, or too many retries for non-bill rows
-          const permanent = /401|403|404|not signed|unauthorized|invalid|schema|column|duplicate key/i.test(msg);
-          const maxAttempts = entry.critical ? 12 : 6;
-          if (forceDropStuck || permanent || attempts >= maxAttempts) {
+          // Auth failures: never drop money/critical rows — pause until re-login
+          const authFail = /401|403|not signed|unauthorized|session expired|session was revoked/i.test(msg);
+          // True poison (schema/not found) — not bare "invalid" (too broad)
+          const permanent = /404|schema|column does not|duplicate key|unique constraint/i.test(msg);
+          const maxAttempts = entry.critical ? 24 : 6;
+          if (authFail) {
+            remaining.push({
+              ...working,
+              status: 'pending',
+              needsAuth: true,
+              lastError: msg,
+              lastAttemptAt: Date.now(),
+            });
+            const cur = getSyncQueue();
+            const ix = cur.findIndex(x =>
+              x.id === working.id || entryKey(x.method, x.collection, x.args) === entryKey(working.method, working.collection, working.args)
+            );
+            if (ix >= 0) cur[ix] = remaining[remaining.length - 1];
+            else cur.push(remaining[remaining.length - 1]);
+            saveSyncQueue(cur);
+            continue;
+          }
+          // Never drop critical bill/settings rows on retries alone (unless forceDropStuck)
+          const mayDrop = forceDropStuck || (permanent && !entry.critical) ||
+            (!entry.critical && attempts >= maxAttempts) ||
+            (entry.critical && permanent && attempts >= maxAttempts);
+          if (mayDrop) {
             console.warn(`[RS_DB] Dropping stuck sync entry ${entry.method}/${entry.collection} after ${attempts} attempt(s): ${msg}`);
             const after = getSyncQueue().filter(x =>
               !(x.id === working.id || entryKey(x.method, x.collection, x.args) === entryKey(working.method, working.collection, working.args))
@@ -1932,6 +1990,16 @@
 
   function cachePinHashFromSettings(settings) {
     try {
+      // Only bank PIN hash for admin/manager sessions (never staff browsers)
+      const role = String(
+        (window.RS_API && RS_API.session && RS_API.session()?.role) ||
+        sessionStorage.getItem('logged_in_role') || ''
+      ).toLowerCase();
+      const isAdmin = role === 'admin' || role === 'manager' || role === 'owner' || role === 'superadmin';
+      if (!isAdmin) {
+        try { localStorage.removeItem('rs:admin_pin_hash'); } catch (_) {}
+        return;
+      }
       if (settings && settings.admin_pin_hash) {
         localStorage.setItem('rs:admin_pin_hash', String(settings.admin_pin_hash));
       }

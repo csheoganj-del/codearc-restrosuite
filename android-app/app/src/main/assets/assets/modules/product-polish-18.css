@@ -1,0 +1,181 @@
+/* RestroSuite product polish pack (18 items) */
+:root {
+  --rs-density-scale: 1;
+}
+html[data-rs-density="compact"] { --rs-density-scale: 0.9; }
+html[data-rs-density="comfortable"] { --rs-density-scale: 1; }
+html[data-rs-density="large"] { --rs-density-scale: 1.12; }
+
+html[data-rs-density="large"] .menu-item-card,
+html[data-rs-density="large"] .kds-ticket,
+html[data-rs-density="large"] .floor-table-card {
+  font-size: calc(1em * var(--rs-density-scale));
+}
+html[data-rs-density="large"] #page-title { font-size: 1.35rem; }
+html[data-rs-density="compact"] .menu-item-card { padding: 8px 10px; }
+
+/* #2 Sync status chip (topbar) */
+#rs-sync-status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  border: 1px solid var(--stroke-2); background: var(--glass); color: var(--text-soft);
+  max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: default; user-select: none;
+}
+#rs-sync-status-pill.is-offline { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+#rs-sync-status-pill.is-syncing { background: #e0f2fe; color: #075985; border-color: #7dd3fc; }
+#rs-sync-status-pill.is-online { background: #ecfdf5; color: #065f46; border-color: #6ee7b7; }
+#rs-sync-status-pill.is-auth { background: #fee2e2; color: #991b1b; border-color: #fca5a5; cursor: pointer; }
+#rs-sync-status-pill i { font-size: 11px; }
+
+/* #4 Live access banner */
+#rs-access-live-banner {
+  display: none; position: sticky; top: 0; z-index: 40;
+  margin: 0 0 10px; padding: 10px 14px; border-radius: 12px;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid #fdba74; color: #9a3412;
+  font-size: 13px; font-weight: 650; align-items: center; gap: 10px;
+}
+#rs-access-live-banner.show { display: flex; }
+#rs-access-live-banner button {
+  margin-left: auto; border: 0; background: #ea580c; color: #fff;
+  border-radius: 8px; padding: 6px 10px; font-weight: 700; cursor: pointer;
+}
+
+/* #5 Role empty states */
+.rs-role-empty {
+  margin: 24px auto; max-width: 420px; text-align: center;
+  padding: 28px 20px; border-radius: 16px; background: var(--glass);
+  border: 1px dashed var(--stroke-2);
+}
+.rs-role-empty i { font-size: 28px; color: var(--orange); margin-bottom: 10px; }
+.rs-role-empty h3 { margin: 0 0 6px; font-size: 16px; }
+.rs-role-empty p { margin: 0; color: var(--text-mute); font-size: 13px; line-height: 1.45; }
+
+/* #6 Role-aware mobile nav */
+body.rs-role-nav-trim .mnav-link[data-tab] { }
+@media (max-width: 900px) {
+  body.rs-role-nav-trim .mnav-link.is-role-hidden { display: none !important; }
+}
+
+/* #7 KDS focus mode */
+html.rs-kds-focus .sidebar,
+html.rs-kds-focus .topbar .tb-search,
+html.rs-kds-focus .topbar .tb-support-wrap,
+html.rs-kds-focus #open-settings,
+html.rs-kds-focus #open-product-guide-btn,
+html.rs-kds-focus .mnav-more-btn:not([data-tab="kds-tab"]) {
+  display: none !important;
+}
+html.rs-kds-focus .main { margin-left: 0 !important; }
+html.rs-kds-focus #kds-tab { min-height: calc(100vh - 64px); }
+html.rs-kds-focus .kds-ticket { font-size: 1.05rem; }
+
+/* #8 Floor long-press hint */
+.rs-floor-hold-hint {
+  position: fixed; z-index: 9990; pointer-events: none;
+  background: rgba(17,24,39,.92); color: #fff; font-size: 12px; font-weight: 650;
+  padding: 8px 12px; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.25);
+  transform: translate(-50%, -120%); white-space: nowrap;
+}
+
+/* #11 WA queue chip */
+#rs-wa-queue-chip {
+  display: none; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; cursor: pointer;
+}
+#rs-wa-queue-chip.has-items { display: inline-flex; }
+#rs-wa-queue-chip.has-failed { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+
+/* #12 86'd menu tiles */
+.menu-item-card.rs-sold-out {
+  opacity: 0.55; position: relative; filter: grayscale(0.35);
+}
+.menu-item-card.rs-sold-out::after {
+  content: '86';
+  position: absolute; top: 8px; right: 8px;
+  background: #dc2626; color: #fff; font-size: 10px; font-weight: 800;
+  padding: 2px 6px; border-radius: 6px; letter-spacing: 0.04em;
+}
+
+/* #13 Audit log panel */
+#rs-owner-audit-panel {
+  margin-top: 16px; padding: 14px; border-radius: 14px;
+  border: 1px solid var(--stroke-2); background: var(--panel, var(--glass));
+}
+#rs-owner-audit-panel h4 { margin: 0 0 8px; font-size: 14px; }
+#rs-owner-audit-panel .rs-audit-row {
+  display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--stroke-2);
+  font-size: 12.5px;
+}
+#rs-owner-audit-panel .rs-audit-row:last-child { border-bottom: 0; }
+#rs-owner-audit-panel .rs-audit-time { color: var(--text-mute); min-width: 110px; }
+
+/* #14 Super-admin shell badge */
+html.rs-role-superadmin .brand-name::after,
+body.rs-role-superadmin #sidebar-brand-type {
+  /* platform chrome */
+}
+#rs-platform-shell-badge {
+  display: none; margin: 6px 12px 0; padding: 6px 10px; border-radius: 8px;
+  background: #1e293b; color: #e2e8f0; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+html.rs-role-superadmin #rs-platform-shell-badge { display: block; }
+
+/* #15 Version about row */
+#rs-about-build {
+  font-size: 11px; color: var(--text-mute); margin-top: 4px;
+}
+
+/* #18 Offline coach modal bits */
+.rs-offline-coach-steps { margin: 12px 0 0; padding: 0; list-style: none; }
+.rs-offline-coach-steps li {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0 0 10px;
+  font-size: 13.5px; line-height: 1.45;
+}
+.rs-offline-coach-steps .n {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--orange); color: #fff; font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Staff access presets */
+.sl-access-presets {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px;
+}
+.sl-access-presets button {
+  border: 1px solid var(--stroke-2); background: var(--glass); border-radius: 999px;
+  padding: 6px 11px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.sl-access-presets button:hover { border-color: var(--orange); color: var(--orange); }
+.sl-access-summary {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(255,79,0,.06); border: 1px solid rgba(255,79,0,.2);
+  font-size: 12.5px; line-height: 1.45;
+}
+.sl-access-summary b { color: var(--orange); }
+
+/* Settle confidence strip */
+.rc-settle-trust {
+  margin: 0 0 10px; padding: 10px 12px; border-radius: 10px;
+  background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46;
+  font-size: 12.5px; font-weight: 650; display: flex; gap: 8px; align-items: flex-start;
+}
+.rc-settle-trust.is-pending {
+  background: #eff6ff; border-color: #93c5fd; color: #1e40af;
+}
+.rc-settle-trust .rc-retry-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rc-settle-trust .rc-retry-row button {
+  border: 0; border-radius: 8px; padding: 6px 10px; font-size: 11.5px; font-weight: 700;
+  cursor: pointer; background: #fff; color: inherit; box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+
+/* Density control in settings */
+#rs-density-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+#rs-density-row button {
+  flex: 1; min-width: 90px; padding: 10px; border-radius: 10px;
+  border: 1.5px solid var(--stroke-2); background: var(--glass); cursor: pointer; font-weight: 700; font-size: 12.5px;
+}
+#rs-density-row button.active { border-color: var(--orange); background: rgba(255,79,0,.08); color: var(--orange); }

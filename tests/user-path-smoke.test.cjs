@@ -15,7 +15,7 @@ test('asset version and SW cache present', () => {
   const html = read('dashboard.html');
   const sw = read('service-worker.js');
   assert.match(html, /builtin = 'v\d+-\d{8}-/);
-  assert.match(sw, /const CACHE_NAME = "restrosuite-shell-v/);
+  assert.match(sw, /const CACHE_NAME = ['"]restrosuite-shell-v/);
 });
 
 test('POS calm mode: customer collapse, pay zone, more tools, no bare demo on html', () => {

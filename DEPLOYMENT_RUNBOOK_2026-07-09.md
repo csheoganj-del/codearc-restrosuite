@@ -4,7 +4,7 @@
 **Purpose:** The exact, in-order commands to take the now-fixed codebase live. Everything here is operational — it needs your Supabase, Vercel and Play Store credentials, so it can't be automated from the code side.
 
 **Live project reference:** `htkauiibuejetimfiavs` (from `desktop/config.json` → `supabaseUrl`)
-**Production origin:** `https://codearc-restrosuite.vercel.app`
+**Production origin:** `https://restrosuite.codearc.co.in`
 
 Run the steps top to bottom. Each step has a verification you should see before moving on.
 
@@ -71,7 +71,7 @@ supabase secrets set LICENSE_SIGNING_KEY="<base64-pkcs8-private-key>"
 supabase secrets set LICENSE_OFFLINE_WINDOW_DAYS="3"
 
 # CORS allowlist (comma-separated, no trailing slash)
-supabase secrets set ALLOWED_ORIGINS="https://codearc-restrosuite.vercel.app"
+supabase secrets set ALLOWED_ORIGINS="https://restrosuite.codearc.co.in"
 ```
 
 **Verify:** `supabase secrets list` shows all five names with a non-empty digest.
@@ -129,7 +129,7 @@ Then redeploy so the vars take effect:
 vercel --prod
 ```
 
-**Verify:** open `https://codearc-restrosuite.vercel.app/api/config` in a browser — it should return JSON containing `supabaseUrl` and `supabaseAnonKey`, **not** an error.
+**Verify:** open `https://restrosuite.codearc.co.in/api/config` in a browser — it should return JSON containing `supabaseUrl` and `supabaseAnonKey`, **not** an error.
 
 ---
 
@@ -151,7 +151,7 @@ Upload the resulting `.aab` to the Play Console → Production track.
 
 ## 6. End-to-end smoke test (do this on the live URL)
 
-1. **Login** — sign in at `https://codearc-restrosuite.vercel.app/login`. A staff PIN login should succeed (confirms `SUPERADMIN_SESSION_SECRET` is set — no HTTP 500).
+1. **Login** — sign in at `https://restrosuite.codearc.co.in/login`. A staff PIN login should succeed (confirms `SUPERADMIN_SESSION_SECRET` is set — no HTTP 500).
 2. **QR order** — scan a real table QR (or open `/qr-order?...` for a seeded table), add an item, place the order.
 3. **Table session** — in the dashboard → Floor, confirm the table flipped to an active session automatically (confirms the trigger + `tenant-public` are live).
 4. **Customer save** — add a customer with an email in CRM, reload on a second device, confirm it synced (confirms the CRM migration + fallback).

@@ -24,7 +24,7 @@
       --surface-alt: #F0EBE3;
       --text: #1A1714;
       --text2: #4A453F;
-      --muted: #7A736A;
+      --muted: #6E675F;
       --border: rgba(26, 23, 20, 0.09);
       --shadow-sm: 0 1px 2px rgba(26, 23, 20, 0.04);
       --shadow: 0 8px 28px rgba(40, 30, 20, 0.07);
@@ -635,7 +635,7 @@
       <div class="drawer-title">Your Order</div>
       <div class="drawer-tag" id="drawer-tag"></div>
     </div>
-    <button class="close-btn" onclick="closeCart()"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" class="close-btn" onclick="closeCart()" aria-label="Close order cart" title="Close cart"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
   </div>
   <div class="cart-list" id="cart-list"></div>
   <div class="cust-form">

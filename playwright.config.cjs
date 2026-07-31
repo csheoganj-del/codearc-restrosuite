@@ -11,7 +11,7 @@ const hasAuthCreds = !!(
 );
 const baseURL =
   process.env.E2E_BASE_URL ||
-  (hasAuthCreds ? 'https://codearc-restrosuite.vercel.app' : 'http://127.0.0.1:4173');
+  (hasAuthCreds ? 'https://restrosuite.codearc.co.in' : 'http://127.0.0.1:4173');
 const isLocal = /127\.0\.0\.1|localhost/.test(baseURL);
 
 module.exports = defineConfig({

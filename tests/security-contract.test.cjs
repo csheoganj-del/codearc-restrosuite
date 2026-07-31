@@ -134,7 +134,7 @@ test("the web app is installable without caching tenant API traffic", () => {
   assert.match(manifest, /"display": "standalone"/);
   assert.match(login, /rel="manifest"/);
   assert.match(serviceWorker, /url\.origin !== self\.location\.origin/);
-  assert.match(serviceWorker, /request\.method !== "GET"/);
+  assert.match(serviceWorker, /request\.method !== ['"]GET['"]/);
 });
 
 test("tenant approval and reset require the admin backend", () => {
@@ -188,7 +188,7 @@ test("tenant administrators can manage staff without exposing password hashes", 
   assert.match(staffApi, /async function hashPassword/);
   assert.match(staffApi, /You cannot remove your own administrator access/);
   assert.doesNotMatch(staffApi, /\.select\("[^"]*password_hash[^"]*"\).*list_users/);
-  assert.match(browserApi, /"tenant-users"/);
+  assert.match(browserApi, /['"]tenant-users['"]/);
 });
 
 test("browser sessions retain staff identity fields", () => {
@@ -205,12 +205,12 @@ test("tenant administrators have a complete staff access dashboard", () => {
   assert.match(manage, /enhanceEmployees/);
   assert.match(manage, /Weekly shift roster/);
   assert.match(manage, /Today’s attendance/);
-  assert.match(staffUi, /role !== "admin"/);
-  assert.match(staffUi, /callStaff\("create_user"/);
-  assert.match(staffUi, /callStaff\("update_user"/);
-  assert.match(staffUi, /callStaff\("reset_password"/);
-  assert.match(staffUi, /callStaff\("revoke_user_sessions"/);
-  assert.match(staffUi, /callStaff\("audit_logs"/);
+  assert.match(staffUi, /role !== ['"]admin['"]/);
+  assert.match(staffUi, /callStaff\(['"]create_user['"]/);
+  assert.match(staffUi, /callStaff\(['"]update_user['"]/);
+  assert.match(staffUi, /callStaff\(['"]reset_password['"]/);
+  assert.match(staffUi, /callStaff\(['"]revoke_user_sessions['"]/);
+  assert.match(staffUi, /callStaff\(['"]audit_logs['"]/);
 });
 
 test("saas plan entitlements are persisted and enforced server-side", () => {
@@ -267,7 +267,7 @@ test("dashboard captures and displays application incidents for superadmin", () 
   assert.match(app, /installGlobalHandlers/);
   assert.match(app, /list_error_reports/);
   assert.match(app, /resolve_error_report/);
-  assert.match(observability, /window\.addEventListener\("error"/);
+  assert.match(observability, /window\.addEventListener\(['"]error['"]/);
   assert.match(observability, /unhandledrejection/);
   assert.match(observability, /function redact/);
   assert.match(checks, /src\/dashboard\/observability\.js/);

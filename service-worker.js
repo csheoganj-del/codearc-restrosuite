@@ -1,7 +1,7 @@
 // CACHE_NAME bumped on every deploy by scripts/bump-sw-version.cjs.
 // Changing this causes the activate event to delete the old cache.
 // Format: restrosuite-shell-vYYYYMMDD-HHmm
-const CACHE_NAME = "restrosuite-shell-v20260726-reload-loop";
+const CACHE_NAME = 'restrosuite-shell-v20260726-reload-loop';
 
 // Per-file content hashes for stale-check in fetch handler (auto-generated — do not edit).
 // Populated by scripts/bump-sw-version.cjs on every deploy. Maps URL pathname → 12-char SHA-256.
@@ -177,7 +177,7 @@ self.addEventListener('activate', (event) => {
 //
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (request.method !== "GET") {return;}
+  if (request.method !== 'GET') {return;}
 
   const url = new URL(request.url);
   if (url.pathname.startsWith('/api/')) {return;}

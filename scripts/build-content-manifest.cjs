@@ -41,7 +41,7 @@ const ROOT_FILES = [
 const DIRS = ['assets', 'src', 'images'];
 
 function walk(dir, base, out) {
-  if (!fs.existsSync(dir)) return;
+  if (!fs.existsSync(dir)) {return;}
   let names;
   try {
     names = fs.readdirSync(dir);
@@ -49,8 +49,8 @@ function walk(dir, base, out) {
     return;
   }
   for (const name of names) {
-    if (name === 'node_modules' || name === '.git' || name === 'dist') continue;
-    if (name.startsWith('.')) continue;
+    if (name === 'node_modules' || name === '.git' || name === 'dist') {continue;}
+    if (name.startsWith('.')) {continue;}
     const full = path.join(dir, name);
     let st;
     try {
@@ -60,13 +60,13 @@ function walk(dir, base, out) {
     }
     const rel = path.relative(base, full).replace(/\\/g, '/');
     if (st.isDirectory()) {
-      if (/node_modules|scratch|test-results|^api(\/|$)/.test(rel)) continue;
+      if (/node_modules|scratch|test-results|^api(\/|$)/.test(rel)) {continue;}
       walk(full, base, out);
     } else if (st.isFile()) {
-      if (/\.(map|exe|apk|blockmap)$/i.test(name)) continue;
+      if (/\.(map|exe|apk|blockmap)$/i.test(name)) {continue;}
       // Private / underscore modules and server helpers are never static UI
-      if (name.startsWith('_')) continue;
-      if (st.size > 6 * 1024 * 1024) continue;
+      if (name.startsWith('_')) {continue;}
+      if (st.size > 6 * 1024 * 1024) {continue;}
       out.push(rel);
     }
   }
@@ -75,7 +75,7 @@ function walk(dir, base, out) {
 function main() {
   const list = [];
   for (const f of ROOT_FILES) {
-    if (fs.existsSync(path.join(ROOT, f))) list.push(f);
+    if (fs.existsSync(path.join(ROOT, f))) {list.push(f);}
   }
   for (const d of DIRS) {
     walk(path.join(ROOT, d), ROOT, list);

@@ -434,8 +434,9 @@
           ${taxHTML}
           <div class="rcp-tot"><span>TOTAL</span><span>${formatCurrency(bill.total)}</span></div>
           <hr class="rcp-hr">
-          <div class="rcp-line"><span class="q">${bill.paymentMethod || 'Cash'}</span><span>${formatCurrency(bill.total)}</span></div>
-          <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by RestroSuite</b></div>
+          <div class="rcp-line"><span class="q" id="bill-pay-method-label">${bill.paymentMethod || 'Cash'}</span><span>${formatCurrency(bill.total)}</span></div>
+          <div class="rcp-foot">Thank you for dining with us!<br><b>Powered by CodeArc RestroSuite</b></div>
+          <div id="bill-pay-online-wrap" style="margin-top:16px;text-align:center"></div>
           <div style="margin-top:18px;text-align:center">
             <a id="feedback-link" href="#" style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,79,0,.1);color:#FF4F00;font-weight:800;font-size:13px;padding:10px 14px;border-radius:999px;text-decoration:none">
               <i class="fa-solid fa-star"></i> Rate your visit
@@ -452,6 +453,86 @@
             if (bill.tableNumber) q.set('table', bill.tableNumber);
             if (bill.no || billNo) q.set('bill', bill.no || billNo);
             fb.href = '/feedback?' + q.toString();
+          }
+        } catch (_) {}
+
+        // Online pay (Razorpay) — useful for Due/credit or remote settle
+        try {
+          const payMethod = String(bill.paymentMethod || '').toLowerCase();
+          const looksUnpaid = /due|credit|unpaid|pending|online/.test(payMethod);
+          const totalInr = Math.max(0, Number(bill.total) || 0);
+          const wrap = document.getElementById('bill-pay-online-wrap');
+          if (wrap && totalInr >= 1) {
+            const paidOnlineKey = 'rs_bill_paid_online:' + tenantSlug + ':' + (bill.no || billNo);
+            let alreadyOnline = false;
+            try { alreadyOnline = localStorage.getItem(paidOnlineKey) === '1'; } catch (_) {}
+            if (alreadyOnline) {
+              wrap.innerHTML = '<div style="font-size:13px;font-weight:800;color:#059669"><i class="fa-solid fa-circle-check"></i> Paid online</div>';
+              const lbl = document.getElementById('bill-pay-method-label');
+              if (lbl) lbl.textContent = 'Razorpay (online)';
+            } else {
+              wrap.innerHTML =
+                (looksUnpaid
+                  ? '<div style="font-size:12px;color:var(--paper-text-soft);margin-bottom:8px;font-weight:600">This bill can be paid online</div>'
+                  : '<div style="font-size:11.5px;color:var(--paper-text-mute);margin-bottom:8px">Already settled at counter? You can still pay online if the outlet asked you to.</div>') +
+                '<button type="button" id="bill-pay-online-btn" style="width:100%;max-width:280px;padding:12px 16px;border:none;border-radius:11px;background:#FF4F00;color:#fff;font-weight:800;font-size:14px;cursor:pointer">' +
+                '<i class="fa-solid fa-lock"></i> Pay ' + formatCurrency(totalInr) + ' online</button>' +
+                '<div id="bill-pay-status" style="font-size:12px;margin-top:8px;color:var(--paper-text-soft)"></div>';
+              const payBtn = document.getElementById('bill-pay-online-btn');
+              const st = document.getElementById('bill-pay-status');
+              if (payBtn) {
+                payBtn.onclick = async function () {
+                  payBtn.disabled = true;
+                  if (st) st.textContent = 'Opening secure payment…';
+                  try {
+                    if (!window.RSRazorpay) {
+                      await new Promise(function (resolve, reject) {
+                        var s = document.createElement('script');
+                        s.src = 'assets/razorpay-checkout.js';
+                        s.onload = resolve;
+                        s.onerror = function () { reject(new Error('Could not load payment module')); };
+                        document.head.appendChild(s);
+                      });
+                    }
+                    var result = await window.RSRazorpay.payRupees(totalInr, {
+                      name: profile.name || 'Restaurant',
+                      description: 'Bill ' + (bill.no || billNo),
+                      purpose: 'bill',
+                      prefillName: bill.customerName || '',
+                      prefillContact: bill.customerPhone || '',
+                      notes: {
+                        purpose: 'bill',
+                        bill_no: bill.no || billNo,
+                        tenant_slug: tenantSlug,
+                        total: String(totalInr),
+                      },
+                      meta: {
+                        bill_no: bill.no || billNo,
+                        tenant_slug: tenantSlug,
+                      },
+                    });
+                    if (result && result.cancelled) {
+                      if (st) st.textContent = 'Payment cancelled';
+                      payBtn.disabled = false;
+                      return;
+                    }
+                    if (result && result.verified) {
+                      try { localStorage.setItem(paidOnlineKey, '1'); } catch (_) {}
+                      wrap.innerHTML = '<div style="font-size:13px;font-weight:800;color:#059669"><i class="fa-solid fa-circle-check"></i> Paid online · ' +
+                        (result.payment_id || '') + '</div>';
+                      var lbl2 = document.getElementById('bill-pay-method-label');
+                      if (lbl2) lbl2.textContent = 'Razorpay (online)';
+                    } else {
+                      if (st) st.textContent = 'Payment not confirmed';
+                      payBtn.disabled = false;
+                    }
+                  } catch (err) {
+                    if (st) st.textContent = (err && err.message) || 'Payment failed';
+                    payBtn.disabled = false;
+                  }
+                };
+              }
+            }
           }
         } catch (_) {}
 

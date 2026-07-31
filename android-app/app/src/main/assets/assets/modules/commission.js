@@ -4,12 +4,12 @@
 (function (global) {
   'use strict';
 
-  var PARTNERS_KEY = 'rs_commission_partners_v1';
-  var EVENTS_KEY = 'rs_commission_events_v1';
-  var PAYOUTS_KEY = 'rs_commission_payouts_v1';
+  const PARTNERS_KEY = 'rs_commission_partners_v1';
+  const EVENTS_KEY = 'rs_commission_events_v1';
+  const PAYOUTS_KEY = 'rs_commission_payouts_v1';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -19,7 +19,7 @@
       .replace(/"/g, '&quot;');
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function load(key) {
@@ -36,7 +36,7 @@
   }
   async function putColl(coll, row) {
     try {
-      if (global.RS_DB && RS_DB.put) await RS_DB.put(coll, row.id, row);
+      if (global.RS_DB && RS_DB.put) {await RS_DB.put(coll, row.id, row);}
     } catch (e) {
       console.warn('[Commission] put', coll, e);
     }
@@ -44,7 +44,7 @@
   async function listColl(coll, lsKey) {
     try {
       if (global.RS_DB && RS_DB.list) {
-        var rows = await RS_DB.list(coll);
+        const rows = await RS_DB.list(coll);
         if (Array.isArray(rows) && rows.length) {
           save(lsKey, rows);
           return rows;
@@ -65,32 +65,32 @@
   }
 
   async function savePartner(p) {
-    var list = await partners();
-    var i = list.findIndex(function (x) {
+    const list = await partners();
+    const i = list.findIndex(function (x) {
       return String(x.id) === String(p.id);
     });
-    if (i >= 0) list[i] = p;
-    else list.unshift(p);
+    if (i >= 0) {list[i] = p;}
+    else {list.unshift(p);}
     save(PARTNERS_KEY, list);
     await putColl('commission_partners', p);
   }
 
   function calcCommission(partner, billGrand) {
-    var g = Number(billGrand) || 0;
-    if (partner.type === 'flat') return Number(partner.rate) || 0;
+    const g = Number(billGrand) || 0;
+    if (partner.type === 'flat') {return Number(partner.rate) || 0;}
     return Math.round(g * ((Number(partner.rate) || 0) / 100) * 100) / 100;
   }
 
   async function recordSale(partnerId, bill) {
-    if (!partnerId || !bill) return null;
-    var list = await partners();
-    var p = list.find(function (x) {
+    if (!partnerId || !bill) {return null;}
+    const list = await partners();
+    const p = list.find(function (x) {
       return String(x.id) === String(partnerId);
     });
-    if (!p || p.active === false) return null;
-    var grand = Number(bill.grand != null ? bill.grand : bill.total) || 0;
-    var amount = calcCommission(p, grand);
-    var row = {
+    if (!p || p.active === false) {return null;}
+    const grand = Number(bill.grand != null ? bill.grand : bill.total) || 0;
+    const amount = calcCommission(p, grand);
+    const row = {
       id: 'ce-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       partnerId: p.id,
       partnerName: p.name,
@@ -101,7 +101,7 @@
       at: new Date().toISOString(),
       paidOut: false,
     };
-    var ev = await events();
+    const ev = await events();
     ev.unshift(row);
     save(EVENTS_KEY, ev.slice(0, 3000));
     await putColl('commission_events', row);
@@ -109,18 +109,18 @@
   }
 
   function filterStats(list, partnerId, fromMs, toMs) {
-    var rows = list.filter(function (e) {
-      if (String(e.partnerId) !== String(partnerId)) return false;
-      var t = new Date(e.at).getTime();
+    const rows = list.filter(function (e) {
+      if (String(e.partnerId) !== String(partnerId)) {return false;}
+      const t = new Date(e.at).getTime();
       return t >= fromMs && t <= toMs;
     });
-    var sales = rows.reduce(function (s, e) {
+    const sales = rows.reduce(function (s, e) {
       return s + (Number(e.billGrand) || 0);
     }, 0);
-    var commission = rows.reduce(function (s, e) {
+    const commission = rows.reduce(function (s, e) {
       return s + (Number(e.commission) || 0);
     }, 0);
-    var unpaid = rows
+    const unpaid = rows
       .filter(function (e) {
         return !e.paidOut;
       })
@@ -135,14 +135,14 @@
   }
 
   async function notifyPartner(partner, text, pdfOpts) {
-    var phone = String(partner.phone || '').replace(/\D/g, '');
+    const phone = String(partner.phone || '').replace(/\D/g, '');
     if (!phone) {
       toast('No WhatsApp for ' + partner.name, 'fa-circle-exclamation');
       return;
     }
     if (pdfOpts && global.RSReportPdf) {
       try {
-        var dataUri = await RSReportPdf.buildReportPdf(pdfOpts);
+        const dataUri = await RSReportPdf.buildReportPdf(pdfOpts);
         return await RSReportPdf.sendReportWhatsApp(
           phone,
           text,
@@ -164,23 +164,23 @@
   }
 
   function periodRange(period) {
-    var end = new Date();
-    var start = new Date();
-    if (period === 'weekly') start.setDate(start.getDate() - 7);
-    else if (period === 'monthly') start.setMonth(start.getMonth() - 1);
-    else start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    const start = new Date();
+    if (period === 'weekly') {start.setDate(start.getDate() - 7);}
+    else if (period === 'monthly') {start.setMonth(start.getMonth() - 1);}
+    else {start.setHours(0, 0, 0, 0);}
     return { start: start.getTime(), end: end.getTime(), label: period };
   }
 
   async function sendPartnerStatement(partnerId, period) {
-    var list = await partners();
-    var p = list.find(function (x) {
+    const list = await partners();
+    const p = list.find(function (x) {
       return String(x.id) === String(partnerId);
     });
-    if (!p) return;
-    var range = periodRange(period || 'daily');
-    var st = await partnerStats(p.id, range.start, range.end);
-    var text =
+    if (!p) {return;}
+    const range = periodRange(period || 'daily');
+    const st = await partnerStats(p.id, range.start, range.end);
+    const text =
       '*Commission — ' +
       range.label +
       '*\n' +
@@ -222,21 +222,21 @@
   }
 
   async function markPayout(partnerId, period) {
-    var list = await partners();
-    var p = list.find(function (x) {
+    const list = await partners();
+    const p = list.find(function (x) {
       return String(x.id) === String(partnerId);
     });
-    if (!p) return;
-    var range = periodRange(period || 'monthly');
-    var st = await partnerStats(p.id, range.start, range.end);
+    if (!p) {return;}
+    const range = periodRange(period || 'monthly');
+    const st = await partnerStats(p.id, range.start, range.end);
     if (st.unpaid <= 0) {
       toast('Nothing unpaid for this period', 'fa-circle-info');
       return;
     }
-    var ev = await events();
+    let ev = await events();
     ev = ev.map(function (e) {
-      if (String(e.partnerId) !== String(p.id) || e.paidOut) return e;
-      var t = new Date(e.at).getTime();
+      if (String(e.partnerId) !== String(p.id) || e.paidOut) {return e;}
+      const t = new Date(e.at).getTime();
       if (t >= range.start && t <= range.end) {
         e.paidOut = true;
         putColl('commission_events', e);
@@ -244,7 +244,7 @@
       return e;
     });
     save(EVENTS_KEY, ev);
-    var pay = {
+    const pay = {
       id: 'cp-' + Date.now(),
       partnerId: p.id,
       partnerName: p.name,
@@ -252,7 +252,7 @@
       period: period,
       paidAt: new Date().toISOString(),
     };
-    var pl = await payouts();
+    const pl = await payouts();
     pl.unshift(pay);
     save(PAYOUTS_KEY, pl);
     await putColl('commission_payouts', pay);
@@ -281,8 +281,8 @@
   }
 
   function openPartnerModal(existing) {
-    if (!global.RSModal) return;
-    var p = existing || {
+    if (!global.RSModal) {return;}
+    const p = existing || {
       id: 'cpn-' + Date.now(),
       name: '',
       phone: '',
@@ -340,9 +340,9 @@
   }
 
   async function renderCommissionPanel() {
-    var host = document.getElementById('growth-hub-tab') || document.getElementById('customers-tab');
-    if (!host) return;
-    var wrap = document.getElementById('rs-commission-panel');
+    const host = document.getElementById('growth-hub-tab') || document.getElementById('customers-tab');
+    if (!host) {return;}
+    let wrap = document.getElementById('rs-commission-panel');
     if (!wrap) {
       wrap = document.createElement('div');
       wrap.id = 'rs-commission-panel';
@@ -350,9 +350,9 @@
       wrap.style.marginTop = '16px';
       host.appendChild(wrap);
     }
-    var list = await partners();
-    var day = periodRange('daily');
-    var allEv = await events();
+    const list = await partners();
+    const day = periodRange('daily');
+    const allEv = await events();
     wrap.innerHTML =
       '<div class="panel-head" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' +
       '<div><h3 style="margin:0">Commission partners</h3>' +
@@ -364,8 +364,8 @@
         ? '<div class="table-scroll" style="margin-top:12px"><table class="data-table"><thead><tr><th>Partner</th><th>Rate</th><th>Today</th><th>Unpaid</th><th></th></tr></thead><tbody>' +
           list
             .map(function (p) {
-              var st = filterStats(allEv, p.id, day.start, day.end);
-              var allUnpaid = filterStats(allEv, p.id, 0, Date.now()).unpaid;
+              const st = filterStats(allEv, p.id, day.start, day.end);
+              const allUnpaid = filterStats(allEv, p.id, 0, Date.now()).unpaid;
               return (
                 '<tr><td><b>' +
                 esc(p.name) +
@@ -398,11 +398,11 @@
           '</tbody></table></div>'
         : '<div class="sr-empty" style="padding:24px;margin-top:8px">No partners yet.</div>');
 
-    var add = wrap.querySelector('#cp-add');
+    const add = wrap.querySelector('#cp-add');
     if (add)
-      add.onclick = function () {
+      {add.onclick = function () {
         openPartnerModal();
-      };
+      };}
     wrap.querySelectorAll('.cp-day').forEach(function (b) {
       b.onclick = function () {
         sendPartnerStatement(b.dataset.id, 'daily');
@@ -426,9 +426,9 @@
   }
 
   function ensureCartPartnerSelect() {
-    var row = document.getElementById('cart-meta-row');
-    if (!row || document.getElementById('cart-commission-partner')) return;
-    var box = document.createElement('div');
+    const row = document.getElementById('cart-meta-row');
+    if (!row || document.getElementById('cart-commission-partner')) {return;}
+    const box = document.createElement('div');
     box.style.cssText = 'margin-top:8px;width:100%';
     box.innerHTML =
       '<label class="fl" style="font-size:11px">Referred by (commission)</label>' +
@@ -438,10 +438,10 @@
   }
 
   async function refreshPartnerSelect() {
-    var sel = document.getElementById('cart-commission-partner');
-    if (!sel) return;
-    var cur = sel.value;
-    var list = await partners();
+    const sel = document.getElementById('cart-commission-partner');
+    if (!sel) {return;}
+    const cur = sel.value;
+    const list = await partners();
     sel.innerHTML =
       '<option value="">— None —</option>' +
       list
@@ -452,11 +452,11 @@
           return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>';
         })
         .join('');
-    if (cur) sel.value = cur;
+    if (cur) {sel.value = cur;}
   }
 
   function getSelectedPartnerId() {
-    var sel = document.getElementById('cart-commission-partner');
+    const sel = document.getElementById('cart-commission-partner');
     return sel && sel.value ? sel.value : '';
   }
 
@@ -481,9 +481,9 @@
   });
   document.addEventListener('rs:bill-settled', function (ev) {
     try {
-      var bill = ev && ev.detail && ev.detail.bill;
-      var pid = (ev && ev.detail && ev.detail.partnerId) || getSelectedPartnerId();
-      if (bill && pid) recordSale(pid, bill);
+      const bill = ev && ev.detail && ev.detail.bill;
+      const pid = (ev && ev.detail && ev.detail.partnerId) || getSelectedPartnerId();
+      if (bill && pid) {recordSale(pid, bill);}
     } catch (_) {}
   });
 })(typeof window !== 'undefined' ? window : globalThis);

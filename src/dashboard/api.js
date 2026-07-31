@@ -106,7 +106,7 @@
       const token = config.getTenantToken && config.getTenantToken();
       if (!token) {throw new Error('Tenant session expired. Please log in again.');}
       return post(
-        "tenant-users",
+        'tenant-users',
         { action, ...(payload || {}) },
         token,
         'Staff account request failed.'

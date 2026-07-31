@@ -46,15 +46,15 @@ function main() {
   const version = desktop.version || '0.0.0';
   let tag = 'v' + version;
   const argTag = process.argv.find((a) => a.startsWith('--tag='));
-  if (argTag) tag = argTag.slice('--tag='.length);
+  if (argTag) {tag = argTag.slice('--tag='.length);}
   const ti = process.argv.indexOf('--tag');
-  if (ti >= 0 && process.argv[ti + 1]) tag = process.argv[ti + 1];
+  if (ti >= 0 && process.argv[ti + 1]) {tag = process.argv[ti + 1];}
 
   // Public downloads-only repo (source repo may be private — release assets must be public).
   // Override: --repo owner/name
   let repo = 'csheoganj-del/restrosuite-downloads';
   const argRepo = process.argv.find((a) => a.startsWith('--repo='));
-  if (argRepo) repo = argRepo.slice('--repo='.length);
+  if (argRepo) {repo = argRepo.slice('--repo='.length);}
   const ri = process.argv.indexOf('--repo');
   if (ri >= 0 && process.argv[ri + 1] && !process.argv[ri + 1].startsWith('-')) {
     repo = process.argv[ri + 1];
@@ -141,12 +141,12 @@ function main() {
 
   const notes =
     `RestroSuite **${version}** — Windows + macOS + Android builds.\n\n` +
-    `- Large installers hosted on GitHub Releases (not Vercel Hobby)\n\n` +
-    `**Windows Setup:** RestroSuite-Windows-Setup.exe\n` +
-    `**Windows Portable:** RestroSuite-Windows-Portable.exe\n` +
-    `**Mac Apple Silicon:** RestroSuite-Mac-AppleSilicon.dmg\n` +
-    `**Mac Intel:** RestroSuite-Mac-Intel.dmg\n` +
-    `**Android:** RestroSuite-Android.apk\n`;
+    '- Large installers hosted on GitHub Releases (not Vercel Hobby)\n\n' +
+    '**Windows Setup:** RestroSuite-Windows-Setup.exe\n' +
+    '**Windows Portable:** RestroSuite-Windows-Portable.exe\n' +
+    '**Mac Apple Silicon:** RestroSuite-Mac-AppleSilicon.dmg\n' +
+    '**Mac Intel:** RestroSuite-Mac-Intel.dmg\n' +
+    '**Android:** RestroSuite-Android.apk\n';
 
   if (!releaseExists) {
     run('gh', [
@@ -247,7 +247,7 @@ function main() {
     const size = urls.assets.nsis.size;
     const minimal =
       `version: ${version}\n` +
-      `files:\n` +
+      'files:\n' +
       `  - url: ${urls.windowsNsis}\n` +
       `    size: ${size}\n` +
       `path: ${urls.windowsNsis}\n` +

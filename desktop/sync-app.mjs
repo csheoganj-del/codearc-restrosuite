@@ -22,7 +22,7 @@ const DEST = path.join(__dirname, 'app');     // ./app
 const ROOT_FILES = [
   'index.html', 'login.html', 'dashboard.html', 'home.html', 'order.html',
   'qr-order.html', 'kds.html', 'tokens.html', 'bill.html', 'privacy.html',
-  'terms.html', 'refund-policy.html', '404.html',
+  'terms.html', 'refund-policy.html', '404.html', 'legal.css',
   'config.js', 'env-config.js', 'pwa.js', 'service-worker.js', 'script.js',
   'manifest.webmanifest', 'robots.txt', 'sitemap.xml',
   // Content updater compares this to production so fresh installs are not "You have: 0"

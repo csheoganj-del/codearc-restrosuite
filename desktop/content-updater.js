@@ -468,11 +468,13 @@ function ensureDirFor(filePath) {
 
 /**
  * Download remote content into a staging folder, then swap into web-overlay.
+ * @param {{ onProgress?: (p: { phase: string, done: number, total: number, file?: string }) => void }} opts
  */
-async function applyContentUpdate({ origin, version, files, title, contentStamp, buildId }) {
+async function applyContentUpdate({ origin, version, files, title, contentStamp, buildId, onProgress }) {
   const base = String(origin || '').replace(/\/+$/, '');
   const staging = path.join(app.getPath('userData'), 'web-overlay-staging');
   const finalDir = overlayDir();
+  const report = typeof onProgress === 'function' ? onProgress : () => {};
 
   // Clean staging
   try {
@@ -484,20 +486,24 @@ async function applyContentUpdate({ origin, version, files, title, contentStamp,
   if (!list.length) throw new Error('Empty content manifest');
   if (list.length > MAX_FILES) throw new Error('Manifest too large (' + list.length + ' files)');
 
-  let done = 0;
-  let failed = 0;
-  const failedPaths = [];
+  // Count downloadable files for a truthful progress total
+  const downloadable = [];
   for (const raw of list) {
     const rel = safeRelPath(typeof raw === 'string' ? raw : raw && raw.path);
     if (!rel) continue;
-    // Serverless / private helpers are not static UI — never download into overlay.
-    // (Older builds aborted the whole update on the first 404 from api/_*.)
     const baseName = rel.split('/').pop() || '';
-    if (/^api\//i.test(rel) || baseName.startsWith('_')) {
-      console.log('[content-updater] skip non-static', rel);
-      continue;
-    }
-    // encodeURIComponent per segment
+    if (/^api\//i.test(rel) || baseName.startsWith('_')) continue;
+    downloadable.push(rel);
+  }
+  const total = Math.max(1, downloadable.length);
+  report({ phase: 'installing', done: 0, total, version, title: 'Updating RestroSuite…' });
+
+  let done = 0; // successful downloads
+  let attempted = 0;
+  let failed = 0;
+  const failedPaths = [];
+  for (const rel of downloadable) {
+    attempted++;
     const segs = rel.split('/');
     const fileUrl = base + '/' + segs.map((s) => encodeURIComponent(s)).join('/');
     try {
@@ -507,7 +513,7 @@ async function applyContentUpdate({ origin, version, files, title, contentStamp,
       fs.writeFileSync(dest, buf);
       done++;
       if (done % 25 === 0) {
-        console.log('[content-updater] downloaded', done + '/' + list.length);
+        console.log('[content-updater] downloaded', done + '/' + total);
       }
     } catch (e) {
       // One missing asset must not brick the whole feature update (old bug:
@@ -516,6 +522,16 @@ async function applyContentUpdate({ origin, version, files, title, contentStamp,
       if (failedPaths.length < 12) failedPaths.push(rel + ' (' + String(e && e.message || e) + ')');
       console.warn('[content-updater] skip file', rel, e && e.message);
     }
+    report({
+      phase: 'progress',
+      done: attempted,
+      total,
+      file: rel,
+      version,
+      title: 'Updating RestroSuite…',
+      detail: 'Downloading the latest screens. This only takes a moment.',
+      statusLine: attempted + ' of ' + total + ' files',
+    });
   }
 
   if (done < 3) {
@@ -651,28 +667,50 @@ async function checkContentUpdate(opts) {
   if (_busy) return { status: 'busy' };
   _busy = true;
   _lastStatus = { status: 'checking' };
+  const useUi = !options.silent;
+  let uiOpen = false;
+
+  const showUi = async (state) => {
+    if (!useUi) {
+      emitUpdateEvent(state);
+      return;
+    }
+    if (!uiOpen) {
+      await openProgressWindow();
+      uiOpen = true;
+      // brief wait so renderer can bind ipc
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    sendProgressState(state);
+  };
+
   try {
     migrateLegacyContent();
     const origin = String(_getProductionOrigin() || 'https://restrosuite.codearc.co.in').replace(/\/+$/, '');
     const webRoot = options.webRoot || '';
     const localVer = localContentVersion(webRoot);
 
+    if (useUi) {
+      await showUi({
+        phase: 'checking',
+        version: localVer,
+        detail: 'Looking for the latest features and fixes on the live server.',
+      });
+    }
+
     let remoteUpdate;
     try {
       remoteUpdate = await fetchJson(origin + '/app-update.json?v=' + Date.now());
     } catch (e) {
       _lastStatus = { status: 'error', error: String(e && e.message || e) };
-      if (!options.silent) {
-        await dialog.showMessageBox(parentWindow(), {
-          type: 'warning',
-          title: 'Update check failed',
-          message: 'Could not reach the RestroSuite update server.',
-          detail: String(e && e.message || e) + '\n\nCheck internet connection, then try Help → Check for Updates.',
-          buttons: ['OK', 'Open website'],
-          defaultId: 0,
-        }).then((r) => {
-          if (r.response === 1) shell.openExternal(origin);
+      if (useUi) {
+        await showUi({
+          phase: 'error',
+          title: 'Could not check for updates',
+          detail: String(e && e.message || e) + '\n\nCheck internet, then try Help → Check for Updates.',
         });
+        await waitUiAction(0);
+        closeProgressWindow();
       }
       return _lastStatus;
     }
@@ -680,6 +718,7 @@ async function checkContentUpdate(opts) {
     const remoteVer = String((remoteUpdate && remoteUpdate.version) || '').trim();
     if (!remoteVer) {
       _lastStatus = { status: 'no-feed' };
+      if (uiOpen) closeProgressWindow();
       return _lastStatus;
     }
 
@@ -705,18 +744,16 @@ async function checkContentUpdate(opts) {
 
     if (!options.force && !needsUpdate) {
       _lastStatus = { status: 'current', version: localVer, kind: 'content' };
-      if (!options.silent) {
-        await dialog.showMessageBox(parentWindow(), {
-          type: 'info',
-          title: 'RestroSuite is up to date',
-          message: 'You already have the latest features.',
+      if (useUi) {
+        await showUi({
+          phase: 'current',
+          version: localVer,
           detail:
-            `UI version: ${localVer}\n` +
-            `App shell: v${app.getVersion()}\n\n` +
-            'Feature updates install from the live site when a newer version ships.\n' +
-            'Full Setup builds also receive silent EXE upgrades when a new shell ships.',
-          buttons: ['OK'],
+            'UI ' + localVer + ' · App shell v' + app.getVersion() +
+            '\nYou already have the latest features.',
         });
+        await waitUiAction(0);
+        closeProgressWindow();
       }
       return _lastStatus;
     }
@@ -749,28 +786,41 @@ async function checkContentUpdate(opts) {
     };
 
     const promptDetail =
-      `${(remoteUpdate && remoteUpdate.title) || 'New features and fixes'}\n\n` +
-      `${(remoteUpdate && remoteUpdate.summary) || ''}\n\n` +
-      `You have: ${localVer}\n` +
-      'This downloads only the updated screens (not the whole installer). Your bills and login stay safe.';
+      ((remoteUpdate && remoteUpdate.title) || 'New features and fixes') +
+      '\n\n' +
+      ((remoteUpdate && remoteUpdate.summary) || '') +
+      '\n\nYou have: ' + localVer +
+      '\nThis downloads only the updated screens (not the whole installer). Your bills and login stay safe.';
 
-    const r = await dialog.showMessageBox(parentWindow(), {
-      type: 'info',
-      title: 'Update available',
-      message: `RestroSuite ${remoteVer} is available`,
+    // Silent background prompt: open progress UI for available + install
+    // (same polished bar whether Help → Check or auto-check)
+    await showUi({
+      phase: 'available',
+      version: remoteVer,
+      localVersion: localVer,
+      title: 'RestroSuite ' + remoteVer + ' is ready',
       detail: promptDetail,
-      buttons: ['Update now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
     });
-    if (r.response !== 0) {
+    uiOpen = true;
+    const action = await waitUiAction(0);
+    if (action !== 'install' && action !== 'primary') {
       rememberDismissed(remoteVer);
       _lastStatus = Object.assign({}, _lastStatus, { status: 'dismissed' });
+      closeProgressWindow();
       return _lastStatus;
     }
 
-    // Download + apply (no blocking "OK" dialog mid-flight — that felt broken)
+    // Download + apply with live progress bar
     console.log('[content-updater] applying', remoteVer, 'from', origin);
+    await showUi({
+      phase: 'installing',
+      version: remoteVer,
+      title: 'Updating RestroSuite…',
+      detail: 'Downloading the latest screens. This only takes a moment.',
+      done: 0,
+      total: 0,
+    });
+
     const man = await loadRemoteManifest(origin);
     // Static UI only — drop serverless / private paths so a bad manifest never
     // 404-aborts install (especially on older EXEs without per-file skip).
@@ -791,6 +841,14 @@ async function checkContentUpdate(opts) {
       title: remoteUpdate && remoteUpdate.title,
       contentStamp: remoteUpdate && (remoteUpdate.contentStamp || remoteUpdate.buildId),
       buildId: remoteUpdate && remoteUpdate.buildId,
+      onProgress: (p) => {
+        showUi(Object.assign({
+          phase: 'progress',
+          version: remoteVer,
+          title: 'Updating RestroSuite…',
+          detail: 'Downloading the latest screens. This only takes a moment.',
+        }, p || {}));
+      },
     });
 
     clearDismissed();
@@ -807,22 +865,22 @@ async function checkContentUpdate(opts) {
 
     const failNote =
       result.failedCount > 0
-        ? `\n(${result.failedCount} optional files skipped — core update still applied.)\n`
+        ? ' (' + result.failedCount + ' optional files skipped)'
         : '';
 
-    const restart = await dialog.showMessageBox(parentWindow(), {
-      type: 'info',
-      title: 'Update installed',
-      message: `RestroSuite ${remoteVer} is ready`,
+    await showUi({
+      phase: 'success',
+      version: banked || remoteVer,
+      title: 'RestroSuite ' + remoteVer + ' installed',
       detail:
-        `Updated ${result.fileCount} files.${failNote}\n` +
-        'Reload the app window to use the new screens. Your data is safe.',
-      buttons: ['Reload now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
+        'Updated ' + result.fileCount + ' files' + failNote +
+        '.\nReload to use the new screens. Your data is safe.',
+      statusLine: 'Update complete',
     });
 
-    if (restart.response === 0 && typeof _onApplied === 'function') {
+    const next = await waitUiAction(0);
+    closeProgressWindow();
+    if ((next === 'reload' || next === 'primary') && typeof _onApplied === 'function') {
       try {
         _onApplied({ version: remoteVer });
       } catch (e) {
@@ -834,14 +892,14 @@ async function checkContentUpdate(opts) {
   } catch (e) {
     console.warn('[content-updater] failed', e);
     _lastStatus = { status: 'error', error: String(e && e.message || e) };
-    if (!options.silent) {
-      await dialog.showMessageBox(parentWindow(), {
-        type: 'warning',
-        title: 'Update failed',
-        message: 'Could not install the feature update.',
+    if (useUi) {
+      await showUi({
+        phase: 'error',
+        title: 'Could not install update',
         detail: String(e && e.message || e),
-        buttons: ['OK'],
       });
+      await waitUiAction(0);
+      closeProgressWindow();
     }
     return _lastStatus;
   } finally {

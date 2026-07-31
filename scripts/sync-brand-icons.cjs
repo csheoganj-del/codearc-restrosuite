@@ -10,43 +10,43 @@
  *
  * Usage: node scripts/sync-brand-icons.cjs
  */
-const fs = require("node:fs");
-const path = require("node:path");
-const sharp = require("sharp");
+const fs = require('node:fs');
+const path = require('node:path');
+const sharp = require('sharp');
 
-const ROOT = path.resolve(__dirname, "..");
-const ASSETS = path.join(ROOT, "assets");
-const ICON_VERSION = "7"; // bump when regenerating — used in HTML ?v=
+const ROOT = path.resolve(__dirname, '..');
+const ASSETS = path.join(ROOT, 'assets');
+const ICON_VERSION = '7'; // bump when regenerating — used in HTML ?v=
 
 function resolveSource() {
   const candidates = [
-    "assets/restrosuite-mark-new-source.png",
-    "assets/restrosuite-mark-new-source.jpg",
-    "assets/restrosuite-mark-512.png",
-    "assets/restrosuite-mark.png",
+    'assets/restrosuite-mark-new-source.png',
+    'assets/restrosuite-mark-new-source.jpg',
+    'assets/restrosuite-mark-512.png',
+    'assets/restrosuite-mark.png',
   ];
   for (const rel of candidates) {
     const abs = path.join(ROOT, rel);
-    if (fs.existsSync(abs)) return abs;
+    if (fs.existsSync(abs)) {return abs;}
   }
-  throw new Error("No brand source image found under assets/");
+  throw new Error('No brand source image found under assets/');
 }
 
 async function writePng(input, outPath, size, opts = {}) {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   let pipeline = sharp(input).resize(size, size, {
-    fit: "cover",
-    position: "centre",
+    fit: 'cover',
+    position: 'centre',
     kernel: sharp.kernel.lanczos3,
   });
   if (opts.flatten) {
-    pipeline = pipeline.flatten({ background: opts.background || "#F3EFE8" });
+    pipeline = pipeline.flatten({ background: opts.background || '#F3EFE8' });
   }
   if (opts.padSafe) {
     // Maskable: keep logo in center ~80% (extra padding ring)
     const inner = Math.round(size * 0.8);
     const buf = await sharp(input)
-      .resize(inner, inner, { fit: "contain", background: { r: 243, g: 239, b: 232, alpha: 1 } })
+      .resize(inner, inner, { fit: 'contain', background: { r: 243, g: 239, b: 232, alpha: 1 } })
       .png()
       .toBuffer();
     await sharp({
@@ -57,7 +57,7 @@ async function writePng(input, outPath, size, opts = {}) {
         background: { r: 243, g: 239, b: 232, alpha: 1 },
       },
     })
-      .composite([{ input: buf, gravity: "centre" }])
+      .composite([{ input: buf, gravity: 'centre' }])
       .png({ compressionLevel: 9 })
       .toFile(outPath);
     return;
@@ -107,25 +107,25 @@ function buildIcoFromPngs(pngBuffers) {
 
 async function pngBuffer(input, size) {
   return sharp(input)
-    .resize(size, size, { fit: "cover", position: "centre", kernel: sharp.kernel.lanczos3 })
+    .resize(size, size, { fit: 'cover', position: 'centre', kernel: sharp.kernel.lanczos3 })
     .png()
     .toBuffer();
 }
 
 async function writeSvgFromPng(png192Path, outSvgPath) {
-  const b64 = fs.readFileSync(png192Path).toString("base64");
+  const b64 = fs.readFileSync(png192Path).toString('base64');
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="RestroSuite">
   <image width="192" height="192" href="data:image/png;base64,${b64}" xlink:href="data:image/png;base64,${b64}"/>
 </svg>
 `;
-  fs.writeFileSync(outSvgPath, svg, "utf8");
+  fs.writeFileSync(outSvgPath, svg, 'utf8');
 }
 
 async function writeSocial(input, outPath) {
   // 1200x630 OG image with centered mark on brand cream
   const mark = await sharp(input)
-    .resize(360, 360, { fit: "contain", background: { r: 243, g: 239, b: 232, alpha: 0 } })
+    .resize(360, 360, { fit: 'contain', background: { r: 243, g: 239, b: 232, alpha: 0 } })
     .png()
     .toBuffer();
   await sharp({
@@ -136,7 +136,7 @@ async function writeSocial(input, outPath) {
       background: { r: 243, g: 239, b: 232 },
     },
   })
-    .composite([{ input: mark, gravity: "centre" }])
+    .composite([{ input: mark, gravity: 'centre' }])
     .png({ compressionLevel: 9 })
     .toFile(outPath);
 }
@@ -148,21 +148,21 @@ function copyFile(src, dest) {
 
 async function main() {
   const source = resolveSource();
-  console.log("Brand source:", path.relative(ROOT, source));
+  console.log('Brand source:', path.relative(ROOT, source));
 
   // Normalize master 1024 square (cover) for consistent crops
   const master1024 = await sharp(source)
-    .resize(1024, 1024, { fit: "cover", position: "centre" })
+    .resize(1024, 1024, { fit: 'cover', position: 'centre' })
     .png()
     .toBuffer();
 
   const targets = {
-    mark192: path.join(ASSETS, "restrosuite-mark.png"),
-    mark512: path.join(ASSETS, "restrosuite-mark-512.png"),
-    maskable: path.join(ASSETS, "restrosuite-maskable-512.png"),
-    logo: path.join(ASSETS, "restrosuite_logo.png"),
-    social: path.join(ASSETS, "restrosuite-social.png"),
-    svg: path.join(ASSETS, "restrosuite-mark.svg"),
+    mark192: path.join(ASSETS, 'restrosuite-mark.png'),
+    mark512: path.join(ASSETS, 'restrosuite-mark-512.png'),
+    maskable: path.join(ASSETS, 'restrosuite-maskable-512.png'),
+    logo: path.join(ASSETS, 'restrosuite_logo.png'),
+    social: path.join(ASSETS, 'restrosuite-social.png'),
+    svg: path.join(ASSETS, 'restrosuite-mark.svg'),
   };
 
   await writePng(master1024, targets.mark192, 192);
@@ -174,78 +174,78 @@ async function main() {
   await writeSvgFromPng(targets.mark192, targets.svg);
 
   // images/ mirror (legacy paths)
-  const imgDir = path.join(ROOT, "images");
-  copyFile(targets.mark192, path.join(imgDir, "restrosuite-mark.png"));
-  copyFile(targets.logo, path.join(imgDir, "restrosuite_logo.png"));
-  copyFile(targets.social, path.join(imgDir, "restrosuite-social.png"));
-  copyFile(targets.svg, path.join(imgDir, "restrosuite-mark.svg"));
+  const imgDir = path.join(ROOT, 'images');
+  copyFile(targets.mark192, path.join(imgDir, 'restrosuite-mark.png'));
+  copyFile(targets.logo, path.join(imgDir, 'restrosuite_logo.png'));
+  copyFile(targets.social, path.join(imgDir, 'restrosuite-social.png'));
+  copyFile(targets.svg, path.join(imgDir, 'restrosuite-mark.svg'));
 
   // Desktop EXE / window icon
   const icoSizes = [16, 24, 32, 48, 64, 128, 256];
   const pngs = [];
-  for (const s of icoSizes) pngs.push(await pngBuffer(master1024, s));
+  for (const s of icoSizes) {pngs.push(await pngBuffer(master1024, s));}
   const ico = buildIcoFromPngs(pngs);
-  const icoPath = path.join(ROOT, "desktop", "build", "icon.ico");
+  const icoPath = path.join(ROOT, 'desktop', 'build', 'icon.ico');
   fs.mkdirSync(path.dirname(icoPath), { recursive: true });
   fs.writeFileSync(icoPath, ico);
   // Also drop PNG for electron tools that accept it
-  await writePng(master1024, path.join(ROOT, "desktop", "build", "icon.png"), 512);
+  await writePng(master1024, path.join(ROOT, 'desktop', 'build', 'icon.png'), 512);
   // Splash logo for desktop splash.html
-  await writePng(master1024, path.join(ROOT, "desktop", "build", "splash-mark.png"), 192);
+  await writePng(master1024, path.join(ROOT, 'desktop', 'build', 'splash-mark.png'), 192);
 
   // Android legacy mipmaps (square launcher)
   const mipmap = {
-    "mipmap-mdpi": 48,
-    "mipmap-hdpi": 72,
-    "mipmap-xhdpi": 96,
-    "mipmap-xxhdpi": 144,
-    "mipmap-xxxhdpi": 192,
+    'mipmap-mdpi': 48,
+    'mipmap-hdpi': 72,
+    'mipmap-xhdpi': 96,
+    'mipmap-xxhdpi': 144,
+    'mipmap-xxxhdpi': 192,
   };
-  const resRoot = path.join(ROOT, "android-app", "app", "src", "main", "res");
+  const resRoot = path.join(ROOT, 'android-app', 'app', 'src', 'main', 'res');
   for (const [folder, size] of Object.entries(mipmap)) {
     const dir = path.join(resRoot, folder);
-    await writePng(master1024, path.join(dir, "ic_launcher.png"), size);
-    await writePng(master1024, path.join(dir, "ic_launcher_round.png"), size);
+    await writePng(master1024, path.join(dir, 'ic_launcher.png'), size);
+    await writePng(master1024, path.join(dir, 'ic_launcher_round.png'), size);
   }
   // Adaptive foreground (108dp @ 4x = 432)
-  await writePng(master1024, path.join(resRoot, "drawable", "ic_launcher_foreground.png"), 432);
-  await writePng(master1024, path.join(resRoot, "drawable", "splash_logo.png"), 256);
+  await writePng(master1024, path.join(resRoot, 'drawable', 'ic_launcher_foreground.png'), 432);
+  await writePng(master1024, path.join(resRoot, 'drawable', 'splash_logo.png'), 256);
 
   // Web asset copies inside Android & Desktop packaged apps
   const webCopies = [
-    path.join(ROOT, "android-app", "app", "src", "main", "assets", "assets"),
-    path.join(ROOT, "android-app", "app", "src", "main", "assets", "images"),
-    path.join(ROOT, "desktop", "app", "assets"),
-    path.join(ROOT, "desktop", "app", "images"),
+    path.join(ROOT, 'android-app', 'app', 'src', 'main', 'assets', 'assets'),
+    path.join(ROOT, 'android-app', 'app', 'src', 'main', 'assets', 'images'),
+    path.join(ROOT, 'desktop', 'app', 'assets'),
+    path.join(ROOT, 'desktop', 'app', 'images'),
   ];
   for (const dir of webCopies) {
-    if (!fs.existsSync(path.dirname(dir))) continue;
+    if (!fs.existsSync(path.dirname(dir))) {continue;}
     fs.mkdirSync(dir, { recursive: true });
-    copyFile(targets.mark192, path.join(dir, "restrosuite-mark.png"));
-    if (path.basename(dir) === "assets" || dir.endsWith(`${path.sep}assets`)) {
-      copyFile(targets.mark512, path.join(dir, "restrosuite-mark-512.png"));
-      copyFile(targets.maskable, path.join(dir, "restrosuite-maskable-512.png"));
-      copyFile(targets.logo, path.join(dir, "restrosuite_logo.png"));
-      copyFile(targets.social, path.join(dir, "restrosuite-social.png"));
-      copyFile(targets.svg, path.join(dir, "restrosuite-mark.svg"));
+    copyFile(targets.mark192, path.join(dir, 'restrosuite-mark.png'));
+    if (path.basename(dir) === 'assets' || dir.endsWith(`${path.sep}assets`)) {
+      copyFile(targets.mark512, path.join(dir, 'restrosuite-mark-512.png'));
+      copyFile(targets.maskable, path.join(dir, 'restrosuite-maskable-512.png'));
+      copyFile(targets.logo, path.join(dir, 'restrosuite_logo.png'));
+      copyFile(targets.social, path.join(dir, 'restrosuite-social.png'));
+      copyFile(targets.svg, path.join(dir, 'restrosuite-mark.svg'));
     } else {
-      copyFile(targets.logo, path.join(dir, "restrosuite_logo.png"));
-      copyFile(targets.social, path.join(dir, "restrosuite-social.png"));
-      copyFile(targets.svg, path.join(dir, "restrosuite-mark.svg"));
+      copyFile(targets.logo, path.join(dir, 'restrosuite_logo.png'));
+      copyFile(targets.social, path.join(dir, 'restrosuite-social.png'));
+      copyFile(targets.svg, path.join(dir, 'restrosuite-mark.svg'));
     }
   }
 
   // Manifest cache-buster note file (optional)
   fs.writeFileSync(
-    path.join(ASSETS, ".brand-icon-version"),
+    path.join(ASSETS, '.brand-icon-version'),
     `v${ICON_VERSION}\nsource=${path.relative(ROOT, source)}\ngenerated=${new Date().toISOString()}\n`,
-    "utf8"
+    'utf8'
   );
 
-  console.log("Wrote web marks: 192, 512, maskable, logo, social, svg");
-  console.log("Wrote desktop/build/icon.ico + icon.png + splash-mark.png");
-  console.log("Wrote Android mipmaps + adaptive foreground + splash_logo");
-  console.log("Synced android/desktop web asset copies");
+  console.log('Wrote web marks: 192, 512, maskable, logo, social, svg');
+  console.log('Wrote desktop/build/icon.ico + icon.png + splash-mark.png');
+  console.log('Wrote Android mipmaps + adaptive foreground + splash_logo');
+  console.log('Synced android/desktop web asset copies');
   console.log(`HTML favicon query should use ?v=${ICON_VERSION}`);
 }
 

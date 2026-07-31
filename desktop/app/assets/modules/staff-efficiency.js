@@ -7,7 +7,7 @@
   const RSStaffEff = (global.RSStaffEff = global.RSStaffEff || {});
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -17,7 +17,7 @@
       .replace(/"/g, '&quot;');
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function employees() {
@@ -30,7 +30,7 @@
     return b.servedBy || b.staff || b.cashier || b.waiter || b.cashierName || b.createdBy || b.userName || null;
   }
   function inLastDays(iso, days) {
-    if (!iso) return false;
+    if (!iso) {return false;}
     const t = new Date(iso).getTime();
     return Number.isFinite(t) && t >= Date.now() - days * 86400000;
   }
@@ -39,19 +39,19 @@
     return Number.isFinite(n) ? n : 0;
   }
   function suggestIncentivePct(score) {
-    if (score >= 90) return 12;
-    if (score >= 80) return 8;
-    if (score >= 70) return 5;
-    if (score >= 55) return 3;
-    if (score >= 40) return 1;
+    if (score >= 90) {return 12;}
+    if (score >= 80) {return 8;}
+    if (score >= 70) {return 5;}
+    if (score >= 55) {return 3;}
+    if (score >= 40) {return 1;}
     return 0;
   }
   function suggestNote(x) {
-    if (x.score >= 90) return 'Top performer — strong raise / bonus candidate';
-    if (x.score >= 80) return 'High output — consider performance bonus';
-    if (x.score >= 70) return 'Solid — small incentive or recognition';
-    if (x.score >= 40) return 'Average — coach for more table turns / upsell';
-    if (x.orders === 0) return 'No billed activity attributed — assign servedBy on POS';
+    if (x.score >= 90) {return 'Top performer — strong raise / bonus candidate';}
+    if (x.score >= 80) {return 'High output — consider performance bonus';}
+    if (x.score >= 70) {return 'Solid — small incentive or recognition';}
+    if (x.score >= 40) {return 'Average — coach for more table turns / upsell';}
+    if (x.orders === 0) {return 'No billed activity attributed — assign servedBy on POS';}
     return 'Below target — training / shift review';
   }
 
@@ -60,12 +60,12 @@
     const map = {};
     bills().forEach((b) => {
       const when = b.dateTime || b.time || b.createdAt || b.created_at;
-      if (!inLastDays(when, d)) return;
-      if (/cancel|void|refund/i.test(String(b.status || ''))) return;
+      if (!inLastDays(when, d)) {return;}
+      if (/cancel|void|refund/i.test(String(b.status || ''))) {return;}
       const who = staffKeyFromBill(b);
-      if (!who) return;
+      if (!who) {return;}
       const key = String(who).trim();
-      if (!map[key]) map[key] = { name: key, orders: 0, sales: 0, covers: 0, tips: 0, avgTicket: 0, score: 0 };
+      if (!map[key]) {map[key] = { name: key, orders: 0, sales: 0, covers: 0, tips: 0, avgTicket: 0, score: 0 };}
       map[key].orders += 1;
       map[key].sales += Number(b.amount != null ? b.amount : b.total) || 0;
       map[key].covers += Math.max(0, Number(b.covers != null ? b.covers : b.pax) || 0);
@@ -73,7 +73,7 @@
     });
     employees().forEach((e) => {
       const name = e.name || e.displayName || e.username;
-      if (!name) return;
+      if (!name) {return;}
       if (!map[name]) {
         map[name] = {
           name,
@@ -110,7 +110,7 @@
   }
 
   function renderPanel(host, days) {
-    if (!host) return;
+    if (!host) {return;}
     const data = computeEfficiency(days || 30);
     host.innerHTML =
       '<div class="rs-eff-head" style="display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start">' +
@@ -177,7 +177,7 @@
       '<p style="font-size:11.5px;color:var(--text-mute);margin-top:10px">Guidance only — owner approves raises. Attribute sales via staff login.</p>';
 
     const sel = host.querySelector('#rs-eff-days');
-    if (sel) sel.onchange = () => renderPanel(host, Number(sel.value) || 30);
+    if (sel) {sel.onchange = () => renderPanel(host, Number(sel.value) || 30);}
     const exp = host.querySelector('#rs-eff-export');
     if (exp) {
       exp.onclick = () => {
@@ -252,7 +252,7 @@
 
   function mountIntoEmployees() {
     const tab = document.getElementById('employees-tab');
-    if (!tab) return;
+    if (!tab) {return;}
     let panel = tab.querySelector('#rs-staff-efficiency');
     if (!panel) {
       panel = document.createElement('div');
@@ -273,6 +273,6 @@
   RSStaffEff.renderPanel = renderPanel;
   RSStaffEff.mountIntoEmployees = mountIntoEmployees;
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  if (document.readyState === 'loading') {document.addEventListener('DOMContentLoaded', boot);}
+  else {boot();}
 })(typeof window !== 'undefined' ? window : globalThis);

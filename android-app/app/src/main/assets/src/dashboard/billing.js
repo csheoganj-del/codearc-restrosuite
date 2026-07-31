@@ -1,12 +1,12 @@
 (function (root, factory) {
   const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) {module.exports = api;}
   if (root) {
     root.RestroSuite = root.RestroSuite || {};
     root.RestroSuite.billing = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  "use strict";
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
 
   function normalizeMoney(value) {
     const number = Number(value);
@@ -14,12 +14,12 @@
   }
 
   function findCustomer(customers, customerName, customerPhone) {
-    const phone = String(customerPhone || "").trim();
-    const name = String(customerName || "").trim().toLowerCase();
+    const phone = String(customerPhone || '').trim();
+    const name = String(customerName || '').trim().toLowerCase();
     return (Array.isArray(customers) ? customers : []).find((customer) => {
-      if (!customer) return false;
-      if (phone && String(customer.phone || "").trim() === phone) return true;
-      return name && String(customer.name || "").trim().toLowerCase() === name;
+      if (!customer) {return false;}
+      if (phone && String(customer.phone || '').trim() === phone) {return true;}
+      return name && String(customer.name || '').trim().toLowerCase() === name;
     }) || null;
   }
 
@@ -55,11 +55,11 @@
     if (gstEnabled) {
       let totalTax = 0;
       cart.forEach(item => {
-        if (!item) return;
+        if (!item) {return;}
         const rate = (item.gst !== undefined && item.gst !== null && item.gst !== '')
           ? parseFloat(String(item.gst).replace('%', ''))
           : gstRate;
-        if (Number.isNaN(rate) || rate <= 0) return;
+        if (Number.isNaN(rate) || rate <= 0) {return;}
 
         const itemSub = normalizeMoney(item.price) * normalizeMoney(item.qty);
         const itemDiscount = subtotal > 0 ? (itemSub * (loyaltyDiscount / subtotal)) : 0;
@@ -93,7 +93,7 @@
   function aggregateDeductions(cart, getSpecs) {
     const totals = {};
     (Array.isArray(cart) ? cart : []).forEach((item) => {
-      const specs = typeof getSpecs === "function" ? getSpecs(item) : {};
+      const specs = typeof getSpecs === 'function' ? getSpecs(item) : {};
       Object.keys(specs || {}).forEach((ingredient) => {
         totals[ingredient] = (totals[ingredient] || 0)
           + (normalizeMoney(specs[ingredient]) * normalizeMoney(item && item.qty));
@@ -102,9 +102,29 @@
     return totals;
   }
 
+  function renderBillingCalcBtn() {
+    return '<button aria-label="Recalculate cart totals and tax"><i class="fa-solid fa-calculator" aria-hidden="true"></i></button>';
+  }
+
+  function renderBillingDiscountBtn() {
+    return '<button aria-label="Apply loyalty or manual discount to cart"><i class="fa-solid fa-percent" aria-hidden="true"></i></button>';
+  }
+
+  function renderBillingSplitBtn() {
+    return '<button aria-label="Open split payment dialogue"><i class="fa-solid fa-coins" aria-hidden="true"></i></button>';
+  }
+
+  function renderBillingReceiptBtn() {
+    return '<button aria-label="Preview digital receipt before printing"><i class="fa-solid fa-receipt" aria-hidden="true"></i></button>';
+  }
+
   return {
     aggregateDeductions,
     calculateCartTotals,
-    findCustomer
+    findCustomer,
+    renderBillingCalcBtn,
+    renderBillingDiscountBtn,
+    renderBillingSplitBtn,
+    renderBillingReceiptBtn
   };
 });

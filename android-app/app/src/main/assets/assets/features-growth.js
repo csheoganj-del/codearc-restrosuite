@@ -1138,6 +1138,21 @@
     }
 
     function drawFloorUI(sec) {
+      // Skeleton paint() sets rs-skel-host { pointer-events: none } on #floor-tab.
+      // Replacing only innerHTML left that class on — buttons looked fine but never clicked
+      // (web + desktop). Billing-only mode is unrelated.
+      try {
+        if (window.RSSkel && typeof RSSkel.clear === 'function') RSSkel.clear(sec);
+        else {
+          sec.classList.remove('rs-skel-host');
+          sec.removeAttribute('aria-busy');
+        }
+      } catch (_) {
+        try {
+          sec.classList.remove('rs-skel-host');
+          sec.removeAttribute('aria-busy');
+        } catch (e2) {}
+      }
       const free = TABLES.filter((t) => t.state === 'free').length;
       const dining = TABLES.filter((t) => t.state === 'occupied' || t.state === 'pending').length;
       const billed = TABLES.filter((t) => t.state === 'billed').length;
@@ -1194,8 +1209,40 @@
           }
         };
       });
+      const setEnabled =
+        typeof window.RS_setActionEnabled === 'function'
+          ? window.RS_setActionEnabled
+          : function (el, on, why) {
+              if (!el) return;
+              el.disabled = !on;
+              if (!on) el.title = why || '';
+            };
+      const notifyWhy =
+        typeof window.RS_notifyWhy === 'function'
+          ? window.RS_notifyWhy
+          : function (msg, ic) {
+              if (window.RS && RS.toast) RS.toast(msg, ic || 'fa-circle-info');
+            };
+
+      const hasTables = TABLES.length > 0;
+      const openN = TABLES.filter((t) => t && t.state && t.state !== 'free').length;
+      const qrOpenCount = TABLES.filter((t) => t && t.qrOpen).length;
+
       const btnPrint = $('#btn-print-floor-qrs', sec);
-      if (btnPrint) btnPrint.onclick = () => showAllTableQRs();
+      if (btnPrint) {
+        setEnabled(
+          btnPrint,
+          hasTables,
+          'No tables to print — use Edit Tables to add tables first'
+        );
+        btnPrint.onclick = () => {
+          if (!hasTables) {
+            notifyWhy('No tables to print — use Edit Tables to add tables first', 'fa-chair');
+            return;
+          }
+          showAllTableQRs();
+        };
+      }
       const btnStaffScan = $('#btn-staff-scan-table', sec);
       if (btnStaffScan) {
         btnStaffScan.onclick = () => {
@@ -1204,12 +1251,23 @@
           } else if (typeof window.openStaffTableScanner === 'function') {
             window.openStaffTableScanner();
           } else {
-            RS.toast('Scanner loading — refresh dashboard', 'fa-circle-exclamation');
+            notifyWhy(
+              'Table scanner is not ready yet — wait a moment or refresh the dashboard',
+              'fa-camera'
+            );
           }
         };
       }
       const btnManage = $('#btn-manage-seating', sec) || $('#btn-manage-seating-empty', sec);
-      if (btnManage) btnManage.onclick = () => openManageSeatingModal();
+      if (btnManage) {
+        btnManage.onclick = () => {
+          if (typeof openManageSeatingModal !== 'function') {
+            notifyWhy('Edit Tables is still loading — try again in a second', 'fa-chair');
+            return;
+          }
+          openManageSeatingModal();
+        };
+      }
       const btnRefresh = $('#btn-refresh-floor', sec);
       if (btnRefresh)
         btnRefresh.onclick = () => {
@@ -1220,19 +1278,62 @@
           } catch (e) {}
         };
       const btnOpenAll = $('#btn-open-all-qr', sec);
-      if (btnOpenAll) btnOpenAll.onclick = () => bulkTableQrSessions('open', btnOpenAll);
+      if (btnOpenAll) {
+        setEnabled(
+          btnOpenAll,
+          hasTables,
+          'No tables configured — open Edit Tables to add tables, then try Open all QR'
+        );
+        btnOpenAll.onclick = () => {
+          if (!hasTables) {
+            notifyWhy(
+              'No tables configured — open Edit Tables to add tables, then try Open all QR',
+              'fa-chair'
+            );
+            return;
+          }
+          bulkTableQrSessions('open', btnOpenAll);
+        };
+      }
       const btnCloseAll = $('#btn-close-all-qr', sec);
-      if (btnCloseAll) btnCloseAll.onclick = () => bulkTableQrSessions('close', btnCloseAll);
+      if (btnCloseAll) {
+        setEnabled(
+          btnCloseAll,
+          hasTables && qrOpenCount > 0,
+          !hasTables
+            ? 'No tables configured'
+            : 'No QR sessions are open — use Open all QR first if guests should scan'
+        );
+        btnCloseAll.onclick = () => {
+          if (!hasTables) {
+            notifyWhy('No tables configured', 'fa-chair');
+            return;
+          }
+          if (!qrOpenCount) {
+            notifyWhy(
+              'No QR sessions are open on any table — nothing to close',
+              'fa-power-off'
+            );
+            return;
+          }
+          bulkTableQrSessions('close', btnCloseAll);
+        };
+      }
       const btnClearAll = $('#btn-clear-all-tables', sec);
       if (btnClearAll) {
-        const openN = TABLES.filter((t) => t && t.state && t.state !== 'free').length;
-        if (!openN) {
-          btnClearAll.disabled = true;
-          btnClearAll.title = 'No open tables to clear';
-          btnClearAll.style.opacity = '0.55';
-        }
+        setEnabled(
+          btnClearAll,
+          openN > 0,
+          openN > 0
+            ? 'Free every dining, held, or billed table'
+            : 'No open tables to clear — all tables are already free'
+        );
         btnClearAll.onclick = async () => {
-          btnClearAll.disabled = true;
+          if (!openN) {
+            notifyWhy('No open tables to clear — all tables are already free', 'fa-broom');
+            return;
+          }
+          setEnabled(btnClearAll, false, 'Clearing open tables…');
           try {
             await clearAllOpenTables();
           } finally {

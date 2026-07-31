@@ -17,10 +17,10 @@ let m;
 while ((m = idRe.exec(cleaned))) {
   const id = m[1];
   if (/^(btn-|cart-|promo-|rs-|set-|bills-|inv-|tb-|mnav|sidebar|open-|klc-)/.test(id) || id.includes('btn'))
-    ids.add(id);
+    {ids.add(id);}
 }
-while ((m = titleRe.exec(cleaned))) titles.add(m[1].replace(/\s+/g, ' ').trim());
-while ((m = ariaRe.exec(cleaned))) titles.add(m[1].replace(/\s+/g, ' ').trim());
+while ((m = titleRe.exec(cleaned))) {titles.add(m[1].replace(/\s+/g, ' ').trim());}
+while ((m = ariaRe.exec(cleaned))) {titles.add(m[1].replace(/\s+/g, ' ').trim());}
 
 const texts = new Set();
 while ((m = btnTextRe.exec(cleaned))) {
@@ -28,7 +28,7 @@ while ((m = btnTextRe.exec(cleaned))) {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  if (t && t.length < 60 && !/^[0-9]+$/.test(t)) texts.add(t);
+  if (t && t.length < 60 && !/^[0-9]+$/.test(t)) {texts.add(t);}
 }
 
 console.log('=== IDS', ids.size);

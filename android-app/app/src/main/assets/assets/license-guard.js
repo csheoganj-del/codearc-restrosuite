@@ -118,14 +118,29 @@
     var cfg = input.cfg || {};
     var now = input.now;
     var hwm = input.hwm || 0;
-    var skew = input.clockSkewToleranceMs != null ? input.clockSkewToleranceMs : (60 * 1000);
+    var skew = input.clockSkewToleranceMs != null
+      ? input.clockSkewToleranceMs
+      : (cfg.CLOCK_SKEW_TOLERANCE_MS != null ? cfg.CLOCK_SKEW_TOLERANCE_MS : (15 * 60 * 1000));
+    var offlineSkew = input.clockSkewOfflineMs != null
+      ? input.clockSkewOfflineMs
+      : (cfg.CLOCK_SKEW_OFFLINE_GRACE_MS != null ? cfg.CLOCK_SKEW_OFFLINE_GRACE_MS : (4 * 60 * 60 * 1000));
     var monitor = cfg.MODE === 'monitor';
 
     // 1) Clock-rollback check. If the wall clock reads meaningfully earlier than
     //    the highest time we have ever observed, the device clock was moved
     //    back — a classic offline-cheat. Lock and force online revalidation.
+    //    Mild NTP/VM glitches (within skew) are ignored. With a still-valid
+    //    signed lease, allow a larger offline grace so restaurants are not
+    //    locked by a bad Windows time sync during dinner service.
     if (hwm && now < hwm - skew) {
-      return decision(false, 'clock_rollback', { monitor: monitor, hwmDelta: hwm - now });
+      var hwmDelta = hwm - now;
+      var hasLiveLease = !!(input.verified && input.claims &&
+        Number(input.claims.lease_expires_at || 0) > now);
+      if (hasLiveLease && hwmDelta <= offlineSkew) {
+        // Fall through — treat clock as OK for this evaluation
+      } else {
+        return decision(false, 'clock_rollback', { monitor: monitor, hwmDelta: hwmDelta });
+      }
     }
 
     // 2) No verified lease.
@@ -447,7 +462,9 @@
       reason === 'lease_expired' ||
       reason === 'lease_no_expiry' ||
       reason === 'bootstrap_start' ||
-      reason === 'bootstrap_grace';
+      reason === 'bootstrap_grace' ||
+      // Online + signed-in: re-mint lease and re-stamp HWM from server time
+      reason === 'clock_rollback';
   }
 
   async function evaluateNow() {
@@ -467,7 +484,9 @@
       hwm: st2.hwm,
       firstSeen: st2.firstSeen,
       killed: lsGet('rs_license_killed_v1') === '1',
-      cfg: CFG
+      cfg: CFG,
+      clockSkewToleranceMs: CFG.CLOCK_SKEW_TOLERANCE_MS,
+      clockSkewOfflineMs: CFG.CLOCK_SKEW_OFFLINE_GRACE_MS
     });
 
     // Record firstSeen on the very first evaluation so bootstrap grace is bounded.
@@ -484,7 +503,7 @@
     if (!IS_BROWSER) return;
     if (document.getElementById('rs-license-lock')) return;
     var messages = {
-      clock_rollback: 'Your device clock looks incorrect. Connect to the internet once to re-verify your subscription.',
+      clock_rollback: 'Your device clock looks incorrect (or jumped after sleep). Set the correct date/time, go online, and tap Retry.',
       lease_expired: 'Your RestroSuite licence needs to reconnect. Please go online briefly to renew.',
       no_lease: 'RestroSuite needs to verify your subscription on this device. Stay online and tap Retry — mobile browsers often need a second try after login.',
       invalid_lease: 'RestroSuite needs to verify your subscription. Please stay online and tap Retry now.',

@@ -10,7 +10,7 @@ Show: **login → sell → print/WhatsApp → bills → shift Z-report → inven
 
 ### 0:00 — Login (1 min)
 
-1. Open production: `https://codearc-restrosuite.vercel.app/login.html`
+1. Open production: `https://restrosuite.codearc.co.in/login`
 2. Outlet slug / username / password for the demo tenant
 3. Land on **POS** (Takeaway active by default)
 

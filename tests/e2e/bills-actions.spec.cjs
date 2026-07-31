@@ -6,6 +6,7 @@
  *   E2E_OUTLET_SLUG / E2E_USERNAME / E2E_PASSWORD
  */
 const { test, expect } = require('@playwright/test');
+const { dismissOnboarding } = require('./helpers/onboarding.cjs');
 
 const slug = process.env.E2E_OUTLET_SLUG || process.env.E2E_TENANT || '';
 const user = process.env.E2E_USERNAME || process.env.E2E_USER || '';
@@ -23,6 +24,7 @@ async function performLogin(page) {
     await page.waitForURL((url) => /dashboard/i.test(url.pathname + url.hash + url.href), {
       timeout: 60000,
     });
+    await dismissOnboarding(page);
     return { ok: true };
   } catch (_) {
     return { ok: false };
@@ -59,8 +61,11 @@ async function ensureBill(page) {
     const b = window.RS && RS.BILLS && RS.BILLS[0];
     return b ? String(b.no || b.orderId || '') : '';
   });
-  const newOrder = page.locator('#rc-new');
-  if (await newOrder.isVisible().catch(() => false)) await newOrder.click();
+  const settleOverlay = page.locator('.rc-settle-overlay.show');
+  const newOrder = settleOverlay.getByRole('button', { name: 'New order' });
+  await expect(newOrder).toBeVisible({ timeout: 60000 });
+  await newOrder.click();
+  await settleOverlay.waitFor({ state: 'hidden', timeout: 10000 });
   return billNo;
 }
 
@@ -89,8 +94,12 @@ test.describe('Bills actions (refund / delete / PIN)', () => {
     const row = page.locator('#bills-table-body tr').filter({ hasText: billNo }).first();
     await expect(row).toBeVisible({ timeout: 20000 });
 
-    // --- Refund path: open gate, cancel ---
-    await row.locator('button.refund-act').click();
+    // --- Refund path: open the row action menu, then open gate and cancel ---
+    const moreActions = row.getByRole('button', { name: 'More actions' });
+    await moreActions.click();
+    const refundAction = row.getByRole('menuitem', { name: /Void \/ refund/i });
+    await expect(refundAction).toBeVisible();
+    await refundAction.click();
 
     // Either PIN overlay or refund reason modal
     const pinOverlay = page.locator('#rs-pin-overlay');
@@ -116,8 +125,11 @@ test.describe('Bills actions (refund / delete / PIN)', () => {
     }, billNo);
     expect(stillPaid).not.toBe('refunded');
 
-    // --- Delete path: open confirm, cancel ---
-    await row.locator('button.del-act').click();
+    // --- Delete path: reopen the row action menu, then open confirm and cancel ---
+    await moreActions.click();
+    const deleteAction = row.getByRole('menuitem', { name: /Delete bill/i });
+    await expect(deleteAction).toBeVisible();
+    await deleteAction.click();
 
     const pin2 = page.locator('#rs-pin-overlay');
     const delOverlay = page.locator('#rs-del-overlay');
