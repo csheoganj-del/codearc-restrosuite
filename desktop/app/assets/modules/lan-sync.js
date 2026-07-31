@@ -16,6 +16,7 @@
   let es = null;
   let lastHub = null;
   let bootRun = 0;
+  let nativeDiscoveryAt = 0;
   const seenKeys = {};
 
   function toast(msg, icon) {
@@ -69,6 +70,26 @@
       if (base) { localStorage.setItem(HUB_KEY, String(base).replace(/\/$/, '')); }
       if (id && token) { localStorage.setItem(tokenKey(id), token); }
     } catch (_) {}
+  }
+
+  function requestNativeDiscovery() {
+    try {
+      if (!global.AndroidLan || typeof global.AndroidLan.discover !== 'function') { return false; }
+      const now = Date.now();
+      if (now - nativeDiscoveryAt < 3000) { return true; }
+      const session = global.RS_API && RS_API.session && RS_API.session();
+      const id = tenantId();
+      if (!session || !id || id === 'local') { return false; }
+      nativeDiscoveryAt = now;
+      global.AndroidLan.discover(
+        id,
+        String(session.token || session.session_token || ''),
+        savedToken(id)
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   function statusRank(s) {
@@ -176,7 +197,23 @@
         });
       }
     }
+    requestNativeDiscovery();
     return null;
+  }
+
+  function acceptNativeHub(payload) {
+    try {
+      const data = typeof payload === 'string' ? JSON.parse(payload) : payload;
+      if (!data || !data.base || !data.token) { return false; }
+      const id = tenantId();
+      if (String(data.tenantId || '') !== id) { return false; }
+      saveHubCredentials(data.base, id, data.token);
+      nativeDiscoveryAt = 0;
+      setTimeout(boot, 0);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   function mergeIntoLocal(row) {
@@ -656,6 +693,8 @@
     findHub: findHub,
     showLanHelp: showLanHelp,
     lanKitchenEnabled: lanKitchenEnabled,
+    acceptNativeHub: acceptNativeHub,
+    requestNativeDiscovery: requestNativeDiscovery,
     boot: boot,
   };
 

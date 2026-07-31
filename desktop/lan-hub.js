@@ -4,6 +4,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const dgram = require('dgram');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -12,6 +13,8 @@ const MAX_ORDERS_PER_TENANT = 400;
 const MAX_STREAMS_PER_TENANT = 20;
 const MAX_STREAMS_TOTAL = 60;
 const MAX_ROW_BYTES = 64 * 1024;
+const DISCOVERY_PORT = 39821;
+const DISCOVERY_REQUEST = 'RESTROSUITE_LAN_DISCOVER_V1';
 const startedAt = Date.now();
 
 /** @type {Map<string, Map<string, object>>} */
@@ -227,7 +230,8 @@ function stateSnapshot() {
  *   port?: number,
  *   getPort?: () => number,
  *   stateFile?: string,
- *   credentialsFile?: string
+ *   credentialsFile?: string,
+ *   validateSession?: (input: {tenantId: string, sessionToken: string}) => Promise<boolean>
  * }} [opts]
  */
 function attachLanHub(app, opts) {
@@ -333,6 +337,53 @@ function attachLanHub(app, opts) {
       pairingUrls,
       connectedClients: (streams.get(tenantId) || new Set()).size,
       queuedOrders: map ? map.size : 0,
+    });
+  });
+
+  app.post('/api/lan/auto-pair', async (req, res) => {
+    if (!allowRate(req, 'auto-pair', 40, 60000)) {
+      return res.status(429).json({ error: 'Too many automatic pairing requests' });
+    }
+    const tenantId = tenantFrom(req);
+    if (!tenantId) return res.status(400).json({ error: 'A valid tenant ID is required' });
+
+    const existingToken = String(req.body && req.body.lanToken || '');
+    if (credentials.valid(tenantId, existingToken)) {
+      return res.json({
+        ok: true,
+        tenantId,
+        token: existingToken,
+        port: requestPort(req),
+        resumed: true,
+      });
+    }
+
+    const sessionToken = String(req.body && req.body.sessionToken || '');
+    if (!sessionToken || typeof opts.validateSession !== 'function') {
+      return res.status(401).json({
+        error: 'A valid outlet session is required for first automatic pairing',
+        code: 'lan_session_required',
+      });
+    }
+    let verified = false;
+    try {
+      verified = await opts.validateSession({ tenantId, sessionToken });
+    } catch (_) {
+      return res.status(503).json({
+        error: 'First LAN authorization requires internet. Existing paired devices continue offline.',
+        code: 'lan_cloud_validation_unavailable',
+      });
+    }
+    if (!verified) {
+      return res.status(401).json({ error: 'Outlet session did not match this LAN request' });
+    }
+    const token = credentials.tokenFor(tenantId, false);
+    return res.json({
+      ok: true,
+      tenantId,
+      token,
+      port: requestPort(req),
+      resumed: false,
     });
   });
 
@@ -477,7 +528,47 @@ function attachLanHub(app, opts) {
   };
 }
 
+function startLanDiscovery(getPort, discoveryPort) {
+  const listenPort = Number(discoveryPort) || DISCOVERY_PORT;
+  const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  let closed = false;
+  let settleReady;
+  const ready = new Promise((resolve) => { settleReady = resolve; });
+  socket.on('error', (error) => {
+    console.warn('[lan-discovery]', error && error.message);
+    settleReady(false);
+  });
+  socket.on('message', (message, remote) => {
+    if (String(message || '').trim() !== DISCOVERY_REQUEST) return;
+    const port = Number(typeof getPort === 'function' && getPort()) || 8001;
+    const response = Buffer.from(JSON.stringify({
+      service: 'restrosuite-lan-v1',
+      port,
+      securePairing: true,
+    }));
+    try { socket.send(response, remote.port, remote.address); } catch (_) {}
+  });
+  try {
+    socket.bind(listenPort, '0.0.0.0', () => {
+      try { socket.setBroadcast(true); } catch (_) {}
+      settleReady(true);
+    });
+  } catch (error) {
+    console.warn('[lan-discovery] unable to start', error && error.message);
+  }
+  return {
+    ready,
+    close() {
+      if (closed) return;
+      closed = true;
+      try { socket.close(); } catch (_) {}
+    },
+  };
+}
+
 module.exports = {
+  DISCOVERY_PORT,
+  DISCOVERY_REQUEST,
   attachLanHub,
   isLoopbackRequest,
   listLanIPs,
@@ -487,4 +578,5 @@ module.exports = {
   sanitizeRow,
   statusRank,
   timingSafeTokenEqual,
+  startLanDiscovery,
 };

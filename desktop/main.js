@@ -49,6 +49,7 @@ function resolveWebRoot() {
 
 let mainWindow = null;
 let serverInstance = null;
+let lanDiscoveryInstance = null;
 let appEntryUrl = null; // set in createWindow; used by the license re-check IPC
 let tray = null;
 let isQuitting = false; // true only for real Quit (tray / menu), not window X
@@ -220,6 +221,13 @@ function startLocalServer() {
             console.log('[main] LAN kitchen hub: open on tablets → http://' + ips[0] + ':' + PORT);
           }
         } catch (_) {}
+        try {
+          const { startLanDiscovery } = require('./lan-hub');
+          if (lanDiscoveryInstance) lanDiscoveryInstance.close();
+          lanDiscoveryInstance = startLanDiscovery(() => PORT);
+        } catch (error) {
+          console.warn('[main] automatic LAN discovery unavailable:', error && error.message);
+        }
         resolve(srv);
       });
     }
@@ -1015,5 +1023,6 @@ app.on('before-quit', () => {
 
 app.on('quit', () => {
   try { if (tray) { tray.destroy(); tray = null; } } catch (e) { /* noop */ }
+  try { if (lanDiscoveryInstance) lanDiscoveryInstance.close(); } catch (e) { /* noop */ }
   try { if (serverInstance) serverInstance.close(); } catch (e) { /* noop */ }
 });
