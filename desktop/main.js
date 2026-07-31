@@ -172,6 +172,9 @@ function startLocalServer() {
     const expressApp = createServer({
       root,
       config,
+      getPort: () => PORT,
+      lanStateFile: path.join(app.getPath('userData'), 'lan-hub-orders.json'),
+      lanCredentialsFile: path.join(app.getPath('userData'), 'lan-hub-pairing.json'),
       getOverlay: () => {
         try {
           return contentUpdater.getOverlayDir();

@@ -12,8 +12,10 @@
   'use strict';
 
   const HUB_KEY = 'rs_lan_hub_url_v1';
+  const TOKEN_PREFIX = 'rs_lan_token_v1:';
   let es = null;
-  let lastPushAt = 0;
+  let lastHub = null;
+  let bootRun = 0;
   const seenKeys = {};
 
   function toast(msg, icon) {
@@ -25,10 +27,48 @@
   function tenantId() {
     try {
       const s = global.RS_API && RS_API.session && RS_API.session();
-      return String((s && (s.tenant_id || s.tenant_slug)) || sessionStorage.getItem('tenant_id') || 'local');
+      return String(
+        (s && (s.tenant_id || s.tenant_slug)) ||
+        sessionStorage.getItem('tenant_id') ||
+        localStorage.getItem('rs_lan_tenant_hint_v1') ||
+        'local'
+      );
     } catch (_) {
       return 'local';
     }
+  }
+
+  function lanKitchenEnabled() {
+    try {
+      if (global.RSOpsMode && typeof RSOpsMode.usesKds === 'function') {
+        return !!RSOpsMode.usesKds();
+      }
+      const mode = String(
+        (global.RS_SETTINGS && RS_SETTINGS.set_operating_mode) || ''
+      ).toLowerCase();
+      return mode.indexOf('full') >= 0 || mode.indexOf('kds') >= 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isLoopbackHost(hostname) {
+    return /^(localhost|127(?:\.\d+){3}|::1)$/i.test(String(hostname || ''));
+  }
+
+  function tokenKey(id) {
+    return TOKEN_PREFIX + String(id || tenantId());
+  }
+
+  function savedToken(id) {
+    try { return localStorage.getItem(tokenKey(id)) || ''; } catch (_) { return ''; }
+  }
+
+  function saveHubCredentials(base, id, token) {
+    try {
+      if (base) { localStorage.setItem(HUB_KEY, String(base).replace(/\/$/, '')); }
+      if (id && token) { localStorage.setItem(tokenKey(id), token); }
+    } catch (_) {}
   }
 
   function statusRank(s) {
@@ -57,8 +97,12 @@
       const saved = localStorage.getItem(HUB_KEY);
       if (saved) { list.unshift(String(saved).replace(/\/$/, '')); }
     } catch (_) {}
-    // Common desktop default
-    list.push('http://127.0.0.1:8001');
+    // A tablet's 127.0.0.1 is the tablet, never the restaurant POS.
+    try {
+      if (isLoopbackHost(location.hostname)) {
+        list.push(location.origin || 'http://127.0.0.1:8001');
+      }
+    } catch (_) {}
     return list.filter(function (v, i, a) { return v && a.indexOf(v) === i; });
   }
 
@@ -67,18 +111,69 @@
       const r = await fetch(base + '/api/lan/info', { cache: 'no-store' });
       if (!r.ok) { return null; }
       const j = await r.json();
-      if (j && j.enabled) { return { base: base, info: j }; }
+      if (j && j.enabled && j.securePairing) { return { base: base, info: j }; }
     } catch (_) {}
     return null;
   }
 
+  async function createLocalPairing(hit) {
+    try {
+      if (!hit || !isLoopbackHost(location.hostname)) { return null; }
+      const id = tenantId();
+      const r = await fetch(hit.base + '/api/lan/pairing', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: id }),
+      });
+      if (!r.ok) { return null; }
+      const pairing = await r.json();
+      if (!pairing || !pairing.token) { return null; }
+      saveHubCredentials(hit.base, id, pairing.token);
+      return pairing;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function authorizedHealth(hit, token) {
+    try {
+      if (!hit || !token) { return null; }
+      const r = await fetch(
+        hit.base + '/api/lan/health?t=' + encodeURIComponent(tenantId()),
+        {
+          cache: 'no-store',
+          headers: { 'X-RS-LAN-Token': token },
+        }
+      );
+      if (!r.ok) { return null; }
+      return await r.json();
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function findHub() {
+    if (!lanKitchenEnabled()) { return null; }
     const cands = defaultHubCandidates();
     for (let i = 0; i < cands.length; i++) {
       const hit = await probeHub(cands[i]);
       if (hit) {
-        try { localStorage.setItem(HUB_KEY, hit.base); } catch (_) {}
-        return hit;
+        const id = tenantId();
+        let token = savedToken(id);
+        let pairing = null;
+        if (!token) {
+          pairing = await createLocalPairing(hit);
+          token = (pairing && pairing.token) || '';
+        }
+        const health = await authorizedHealth(hit, token);
+        if (!health) { continue; }
+        saveHubCredentials(hit.base, id, token);
+        return Object.assign(hit, {
+          token: token,
+          pairing: pairing,
+          health: health,
+        });
       }
     }
     return null;
@@ -116,16 +211,18 @@
   }
 
   async function pushRow(row) {
-    if (!row) { return; }
+    if (!row || !lanKitchenEnabled()) { return; }
     const hub = await findHub();
     if (!hub) { return; }
     try {
       await fetch(hub.base + '/api/lan/push', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RS-LAN-Token': hub.token,
+        },
         body: JSON.stringify({ tenantId: tenantId(), row: row }),
       });
-      lastPushAt = Date.now();
       paintLanChip(true, hub);
     } catch (_) {
       paintLanChip(false, null);
@@ -150,61 +247,173 @@
         showLanHelp(hub);
       };
     }
+    if (!lanKitchenEnabled()) {
+      chip.style.display = 'none';
+      return;
+    }
     if (!ok || !hub) {
       // Still show if we're on desktop localhost so staff can copy IP
       try {
-        if (/localhost|127\.0\.0\.1/.test(location.hostname || '')) {
+        if (isLoopbackHost(location.hostname)) {
           chip.style.display = 'inline-flex';
-          chip.querySelector('.t').textContent = 'LAN hub';
-          chip.title = 'Kitchen tablets: open this PC’s Wi‑Fi address (see /api/lan/info)';
+          chip.style.background = '#fff7ed';
+          chip.style.color = '#9a3412';
+          chip.style.borderColor = '#fdba74';
+          chip.querySelector('.t').textContent = 'LAN setup';
+          chip.title = 'Set up a secure kitchen tablet connection';
           chip.onclick = function () { showLanHelp(null); };
+        } else {
+          chip.style.display = 'none';
         }
       } catch (_) {}
       return;
     }
+    lastHub = hub;
     chip.style.display = 'inline-flex';
     chip.style.background = '#ecfdf5';
     chip.style.color = '#065f46';
     chip.style.borderColor = '#6ee7b7';
-    chip.querySelector('.t').textContent = 'LAN kitchen';
-    chip.title = 'Connected to kitchen hub ' + hub.base;
+    const clients = Number(hub.health && hub.health.connectedClients) || 0;
+    chip.querySelector('.t').textContent = clients ? ('LAN kitchen · ' + clients) : 'LAN kitchen';
+    chip.title = clients
+      ? clients + ' kitchen tablet' + (clients === 1 ? '' : 's') + ' connected'
+      : 'LAN kitchen is ready. Tap to pair a tablet.';
     chip.onclick = function () { showLanHelp(hub); };
   }
 
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async function pairingForHub(hub) {
+    if (hub && hub.pairing && hub.pairing.token) { return hub.pairing; }
+    if (hub && isLoopbackHost(location.hostname)) {
+      const pairing = await createLocalPairing(hub);
+      if (pairing) {
+        hub.pairing = pairing;
+        hub.token = pairing.token;
+        hub.health = await authorizedHealth(hub, hub.token);
+      }
+      return pairing;
+    }
+    return null;
+  }
+
+  function copyText(value) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(value);
+    }
+    const area = document.createElement('textarea');
+    area.value = value;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); } finally { area.remove(); }
+    return Promise.resolve();
+  }
+
   async function showLanHelp(hub) {
-    let info = hub && hub.info;
-    if (!info) {
+    if (!lanKitchenEnabled()) {
+      toast('LAN kitchen is available in Full operations mode.', 'fa-circle-info');
+      return;
+    }
+    hub = hub || lastHub || await findHub();
+    if (!hub) {
+      toast('LAN kitchen is not ready. Restart RestroSuite Desktop and check Windows Firewall.', 'fa-triangle-exclamation');
+      return;
+    }
+    const pairing = await pairingForHub(hub);
+    const urls = (pairing && pairing.pairingUrls) || [];
+    const pairUrl = urls[0] || '';
+    const displayUrl = pairUrl ? pairUrl.split('/lan-pair')[0] : '';
+    const clients = Number((hub.health && hub.health.connectedClients) || (pairing && pairing.connectedClients)) || 0;
+    const queued = Number((hub.health && hub.health.queuedOrders) || (pairing && pairing.queuedOrders)) || 0;
+    let qr = '';
+    if (pairUrl && global.QRCode && typeof global.QRCode.toDataURL === 'function') {
       try {
-        const r = await fetch('/api/lan/info', { cache: 'no-store' });
-        if (r.ok) { info = await r.json(); }
+        qr = await global.QRCode.toDataURL(pairUrl, {
+          width: 220,
+          margin: 1,
+          color: { dark: '#111827', light: '#ffffff' },
+        });
       } catch (_) {}
     }
-    const ips = (info && info.lanIps) || [];
-    const port = (info && info.port) || location.port || 8001;
-    const lines = ips.length
-      ? ips.map(function (ip) { return 'http://' + ip + ':' + port; }).join('\n')
-      : (location.origin || '');
-    const msg =
-      'Same Wi‑Fi kitchen (no internet needed)\n\n' +
-      '1) Run RestroSuite Desktop on the POS PC\n' +
-      '2) On kitchen tablet browser open:\n' +
-      lines +
-      '\n3) Sign in once (when internet available), Keep me signed in\n' +
-      '4) KOTs from POS appear on KDS over LAN\n\n' +
-      'When internet returns: cloud sync runs. Finished (Ready) tickets will NOT re-open as new.';
+    const addressBlock = pairUrl
+      ? '<div style="font-size:12px;color:var(--text-soft);margin-bottom:4px">Kitchen tablet address</div>' +
+        '<div style="font:700 14px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all">' + esc(displayUrl) + '</div>'
+      : '<div style="padding:12px;border-radius:10px;background:#fff7ed;color:#9a3412">' +
+        '<b>No usable Wi-Fi address detected.</b><br>Connect this POS to the restaurant Wi-Fi and allow RestroSuite through Windows Firewall. Never enter localhost on the tablet.' +
+        '</div>';
+    const body =
+      '<div style="display:grid;grid-template-columns:' + (qr ? '220px minmax(240px,1fr)' : '1fr') + ';gap:20px;align-items:start">' +
+        (qr ? '<img src="' + esc(qr) + '" alt="Secure LAN pairing QR code" style="width:220px;height:220px;border:1px solid var(--stroke-2);border-radius:12px">' : '') +
+        '<div>' +
+          '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Secure kitchen pairing</div>' +
+          addressBlock +
+          '<ol style="padding-left:20px;line-height:1.55;margin:14px 0">' +
+            '<li>Connect the kitchen tablet to the same Wi-Fi.</li>' +
+            '<li>Scan this QR code, or copy the secure link.</li>' +
+            '<li>Sign in once and open Kitchen. It keeps working if internet drops.</li>' +
+          '</ol>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<span data-lan-status style="padding:6px 9px;border-radius:999px;background:#ecfdf5;color:#065f46;font-size:12px;font-weight:700">' +
+              clients + ' tablet' + (clients === 1 ? '' : 's') + ' connected</span>' +
+            '<span style="padding:6px 9px;border-radius:999px;background:var(--glass);font-size:12px;font-weight:700">' +
+              queued + ' KOT' + (queued === 1 ? '' : 's') + ' cached</span>' +
+          '</div>' +
+          '<div style="font-size:11px;color:var(--text-soft);margin-top:12px">The copied link contains a private pairing key. Share it only with your kitchen tablet.</div>' +
+        '</div>' +
+      '</div>';
     if (global.RSModal) {
       global.RSModal.open({
         title: 'LAN kitchen link',
         icon: 'fa-network-wired',
-        size: 'sm',
-        body: '<pre style="white-space:pre-wrap;font-size:12.5px;line-height:1.45;margin:0">' + msg.replace(/</g, '&lt;') + '</pre>',
-        foot: '<button type="button" class="btn btn-primary" data-x>OK</button>',
+        size: 'md',
+        body: body,
+        foot:
+          '<button type="button" class="btn btn-secondary" data-lan-test>Test connection</button>' +
+          (pairUrl ? '<button type="button" class="btn btn-secondary" data-lan-copy>Copy secure link</button>' : '') +
+          '<button type="button" class="btn btn-primary" data-x>Done</button>',
         onMount: function (m, close) {
           m.querySelector('[data-x]').onclick = close;
+          const copy = m.querySelector('[data-lan-copy]');
+          if (copy) {
+            copy.onclick = function () {
+              copyText(pairUrl).then(function () {
+                copy.textContent = 'Copied';
+                toast('Secure kitchen link copied.', 'fa-copy');
+              });
+            };
+          }
+          const test = m.querySelector('[data-lan-test]');
+          test.onclick = async function () {
+            test.disabled = true;
+            test.textContent = 'Testing...';
+            const health = await authorizedHealth(hub, hub.token);
+            test.disabled = false;
+            if (health) {
+              hub.health = health;
+              const count = Number(health.connectedClients) || 0;
+              const status = m.querySelector('[data-lan-status]');
+              if (status) { status.textContent = count + ' tablet' + (count === 1 ? '' : 's') + ' connected'; }
+              test.textContent = 'Connection healthy';
+              paintLanChip(true, hub);
+            } else {
+              test.textContent = 'Could not connect';
+            }
+          };
         },
       });
     } else {
-      alert(msg);
+      alert(pairUrl
+        ? 'Open this secure link on the kitchen tablet:\n\n' + pairUrl
+        : 'No usable Wi-Fi address detected. Connect this POS to Wi-Fi and allow RestroSuite through Windows Firewall.');
     }
   }
 
@@ -214,7 +423,8 @@
       es = null;
     }
     if (!hub || typeof EventSource === 'undefined') { return; }
-    const url = hub.base + '/api/lan/stream?t=' + encodeURIComponent(tenantId());
+    const url = hub.base + '/api/lan/stream?t=' + encodeURIComponent(tenantId()) +
+      '&token=' + encodeURIComponent(hub.token);
     try {
       es = new EventSource(url);
       es.addEventListener('order', function (ev) {
@@ -249,7 +459,10 @@
   async function pullSnapshot(hub) {
     if (!hub) { return; }
     try {
-      const r = await fetch(hub.base + '/api/lan/snapshot?t=' + encodeURIComponent(tenantId()), { cache: 'no-store' });
+      const r = await fetch(hub.base + '/api/lan/snapshot?t=' + encodeURIComponent(tenantId()), {
+        cache: 'no-store',
+        headers: { 'X-RS-LAN-Token': hub.token },
+      });
       if (!r.ok) { return; }
       const j = await r.json();
       const orders = (j && j.orders) || [];
@@ -279,8 +492,18 @@
   }
 
   async function boot() {
+    const run = ++bootRun;
+    if (!lanKitchenEnabled()) {
+      if (es) {
+        try { es.close(); } catch (_) {}
+        es = null;
+      }
+      paintLanChip(false, null);
+      return;
+    }
     hookDbPuts();
     const hub = await findHub();
+    if (run !== bootRun) { return; }
     if (hub) {
       paintLanChip(true, hub);
       await pullSnapshot(hub);
@@ -431,11 +654,14 @@
     },
     pushRow: pushRow,
     findHub: findHub,
+    showLanHelp: showLanHelp,
+    lanKitchenEnabled: lanKitchenEnabled,
     boot: boot,
   };
 
   document.addEventListener('rs:ready', function () { setTimeout(boot, 400); });
   document.addEventListener('rs:hydrated', function () { setTimeout(boot, 200); });
+  document.addEventListener('rs:settings-changed', function () { setTimeout(boot, 100); });
   window.addEventListener('online', function () {
     // Cloud will drain; re-attach LAN if still useful
     setTimeout(boot, 800);
