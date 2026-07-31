@@ -6,14 +6,14 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function initials(value) {
-    if (global.RS && typeof RS.initials === 'function') return RS.initials(value);
+    if (global.RS && typeof RS.initials === 'function') {return RS.initials(value);}
     return String(value || '')
       .trim()
       .split(/\s+/)
@@ -23,7 +23,7 @@
       .join('');
   }
   function getAvatarColors() {
-    if (global.RS && Array.isArray(RS.avatarColors) && RS.avatarColors.length) return RS.avatarColors;
+    if (global.RS && Array.isArray(RS.avatarColors) && RS.avatarColors.length) {return RS.avatarColors;}
     return ['#FF4F00', '#5B6C8F', '#2A9B8F', '#1F8A5B', '#C47B16'];
   }
   function esc(s) {
@@ -48,7 +48,7 @@
       .split(' ')
       .filter(Boolean)
       .map((w) => {
-        if (w.length <= 2 && w === w.toUpperCase()) return w;
+        if (w.length <= 2 && w === w.toUpperCase()) {return w;}
         return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
       })
       .join(' ');
@@ -56,7 +56,7 @@
   function formatPlanLabel(code, name) {
     const PLAN = { starter: 'Starter', growth: 'Growth', enterprise: 'Enterprise', chain: 'Chain' };
     const c = String(code || '').toLowerCase();
-    if (name && String(name).toLowerCase() !== c) return titleCaseWords(name);
+    if (name && String(name).toLowerCase() !== c) {return titleCaseWords(name);}
     return PLAN[c] || titleCaseWords(code || 'Starter') || 'Starter';
   }
   /** Account status for staff: approved ≡ Active (one vocabulary with modal). */
@@ -81,15 +81,15 @@
     return titleCaseWords(String(type || 'restaurant').replace(/_/g, ' ')) || 'Restaurant';
   }
   function formatDateIN(value) {
-    if (!value) return '—';
+    if (!value) {return '—';}
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime())) {return '—';}
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   }
   function formatDateTimeIN(value) {
-    if (!value) return '—';
+    if (!value) {return '—';}
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '—';
+    if (Number.isNaN(d.getTime())) {return '—';}
     return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
   function platformSummaryEl() {
@@ -99,10 +99,10 @@
 
 let superAdminFilter = 'all';
 let superAdminSearch = '';
-let superAdminSort = { col: 'joined', dir: 'desc' };
+const superAdminSort = { col: 'joined', dir: 'desc' };
 let _cachedTenants = [];
 let selectedTenantIds = new Set();
-let saasGatewayPollingInterval = null;
+const saasGatewayPollingInterval = null;
 
 function tenantSearchInputs() {
   return [
@@ -113,7 +113,7 @@ function tenantSearchInputs() {
 
 function syncTenantSearchInputs(value) {
   tenantSearchInputs().forEach(input => {
-    if (input.value !== value) input.value = value;
+    if (input.value !== value) {input.value = value;}
   });
 }
 
@@ -124,7 +124,7 @@ function readVisibleTenantSearch() {
 }
 
 function escHtml(str) {
-  if (!str) return '';
+  if (!str) {return '';}
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -134,9 +134,9 @@ function escHtml(str) {
 }
 
 function formatIncidentTime(value) {
-  if (!value) return 'Unknown time';
+  if (!value) {return 'Unknown time';}
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  if (Number.isNaN(date.getTime())) {return 'Unknown time';}
   return date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
@@ -169,7 +169,7 @@ function saasSnapshotCard(title, value, subtitle, iconClass, filterAttr, isActiv
 
 function renderPlatformSummary(tenants = []) {
   const target = platformSummaryEl();
-  if (!target) return;
+  if (!target) {return;}
   const total = tenants.length;
   const active = tenants.filter(t => t.status === 'approved' || t.status === 'active').length;
   const pending = tenants.filter(t => t.status === 'pending').length;
@@ -214,7 +214,7 @@ function pruneTenantSelection() {
 
 function syncTenantSelectAll(visibleTenants = []) {
   const all = document.getElementById('tenant-select-all');
-  if (!all) return;
+  if (!all) {return;}
   const visibleIds = visibleTenants.map(getTenantRowId).filter(Boolean);
   const selectedVisible = visibleIds.filter(id => selectedTenantIds.has(id)).length;
   all.checked = visibleIds.length > 0 && selectedVisible === visibleIds.length;
@@ -225,7 +225,7 @@ function syncTenantSelectAll(visibleTenants = []) {
 // Render tenant table from cached data (no network call)
 function renderTenantTable() {
   const tbody = $('#tenant-table-body');
-  if (!tbody) return;
+  if (!tbody) {return;}
   pruneTenantSelection();
   // Local colors only — never rely on dashboard closure (module is strict IIFE).
   const avatarColors = getAvatarColors();
@@ -239,9 +239,9 @@ function renderTenantTable() {
   let filtered = _cachedTenants.slice();
 
   // Status filter
-  if (superAdminFilter === 'pending') filtered = filtered.filter(t => t.status === 'pending');
-  else if (superAdminFilter === 'paid') filtered = filtered.filter(t => ['growth','enterprise'].includes(t.plan_code));
-  else if (superAdminFilter === 'risk') filtered = filtered.filter(t => ['past_due','canceled'].includes(t.subscription_status));
+  if (superAdminFilter === 'pending') {filtered = filtered.filter(t => t.status === 'pending');}
+  else if (superAdminFilter === 'paid') {filtered = filtered.filter(t => ['growth','enterprise'].includes(t.plan_code));}
+  else if (superAdminFilter === 'risk') {filtered = filtered.filter(t => ['past_due','canceled'].includes(t.subscription_status));}
 
   // Text search
   const q = (superAdminSearch || '').toLowerCase().trim();
@@ -264,20 +264,20 @@ function renderTenantTable() {
     else if (col === 'status') { va = (a.status || '').toLowerCase(); vb = (b.status || '').toLowerCase(); }
     else if (col === 'renews') { va = a.subscription_current_period_end || ''; vb = b.subscription_current_period_end || ''; }
     else { va = a.created_at || ''; vb = b.created_at || ''; }
-    if (va < vb) return dir === 'asc' ? -1 : 1;
-    if (va > vb) return dir === 'asc' ? 1 : -1;
+    if (va < vb) {return dir === 'asc' ? -1 : 1;}
+    if (va > vb) {return dir === 'asc' ? 1 : -1;}
     return 0;
   });
 
   // Update count badge
   const countEl = document.getElementById('tenant-count');
-  if (countEl) countEl.textContent = `${filtered.length} of ${_cachedTenants.length}`;
+  if (countEl) {countEl.textContent = `${filtered.length} of ${_cachedTenants.length}`;}
 
   // Update sort headers
   document.querySelectorAll('th[data-sort-col]').forEach(th => {
     const c = th.getAttribute('data-sort-col');
     const icon = th.querySelector('.sort-icon');
-    if (!icon) return;
+    if (!icon) {return;}
     if (c === col) {
       icon.className = `sort-icon fa-solid ${dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`;
       icon.style.color = 'var(--orange)';
@@ -370,9 +370,9 @@ function renderTenantTable() {
     cb.addEventListener('click', e => e.stopPropagation());
     cb.addEventListener('change', () => {
       const tid = cb.getAttribute('data-tid');
-      if (!tid) return;
-      if (cb.checked) selectedTenantIds.add(tid);
-      else selectedTenantIds.delete(tid);
+      if (!tid) {return;}
+      if (cb.checked) {selectedTenantIds.add(tid);}
+      else {selectedTenantIds.delete(tid);}
       renderTenantTable();
     });
   });
@@ -383,16 +383,18 @@ function renderTenantTable() {
       e.stopPropagation();
       const tid = btn.getAttribute('data-tid');
       const t = _cachedTenants.find(x => String(x.id) === String(tid));
-      if (!t) return;
+      if (!t) {return;}
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
       try {
         await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved' });
         t.status = 'approved';
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast(`${t.name || 'Workspace'} approved!`, 'fa-circle-check');
         renderPlatformSummary(_cachedTenants);
         renderTenantTable();
       } catch (err) {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('Approval failed: ' + (err.message || err), 'fa-circle-exclamation');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve';
@@ -406,20 +408,22 @@ function renderTenantTable() {
       e.stopPropagation();
       const tid = btn.getAttribute('data-tid');
       const tname = btn.getAttribute('data-tname') || 'workspace';
-      if (!tid) return;
+      if (!tid) {return;}
       const ok = window.confirm(
         'Load demo menu/inventory/bills into "' + tname + '"?\n\nExisting operational data for this workspace will be reset.'
       );
-      if (!ok) return;
+      if (!ok) {return;}
       const prev = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
       try {
         await RS_API.admin({ action: 'seed_tenant_data', tenant_id: tid });
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast('Demo data loaded for ' + tname, 'fa-seedling');
         await renderSuper();
       } catch (err) {
         console.error(err);
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('Seed failed: ' + (err.message || err), 'fa-circle-exclamation');
         btn.disabled = false;
         btn.innerHTML = prev;
@@ -433,7 +437,7 @@ function renderTenantTable() {
       e.stopPropagation();
       const tid = btn.getAttribute('data-tid');
       const t = _cachedTenants.find(x => String(x.id) === String(tid));
-      if (!t) return;
+      if (!t) {return;}
       btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
       try {
         await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'suspended',
@@ -441,9 +445,11 @@ function renderTenantTable() {
           subscription_status: t.subscription_status || 'active',
           allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
         t.status = 'suspended';
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast(`${t.name || 'Workspace'} suspended.`, 'fa-ban');
         renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
       } catch (err) {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('Suspend failed: ' + (err.message || err), 'fa-circle-exclamation');
         btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-ban"></i> Suspend';
       }
@@ -456,7 +462,7 @@ function renderTenantTable() {
       e.stopPropagation();
       const tid = btn.getAttribute('data-tid');
       const t = _cachedTenants.find(x => String(x.id) === String(tid));
-      if (!t) return;
+      if (!t) {return;}
       btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
       try {
         await RS_API.admin({ action: 'update_tenant', tenant_id: tid, status: 'approved',
@@ -464,9 +470,11 @@ function renderTenantTable() {
           subscription_status: t.subscription_status || 'active',
           allowed_tabs: t.allowed_tabs || [], phone: t.phone || '', email: t.email || '' });
         t.status = 'approved';
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast(`${t.name || 'Workspace'} reactivated!`, 'fa-rotate-left');
         renderPlatformSummary(_cachedTenants); renderTenantTable(); updateBulkBar();
       } catch (err) {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('Reactivate failed: ' + (err.message || err), 'fa-circle-exclamation');
         btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Reactivate';
       }
@@ -482,6 +490,7 @@ function renderTenantTable() {
       const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
       const openDash = global.openTenantDashboard || (typeof window !== 'undefined' && window.openTenantDashboard);
       if (typeof openDash !== 'function') {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         toast('Open workspace is not loaded. Hard-refresh the page (Ctrl+Shift+R).', 'fa-circle-exclamation');
         return;
       }
@@ -495,18 +504,18 @@ function renderTenantTable() {
       e.stopPropagation();
       const tenantId = btn.getAttribute('data-tid');
       const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
-      if (tenant) openTenantManageModal(tenant);
-      else toast('Tenant details not found.', 'fa-circle-exclamation');
+      if (tenant) {openTenantManageModal(tenant);}
+      else {toast('Tenant details not found.', 'fa-circle-exclamation');}
     });
   });
 
   // Click row (outside actions) to open manage modal
   tbody.querySelectorAll('tr.tenant-row[data-tid]').forEach(row => {
     row.addEventListener('click', (e) => {
-      if (e.target.closest('input, button, a, .row-actions')) return;
+      if (e.target.closest('input, button, a, .row-actions')) {return;}
       const tenantId = row.getAttribute('data-tid');
       const tenant = _cachedTenants.find(t => String(t.id) === String(tenantId));
-      if (tenant) openTenantManageModal(tenant);
+      if (tenant) {openTenantManageModal(tenant);}
     });
   });
 }
@@ -514,10 +523,10 @@ function renderTenantTable() {
 let _superPollTimer = null;
 async function pollSuperTenants() {
   try {
-    if (!window.RS_API || !RS_API.configured) return;
+    if (!window.RS_API || !RS_API.configured) {return;}
     const body = document.getElementById('tenant-table-body');
-    if (!body || body.offsetParent === null) return;
-    if (document.visibilityState !== 'visible') return;
+    if (!body || body.offsetParent === null) {return;}
+    if (document.visibilityState !== 'visible') {return;}
     const out = await RS_API.admin({ action: 'list_tenants' }).catch(() => null);
     if (out && Array.isArray(out.tenants)) {
       _cachedTenants = out.tenants;
@@ -527,13 +536,13 @@ async function pollSuperTenants() {
   } catch (e) { /* quiet */ }
 }
 function startSuperPolling() {
-  if (_superPollTimer) return;
+  if (_superPollTimer) {return;}
   _superPollTimer = setInterval(pollSuperTenants, 30000);
 }
 
 async function renderSuper() {
   const tbody = $('#tenant-table-body');
-  if (!tbody) return;
+  if (!tbody) {return;}
   superAdminSearch = readVisibleTenantSearch();
   syncTenantSearchInputs(superAdminSearch);
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading client workspace registry...</td></tr>';
@@ -558,10 +567,10 @@ async function renderSuper() {
       }
       const out = await Promise.race([
         RS_API.admin({ action: 'list_tenants' }).catch(err => ({ error: err && err.message ? err.message : String(err), tenants: [] })),
-        new Promise(resolve => setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 10000))
+        new Promise(resolve => { setTimeout(() => resolve({ error: 'Tenant registry request timed out.', tenants: [] }), 10000); })
       ]);
-      if (out && out.error) console.warn('Superadmin tenant registry unavailable:', out.error);
-      if (out && Array.isArray(out.tenants)) _cachedTenants = out.tenants;
+      if (out && out.error) {console.warn('Superadmin tenant registry unavailable:', out.error);}
+      if (out && Array.isArray(out.tenants)) {_cachedTenants = out.tenants;}
       // If we got an auth error, show a helpful message with retry
       if (out && out.error && (out.error.includes('not configured') || out.error.includes('expired') || out.error.includes('401'))) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-mute)"><i class="fa-solid fa-rotate-right" style="display:block;margin-bottom:8px;font-size:20px;color:#F59E0B"></i>Session expired — <button onclick="location.reload()" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">reload</button> or <button onclick="RS_API.logout();location.href=\'login\'" style="background:none;border:none;color:var(--orange);cursor:pointer;font-weight:600;text-decoration:underline">sign in again</button>.</td></tr>';
@@ -576,12 +585,12 @@ async function renderSuper() {
 
     // Wire sort headers (only once)
     document.querySelectorAll('th[data-sort-col]').forEach(th => {
-      if (th.dataset.sortBound) return;
+      if (th.dataset.sortBound) {return;}
       th.dataset.sortBound = '1';
       th.style.cursor = 'pointer';
       th.addEventListener('click', () => {
         const c = th.getAttribute('data-sort-col');
-        if (superAdminSort.col === c) superAdminSort.dir = superAdminSort.dir === 'asc' ? 'desc' : 'asc';
+        if (superAdminSort.col === c) {superAdminSort.dir = superAdminSort.dir === 'asc' ? 'desc' : 'asc';}
         else { superAdminSort.col = c; superAdminSort.dir = 'asc'; }
         renderTenantTable();
       });
@@ -589,7 +598,7 @@ async function renderSuper() {
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--red)"><i class="fa-solid fa-circle-exclamation" style="display:block;margin-bottom:8px"></i>${_e(err.message || 'Failed to load tenants')}</td></tr>`;
   }
-};
+}
 
 // ── Bulk Actions ────────────────────────────────────────────────────────
 function updateBulkBar() {
@@ -598,7 +607,7 @@ function updateBulkBar() {
   const icon = document.getElementById('sa-bulk-icon');
   const selectionActions = document.getElementById('sa-selection-actions');
   const approveBtn = document.getElementById('sa-bulk-approve-btn');
-  if (!bar || !label) return;
+  if (!bar || !label) {return;}
   const selected = getSelectedTenants();
   const pending = _cachedTenants.filter(t => t.status === 'pending');
   if (selected.length > 0) {
@@ -611,8 +620,8 @@ function updateBulkBar() {
       icon.className = 'fa-solid fa-trash-can';
       icon.style.color = '#dc2626';
     }
-    if (selectionActions) selectionActions.style.display = 'flex';
-    if (approveBtn) approveBtn.style.display = 'none';
+    if (selectionActions) {selectionActions.style.display = 'flex';}
+    if (approveBtn) {approveBtn.style.display = 'none';}
   } else if (pending.length > 0) {
     bar.style.display = 'flex';
     bar.style.background = 'rgba(245,158,11,0.08)';
@@ -623,12 +632,12 @@ function updateBulkBar() {
       icon.className = 'fa-solid fa-user-clock';
       icon.style.color = '#b45309';
     }
-    if (selectionActions) selectionActions.style.display = 'none';
-    if (approveBtn) approveBtn.style.display = 'inline-flex';
+    if (selectionActions) {selectionActions.style.display = 'none';}
+    if (approveBtn) {approveBtn.style.display = 'inline-flex';}
   } else {
     bar.style.display = 'none';
-    if (selectionActions) selectionActions.style.display = 'none';
-    if (approveBtn) approveBtn.style.display = 'inline-flex';
+    if (selectionActions) {selectionActions.style.display = 'none';}
+    if (approveBtn) {approveBtn.style.display = 'inline-flex';}
   }
 }
 
@@ -647,8 +656,8 @@ function bindTenantBulkControls() {
         .map(cb => cb.getAttribute('data-tid'))
         .filter(Boolean);
       visibleIds.forEach(id => {
-        if (selectAll.checked) selectedTenantIds.add(id);
-        else selectedTenantIds.delete(id);
+        if (selectAll.checked) {selectedTenantIds.add(id);}
+        else {selectedTenantIds.delete(id);}
       });
       renderTenantTable();
     });
@@ -670,7 +679,7 @@ function bindTenantBulkControls() {
 
 async function bulkApproveAllPending() {
   const pending = _cachedTenants.filter(t => t.status === 'pending');
-  if (!pending.length) return toast('No pending workspaces to approve.', 'fa-circle-info');
+  if (!pending.length) {return toast('No pending workspaces to approve.', 'fa-circle-info');}
   const btn = document.getElementById('sa-bulk-approve-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving…'; }
   let done = 0, failed = 0;
@@ -693,7 +702,7 @@ async function bulkApproveAllPending() {
 
 async function bulkDeleteSelectedTenants() {
   const selected = getSelectedTenants();
-  if (!selected.length) return toast('Select clients to delete first.', 'fa-circle-info');
+  if (!selected.length) {return toast('Select clients to delete first.', 'fa-circle-info');}
   const sampleNames = selected.slice(0, 4).map(t => t.name || t.tenant_name || t.slug || 'Unnamed client');
   const more = selected.length > sampleNames.length ? ` and ${selected.length - sampleNames.length} more` : '';
   confirmDangerAction(
@@ -727,6 +736,7 @@ async function bulkDeleteSelectedTenants() {
       renderPlatformSummary(_cachedTenants);
       renderTenantTable();
       updateBulkBar();
+      try { if (window.RSActionFeedback) {window.RSActionFeedback[done ? 'success' : 'error']();} } catch(_) {}
       toast(`${done} client${done !== 1 ? 's' : ''} deleted${failed ? ` · ${failed} failed` : ''}.`, done ? 'fa-circle-check' : 'fa-circle-exclamation');
       if (btn) {
         btn.disabled = false;
@@ -739,16 +749,16 @@ async function bulkDeleteSelectedTenants() {
 // ── Create Tenant Modal ─────────────────────────────────────────────────
 function openCreateTenantModal() {
   const modal = document.getElementById('create-tenant-modal');
-  if (!modal) return;
+  if (!modal) {return;}
   // Clear form
   ['ct-name','ct-slug','ct-username','ct-password','ct-email','ct-phone'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.value = '';
+    if (el) {el.value = '';}
   });
   const errEl = document.getElementById('ct-error');
-  if (errEl) errEl.style.display = 'none';
+  if (errEl) {errEl.style.display = 'none';}
   const autoApprove = document.getElementById('ct-auto-approve');
-  if (autoApprove) autoApprove.checked = true;
+  if (autoApprove) {autoApprove.checked = true;}
 
   // Auto-generate slug and username from name
   const nameEl = document.getElementById('ct-name');
@@ -758,8 +768,8 @@ function openCreateTenantModal() {
     nameEl.dataset.slugWired = '1';
     nameEl.addEventListener('input', () => {
       const base = nameEl.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-      if (slugEl) slugEl.value = base;
-      if (userEl) userEl.value = base ? base + '-admin' : '';
+      if (slugEl) {slugEl.value = base;}
+      if (userEl) {userEl.value = base ? base + '-admin' : '';}
     });
   }
 
@@ -767,7 +777,7 @@ function openCreateTenantModal() {
     modal.dataset.eventsBound = '1';
     document.getElementById('close-create-tenant-modal').addEventListener('click', () => modal.classList.remove('active'));
     document.getElementById('ct-cancel-btn').addEventListener('click', () => modal.classList.remove('active'));
-    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
+    modal.addEventListener('click', e => { if (e.target === modal) {modal.classList.remove('active');} });
 
     document.getElementById('ct-submit-btn').addEventListener('click', async () => {
       const name = document.getElementById('ct-name').value.trim();
@@ -784,10 +794,10 @@ function openCreateTenantModal() {
       const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
       errEl.style.display = 'none';
 
-      if (!name) return showErr('Business name is required.');
-      if (!slug || !/^[a-z0-9-]+$/.test(slug)) return showErr('Slug must be lowercase letters, numbers and hyphens only.');
-      if (!username) return showErr('Admin username is required.');
-      if (!password || password.length < 6) return showErr('Password must be at least 6 characters.');
+      if (!name) {return showErr('Business name is required.');}
+      if (!slug || !/^[a-z0-9-]+$/.test(slug)) {return showErr('Slug must be lowercase letters, numbers and hyphens only.');}
+      if (!username) {return showErr('Admin username is required.');}
+      if (!password || password.length < 6) {return showErr('Password must be at least 6 characters.');}
 
       const btn = document.getElementById('ct-submit-btn');
       btn.disabled = true;
@@ -813,11 +823,13 @@ function openCreateTenantModal() {
           } catch(e) { /* approval failed silently — tenant still created */ }
         }
         modal.classList.remove('active');
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast(`Workspace "${name}" created${autoApproveChecked ? ' & approved' : ' (pending approval)'}!`, 'fa-store');
         renderPlatformSummary(_cachedTenants);
         renderTenantTable();
         updateBulkBar();
       } catch (err) {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
         showErr(err.message || 'Failed to create workspace. Check details and try again.');
       } finally {
         btn.disabled = false;
@@ -846,7 +858,7 @@ async function openPlanPricingEditor() {
     </div>`;
   document.body.appendChild(m);
   m.querySelector('#rs-pricing-close').onclick = () => m.remove();
-  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  m.addEventListener('click', e => { if (e.target === m) {m.remove();} });
   const body = m.querySelector('#rs-pricing-body');
   let plans = [];
   try { const out = await RS_API.admin({ action: 'list_plans' }); plans = (out && out.plans) || []; }
@@ -884,8 +896,8 @@ async function openPlanPricingEditor() {
         is_public: row.querySelector('.rs-pp-pub').checked,
       };
       btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Saving…';
-      try { await RS_API.admin(payload); toast('Plan pricing updated.', 'fa-circle-check'); }
-      catch (e) { toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
+      try { await RS_API.admin(payload); try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {} toast('Plan pricing updated.', 'fa-circle-check'); }
+      catch (e) { try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {} toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
       finally { btn.disabled = false; btn.textContent = orig; }
     });
   });
@@ -893,14 +905,14 @@ async function openPlanPricingEditor() {
 
 async function loadTenantDevices(tenantId) {
   const box = document.getElementById('manage-devices-box');
-  if (!box) return;
+  if (!box) {return;}
   if (!tenantId) { box.textContent = 'Save the workspace first to see licensed devices.'; return; }
   box.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading devices…';
   let devices = [];
   try { const out = await RS_API.admin({ action: 'list_devices', tenant_id: tenantId }); devices = (out && out.devices) || []; }
   catch (e) { box.innerHTML = '<span style="color:#dc2626">Could not load devices (' + _e(e.message || 'error') + ').</span>'; return; }
   if (!devices.length) { box.innerHTML = '<span style="color:var(--text-mute)">No devices have activated a licence yet.</span>'; return; }
-  const rel = (iso) => { if (!iso) return '—'; const ms = Date.now() - new Date(iso).getTime(); const d = Math.floor(ms/86400000); if (d>0) return d+'d ago'; const h=Math.floor(ms/3600000); if(h>0) return h+'h ago'; const mi=Math.floor(ms/60000); return mi>0?mi+'m ago':'just now'; };
+  const rel = (iso) => { if (!iso) {return '—';} const ms = Date.now() - new Date(iso).getTime(); const d = Math.floor(ms/86400000); if (d>0) {return d+'d ago';} const h=Math.floor(ms/3600000); if(h>0) {return h+'h ago';} const mi=Math.floor(ms/60000); return mi>0?mi+'m ago':'just now'; };
   box.innerHTML = devices.map(d => {
     const shortId = _e(String(d.device_id || '').replace(/^dev_/, '').slice(0, 12));
     const revoked = !!d.revoked;
@@ -921,9 +933,10 @@ async function loadTenantDevices(tenantId) {
       btn.disabled = true;
       try {
         await RS_API.admin({ action: act, tenant_id: tenantId, device_id: dev, reason: 'Toggled from admin console' });
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
         toast(act === 'revoke_device' ? 'Device revoked — it will lock within the offline window.' : 'Device restored.', 'fa-circle-check');
         loadTenantDevices(tenantId);
-      } catch (e) { btn.disabled = false; toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
+      } catch (e) { btn.disabled = false; try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {} toast('Failed: ' + (e.message || 'error'), 'fa-circle-exclamation'); }
     });
   });
 }
@@ -931,7 +944,7 @@ async function loadTenantDevices(tenantId) {
 function openTenantManageModal(tenant) {
   try {
     const modal = document.getElementById('tenant-manage-modal');
-    if (!modal) return;
+    if (!modal) {return;}
 
     initTenantManageModalEvents();
 
@@ -954,13 +967,13 @@ function openTenantManageModal(tenant) {
 
     const rawName = tenant.name || tenant.tenant_name || 'Unknown';
     const displayName = formatDisplayName(rawName);
-    if (tenantNameEl) tenantNameEl.textContent = displayName;
+    if (tenantNameEl) {tenantNameEl.textContent = displayName;}
     const typeChip = document.getElementById('manage-outlet-type');
     if (typeChip) {
       typeChip.textContent = formatOutletType(tenant.outlet_type || tenant.business_type || 'restaurant');
       typeChip.style.display = '';
     }
-    if (avatarEl) avatarEl.textContent = initials(rawName) || 'U';
+    if (avatarEl) {avatarEl.textContent = initials(rawName) || 'U';}
 
     if (statusBadge) {
       const s = String(tenant.status || 'pending').toLowerCase();
@@ -977,22 +990,22 @@ function openTenantManageModal(tenant) {
       statusBadge.innerHTML = `<span style="width:6px;height:6px;border-radius:50%;background:${_e(b.dot)};display:inline-block;"></span>${_e(b.label)}`;
     }
 
-    if (usernameEl) usernameEl.value = tenant.username || '';
-    if (passwordEl) passwordEl.value = '';
+    if (usernameEl) {usernameEl.value = tenant.username || '';}
+    if (passwordEl) {passwordEl.value = '';}
     if (statusEl) {
       statusEl.value = tenant.status === 'approved' ? 'approved' : (tenant.status || 'pending');
     }
-    if (phoneEl) phoneEl.value = tenant.phone || '';
-    if (emailEl) emailEl.value = tenant.email || '';
-    if (planCodeEl) planCodeEl.value = tenant.plan_code || 'starter';
-    if (subscriptionStatusEl) subscriptionStatusEl.value = tenant.subscription_status || 'active';
+    if (phoneEl) {phoneEl.value = tenant.phone || '';}
+    if (emailEl) {emailEl.value = tenant.email || '';}
+    if (planCodeEl) {planCodeEl.value = tenant.plan_code || 'starter';}
+    if (subscriptionStatusEl) {subscriptionStatusEl.value = tenant.subscription_status || 'active';}
     const periodEndEl = document.getElementById('manage-period-end');
     if (periodEndEl) {
       try { periodEndEl.value = tenant.subscription_current_period_end ? new Date(tenant.subscription_current_period_end).toISOString().slice(0,10) : ''; }
       catch (e) { periodEndEl.value = ''; }
     }
     loadTenantDevices(tenant.id);
-    if (window.__rsDeviceTimer) clearInterval(window.__rsDeviceTimer);
+    if (window.__rsDeviceTimer) {clearInterval(window.__rsDeviceTimer);}
     window.__rsDeviceTimer = setInterval(function () {
       const box = document.getElementById('manage-devices-box');
       if (!box || box.offsetParent === null) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; return; }
@@ -1038,7 +1051,7 @@ function openTenantManageModal(tenant) {
         const origin = location.origin + location.pathname.replace(/\/[^\/]*$/, '');
         const url = `${origin}/login?tenant=${encodeURIComponent(slug)}`;
         navigator.clipboard.writeText(url)
-          .then(() => toast('Login URL copied!', 'fa-link'))
+          .then(() => { try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {} toast('Login URL copied!', 'fa-link'); })
           .catch(() => prompt('Copy tenant login URL:', url));
       };
     }
@@ -1067,7 +1080,7 @@ function openTenantManageModal(tenant) {
 
 function closeTenantModal() {
   const modal = document.getElementById('tenant-manage-modal');
-  if (modal) modal.classList.remove('active');
+  if (modal) {modal.classList.remove('active');}
   if (window.__rsDeviceTimer) { clearInterval(window.__rsDeviceTimer); window.__rsDeviceTimer = null; }
 }
 
@@ -1127,23 +1140,23 @@ function openSuperAdminSettingsModal() {
       </div>`;
     document.body.appendChild(m);
     document.getElementById('close-sa-settings').onclick = () => m.remove();
-    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+    m.addEventListener('click', e => { if (e.target === m) {m.remove();} });
     const themeBtn = document.getElementById('sa-theme-toggle');
-    if (themeBtn) themeBtn.onclick = () => {
+    if (themeBtn) {themeBtn.onclick = () => {
       const tt = document.getElementById('theme-toggle');
-      if (tt) tt.click();
+      if (tt) {tt.click();}
       m.remove();
-    };
+    };}
     const sbBtn = document.getElementById('sa-sidebar-toggle');
-    if (sbBtn) sbBtn.onclick = () => {
+    if (sbBtn) {sbBtn.onclick = () => {
       const sb = document.getElementById('sb-collapse');
-      if (sb) sb.click();
+      if (sb) {sb.click();}
       m.remove();
-    };
+    };}
     // UI copy shield — Super-Admin only (never shown on outlet Settings)
     const shieldBtn = document.getElementById('sa-ui-shield-toggle');
     const paintShieldBtn = () => {
-      if (!shieldBtn) return;
+      if (!shieldBtn) {return;}
       const on = !(window.RSSecurityShield && RSSecurityShield.getConfig)
         ? true
         : !!(RSSecurityShield.getConfig().enabled);
@@ -1172,7 +1185,7 @@ function openSuperAdminSettingsModal() {
           toast('Only Super-Admin can change the UI copy shield.', 'fa-shield-halved');
           return;
         }
-        if (typeof RSSecurityShield.install === 'function') RSSecurityShield.install();
+        if (typeof RSSecurityShield.install === 'function') {RSSecurityShield.install();}
         paintShieldBtn();
         toast(
           !cur ? 'UI copy shield enabled (this Super-Admin browser).' : 'UI copy shield disabled on this Super-Admin browser only. Restaurant accounts stay protected.',
@@ -1181,17 +1194,17 @@ function openSuperAdminSettingsModal() {
       };
     }
     const expBtn = document.getElementById('sa-export-btn');
-    if (expBtn) expBtn.onclick = () => {
+    if (expBtn) {expBtn.onclick = () => {
       m.remove();
       const exportBtn2 = document.getElementById('btn-export-tenants');
-      if (exportBtn2) exportBtn2.click();
-    };
+      if (exportBtn2) {exportBtn2.click();}
+    };}
     const logoutBtn = document.getElementById('sa-settings-logout');
-    if (logoutBtn) logoutBtn.onclick = () => {
+    if (logoutBtn) {logoutBtn.onclick = () => {
       m.remove();
-      if (window.RS_API) RS_API.logout();
+      if (window.RS_API) {RS_API.logout();}
       location.href = 'login';
-    };
+    };}
   } else {
     m.remove();
   }
@@ -1215,7 +1228,7 @@ function confirmDangerAction(title, body, onConfirm) {
   document.body.appendChild(m);
   document.getElementById('danger-cancel').onclick = () => m.remove();
   document.getElementById('danger-confirm').onclick = () => { m.remove(); onConfirm(); };
-  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  m.addEventListener('click', e => { if (e.target === m) {m.remove();} });
 }
 
 function initTenantManageModalEvents() {
@@ -1275,7 +1288,7 @@ function initTenantManageModalEvents() {
         };
         updates.subscription_current_period_end = periodEndRaw ? new Date(periodEndRaw + 'T23:59:59Z').toISOString() : '';
 
-        if (password !== '') updates.password = password;
+        if (password !== '') {updates.password = password;}
 
         // Save notes locally
         const notesVal = (document.getElementById('manage-notes') || {}).value || '';
@@ -1284,14 +1297,14 @@ function initTenantManageModalEvents() {
         await RS_API.admin({ action: 'update_tenant', ...updates });
         // Update cache so table reflects status/plan change immediately
         const idx = _cachedTenants.findIndex(t => String(t.id) === String(tenantId));
-        if (idx !== -1) Object.assign(_cachedTenants[idx], { username, status, plan_code, subscription_status, phone, email, allowed_tabs });
+        if (idx !== -1) {Object.assign(_cachedTenants[idx], { username, status, plan_code, subscription_status, phone, email, allowed_tabs });}
         closeTenantModal();
         renderPlatformSummary(_cachedTenants);
         renderTenantTable();
-        toast("Client configurations saved successfully!");
+        toast('Client configurations saved successfully!');
       } catch (err) {
         console.error(err);
-        toast("Error saving settings: " + err.message, "fa-circle-exclamation");
+        toast('Error saving settings: ' + err.message, 'fa-circle-exclamation');
       }
     });
   }
@@ -1461,13 +1474,13 @@ function initTenantManageModalEvents() {
         const checkboxes = document.querySelectorAll('#manage-tabs-grid input[type="checkbox"]');
         const allowed_tabs = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
         const t = _cachedTenants.find(x => String(x.id) === String(tenantId));
-        if (!t) return;
+        if (!t) {return;}
         saveFeaturesBtn.disabled = true; saveFeaturesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
         await RS_API.admin({ action: 'update_tenant', tenant_id: tenantId,
           username: t.username, status: t.status, plan_code: t.plan_code || 'starter',
           subscription_status: t.subscription_status || 'active',
           allowed_tabs, phone: t.phone || '', email: t.email || '' });
-        if (t) t.allowed_tabs = allowed_tabs;
+        if (t) {t.allowed_tabs = allowed_tabs;}
         toast('Feature access updated!', 'fa-toggle-on');
         closeTenantModal();
         renderTenantTable();
@@ -1493,7 +1506,7 @@ function initTenantManageModalEvents() {
     setSearch(q) {
       superAdminSearch = String(q || '');
       syncTenantSearchInputs(superAdminSearch);
-      if (typeof renderTenantTable === 'function') renderTenantTable();
+      if (typeof renderTenantTable === 'function') {renderTenantTable();}
     },
     getSearch() {
       return superAdminSearch;
@@ -1509,9 +1522,9 @@ function initTenantManageModalEvents() {
   global.renderTenantTable = renderTenantTable;
 
   function attach() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderSuper = renderSuper;
   }
-  if (global.RS) attach();
+  if (global.RS) {attach();}
   document.addEventListener('rs:ready', attach);
 })(typeof window !== 'undefined' ? window : globalThis);

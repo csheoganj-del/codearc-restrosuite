@@ -247,6 +247,28 @@
         if (go) RS.activateTab(go);
       }
 
+      function searchAllowedTabs() {
+        try {
+          const roleInfo = window.RS_ROLE || {};
+          const rRole = String(roleInfo.staffRole || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+          if (['owner', 'admin', 'superadmin', 'brand_admin'].includes(rRole)) return null; // all
+          if (roleInfo.allowedTabs == null && !rRole) return null;
+          if (Array.isArray(roleInfo.allowedTabs)) {
+            const t = roleInfo.allowedTabs.slice();
+            if (rRole === 'manager') t.push('settings-tab');
+            return t;
+          }
+          return ['pos-tab'];
+        } catch (_) {
+          return ['pos-tab'];
+        }
+      }
+      function canSearchTab(tabId, allowed) {
+        if (!allowed) return true;
+        if (tabId === 'settings-tab') return allowed.includes('settings-tab');
+        return allowed.includes(tabId);
+      }
+
       function run(q) {
         const t = q.trim().toLowerCase();
         if (!t) {
@@ -256,33 +278,48 @@
           return;
         }
 
-        const menu = (RS.MENU || [])
-          .filter((m) => match(m.name, t) || match(m.cat, t) || match(m.code, t) || match(m.itemCode, t))
-          .slice(0, 5);
-        const bills = (RS.BILLS || [])
-          .filter(
-            (b) =>
-              match(b.no, t) ||
-              match(b.table, t) ||
-              match(b.customerName, t) ||
-              match(b.customerPhone, t)
-          )
-          .slice(0, 4);
-        const inv = (RS.INVENTORY || [])
-          .filter((i) => match(i.name, t) || match(i.cat, t))
-          .slice(0, 3);
-        const team = (RS.EMPLOYEES || [])
-          .filter((e) => match(e.name, t) || match(e.role, t) || match(e.email, t))
-          .slice(0, 3);
-        const cust = (RS.CUSTOMERS || [])
-          .filter((c) => match(c.name, t) || match(c.phone, t))
-          .slice(0, 3);
+        const allowed = searchAllowedTabs();
+        const menu = canSearchTab('pos-tab', allowed)
+          ? (RS.MENU || [])
+              .filter((m) => match(m.name, t) || match(m.cat, t) || match(m.code, t) || match(m.itemCode, t))
+              .slice(0, 5)
+          : [];
+        const bills = canSearchTab('bills-tab', allowed)
+          ? (RS.BILLS || [])
+              .filter(
+                (b) =>
+                  match(b.no, t) ||
+                  match(b.table, t) ||
+                  match(b.customerName, t) ||
+                  match(b.customerPhone, t)
+              )
+              .slice(0, 4)
+          : [];
+        const inv = canSearchTab('inventory-tab', allowed)
+          ? (RS.INVENTORY || [])
+              .filter((i) => match(i.name, t) || match(i.cat, t))
+              .slice(0, 3)
+          : [];
+        const team = canSearchTab('employees-tab', allowed)
+          ? (RS.EMPLOYEES || [])
+              .filter((e) => match(e.name, t) || match(e.role, t) || match(e.email, t))
+              .slice(0, 3)
+          : [];
+        const cust = canSearchTab('customers-tab', allowed)
+          ? (RS.CUSTOMERS || [])
+              .filter((c) => match(c.name, t) || match(c.phone, t))
+              .slice(0, 3)
+          : [];
         const pages = PAGES.filter(
-          (p) => match(p[1], t) || match(p[3], t) || match(p[0], t)
+          (p) =>
+            canSearchTab(p[0], allowed) &&
+            (match(p[1], t) || match(p[3], t) || match(p[0], t))
         ).slice(0, 6);
-        const settingsHits = SETTINGS.filter(
-          (s) => match(s.title, t) || match(s.sub, t) || match(s.kw, t)
-        ).slice(0, 8);
+        const settingsHits = canSearchTab('settings-tab', allowed)
+          ? SETTINGS.filter(
+              (s) => match(s.title, t) || match(s.sub, t) || match(s.kw, t)
+            ).slice(0, 8)
+          : [];
 
         let html = '';
         if (settingsHits.length) {
@@ -1044,7 +1081,7 @@
             <div></div>
           </div>
           ${toggle('Service charge','Add service charge on dine-in orders',false)}
-          <div class="form-grid-2" style="margin-top:10px">${field('Service charge %','5','e.g. 5 or 10')}<div></div></div>
+          <div class="form-grid-2" style="margin-top:10px">${field('Service charge pct','5','e.g. 5 or 10')}<div></div></div>
           ${toggle('Round-off totals','Round bill total to nearest currency unit',true)}
           ${toggle('Show HSN codes','Print HSN/SAC codes on GST invoice (tax shops only)',false)}
           ${toggle('Inclusive pricing','Menu prices already include tax',false)}`) +
@@ -2936,10 +2973,20 @@
         }
         // Filter the sheet by the signed-in staff role's allowed tabs so
         // restricted roles can't even see (let alone open) forbidden screens.
+        // Fail closed: empty allowedTabs for staff ≠ full menu (was a privilege leak).
         const roleInfo = window.RS_ROLE || {};
-        const allowed = Array.isArray(roleInfo.allowedTabs) && roleInfo.allowedTabs.length
-          ? roleInfo.allowedTabs.concat(roleInfo.staffRole === 'manager' ? ['settings-tab'] : [], ['logout'])
-          : null;
+        const rRole = String(roleInfo.staffRole || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+        const unrestricted = !rRole || ['owner', 'admin', 'superadmin', 'brand_admin'].includes(rRole);
+        let allowed = null;
+        if (unrestricted && roleInfo.allowedTabs == null) {
+          allowed = null; // full MORE
+        } else if (Array.isArray(roleInfo.allowedTabs)) {
+          allowed = roleInfo.allowedTabs.slice();
+          if (rRole === 'manager') allowed.push('settings-tab');
+          allowed.push('logout');
+        } else if (!unrestricted) {
+          allowed = ['pos-tab', 'logout'];
+        }
         const VISIBLE = allowed ? MORE.filter(m => allowed.includes(m[0])) : MORE;
         RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
           body:`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${VISIBLE.map(m=>{

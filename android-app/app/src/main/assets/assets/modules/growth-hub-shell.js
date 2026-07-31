@@ -6,7 +6,7 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -38,7 +38,7 @@
 
   function liveMeta(title) {
     try {
-      if (title === 'Reservations' && global.RS_DB) return null; // async paint later
+      if (title === 'Reservations' && global.RS_DB) {return null;} // async paint later
       if (title === 'Offers & Coupons' && global.RS && Array.isArray(RS.OFFERS)) {
         const n = RS.OFFERS.filter((o) => !o.status || o.status === 'active').length;
         return n ? n + ' live' : 'Open';
@@ -52,7 +52,7 @@
 
   function renderHub() {
     const grid = $('#hub-grid');
-    if (!grid) return;
+    if (!grid) {return;}
     grid.innerHTML = HUB.map((h) => {
       const meta = liveMeta(h.t) || h.m;
       return `
@@ -88,9 +88,9 @@
   global.RSGrowthHubShell = { renderHub, renderGrowthHub, HUB };
 
   function attach() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderGrowthHub = renderGrowthHub;
   }
-  if (global.RS) attach();
+  if (global.RS) {attach();}
   document.addEventListener('rs:ready', attach);
 })(typeof window !== 'undefined' ? window : globalThis);

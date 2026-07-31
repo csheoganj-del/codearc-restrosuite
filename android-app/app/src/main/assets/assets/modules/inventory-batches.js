@@ -11,7 +11,7 @@
   let _loadPromise = null;
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function getInventory() {
     return (global.RS && RS.INVENTORY) || [];
@@ -22,10 +22,10 @@
     return x;
   }
   function parseDate(v) {
-    if (!v) return null;
-    if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+    if (!v) {return null;}
+    if (v instanceof Date) {return Number.isNaN(v.getTime()) ? null : v;}
     const s = String(v).trim();
-    if (!s) return null;
+    if (!s) {return null;}
     // yyyy-mm-dd
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
       const d = new Date(s.slice(0, 10) + 'T12:00:00');
@@ -36,27 +36,27 @@
   }
   function toIsoDate(v) {
     const d = parseDate(v);
-    if (!d) return '';
+    if (!d) {return '';}
     const pad = (n) => String(n).padStart(2, '0');
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
   function daysUntil(expiry) {
     const d = parseDate(expiry);
-    if (!d) return null;
+    if (!d) {return null;}
     const today = startOfDay(new Date());
     const exp = startOfDay(d);
     return Math.round((exp - today) / 86400000);
   }
   function ingredientKey(itemOrName) {
-    if (!itemOrName) return '';
+    if (!itemOrName) {return '';}
     if (typeof itemOrName === 'object') {
-      if (itemOrName.key) return String(itemOrName.key).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      if (itemOrName.key) {return String(itemOrName.key).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');}
       if (itemOrName.name)
-        return String(itemOrName.name)
+        {return String(itemOrName.name)
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '_')
-          .replace(/^_|_$/g, '');
-      if (itemOrName.id) return String(itemOrName.id);
+          .replace(/^_|_$/g, '');}
+      if (itemOrName.id) {return String(itemOrName.id);}
     }
     return String(itemOrName)
       .toLowerCase()
@@ -64,11 +64,11 @@
       .replace(/^_|_$/g, '');
   }
   function matchBatchToItem(batch, item) {
-    if (!batch || !item) return false;
+    if (!batch || !item) {return false;}
     const bk = String(batch.ingredientKey || batch.ingredient_key || '').toLowerCase();
     const ik = ingredientKey(item);
-    if (bk && ik && bk === ik) return true;
-    if (batch.invId && item.id && String(batch.invId) === String(item.id)) return true;
+    if (bk && ik && bk === ik) {return true;}
+    if (batch.invId && item.id && String(batch.invId) === String(item.id)) {return true;}
     if (batch.ingredientName && item.name) {
       return String(batch.ingredientName).toLowerCase() === String(item.name).toLowerCase();
     }
@@ -76,8 +76,8 @@
   }
 
   async function loadBatches(force) {
-    if (_loaded && !force) return _batches;
-    if (_loadPromise && !force) return _loadPromise;
+    if (_loaded && !force) {return _batches;}
+    if (_loadPromise && !force) {return _loadPromise;}
     _loadPromise = (async () => {
       try {
         if (global.RS_DB && typeof RS_DB.list === 'function') {
@@ -109,15 +109,15 @@
   }
 
   async function saveBatch(batch) {
-    if (!batch || !batch.id) throw new Error('batch id required');
+    if (!batch || !batch.id) {throw new Error('batch id required');}
     const idx = _batches.findIndex((b) => String(b.id) === String(batch.id));
-    if (idx >= 0) _batches[idx] = batch;
-    else _batches.push(batch);
+    if (idx >= 0) {_batches[idx] = batch;}
+    else {_batches.push(batch);}
     try {
       localStorage.setItem('rs_inventory_batches', JSON.stringify(_batches));
     } catch (_) {}
     try {
-      if (global.RS_DB && RS_DB.put) await RS_DB.put('inventory_batches', batch.id, batch);
+      if (global.RS_DB && RS_DB.put) {await RS_DB.put('inventory_batches', batch.id, batch);}
     } catch (e) {
       console.warn('[Batches] cloud put failed (local kept)', e && e.message);
     }
@@ -143,7 +143,7 @@
     const o = opts || {};
     const item = o.item;
     const qty = Math.max(0, Number(o.qty) || 0);
-    if (!item || !(qty > 0)) return null;
+    if (!item || !(qty > 0)) {return null;}
     await loadBatches();
     const expiry = toIsoDate(o.expiryDate);
     const received = toIsoDate(o.receivedDate) || toIsoDate(new Date());
@@ -170,7 +170,7 @@
    */
   async function deductFefo(item, qty) {
     const need = Math.max(0, Number(qty) || 0);
-    if (!item || !(need > 0)) return { deducted: 0, remaining: need, batchesTouched: [] };
+    if (!item || !(need > 0)) {return { deducted: 0, remaining: need, batchesTouched: [] };}
     await loadBatches();
     const today = startOfDay(new Date()).getTime();
     // Prefer batches with earliest expiry; undated batches last; expired still usable but first
@@ -180,18 +180,18 @@
       .sort((a, b) => {
         const da = parseDate(a.expiryDate);
         const db = parseDate(b.expiryDate);
-        if (!da && !db) return String(a.receivedDate || '').localeCompare(String(b.receivedDate || ''));
-        if (!da) return 1;
-        if (!db) return -1;
+        if (!da && !db) {return String(a.receivedDate || '').localeCompare(String(b.receivedDate || ''));}
+        if (!da) {return 1;}
+        if (!db) {return -1;}
         return da - db;
       });
 
     let left = need;
     const touched = [];
     for (const b of mine) {
-      if (left <= 0) break;
+      if (left <= 0) {break;}
       const have = Number(b.qty) || 0;
-      if (have <= 0) continue;
+      if (have <= 0) {continue;}
       const take = Math.min(have, left);
       b.qty = Math.round((have - take) * 1000) / 1000;
       left = Math.round((left - take) * 1000) / 1000;
@@ -214,16 +214,16 @@
     let nearestDays = null;
     let expiredQty = 0;
     let nearQty = 0;
-    let batchCount = mine.length;
+    const batchCount = mine.length;
     mine.forEach((b) => {
       const d = daysUntil(b.expiryDate);
-      if (d == null) return;
+      if (d == null) {return;}
       if (nearestDays == null || d < nearestDays) {
         nearestDays = d;
         nearest = b;
       }
-      if (d < 0) expiredQty += Number(b.qty) || 0;
-      else if (d <= NEAR_DAYS) nearQty += Number(b.qty) || 0;
+      if (d < 0) {expiredQty += Number(b.qty) || 0;}
+      else if (d <= NEAR_DAYS) {nearQty += Number(b.qty) || 0;}
     });
     return {
       batchCount,
@@ -254,7 +254,7 @@
 
   function formatShort(iso) {
     const d = parseDate(iso);
-    if (!d) return '—';
+    if (!d) {return '—';}
     try {
       return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     } catch (_) {
@@ -266,9 +266,9 @@
     const days = withinDays == null ? NEAR_DAYS : withinDays;
     const out = [];
     _batches.forEach((b) => {
-      if (!(Number(b.qty) > 0)) return;
+      if (!(Number(b.qty) > 0)) {return;}
       const d = daysUntil(b.expiryDate);
-      if (d == null) return;
+      if (d == null) {return;}
       if (d <= days) {
         out.push({
           ...b,
@@ -288,9 +288,9 @@
       .sort((a, b) => {
         const da = parseDate(a.expiryDate);
         const db = parseDate(b.expiryDate);
-        if (!da && !db) return 0;
-        if (!da) return 1;
-        if (!db) return -1;
+        if (!da && !db) {return 0;}
+        if (!da) {return 1;}
+        if (!db) {return -1;}
         return da - db;
       });
   }

@@ -492,12 +492,15 @@
             const halfB2c = Math.round(totalB2cGst / 2);
             csv += `"Delhi",5,${totalB2cTaxable.toFixed(2)},${halfB2c},${totalB2cGst - halfB2c}\n`;
             
-            // Settings → Show HSN codes (default OFF for simple cafés)
+            // Settings → Calculate taxes + Show HSN codes (both OFF by default)
             const showHsn =
-              typeof window.RS_featureOn === 'function'
-                ? window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
-                : window.RS_SETTINGS?.set_show_hsn_codes === true ||
-                  window.RS_SETTINGS?.set_show_hsn_codes === 'true';
+              (typeof window.RS_featureOn === 'function'
+                ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false) &&
+                  window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
+                : (window.RS_SETTINGS?.set_calculate_taxes === true ||
+                    window.RS_SETTINGS?.set_calculate_taxes === 'true') &&
+                  (window.RS_SETTINGS?.set_show_hsn_codes === true ||
+                    window.RS_SETTINGS?.set_show_hsn_codes === 'true'));
             if (showHsn) {
               csv += "\nHSN/SAC Summary (SAC 9963)\nHSN/SAC,Description,UQC,Total Quantity,Total Value,Taxable Value,CGST,SGST\n";
               let totalVal = 0, totalTaxable = 0, totalGst = 0, totalQty = 0;
@@ -573,9 +576,12 @@
                 pos: profile.state_code || "07"
               })),
               hsn: (typeof window.RS_featureOn === 'function'
-                ? window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
-                : window.RS_SETTINGS?.set_show_hsn_codes === true ||
-                  window.RS_SETTINGS?.set_show_hsn_codes === 'true')
+                ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false) &&
+                  window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
+                : (window.RS_SETTINGS?.set_calculate_taxes === true ||
+                    window.RS_SETTINGS?.set_calculate_taxes === 'true') &&
+                  (window.RS_SETTINGS?.set_show_hsn_codes === true ||
+                    window.RS_SETTINGS?.set_show_hsn_codes === 'true'))
                 ? {
                     data: [{
                       num: 1,

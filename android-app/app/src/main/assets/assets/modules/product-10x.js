@@ -10,8 +10,8 @@
   const RS10 = (global.RS10 = global.RS10 || {});
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
-    else if (typeof console !== 'undefined') console.log('[RS10]', msg);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
+    else if (typeof console !== 'undefined') {console.log('[RS10]', msg);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -21,7 +21,7 @@
       .replace(/"/g, '&quot;');
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function session() {
@@ -140,17 +140,17 @@
   function applyI18nDom() {
     document.querySelectorAll('[data-i18n]').forEach((el) => {
       const key = el.getAttribute('data-i18n');
-      if (!key) return;
+      if (!key) {return;}
       const val = t(key);
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        if (el.placeholder != null) el.placeholder = val;
+        if (el.placeholder != null) {el.placeholder = val;}
       } else {
         el.textContent = val;
       }
     });
     document.querySelectorAll('[data-i18n-title]').forEach((el) => {
       const key = el.getAttribute('data-i18n-title');
-      if (key) el.setAttribute('title', t(key));
+      if (key) {el.setAttribute('title', t(key));}
     });
     // Mobile bottom nav labels
     const map = {
@@ -163,10 +163,10 @@
     document.querySelectorAll('.mnav-link[data-tab]').forEach((a) => {
       const k = map[a.getAttribute('data-tab')];
       const span = a.querySelector('span');
-      if (k && span) span.textContent = t(k);
+      if (k && span) {span.textContent = t(k);}
     });
     const more = document.querySelector('#mnav-more span');
-    if (more) more.textContent = t('more');
+    if (more) {more.textContent = t('more');}
   }
 
   /* ───────────── INR denomination helpers ───────────── */
@@ -214,12 +214,12 @@
         const n = Math.max(0, Math.floor(Number(inp.value) || 0));
         counts[d] = n;
         const line = root.querySelector(`[data-den-line="${d}"]`);
-        if (line) line.textContent = rs(d * n);
+        if (line) {line.textContent = rs(d * n);}
       });
       const sum = denomTotal(counts);
       const el = root.querySelector('#rs10-den-sum');
-      if (el) el.textContent = rs(sum);
-      if (onChange) onChange(sum, counts);
+      if (el) {el.textContent = rs(sum);}
+      if (onChange) {onChange(sum, counts);}
       return { sum, counts };
     };
     root.querySelectorAll('[data-den]').forEach((inp) => {
@@ -232,8 +232,9 @@
     return new Promise((resolve) => {
       if (!global.RSModal) {
         const f = window.prompt(title + ' — total ₹', String(initial || 0));
-        if (f === null) return resolve(null);
-        return resolve({ total: Number(f) || 0, counts: {}, note: '' });
+        if (f === null) { resolve(null); return; }
+        resolve({ total: Number(f) || 0, counts: {}, note: '' });
+        return;
       }
       let last = { sum: Number(initial) || 0, counts: {} };
       RSModal.open({
@@ -250,17 +251,17 @@
           });
           const x = m.querySelector('[data-x]');
           if (x)
-            x.onclick = () => {
+            {x.onclick = () => {
               close();
               resolve(null);
-            };
+            };}
           const ok = m.querySelector('[data-ok]');
           if (ok)
-            ok.onclick = () => {
+            {ok.onclick = () => {
               const note = (m.querySelector('#rs10-den-note') || {}).value || '';
               close();
               resolve({ total: last.sum, counts: last.counts, note: String(note).trim() });
-            };
+            };}
         },
       });
     });
@@ -275,7 +276,7 @@
   /* ───────────── Mobile topbar overflow + QR scanner ───────────── */
   function installMobileChrome() {
     const right = document.getElementById('tb-right');
-    if (!right || right.dataset.rs10Chrome === '1') return;
+    if (!right || right.dataset.rs10Chrome === '1') {return;}
     right.dataset.rs10Chrome = '1';
 
     // Overflow "⋯" for secondary icons on mobile
@@ -345,9 +346,9 @@
       // Prefer next to WhatsApp / support cluster so it is not lost in overflow
       const wa = document.getElementById('tb-wa-status-btn');
       const support = document.getElementById('tb-support-wrap');
-      if (wa && wa.parentNode) wa.parentNode.insertBefore(scan, wa);
-      else if (support && support.parentNode) support.parentNode.insertBefore(scan, support);
-      else right.insertBefore(scan, right.firstChild);
+      if (wa && wa.parentNode) {wa.parentNode.insertBefore(scan, wa);}
+      else if (support && support.parentNode) {support.parentNode.insertBefore(scan, support);}
+      else {right.insertBefore(scan, right.firstChild);}
       scan.onclick = () => openStaffQrScanner();
     }
     updateScanVisibility();
@@ -356,14 +357,26 @@
 
   function updateScanVisibility() {
     const scan = document.getElementById('tb-qr-scan');
-    if (!scan) return;
-    // Always show — staff on counter PC also need table QR scan / table #
-    scan.style.display = '';
-    scan.hidden = false;
+    if (!scan) {return;}
+    // Kitchen / inventory / token display do not need floor QR scan chrome
+    const role = String(
+      (session() && session().role) || sessionStorage.getItem('logged_in_role') || ''
+    ).toLowerCase();
+    const hideFor = /^(kitchen|inventory|customer_display)$/.test(role);
+    let hideByTabs = false;
+    try {
+      const tabs = window.RS_ROLE && window.RS_ROLE.allowedTabs;
+      if (Array.isArray(tabs) && tabs.length) {
+        hideByTabs = !tabs.includes('pos-tab') && !tabs.includes('floor-tab');
+      }
+    } catch (_) {}
+    const show = !hideFor && !hideByTabs;
+    scan.style.display = show ? '' : 'none';
+    scan.hidden = !show;
   }
 
   function openStaffQrScanner() {
-    // Role gate: waiter, admin, manager, owner, captain
+    // Role gate: waiter, admin, manager, owner, captain, cashier
     const role = String(session().role || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
     const allowed = /owner|admin|manager|waiter|captain|cashier|superadmin/.test(role) || !role;
     if (!allowed) {
@@ -391,7 +404,7 @@
     // Fallback modal if staff-table-scanner.js not loaded
     if (!global.RSModal) {
       const url = window.prompt('Table number or paste QR link');
-      if (url) handleScannedTablePayload(url);
+      if (url) {handleScannedTablePayload(url);}
       return;
     }
 
@@ -421,7 +434,7 @@
         </div>
         <p id="rs10-scan-status" class="rs10-scan-status"></p>
       </div>`,
-      foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>`,
+      foot: '<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>',
       onMount(m, close) {
         let stream = null;
         let timer = null;
@@ -431,7 +444,7 @@
             clearInterval(timer);
             timer = null;
           }
-          if (stream) stream.getTracks().forEach((tr) => tr.stop());
+          if (stream) {stream.getTracks().forEach((tr) => tr.stop());}
           stream = null;
         };
         m.querySelector('[data-x]').onclick = () => {
@@ -440,7 +453,7 @@
         };
         m.querySelector('#rs10-scan-go').onclick = () => {
           const v = (m.querySelector('#rs10-scan-table').value || '').trim();
-          if (!v) return;
+          if (!v) {return;}
           stop();
           close();
           handleScannedTablePayload(v);
@@ -451,11 +464,11 @@
         if (snap) {
           snap.onchange = async () => {
             const file = snap.files && snap.files[0];
-            if (!file) return;
-            if (status) status.textContent = 'Reading photo…';
+            if (!file) {return;}
+            if (status) {status.textContent = 'Reading photo…';}
             const ensureJs = () =>
               new Promise((resolve) => {
-                if (global.jsQR) return resolve(true);
+                if (global.jsQR) { resolve(true); return; }
                 const s = document.createElement('script');
                 s.src = 'assets/lib/jsQR.min.js';
                 s.onload = () => resolve(!!global.jsQR);
@@ -470,7 +483,7 @@
               });
             const ok = await ensureJs();
             if (!ok) {
-              if (status) status.textContent = 'Decoder missing — type table number';
+              if (status) {status.textContent = 'Decoder missing — type table number';}
               return;
             }
             const url = URL.createObjectURL(file);
@@ -497,12 +510,12 @@
                   status.textContent = 'No QR in photo — retake or type table #';
                 }
               } catch (e) {
-                if (status) status.textContent = 'Could not read photo';
+                if (status) {status.textContent = 'Could not read photo';}
               }
             };
             img.onerror = () => {
               URL.revokeObjectURL(url);
-              if (status) status.textContent = 'Could not open photo';
+              if (status) {status.textContent = 'Could not open photo';}
             };
             img.src = url;
             snap.value = '';
@@ -513,10 +526,10 @@
         const canvas = m.querySelector('#rs10-scan-canvas');
         const wrap = m.querySelector('#rs10-scan-video-wrap');
         const startCam = async () => {
-          if (wrap) wrap.style.display = '';
+          if (wrap) {wrap.style.display = '';}
           try {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-              if (status) status.textContent = 'Camera not available — use Snap photo or type #';
+              if (status) {status.textContent = 'Camera not available — use Snap photo or type #';}
               return;
             }
             const tries = isiOS
@@ -540,7 +553,7 @@
               }
             }
             if (!stream) {
-              if (status) status.textContent = 'Camera denied — use Snap photo or type table #';
+              if (status) {status.textContent = 'Camera denied — use Snap photo or type table #';}
               console.warn('[rs10 scan]', errLast);
               return;
             }
@@ -549,11 +562,11 @@
             video.muted = true;
             video.srcObject = stream;
             await video.play();
-            if (status) status.textContent = 'Scanning… hold QR in the box';
+            if (status) {status.textContent = 'Scanning… hold QR in the box';}
 
             const runJsQr = () => {
               if (!global.jsQR || !canvas) {
-                if (status) status.textContent = 'Enter table # or use Snap photo';
+                if (status) {status.textContent = 'Enter table # or use Snap photo';}
                 return;
               }
               let ctx = null;
@@ -564,7 +577,7 @@
               }
               timer = setInterval(() => {
                 try {
-                  if (video.readyState < 2 || !video.videoWidth) return;
+                  if (video.readyState < 2 || !video.videoWidth) {return;}
                   const maxW = 480;
                   const scale = video.videoWidth > maxW ? maxW / video.videoWidth : 1;
                   canvas.width = Math.floor(video.videoWidth * scale);
@@ -584,7 +597,7 @@
             };
 
             // Prefer jsQR always (BarcodeDetector missing on Safari)
-            if (global.jsQR) runJsQr();
+            if (global.jsQR) {runJsQr();}
             else {
               const s = document.createElement('script');
               s.src = 'assets/lib/jsQR.min.js';
@@ -594,21 +607,21 @@
                 s2.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
                 s2.onload = runJsQr;
                 s2.onerror = () => {
-                  if (status) status.textContent = 'Enter table # or Snap photo';
+                  if (status) {status.textContent = 'Enter table # or Snap photo';}
                 };
                 document.head.appendChild(s2);
               };
               document.head.appendChild(s);
             }
           } catch (err) {
-            if (status) status.textContent = 'Camera failed — use Snap photo or type table #';
+            if (status) {status.textContent = 'Camera failed — use Snap photo or type table #';}
           }
         };
 
         const liveBtn = m.querySelector('#rs10-scan-live');
-        if (liveBtn) liveBtn.onclick = () => startCam();
-        if (!isiOS) startCam();
-        else if (status) status.textContent = 'Tap Snap QR photo (best on iPhone)';
+        if (liveBtn) {liveBtn.onclick = () => startCam();}
+        if (!isiOS) {startCam();}
+        else if (status) {status.textContent = 'Tap Snap QR photo (best on iPhone)';}
       },
     });
   }
@@ -616,7 +629,7 @@
 
   function handleScannedTablePayload(raw) {
     const text = String(raw || '').trim();
-    if (!text) return;
+    if (!text) {return;}
 
     // Prefer full floor/POS open from staff-table-scanner parse when available
     if (global.RSStaffTableScanner && typeof RSStaffTableScanner.parse === 'function') {
@@ -664,7 +677,7 @@
     const tableLabel = m ? 'Table ' + parseInt(m[1], 10) : table;
 
     try {
-      if (global.RS && RS.activateTab) RS.activateTab('pos-tab');
+      if (global.RS && RS.activateTab) {RS.activateTab('pos-tab');}
     } catch (_) {}
 
     const sel = document.getElementById('cart-table');
@@ -707,7 +720,7 @@
   /* ───────────── Support → Feedback ───────────── */
   function installSupportFeedback() {
     const menu = document.getElementById('tb-support-menu');
-    if (!menu || menu.querySelector('[data-rs10-feedback]')) return;
+    if (!menu || menu.querySelector('[data-rs10-feedback]')) {return;}
     const a = document.createElement('button');
     a.type = 'button';
     a.className = 'tb-support-item';
@@ -746,7 +759,7 @@
   function openStaffFeedback() {
     const slug = sessionStorage.getItem('tenant_slug') || '';
     if (!global.RSModal) {
-      if (slug) window.open('/feedback?tenant=' + encodeURIComponent(slug) + '&source=staff', '_blank');
+      if (slug) {window.open('/feedback?tenant=' + encodeURIComponent(slug) + '&source=staff', '_blank');}
       return;
     }
     RSModal.open({
@@ -797,7 +810,7 @@
             tableNumber: '',
           };
           try {
-            if (global.RS_DB && RS_DB.put) await RS_DB.put('reviews', row.id, row);
+            if (global.RS_DB && RS_DB.put) {await RS_DB.put('reviews', row.id, row);}
             // local hub list
             try {
               const key = 'rs_hub_reviews';
@@ -820,14 +833,14 @@
   function installReviewApprovalHooks() {
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest && e.target.closest('[data-rs10-review-act]');
-      if (!btn) return;
+      if (!btn) {return;}
       e.preventDefault();
       const id = btn.getAttribute('data-id');
       const act = btn.getAttribute('data-rs10-review-act');
-      if (!id || !act) return;
+      if (!id || !act) {return;}
       let row = null;
       try {
-        if (global.RS_DB && RS_DB.get) row = await RS_DB.get('reviews', id);
+        if (global.RS_DB && RS_DB.get) {row = await RS_DB.get('reviews', id);}
       } catch (_) {}
       if (!row) {
         try {
@@ -847,13 +860,13 @@
         row.status = 'hidden';
       }
       try {
-        if (global.RS_DB && RS_DB.put) await RS_DB.put('reviews', row.id, row);
+        if (global.RS_DB && RS_DB.put) {await RS_DB.put('reviews', row.id, row);}
       } catch (_) {}
       try {
         const list = JSON.parse(localStorage.getItem('rs_hub_reviews') || '[]');
         const i = list.findIndex((r) => String(r.id) === String(id));
-        if (i >= 0) list[i] = row;
-        else list.unshift(row);
+        if (i >= 0) {list[i] = row;}
+        else {list.unshift(row);}
         localStorage.setItem('rs_hub_reviews', JSON.stringify(list.slice(0, 200)));
         // Publish approved set for homepage
         const approved = list.filter((r) => r.homepageApproved && Number(r.rating) >= 4);
@@ -876,7 +889,7 @@
   function installManualOnlineOrder() {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest && e.target.closest('#agg-manual-order, [data-rs10-manual-online]');
-      if (!btn) return;
+      if (!btn) {return;}
       e.preventDefault();
       openManualOnlineOrder();
     });
@@ -884,7 +897,7 @@
     // Inject button into aggregator toolbar when rendered
     const obs = new MutationObserver(() => {
       const toolbar = document.querySelector('.agg-toolbar');
-      if (!toolbar || toolbar.querySelector('#agg-manual-order')) return;
+      if (!toolbar || toolbar.querySelector('#agg-manual-order')) {return;}
       const b = document.createElement('button');
       b.type = 'button';
       b.id = 'agg-manual-order';
@@ -892,8 +905,8 @@
       b.title = 'Enter Swiggy / Zomato / other order manually';
       b.innerHTML = '<i class="fa-solid fa-plus"></i> Manual order';
       const refresh = toolbar.querySelector('#agg-refresh');
-      if (refresh) toolbar.insertBefore(b, refresh);
-      else toolbar.appendChild(b);
+      if (refresh) {toolbar.insertBefore(b, refresh);}
+      else {toolbar.appendChild(b);}
     });
     obs.observe(document.body, { childList: true, subtree: true });
   }
@@ -988,7 +1001,7 @@
         m.querySelector('#rs10-ol-add').onclick = () => {
           const sel = m.querySelector('#rs10-ol-menu');
           const opt = sel.options[sel.selectedIndex];
-          if (!opt || !opt.value) return;
+          if (!opt || !opt.value) {return;}
           const qty = Math.max(1, Number(m.querySelector('#rs10-ol-qty').value) || 1);
           lines.push({
             id: opt.value,
@@ -1037,7 +1050,7 @@
             if (window.RS_DB) {
               await RS_DB.put('pending_orders', id, row);
               if (window.RS_SYNC && RS_SYNC.syncPendingOrders)
-                await RS_SYNC.syncPendingOrders({ forceCloud: true });
+                {await RS_SYNC.syncPendingOrders({ forceCloud: true });}
             }
             // If delivered, also create a bill for history/reporting
             if (status === 'delivered' || status === 'ready') {
@@ -1046,13 +1059,13 @@
             toast((platName(plat) || 'Online') + ' order saved', 'fa-motorcycle');
             close();
             try {
-              if (global.RS && RS.activateTab) RS.activateTab('aggregator-tab');
+              if (global.RS && RS.activateTab) {RS.activateTab('aggregator-tab');}
               document.dispatchEvent(new CustomEvent('rs:online-order-manual', { detail: row }));
             } catch (_) {}
             // re-render if possible
             setTimeout(() => {
               try {
-                if (global.RS && RS.renderAgg) RS.renderAgg();
+                if (global.RS && RS.renderAgg) {RS.renderAgg();}
               } catch (_) {}
             }, 200);
           } catch (err) {
@@ -1070,7 +1083,7 @@
   }
 
   async function settleOnlineToBill(order) {
-    if (!global.RS || !RS.saveOne) return;
+    if (!global.RS || !RS.saveOne) {return;}
     const items = order.items || [];
     const sub = items.reduce((a, i) => a + Number(i.price) * Number(i.qty), 0);
     const fee = Number(order.deliveryFee) || 0;
@@ -1100,7 +1113,7 @@
     };
     try {
       await RS.saveOne('bills', bill);
-      if (Array.isArray(RS.BILLS)) RS.BILLS.unshift(bill);
+      if (Array.isArray(RS.BILLS)) {RS.BILLS.unshift(bill);}
     } catch (e) {
       console.warn('[RS10] settle bill', e);
     }
@@ -1125,7 +1138,7 @@
                 String(u.employee_id || '') === String(empId) ||
                 String(u.display_name || '').toLowerCase() === String(label).toLowerCase()
             );
-            if (hit) sid = hit.id;
+            if (hit) {sid = hit.id;}
           } catch (_) {}
         }
         if (sid) {
@@ -1160,20 +1173,20 @@
 
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest && e.target.closest('[data-rs10-deactivate]');
-      if (!btn) return;
+      if (!btn) {return;}
       // Let employees-ui handle its native toggle unless this is our inject only
-      if (btn.classList.contains('emp-toggle-active')) return;
+      if (btn.classList.contains('emp-toggle-active')) {return;}
       e.preventDefault();
       const userId = btn.getAttribute('data-user-id') || btn.getAttribute('data-id');
       const staffUserId = btn.getAttribute('data-staff-user-id') || '';
       const name = btn.getAttribute('data-name') || 'Staff';
-      if (!userId && !staffUserId) return;
+      if (!userId && !staffUserId) {return;}
       if (!confirm('Deactivate ' + name + '?\n\nThey cannot login. Active sessions will be revoked.'))
-        return;
+        {return;}
       try {
         await hardDeactivate({ empId: userId, staffUserId, name });
         const row = btn.closest('tr, .emp-line-row, .emp-card');
-        if (row) row.classList.add('rs10-deactivated');
+        if (row) {row.classList.add('rs10-deactivated');}
       } catch (err) {
         toast('Deactivate failed — open Employees → Logins and Suspend', 'fa-circle-exclamation');
       }
@@ -1184,9 +1197,9 @@
       document
         .querySelectorAll('#employees-tab tr[data-id], #employees-tab [data-emp-id], #employees-tab .emp-line-row[data-id]')
         .forEach((row) => {
-          if (row.querySelector('[data-rs10-deactivate], .emp-toggle-active')) return;
+          if (row.querySelector('[data-rs10-deactivate], .emp-toggle-active')) {return;}
           const id = row.getAttribute('data-id') || row.getAttribute('data-emp-id');
-          if (!id) return;
+          if (!id) {return;}
           const cell =
             row.querySelector('.rl-acts, td:last-child, .emp-actions') || row;
           const b = document.createElement('button');
@@ -1206,12 +1219,12 @@
 
   /* ───────────── Mobile: Menu + Inventory (+ bills) as cards ───────────── */
   function installMobileDataCards() {
-    if (document.documentElement.dataset.rs10Cards === '1') return;
+    if (document.documentElement.dataset.rs10Cards === '1') {return;}
     document.documentElement.dataset.rs10Cards = '1';
 
     function ensureCardsHost(tabEl, className, afterScroll) {
       let cards = tabEl.querySelector('.' + className);
-      if (cards) return cards;
+      if (cards) {return cards;}
       cards = document.createElement('div');
       cards.className = className;
       cards.setAttribute('data-rs10-mobile-cards', '1');
@@ -1219,8 +1232,8 @@
         afterScroll ||
         tabEl.querySelector('.table-scroll') ||
         tabEl.querySelector('.panel .table-scroll');
-      if (scroll && scroll.parentNode) scroll.parentNode.insertBefore(cards, scroll.nextSibling || scroll);
-      else tabEl.appendChild(cards);
+      if (scroll && scroll.parentNode) {scroll.parentNode.insertBefore(cards, scroll.nextSibling || scroll);}
+      else {tabEl.appendChild(cards);}
       return cards;
     }
 
@@ -1235,7 +1248,7 @@
     const enhanceBills = () => {
       const body = document.getElementById('bills-table-body');
       const wrap = document.getElementById('bills-tab');
-      if (!body || !wrap) return;
+      if (!body || !wrap) {return;}
       const cards = ensureCardsHost(wrap, 'rs10-bill-cards');
       if (!isMobileCards()) {
         cards.innerHTML = '';
@@ -1248,8 +1261,8 @@
       // Paginate instead of hard-capping (old slice(0,60) hid bills 61+)
       const pageSize = 40;
       let shown = Number(cards.dataset.rsBillShown || pageSize);
-      if (!Number.isFinite(shown) || shown < pageSize) shown = pageSize;
-      if (shown > allRows.length) shown = allRows.length || pageSize;
+      if (!Number.isFinite(shown) || shown < pageSize) {shown = pageSize;}
+      if (shown > allRows.length) {shown = allRows.length || pageSize;}
       const rows = allRows.slice(0, shown);
       const sig =
         allRows.length +
@@ -1260,7 +1273,7 @@
         '|s' +
         shown;
       // Skip rebuild if same data (keeps ⋯ menu open, reduces flicker)
-      if (cards.dataset.rsBillSig === sig && cards.querySelector('.rs10-bill-card')) return;
+      if (cards.dataset.rsBillSig === sig && cards.querySelector('.rs10-bill-card')) {return;}
       cards.dataset.rsBillSig = sig;
       cards.dataset.rsBillShown = String(shown);
       if (!rows.length) {
@@ -1316,26 +1329,26 @@
 
       const closeCardMoreMenus = (except) => {
         cards.querySelectorAll('.rs10-bill-more-menu').forEach((menu) => {
-          if (except && menu === except) return;
+          if (except && menu === except) {return;}
           menu.hidden = true;
         });
         cards.querySelectorAll('.rs10-bill-more.is-open').forEach((wrapEl) => {
-          if (except && wrapEl.contains(except)) return;
+          if (except && wrapEl.contains(except)) {return;}
           wrapEl.classList.remove('is-open');
           const mb = wrapEl.querySelector('[data-card-more]');
-          if (mb) mb.setAttribute('aria-expanded', 'false');
+          if (mb) {mb.setAttribute('aria-expanded', 'false');}
         });
       };
 
       cards.querySelectorAll('.rs10-bill-card').forEach((card) => {
         const tr = rows[+card.getAttribute('data-i')];
-        if (!tr) return;
+        if (!tr) {return;}
 
         /** Prefer RSBillsHistory APIs; fall back to clicking the (hidden) table row actions. */
         const resolveBill = () => {
           const no = String(card.getAttribute('data-bill-no') || tr.getAttribute('data-bill-no') || '').trim();
           const match = (b) => {
-            if (!b) return false;
+            if (!b) {return false;}
             const keys = [b.no, b.orderId, b.id].map((x) => String(x == null ? '' : x).trim()).filter(Boolean);
             return keys.includes(no);
           };
@@ -1343,17 +1356,17 @@
             const BH = global.RSBillsHistory;
             if (BH && typeof BH.getFilteredBills === 'function') {
               const hit = (BH.getFilteredBills() || []).find(match);
-              if (hit) return hit;
+              if (hit) {return hit;}
             }
             if (global.RS && Array.isArray(RS.BILLS)) {
               const hit = RS.BILLS.find(match);
-              if (hit) return hit;
+              if (hit) {return hit;}
             }
             // Last resort: row index into filtered list (same order as paintBillsTable)
             if (BH && typeof BH.getFilteredBills === 'function') {
               const list = BH.getFilteredBills() || [];
               const i = +card.getAttribute('data-i');
-              if (Number.isFinite(i) && list[i]) return list[i];
+              if (Number.isFinite(i) && list[i]) {return list[i];}
             }
           } catch (_) {}
           return null;
@@ -1361,22 +1374,22 @@
 
         const fireRow = (sel) => {
           const src = tr.querySelector(sel);
-          if (!src || src.disabled) return false;
+          if (!src || src.disabled) {return false;}
           // Ensure parent more-menu is temporarily interactive for refund/delete
           const menu = src.closest('.bills-more-menu');
           const wasHidden = menu && menu.hidden;
-          if (menu && wasHidden) menu.hidden = false;
+          if (menu && wasHidden) {menu.hidden = false;}
           try {
             src.click();
           } finally {
-            if (menu && wasHidden) menu.hidden = true;
+            if (menu && wasHidden) {menu.hidden = true;}
           }
           return true;
         };
 
         const wire = (cardSel, action) => {
           const btn = card.querySelector(cardSel);
-          if (!btn) return;
+          if (!btn) {return;}
           btn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1472,7 +1485,7 @@
     const enhanceEditor = () => {
       const wrap = document.getElementById('editor-tab');
       const body = document.getElementById('editor-list');
-      if (!wrap || !body) return;
+      if (!wrap || !body) {return;}
       const listPanel = body.closest('.panel') || wrap;
       const cards = ensureCardsHost(listPanel, 'rs10-menu-cards', body.closest('.table-scroll'));
       if (!isMobileCards()) {
@@ -1530,16 +1543,16 @@
         .join('');
       cards.querySelectorAll('.rs10-menu-card').forEach((card) => {
         const tr = rows[+card.getAttribute('data-i')];
-        if (!tr) return;
+        if (!tr) {return;}
         const av = card.querySelector('[data-card-av]');
         if (av) {
           av.onchange = () => {
             const src = tr.querySelector('input[data-av]');
-            if (!src) return;
+            if (!src) {return;}
             src.checked = av.checked;
             src.dispatchEvent(new Event('change', { bubbles: true }));
             const lab = card.querySelector('.rs10-mcard-toggle span');
-            if (lab) lab.textContent = av.checked ? 'Available' : 'Sold out';
+            if (lab) {lab.textContent = av.checked ? 'Available' : 'Sold out';}
           };
         }
         const map = [
@@ -1550,12 +1563,12 @@
         map.forEach(([sel, srcSel]) => {
           const b = card.querySelector(sel);
           if (b)
-            b.onclick = (e) => {
+            {b.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
               const src = tr.querySelector(srcSel);
-              if (src) src.click();
-            };
+              if (src) {src.click();}
+            };}
         });
       });
     };
@@ -1563,12 +1576,12 @@
     /** Inventory stock list as cards */
     const enhanceInv = () => {
       const wrap = document.getElementById('inventory-tab');
-      if (!wrap) return;
+      if (!wrap) {return;}
       const tbody =
         document.getElementById('inv-table-body') ||
         wrap.querySelector('#inv-panel-stock tbody') ||
         wrap.querySelector('.inv-stock-table tbody');
-      if (!tbody) return;
+      if (!tbody) {return;}
       const stockPanel = document.getElementById('inv-panel-stock') || tbody.closest('.panel') || wrap;
       const cards = ensureCardsHost(stockPanel, 'rs10-inv-cards', tbody.closest('.table-scroll'));
       if (!isMobileCards()) {
@@ -1635,15 +1648,15 @@
         .join('');
       cards.querySelectorAll('.rs10-inv-card').forEach((card) => {
         const tr = rows[+card.getAttribute('data-i')];
-        if (!tr) return;
+        if (!tr) {return;}
         const wire = (sel, srcSel) => {
           const b = card.querySelector(sel);
-          if (!b) return;
+          if (!b) {return;}
           b.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
             const src = tr.querySelector(srcSel);
-            if (src) src.click();
+            if (src) {src.click();}
           };
         };
         wire('[data-card-batches]', '.inv-name-btn, [data-batches]');
@@ -1686,7 +1699,7 @@
         } catch (_) {}
         ['bills-table-body', 'editor-list', 'inv-table-body'].forEach((id) => {
           const el = document.getElementById(id);
-          if (el) obs.observe(el, { childList: true, subtree: true });
+          if (el) {obs.observe(el, { childList: true, subtree: true });}
         });
       }, 2000);
     }
@@ -1706,10 +1719,10 @@
       'click',
       (e) => {
         const btn = e.target.closest && e.target.closest('.set-nav button[data-s]');
-        if (!btn) return;
+        if (!btn) {return;}
         // Ensure click always reaches show() — re-dispatch if label span swallowed
         const key = btn.getAttribute('data-s');
-        if (!key) return;
+        if (!key) {return;}
         // Visual feedback
         const nav = btn.closest('.set-nav');
         if (nav) {
@@ -1732,7 +1745,7 @@
       'click',
       (e) => {
         const btn = e.target.closest && e.target.closest('[data-danger-reset], #btn-reset-outlet, [data-wipe]');
-        if (!btn) return;
+        if (!btn) {return;}
         const role = String(session().role || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
         if (!/owner|admin|superadmin/.test(role)) {
           e.preventDefault();
@@ -1791,7 +1804,7 @@
     toast('Order updated' + (table ? ' · ' + table : '') + ' · by ' + who, 'fa-bell');
     // Sound if available
     try {
-      if (global.RSOps && typeof RSOps.playFloorChime === 'function') RSOps.playFloorChime();
+      if (global.RSOps && typeof RSOps.playFloorChime === 'function') {RSOps.playFloorChime();}
     } catch (_) {}
   };
 
@@ -1799,12 +1812,12 @@
   function polishUpdates() {
     // Ensure app-update.json highlights always show a "What's new" guide link
     const orig = global.RS_SHOW_UPDATE_DIALOG;
-    if (typeof orig !== 'function' || orig._rs10) return;
+    if (typeof orig !== 'function' || orig._rs10) {return;}
     global.RS_SHOW_UPDATE_DIALOG = function () {
       orig.apply(this, arguments);
       setTimeout(() => {
         const card = document.querySelector('.app-update-card');
-        if (!card || card.querySelector('.rs10-update-guide')) return;
+        if (!card || card.querySelector('.rs10-update-guide')) {return;}
         const p = document.createElement('p');
         p.className = 'rs10-update-guide';
         p.style.cssText = 'font-size:12.5px;color:var(--text-soft);margin:8px 0 0';
@@ -1819,7 +1832,7 @@
   /* ───────────── Cart mobile sheet fix ───────────── */
   function installMobileCartFix() {
     const bar = document.getElementById('pos-m-cart-bar');
-    if (!bar || bar.dataset.rs10 === '1') return;
+    if (!bar || bar.dataset.rs10 === '1') {return;}
     bar.dataset.rs10 = '1';
     bar.addEventListener('click', (e) => {
       // Prefer canonical POS mobile cart open (locks body scroll, flex sheet)
@@ -1838,7 +1851,7 @@
       if (cart) {
         cart.classList.add('active', 'rs10-cart-sheet');
         const items = cart.querySelector('#cart-items, .cart-items');
-        if (items) items.scrollTop = 0;
+        if (items) {items.scrollTop = 0;}
       }
     });
     // Close when tapping menu backdrop (not the cart sheet)
@@ -1849,14 +1862,14 @@
           !document.body.classList.contains('rs10-cart-open') &&
           !document.body.classList.contains('pos-mobile-cart-open')
         )
-          return;
+          {return;}
         const cart =
           document.querySelector('#pos-tab .pos-cart.active, .rs10-cart-sheet') ||
           document.querySelector('.pos-cart.active');
-        if (!cart) return;
-        if (cart.contains(e.target) || (bar && bar.contains(e.target))) return;
+        if (!cart) {return;}
+        if (cart.contains(e.target) || (bar && bar.contains(e.target))) {return;}
         // Adding more menu items keeps cart open; only dismiss on empty chrome click
-        if (e.target.closest && e.target.closest('.pos-item, .menu-card, .pos-cat-btn')) return;
+        if (e.target.closest && e.target.closest('.pos-item, .menu-card, .pos-cat-btn')) {return;}
         if (global.RSPosUI && typeof RSPosUI.closeMobilePOSCart === 'function') {
           RSPosUI.closeMobilePOSCart(true);
           return;
@@ -1864,7 +1877,7 @@
         document.body.classList.remove('rs10-cart-open', 'pos-mobile-cart-open');
         cart.classList.remove('rs10-cart-sheet', 'active');
         const posLeft = document.querySelector('.pos-left');
-        if (posLeft) posLeft.classList.remove('hidden');
+        if (posLeft) {posLeft.classList.remove('hidden');}
       },
       true
     );
@@ -1872,7 +1885,7 @@
 
   /* ───────────── Boot ───────────── */
   function boot() {
-    if (document.documentElement.dataset.rs10 === '1') return;
+    if (document.documentElement.dataset.rs10 === '1') {return;}
     document.documentElement.dataset.rs10 = '1';
     document.documentElement.setAttribute('data-rs-lang', getLang());
     document.documentElement.setAttribute('lang', getLang() === 'hi' ? 'hi' : 'en');
@@ -1901,10 +1914,10 @@
   function installTaxRateTools() {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest && e.target.closest('[data-s="tax"], .set-nav button[data-s="tax"]');
-      if (!btn) return;
+      if (!btn) {return;}
       setTimeout(() => {
         const body = document.getElementById('set-body');
-        if (!body || body.querySelector('#rs10-tax-tools')) return;
+        if (!body || body.querySelector('#rs10-tax-tools')) {return;}
         const bar = document.createElement('div');
         bar.id = 'rs10-tax-tools';
         bar.style.cssText =
@@ -1922,14 +1935,14 @@
             if (global.RSTaxCountry && RSTaxCountry.exportRatesCsv) {
               const n = RSTaxCountry.exportRatesCsv(c);
               toast('Exported ' + n + ' rates for ' + c, 'fa-file-csv');
-            } else toast('Tax pack not loaded', 'fa-circle-exclamation');
+            } else {toast('Tax pack not loaded', 'fa-circle-exclamation');}
           };
         }
         const imp = bar.querySelector('#rs10-tax-import');
         if (imp) {
           imp.onchange = async () => {
             const f = imp.files && imp.files[0];
-            if (!f) return;
+            if (!f) {return;}
             const text = await f.text();
             if (global.RSTaxCountry && RSTaxCountry.importRatesCsv) {
               const n = RSTaxCountry.importRatesCsv(text);
@@ -1945,10 +1958,10 @@
   function installPrintCapabilityHint() {
     document.addEventListener('click', (e) => {
       const btn = e.target.closest && e.target.closest('[data-s="printers"], .set-nav button[data-s="printers"]');
-      if (!btn) return;
+      if (!btn) {return;}
       setTimeout(() => {
         const body = document.getElementById('set-body');
-        if (!body || body.querySelector('#rs10-print-cap')) return;
+        if (!body || body.querySelector('#rs10-print-cap')) {return;}
         let caps = 'Browser print dialog';
         try {
           if (global.AndroidInterface && typeof AndroidInterface.getPrintCapabilities === 'function') {
@@ -1977,7 +1990,7 @@
             if (global.RSPrintBridge && RSPrintBridge.printWebBluetoothEscPos) {
               const r = await RSPrintBridge.printWebBluetoothEscPos(btoa('\nRestroSuite BT OK\n\n\n'));
               toast(r && r.ok ? 'Bluetooth printer ready' : (r && r.error) || 'BT pair failed', 'fa-bluetooth');
-            } else toast('Bluetooth not available in this browser', 'fa-circle-exclamation');
+            } else {toast('Bluetooth not available in this browser', 'fa-circle-exclamation');}
           };
         }
       }, 200);

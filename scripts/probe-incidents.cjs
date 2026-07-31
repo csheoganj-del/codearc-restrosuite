@@ -9,14 +9,14 @@ const path = require('node:path');
 function loadEnv() {
   for (const f of ['.env.local', '.env']) {
     const p = path.join(__dirname, '..', f);
-    if (!fs.existsSync(p)) continue;
+    if (!fs.existsSync(p)) {continue;}
     for (const line of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
-      if (!line.trim() || line.trim().startsWith('#')) continue;
+      if (!line.trim() || line.trim().startsWith('#')) {continue;}
       const m = line.match(/^\s*([\w.\-]+)\s*=\s*(.*)?\s*$/);
-      if (!m) continue;
+      if (!m) {continue;}
       let v = m[2] || '';
-      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
-      if (!process.env[m[1]]) process.env[m[1]] = v.trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {v = v.slice(1, -1);}
+      if (!process.env[m[1]]) {process.env[m[1]] = v.trim();}
     }
   }
 }

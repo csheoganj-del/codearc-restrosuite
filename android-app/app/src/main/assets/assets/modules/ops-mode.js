@@ -284,6 +284,19 @@
     } catch (_) {}
   }
 
+  function ensureKdsVisibilityGuard() {
+    let style = document.getElementById('rs-ops-mode-visibility-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'rs-ops-mode-visibility-style';
+      style.textContent =
+        'html.rs-billing-only-mode [data-tab="kds-tab"],' +
+        'html.rs-kitchen-printer-mode [data-tab="kds-tab"]{' +
+        'display:none!important}';
+      document.head.appendChild(style);
+    }
+  }
+
   /** Apply nav / button visibility for current mode */
   function applyUi() {
     const mode = getMode();
@@ -296,6 +309,7 @@
     document.documentElement.classList.toggle('rs-kitchen-printer-mode', printerOnly);
     document.documentElement.classList.toggle('rs-full-ops-mode', mode === 'full');
     document.documentElement.setAttribute('data-rs-ops-mode', mode);
+    ensureKdsVisibilityGuard();
 
     document.querySelectorAll('[data-tab="kds-tab"]').forEach(function (el) {
       el.style.display = hideKds ? 'none' : '';

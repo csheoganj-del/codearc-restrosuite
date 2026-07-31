@@ -1,55 +1,55 @@
 (function (root, factory) {
   const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) {module.exports = api;}
   if (root) {
     root.RestroSuite = root.RestroSuite || {};
     root.RestroSuite.observability = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  "use strict";
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
 
   function redact(value) {
-    return String(value || "")
-      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
-      .replace(/\b\d{10,}\b/g, "[number]")
+    return String(value || '')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+      .replace(/\b\d{10,}\b/g, '[number]')
       .slice(0, 1800);
   }
 
   function createReporter(options) {
     const config = options || {};
     const fetchImpl = config.fetchImpl || fetch;
-    const baseUrl = String(config.baseUrl || "").replace(/\/$/, "");
-    const anonKey = String(config.anonKey || "");
-    const source = String(config.source || "dashboard");
-    const appVersion = String(config.appVersion || "2.0");
+    const baseUrl = String(config.baseUrl || '').replace(/\/$/, '');
+    const anonKey = String(config.anonKey || '');
+    const source = String(config.source || 'dashboard');
+    const appVersion = String(config.appVersion || '2.0');
     const seen = new Set();
 
     async function report(input) {
       const payload = input || {};
-      const message = redact(payload.message || "Unknown app error").slice(0, 500);
-      const fingerprint = `${source}:${message}:${payload.url_path || ""}`;
-      if (seen.has(fingerprint)) return;
+      const message = redact(payload.message || 'Unknown app error').slice(0, 500);
+      const fingerprint = `${source}:${message}:${payload.url_path || ''}`;
+      if (seen.has(fingerprint)) {return;}
       seen.add(fingerprint);
-      if (seen.size > 60) seen.clear();
-      if (!baseUrl || !anonKey || !message) return;
+      if (seen.size > 60) {seen.clear();}
+      if (!baseUrl || !anonKey || !message) {return;}
 
       try {
         await fetchImpl(`${baseUrl}/functions/v1/app-observability`, {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/json",
-            "apikey": anonKey,
+            'Content-Type': 'application/json',
+            'apikey': anonKey,
           },
           body: JSON.stringify({
-            severity: payload.severity || "error",
+            severity: payload.severity || 'error',
             source,
-            tenant_id: payload.tenant_id || "",
-            tenant_slug: payload.tenant_slug || "",
+            tenant_id: payload.tenant_id || '',
+            tenant_slug: payload.tenant_slug || '',
             message,
             stack: redact(payload.stack),
-            url_path: redact(payload.url_path || (location && location.pathname) || ""),
+            url_path: redact(payload.url_path || (location && location.pathname) || ''),
             app_version: appVersion,
-            user_agent: redact((navigator && navigator.userAgent) || "").slice(0, 300),
+            user_agent: redact((navigator && navigator.userAgent) || '').slice(0, 300),
             metadata: payload.metadata || {},
           }),
         });
@@ -59,8 +59,8 @@
     }
 
     function installGlobalHandlers(getContext) {
-      const context = typeof getContext === "function" ? getContext : function () { return {}; };
-      window.addEventListener("error", (event) => {
+      const context = typeof getContext === 'function' ? getContext : function () { return {}; };
+      window.addEventListener('error', (event) => {
         const info = context();
         report({
           ...info,
@@ -69,13 +69,13 @@
           url_path: event.filename || location.pathname,
         });
       });
-      window.addEventListener("unhandledrejection", (event) => {
+      window.addEventListener('unhandledrejection', (event) => {
         const reason = event.reason || {};
         const info = context();
         report({
           ...info,
           message: reason.message || String(reason),
-          stack: reason.stack || "",
+          stack: reason.stack || '',
           url_path: location.pathname,
         });
       });
@@ -84,5 +84,21 @@
     return { installGlobalHandlers, report };
   }
 
-  return { createReporter, redact };
+  function renderObservabilityReportBtn() {
+    return '<button aria-label="Manually send error report to observability service"><i class="fa-solid fa-bug" aria-hidden="true"></i></button>';
+  }
+
+  function renderObservabilityLogsBtn() {
+    return '<button aria-label="View recent app activity and error logs"><i class="fa-solid fa-scroll" aria-hidden="true"></i></button>';
+  }
+
+  function renderObservabilityMuteBtn() {
+    return '<button aria-label="Mute repeat error notifications for this session"><i class="fa-solid fa-volume-xmark" aria-hidden="true"></i></button>';
+  }
+
+  function renderObservabilityExportBtn() {
+    return '<button aria-label="Export current observability batch as JSON"><i class="fa-solid fa-code" aria-hidden="true"></i></button>';
+  }
+
+  return { createReporter, redact, renderObservabilityReportBtn, renderObservabilityLogsBtn, renderObservabilityMuteBtn, renderObservabilityExportBtn };
 });

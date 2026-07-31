@@ -1128,7 +1128,7 @@
               .join('')
           : ''
       }
-      <div style="text-align:center;font-size:11px;color:#666;margin-top:14px">Powered by RestroSuite</div>
+      <div style="text-align:center;font-size:11px;color:#666;margin-top:14px">Powered by CodeArc RestroSuite</div>
     </div>`;
   }
 
@@ -1335,11 +1335,14 @@
     const mustShift = isShiftRequired();
     const openShiftNow = getOpenShift();
 
-    // Simple café: Require open shift OFF → hide bar + cart banner completely
-    // (no "Shift" chip, no "Open shift to bill")
-    if (!mustShift && !openShiftNow) {
+    // Simple café: Require open shift OFF → hide Z / lock / shift chrome completely.
+    // (Previously a leftover open shift still showed Z + padlock and confused staff.)
+    if (!mustShift) {
       const hostHide = document.getElementById('rs-topbar-shift');
-      if (hostHide) hostHide.style.display = 'none';
+      if (hostHide) {
+        hostHide.style.display = 'none';
+        hostHide.innerHTML = '';
+      }
       const barHide = document.getElementById('rs-shift-bar');
       if (barHide) {
         barHide.style.display = 'none';
@@ -1356,6 +1359,10 @@
       if (cartSlot0) {
         cartSlot0.innerHTML = '';
         cartSlot0.style.display = 'none';
+      }
+      // Clear a stale open shift when the setting is OFF so it cannot reappear later
+      if (openShiftNow) {
+        try { localStorage.removeItem(SHIFT_KEY); } catch (_) {}
       }
       return;
     }

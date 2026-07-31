@@ -1,7 +1,7 @@
 {
   "name": "restrosuite-gateway-tray",
   "productName": "RestroSuite Gateway",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "private": true,
   "description": "System-tray controller for RestroSuite WhatsApp gateway + ngrok. Starts with Windows; close keeps it in tray.",
   "author": "RestroSuite",
@@ -14,8 +14,8 @@
     "dist:local": "electron-builder --win portable nsis"
   },
   "devDependencies": {
-    "electron": "^31.0.0",
-    "electron-builder": "^24.13.3"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.restrosuite.gateway-tray",
@@ -58,11 +58,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",

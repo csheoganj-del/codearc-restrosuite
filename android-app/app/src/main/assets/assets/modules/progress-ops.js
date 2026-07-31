@@ -5,12 +5,12 @@
 (function (global) {
   'use strict';
 
-  var STYLE_ID = 'rs-progress-ops-style';
-  var ROOT_ID = 'rs-progress-ops-root';
+  const STYLE_ID = 'rs-progress-ops-style';
+  const ROOT_ID = 'rs-progress-ops-root';
 
   function ensureStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
+    if (document.getElementById(STYLE_ID)) {return;}
+    const s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent =
       '#' + ROOT_ID + '{position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;' +
@@ -41,12 +41,12 @@
   function open(opts) {
     opts = opts || {};
     ensureStyle();
-    var prev = document.getElementById(ROOT_ID);
-    if (prev) prev.remove();
+    const prev = document.getElementById(ROOT_ID);
+    if (prev) {prev.remove();}
 
-    var total = Math.max(0, Number(opts.total) || 0);
-    var done = 0;
-    var root = document.createElement('div');
+    let total = Math.max(0, Number(opts.total) || 0);
+    let done = 0;
+    const root = document.createElement('div');
     root.id = ROOT_ID;
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
@@ -60,19 +60,19 @@
       '</div>';
     document.body.appendChild(root);
 
-    var elT = root.querySelector('[data-t]');
-    var elS = root.querySelector('[data-s]');
-    var elF = root.querySelector('[data-f]');
-    var elC = root.querySelector('[data-c]');
-    var elP = root.querySelector('[data-p]');
-    var card = root.querySelector('.rs-prog-card');
+    const elT = root.querySelector('[data-t]');
+    const elS = root.querySelector('[data-s]');
+    const elF = root.querySelector('[data-f]');
+    const elC = root.querySelector('[data-c]');
+    const elP = root.querySelector('[data-p]');
+    const card = root.querySelector('.rs-prog-card');
 
     function paint() {
       elT.textContent = opts.title || 'Processing…';
       elS.textContent = opts.sub || opts.label || 'Please wait — do not close this window.';
       if (total > 0) {
         card.classList.remove('rs-prog-indet');
-        var pct = clamp(Math.round((done / total) * 100), 0, 100);
+        const pct = clamp(Math.round((done / total) * 100), 0, 100);
         elF.style.width = pct + '%';
         elC.textContent = done + ' / ' + total + (opts.unit ? ' ' + opts.unit : ' items');
         elP.textContent = pct + '%';
@@ -88,18 +88,18 @@
     return {
       update: function (u) {
         u = u || {};
-        if (u.title != null) opts.title = u.title;
-        if (u.sub != null) opts.sub = u.sub;
-        if (u.label != null) opts.label = u.label;
-        if (u.unit != null) opts.unit = u.unit;
-        if (u.total != null) total = Math.max(0, Number(u.total) || 0);
-        if (u.done != null) done = Math.max(0, Number(u.done) || 0);
-        else if (u.inc) done = Math.min(total || Infinity, done + (Number(u.inc) || 1));
+        if (u.title != null) {opts.title = u.title;}
+        if (u.sub != null) {opts.sub = u.sub;}
+        if (u.label != null) {opts.label = u.label;}
+        if (u.unit != null) {opts.unit = u.unit;}
+        if (u.total != null) {total = Math.max(0, Number(u.total) || 0);}
+        if (u.done != null) {done = Math.max(0, Number(u.done) || 0);}
+        else if (u.inc) {done = Math.min(total || Infinity, done + (Number(u.inc) || 1));}
         paint();
       },
       setIndeterminate: function (label) {
         total = 0;
-        if (label) opts.label = label;
+        if (label) {opts.label = label;}
         paint();
       },
       close: function () {
@@ -113,22 +113,22 @@
   /** Run async work over an array with progress. */
   async function mapWithProgress(items, worker, opts) {
     opts = opts || {};
-    var list = Array.isArray(items) ? items : [];
-    var prog = open({
+    const list = Array.isArray(items) ? items : [];
+    const prog = open({
       title: opts.title || 'Processing…',
       sub: opts.sub || '',
       total: list.length,
       unit: opts.unit || 'items',
     });
-    var results = [];
+    const results = [];
     try {
-      for (var i = 0; i < list.length; i++) {
+      for (let i = 0; i < list.length; i++) {
         results.push(await worker(list[i], i, list));
         prog.update({ done: i + 1 });
       }
       return results;
     } finally {
-      if (opts.keepOpen) return { results: results, progress: prog };
+      if (opts.keepOpen) {return { results: results, progress: prog };}
       prog.close();
     }
   }

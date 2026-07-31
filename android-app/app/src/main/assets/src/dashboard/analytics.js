@@ -24,13 +24,13 @@
 
 (function (root, factory) {
   const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) {module.exports = api;}
   if (root) {
     root.RestroSuite = root.RestroSuite || {};
     root.RestroSuite.analytics = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  "use strict";
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
 
   // -- Helpers ------------------------------------------------------------------
 
@@ -64,12 +64,12 @@
   }
 
   function safeJsonArray(val) {
-    if (Array.isArray(val)) return val;
-    if (typeof val === "string") { try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch (_) {} }
+    if (Array.isArray(val)) {return val;}
+    if (typeof val === 'string') { try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch (_) {} }
     return [];
   }
 
-  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // -- Factory ------------------------------------------------------------------
 
@@ -78,51 +78,51 @@
     const db       = config.db;
     const tenantId = config.tenantId;
 
-    if (!db)       throw new Error("analytics.create: db is required");
-    if (!tenantId) throw new Error("analytics.create: tenantId is required");
+    if (!db)       {throw new Error('analytics.create: db is required');}
+    if (!tenantId) {throw new Error('analytics.create: tenantId is required');}
 
     // -- Data loaders ----------------------------------------------------------
 
     async function fetchBills(sinceIso) {
-      let query = db
-        .from("doppio_bills")
-        .select("id, created_at, total, items, paymentMethod, customerName, tenders")
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: true });
+      const query = db
+        .from('doppio_bills')
+        .select('id, created_at, total, items, paymentMethod, customerName, tenders')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: true });
       const { data, error } = await query;
-      if (error) throw new Error("Failed to load bills: " + error.message);
+      if (error) {throw new Error('Failed to load bills: ' + error.message);}
       const rows = data || [];
-      if (sinceIso) return rows.filter((b) => b.created_at >= sinceIso);
+      if (sinceIso) {return rows.filter((b) => b.created_at >= sinceIso);}
       return rows;
     }
 
     async function fetchAttendance(sinceIso) {
       const { data, error } = await db
-        .from("doppio_attendance")
-        .select("employeeId, date, status, clockInTime, clockOutTime, hoursWorked")
-        .eq("tenant_id", tenantId);
-      if (error) throw new Error("Failed to load attendance: " + error.message);
+        .from('doppio_attendance')
+        .select('employeeId, date, status, clockInTime, clockOutTime, hoursWorked')
+        .eq('tenant_id', tenantId);
+      if (error) {throw new Error('Failed to load attendance: ' + error.message);}
       const rows = data || [];
-      if (sinceIso) return rows.filter((a) => (a.date || "") >= sinceIso.slice(0, 10));
+      if (sinceIso) {return rows.filter((a) => (a.date || '') >= sinceIso.slice(0, 10));}
       return rows;
     }
 
     async function fetchEmployees() {
       const { data, error } = await db
-        .from("doppio_employees")
-        .select("id, name, role")
-        .eq("tenant_id", tenantId);
-      if (error) throw new Error("Failed to load employees: " + error.message);
+        .from('doppio_employees')
+        .select('id, name, role')
+        .eq('tenant_id', tenantId);
+      if (error) {throw new Error('Failed to load employees: ' + error.message);}
       return data || [];
     }
 
     async function fetchOnlineOrders(sinceIso) {
       const { data } = await db
-        .from("doppio_online_orders")
-        .select("id, created_at, platform, total, status")
-        .eq("tenant_id", tenantId);
+        .from('doppio_online_orders')
+        .select('id, created_at, platform, total, status')
+        .eq('tenant_id', tenantId);
       const rows = data || [];
-      if (sinceIso) return rows.filter((o) => o.created_at >= sinceIso);
+      if (sinceIso) {return rows.filter((o) => o.created_at >= sinceIso);}
       return rows;
     }
 
@@ -183,8 +183,8 @@
         const revenue = slice.reduce((s, d) => s + d.revenue, 0);
         const orders  = slice.reduce((s, d) => s + d.orders, 0);
         byWeek.push({
-          week_start:      slice[0]?.date || "",
-          week_end:        slice[slice.length - 1]?.date || "",
+          week_start:      slice[0]?.date || '',
+          week_end:        slice[slice.length - 1]?.date || '',
           revenue,
           orders,
           avg_order_value: orders ? revenue / orders : 0
@@ -229,11 +229,11 @@
       bills.forEach((bill) => {
         const items = safeJsonArray(bill.items);
         items.forEach((item) => {
-          const name    = String(item.name || item.item_name || "Unknown").trim();
+          const name    = String(item.name || item.item_name || 'Unknown').trim();
           const qty     = num(item.qty || item.quantity || 1);
           const price   = num(item.price || item.unit_price || 0);
           const revenue = price * qty;
-          if (!map.has(name)) map.set(name, { name, qty_sold: 0, revenue: 0, orders: 0 });
+          if (!map.has(name)) {map.set(name, { name, qty_sold: 0, revenue: 0, orders: 0 });}
           const entry = map.get(name);
           entry.qty_sold += qty;
           entry.revenue  += revenue;
@@ -253,26 +253,26 @@
       const bills  = await fetchBills(daysAgo(days));
       const payCounts = {};
       const orderCounts = {};
-      
+
       bills.forEach(b => {
         let tenders = b.tenders;
         if (tenders && typeof tenders === 'string') {
           try { tenders = JSON.parse(tenders); } catch(e) { tenders = null; }
         }
-        
+
         if (tenders && Array.isArray(tenders) && tenders.length) {
           tenders.forEach(t => {
-            const m = String(t.method || "other").toLowerCase();
+            const m = String(t.method || 'other').toLowerCase();
             payCounts[m] = (payCounts[m] || 0) + num(t.amount);
             orderCounts[m] = (orderCounts[m] || 0) + 1;
           });
         } else {
-          const m = String(b.paymentMethod || b.payment_method || "other").toLowerCase();
+          const m = String(b.paymentMethod || b.payment_method || 'other').toLowerCase();
           payCounts[m] = (payCounts[m] || 0) + num(b.total);
           orderCounts[m] = (orderCounts[m] || 0) + 1;
         }
       });
-      
+
       return Object.entries(payCounts).map(([method, revenue]) => ({
         method,
         orders:  orderCounts[method] || 0,
@@ -315,22 +315,22 @@
       const targetMonth = month || new Date().toISOString().slice(0, 7);
       const [employees, attendance] = await Promise.all([
         fetchEmployees(),
-        fetchAttendance(targetMonth + "-01")
+        fetchAttendance(targetMonth + '-01')
       ]);
 
       const empMap = Object.fromEntries(employees.map((e) => [e.id, e]));
 
       const filtered = attendance.filter((a) => {
-        return (a.date || "").startsWith(targetMonth);
+        return (a.date || '').startsWith(targetMonth);
       });
 
       const byEmployee = groupBy(filtered, (a) => a.employeeId);
 
       return employees.map((emp) => {
         const records   = byEmployee[emp.id] || [];
-        const present   = records.filter((r) => r.status === "present").length;
-        const absent    = records.filter((r) => r.status === "absent").length;
-        const late      = records.filter((r) => r.status === "late").length;
+        const present   = records.filter((r) => r.status === 'present').length;
+        const absent    = records.filter((r) => r.status === 'absent').length;
+        const late      = records.filter((r) => r.status === 'late').length;
         const hoursWorked = records.reduce((sum, r) => {
           return sum + (num(r.hoursWorked) || 0);
         }, 0);
@@ -358,7 +358,7 @@
         platform,
         orders:  rows.length,
         revenue: rows.reduce((s, o) => s + num(o.total), 0),
-        cancelled: rows.filter((o) => o.status === "cancelled").length
+        cancelled: rows.filter((o) => o.status === 'cancelled').length
       }));
     }
 
@@ -417,9 +417,9 @@
    * @param {HTMLCanvasElement} canvas
    * @param {{ labels: string[], values: number[], color?: string, title?: string }} opts
    */
-  function renderBarChart(canvas, { labels, values, color = "#6366f1", title = "" }) {
-    if (!canvas || !canvas.getContext) return;
-    const ctx    = canvas.getContext("2d");
+  function renderBarChart(canvas, { labels, values, color = '#6366f1', title = '' }) {
+    if (!canvas || !canvas.getContext) {return;}
+    const ctx    = canvas.getContext('2d');
     const W      = canvas.width  || 600;
     const H      = canvas.height || 300;
     const PAD    = 48;
@@ -429,13 +429,13 @@
     ctx.clearRect(0, 0, W, H);
 
     // Background
-    ctx.fillStyle = "#0f172a";
+    ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, W, H);
 
     // Title
     if (title) {
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font      = "bold 13px sans-serif";
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font      = 'bold 13px sans-serif';
       ctx.fillText(title, PAD, 20);
     }
 
@@ -449,21 +449,21 @@
       ctx.fillRect(x, y, BAR_W, barH);
 
       // Label
-      ctx.fillStyle   = "#94a3b8";
-      ctx.font        = "10px sans-serif";
-      ctx.textAlign   = "center";
+      ctx.fillStyle   = '#94a3b8';
+      ctx.font        = '10px sans-serif';
+      ctx.textAlign   = 'center';
       ctx.fillText(label, x + BAR_W / 2, H - PAD + 14);
 
       // Value on top of bar
       if (barH > 16) {
-        ctx.fillStyle = "#fff";
-        ctx.font      = "9px sans-serif";
+        ctx.fillStyle = '#fff';
+        ctx.font      = '9px sans-serif';
         ctx.fillText(String(Math.round(values[i] || 0)), x + BAR_W / 2, y - 2);
       }
     });
 
     // Y-axis line
-    ctx.strokeStyle = "#334155";
+    ctx.strokeStyle = '#334155';
     ctx.lineWidth   = 1;
     ctx.beginPath();
     ctx.moveTo(PAD - 4, PAD - 10);
@@ -478,8 +478,8 @@
    * @param {{ labels: string[], values: number[], colors?: string[] }} opts
    */
   function renderDonutChart(canvas, { labels, values, colors }) {
-    if (!canvas || !canvas.getContext) return;
-    const ctx    = canvas.getContext("2d");
+    if (!canvas || !canvas.getContext) {return;}
+    const ctx    = canvas.getContext('2d');
     const W      = canvas.width  || 300;
     const H      = canvas.height || 300;
     const cx     = W / 2;
@@ -487,10 +487,10 @@
     const r      = Math.min(W, H) / 2 - 16;
     const ir     = r * 0.55; // inner radius for donut
     const total  = values.reduce((s, v) => s + (v || 0), 0) || 1;
-    const palette = colors || ["#6366f1","#f59e0b","#10b981","#ef4444","#3b82f6","#8b5cf6"];
+    const palette = colors || ['#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6','#8b5cf6'];
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#0f172a";
+    ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, W, H);
 
     let startAngle = -Math.PI / 2;
@@ -506,7 +506,7 @@
     });
 
     // Donut hole
-    ctx.fillStyle = "#0f172a";
+    ctx.fillStyle = '#0f172a';
     ctx.beginPath();
     ctx.arc(cx, cy, ir, 0, 2 * Math.PI);
     ctx.fill();
@@ -517,12 +517,28 @@
       const y = legendY + i * 14;
       ctx.fillStyle = palette[i % palette.length];
       ctx.fillRect(8, y, 10, 10);
-      ctx.fillStyle = "#e2e8f0";
-      ctx.font      = "10px sans-serif";
-      ctx.textAlign = "left";
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font      = '10px sans-serif';
+      ctx.textAlign = 'left';
       ctx.fillText(`${lbl}: ${Math.round((values[i] / total) * 100)}%`, 22, y + 9);
     });
   }
 
-  return { create, renderBarChart, renderDonutChart };
+  function renderAnalyticsRefreshBtn() {
+    return '<button aria-label="Refresh analytics data and charts"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></button>';
+  }
+
+  function renderAnalyticsExportBtn() {
+    return '<button aria-label="Export analytics report as CSV"><i class="fa-solid fa-file-csv" aria-hidden="true"></i></button>';
+  }
+
+  function renderAnalyticsPrintBtn() {
+    return '<button aria-label="Print analytics dashboard summary"><i class="fa-solid fa-print" aria-hidden="true"></i></button>';
+  }
+
+  function renderAnalyticsZoomBtn() {
+    return '<button aria-label="Zoom into selected chart data range"><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i></button>';
+  }
+
+  return { create, renderBarChart, renderDonutChart, renderAnalyticsRefreshBtn, renderAnalyticsExportBtn, renderAnalyticsPrintBtn, renderAnalyticsZoomBtn };
 });

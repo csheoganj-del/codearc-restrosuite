@@ -8,10 +8,11 @@
  *   E2E_PASSWORD=...
  *
  * Optional:
- *   E2E_BASE_URL=https://codearc-restrosuite.vercel.app
+ *   E2E_BASE_URL=https://restrosuite.codearc.co.in
  *   (defaults to production when credentials are set)
  */
 const { test, expect } = require('@playwright/test');
+const { dismissOnboarding } = require('./helpers/onboarding.cjs');
 
 const slug = process.env.E2E_OUTLET_SLUG || process.env.E2E_TENANT || '';
 const user = process.env.E2E_USERNAME || process.env.E2E_USER || '';
@@ -32,6 +33,7 @@ async function performLogin(page) {
     await page.waitForURL((url) => /dashboard/i.test(url.pathname + url.hash + url.href), {
       timeout: 60000,
     });
+    await dismissOnboarding(page);
     return { ok: true, url: page.url() };
   } catch (_) {
     const errBox = page.locator('#error-box.show, #error-box.alert.err.show, #error-box');

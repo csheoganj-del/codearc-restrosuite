@@ -8,14 +8,41 @@
  *   E2E_PASSWORD=...
  *
  * Optional:
- *   E2E_BASE_URL=https://codearc-restrosuite.vercel.app
+ *   E2E_BASE_URL=https://restrosuite.codearc.co.in
  */
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
+const { dismissOnboarding } = require('./helpers/onboarding.cjs');
 
 const slug = process.env.E2E_OUTLET_SLUG || process.env.E2E_TENANT || '';
 const user = process.env.E2E_USERNAME || process.env.E2E_USER || '';
 const pass = process.env.E2E_PASSWORD || process.env.E2E_PASS || '';
 const hasCreds = !!(slug && user && pass);
+const useLocalAssetOverrides = process.env.E2E_LOCAL_ASSET_OVERRIDES === '1';
+
+async function installLocalAssetOverrides(page) {
+  if (!useLocalAssetOverrides) {return;}
+  const root = path.resolve(__dirname, '..', '..');
+  const overrides = new Map([
+    ['/assets/dist/critical.bundle.js', path.join(root, 'assets', 'dist', 'critical.bundle.js')],
+    ['/assets/features-pos.js', path.join(root, 'assets', 'features-pos.js')],
+    ['/assets/modules/pos-ui.js', path.join(root, 'assets', 'modules', 'pos-ui.js')],
+  ]);
+  await page.route('**/*', async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    const file = overrides.get(pathname);
+    if (!file) {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/javascript; charset=utf-8',
+      body: fs.readFileSync(file),
+    });
+  });
+}
 
 async function performLogin(page) {
   await page.goto('/login.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -29,6 +56,7 @@ async function performLogin(page) {
     await page.waitForURL((url) => /dashboard/i.test(url.pathname + url.hash + url.href), {
       timeout: 60000,
     });
+    await dismissOnboarding(page);
     return { ok: true, url: page.url() };
   } catch (_) {
     let errText = '';
@@ -47,6 +75,7 @@ test.describe('POS checkout → bills', () => {
 
   test('staff can sell an item and see it in bills history', async ({ page }) => {
     test.setTimeout(180_000);
+    await installLocalAssetOverrides(page);
 
     // Accept KOT / confirm dialogs if dine-in path triggers them
     page.on('dialog', async (d) => {
@@ -81,9 +110,14 @@ test.describe('POS checkout → bills', () => {
       test.skip(true, 'No in-stock menu items available for checkout E2E');
     }
 
-    // Snapshot bill count before sale
-    const billsBefore = await page.evaluate(() =>
-      window.RS && Array.isArray(RS.BILLS) ? RS.BILLS.length : 0
+    // Snapshot stable bill identities before sale so the test can prove that
+    // exactly one new bill was created by one checkout click.
+    const billIdsBefore = await page.evaluate(() =>
+      window.RS && Array.isArray(RS.BILLS)
+        ? RS.BILLS
+            .map((b) => String(b && (b.no || b.orderId || b.id) || ''))
+            .filter(Boolean)
+        : []
     );
 
     await menuItem.click();
@@ -102,28 +136,38 @@ test.describe('POS checkout → bills', () => {
     await expect(checkout).toBeEnabled({ timeout: 15000 });
     await checkout.click();
 
-    // Bill settled modal or bill array growth
+    // Wait for a visible settlement and exactly one new in-memory bill.
     await page.waitForFunction(
-      (before) => {
-        const n = window.RS && Array.isArray(RS.BILLS) ? RS.BILLS.length : 0;
-        const modal = document.querySelector('#rc-new, .receipt-paper, [class*="modal"]');
-        return n > before || !!modal;
+      (beforeIds) => {
+        const before = new Set(beforeIds);
+        const list = window.RS && Array.isArray(RS.BILLS) ? RS.BILLS : [];
+        const created = list.filter((b) => {
+          const id = String(b && (b.no || b.orderId || b.id) || '');
+          return id && !before.has(id);
+        });
+        return created.length === 1 && !!document.querySelector('.rc-settle-overlay.show');
       },
-      billsBefore,
+      billIdsBefore,
       { timeout: 60000 }
     );
 
-    const billNo = await page.evaluate(() => {
-      const b = window.RS && RS.BILLS && RS.BILLS[0];
-      return b ? String(b.no || b.orderId || b.id || '') : '';
-    });
+    const createdBillNos = await page.evaluate((beforeIds) => {
+      const before = new Set(beforeIds);
+      const list = window.RS && Array.isArray(RS.BILLS) ? RS.BILLS : [];
+      return list
+        .map((b) => String(b && (b.no || b.orderId || b.id) || ''))
+        .filter((id) => id && !before.has(id));
+    }, billIdsBefore);
+    expect(createdBillNos, 'one click must create exactly one bill').toHaveLength(1);
+    const billNo = createdBillNos[0];
     expect(billNo, 'expected a bill number after checkout').toBeTruthy();
 
-    // Close receipt modal if open
-    const newOrder = page.locator('#rc-new');
-    if (await newOrder.isVisible().catch(() => false)) {
-      await newOrder.click();
-    }
+    // Close the visible settlement receipt before navigating away.
+    const settleOverlay = page.locator('.rc-settle-overlay.show');
+    const newOrder = settleOverlay.getByRole('button', { name: 'New order' });
+    await expect(newOrder).toBeVisible({ timeout: 60000 });
+    await newOrder.click();
+    await settleOverlay.waitFor({ state: 'hidden', timeout: 10000 });
 
     // Navigate to bills history
     const billsNav = page.locator('[data-tab="bills-tab"]').first();

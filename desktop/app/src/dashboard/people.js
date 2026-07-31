@@ -1,19 +1,19 @@
 (function (root, factory) {
   const api = factory();
-  if (typeof module === "object" && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) {module.exports = api;}
   if (root) {
     root.RestroSuite = root.RestroSuite || {};
     root.RestroSuite.people = api;
   }
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  "use strict";
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
 
   function getLoyaltyTier(spend) {
     const amount = Number(spend) || 0;
-    if (amount >= 5000) return "Platinum";
-    if (amount >= 2500) return "Gold";
-    if (amount >= 1000) return "Silver";
-    return "Bronze";
+    if (amount >= 5000) {return 'Platinum';}
+    if (amount >= 2500) {return 'Gold';}
+    if (amount >= 1000) {return 'Silver';}
+    return 'Bronze';
   }
 
   function calculatePayroll(baseSalary, lossOfPayDays, daysInMonth) {
@@ -57,7 +57,7 @@
     }
 
     // Section 87A rebate: zero tax if taxable income <= 7L
-    if (taxableIncome <= 700000) annualTax = 0;
+    if (taxableIncome <= 700000) {annualTax = 0;}
 
     // Add 4% health & education cess
     annualTax = annualTax * 1.04;
@@ -79,5 +79,21 @@
     };
   }
 
-  return { calculatePayroll, getLoyaltyTier };
+  function renderPeoplePayrollBtn() {
+    return '<button aria-label="Run monthly payroll calculation and export"><i class="fa-solid fa-money-check-dollar" aria-hidden="true"></i></button>';
+  }
+
+  function renderPeopleAttendanceBtn() {
+    return '<button aria-label="Mark or view employee attendance records"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i></button>';
+  }
+
+  function renderPeopleLoyaltyBtn(customerId) {
+    return `<button aria-label="View loyalty tier and points for customer ${customerId}"><i class="fa-solid fa-star" aria-hidden="true"></i></button>`;
+  }
+
+  function renderPeopleLeaveBtn(employeeId) {
+    return `<button aria-label="Review leave requests for employee ${employeeId}"><i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i></button>`;
+  }
+
+  return { calculatePayroll, getLoyaltyTier, renderPeoplePayrollBtn, renderPeopleAttendanceBtn, renderPeopleLoyaltyBtn, renderPeopleLeaveBtn };
 });

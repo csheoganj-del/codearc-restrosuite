@@ -15,7 +15,7 @@ function wire(file, isMobile) {
   const endMarker = 'function ensureDirs()';
   const si = t.indexOf(startMarker);
   const ei = t.indexOf(endMarker);
-  if (si < 0 || ei < 0) throw new Error('markers not found in ' + file + ' ' + si + ' ' + ei);
+  if (si < 0 || ei < 0) {throw new Error('markers not found in ' + file + ' ' + si + ' ' + ei);}
 
   const inject =
     '/** Ordered guide steps — exhaustive client coverage from shared module */\n' +
@@ -38,11 +38,11 @@ function wire(file, isMobile) {
       let i = detailAssign + 'const DETAIL = {'.length;
       let depth = 1;
       while (i < t.length && depth > 0) {
-        if (t[i] === '{') depth++;
-        else if (t[i] === '}') depth--;
+        if (t[i] === '{') {depth++;}
+        else if (t[i] === '}') {depth--;}
         i++;
       }
-      while (t[i] === ';' || t[i] === '\r' || t[i] === '\n' || t[i] === ' ') i++;
+      while (t[i] === ';' || t[i] === '\r' || t[i] === '\n' || t[i] === ' ') {i++;}
       t = t.slice(0, detailStart) + t.slice(i);
     }
   }

@@ -47,7 +47,7 @@ function ensureDirs() {
 }
 
 function toDataUri(filePath) {
-  if (!fs.existsSync(filePath)) return '';
+  if (!fs.existsSync(filePath)) {return '';}
   const buf = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
   const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
@@ -119,8 +119,8 @@ async function openTab(page, tabId) {
       await page.evaluate(() => {
         try {
           const btn = document.getElementById('open-settings');
-          if (btn) btn.click();
-          else if (window.RS && typeof RS.switchTab === 'function') RS.switchTab('settings-tab');
+          if (btn) {btn.click();}
+          else if (window.RS && typeof RS.switchTab === 'function') {RS.switchTab('settings-tab');}
         } catch (e) {}
       });
     }
@@ -147,7 +147,7 @@ async function openTab(page, tabId) {
           return;
         }
         const a = document.querySelector(`.sidebar-link[data-tab="${id}"]`);
-        if (a) a.click();
+        if (a) {a.click();}
         else {
           document.querySelectorAll('.tab-content').forEach((el) => {
             el.classList.remove('active');

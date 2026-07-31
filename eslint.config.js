@@ -21,6 +21,7 @@ const BROWSER_GLOBALS = {
   ArrayBuffer: 'readonly', SharedArrayBuffer: 'readonly', DataView: 'readonly',
   Blob: 'readonly', File: 'readonly', FileReader: 'readonly',
   MutationObserver: 'readonly', IntersectionObserver: 'readonly',
+  PerformanceObserver: 'readonly',
   ResizeObserver: 'readonly', requestAnimationFrame: 'readonly',
   cancelAnimationFrame: 'readonly', localStorage: 'readonly',
   sessionStorage: 'readonly', indexedDB: 'readonly', crypto: 'readonly',
@@ -32,7 +33,22 @@ const BROWSER_GLOBALS = {
   // RestroSuite runtime globals
   RS_API: 'readonly', RS_AUTH: 'readonly', RSActionFeedback: 'readonly',
   RSLicense: 'readonly', RSSkel: 'readonly', supabase: 'readonly',
-  CONFIG: 'readonly',
+  CONFIG: 'readonly', RS: 'readonly', RS_DB: 'readonly', RSModal: 'readonly',
+  RSRecipeUnits: 'readonly', RSOps: 'readonly', RSReceipt: 'readonly',
+  RS_SYNC: 'readonly', RSMenuIntel: 'readonly', RSSecurityShield: 'readonly',
+  RSViewMode: 'readonly', RSInventoryBatches: 'readonly', RSReportPdf: 'readonly',
+  RSKitchenLinkCoach: 'readonly', RSWaQueue: 'readonly', RSPinModal: 'readonly',
+  RSPOS: 'readonly', RSOpsMode: 'readonly', RS_SETTINGS: 'readonly',
+  RSStaffTableScanner: 'readonly', RSProgress: 'readonly', RSPrintBridge: 'readonly',
+  INVENTORY: 'readonly', RSPosUI: 'readonly', RSTaxCountry: 'readonly',
+  AndroidInterface: 'readonly', RSAmend: 'readonly', RSReceiptEngine: 'readonly',
+  RSXlsxLite: 'readonly', RSInventoryToolbar: 'readonly', RSInventoryLedger: 'readonly',
+  RSLanSync: 'readonly', RSInventoryUI: 'readonly', RSServiceAlerts: 'readonly',
+  RS_SAAS: 'readonly', Image: 'readonly', RS_getTenantTaxProfile: 'readonly',
+  RS_ROLE_DEFAULTS: 'readonly', RS_getOutletLocale: 'readonly',
+  RS_getOutletTimezone: 'readonly', EventSource: 'readonly', playChime: 'readonly',
+  activateTab: 'readonly', BarcodeDetector: 'readonly', TextEncoder: 'readonly',
+  RS10: 'readonly',
 };
 
 const NODE_GLOBALS = {
@@ -127,7 +143,7 @@ const config = [
   // ── Gateway + scripts — console is the logger ──────────────────────────
   {
     files: [
-      'whatsapp-gateway.js', 'gateway-modules/**/*.js',
+      'whatsapp-gateway.js', 'ngrok-service.js', 'gateway-modules/**/*.js',
       'scripts/**/*.cjs', 'scripts/**/*.js',
       'api/**/*.js', 'tests/**/*.cjs',
     ],

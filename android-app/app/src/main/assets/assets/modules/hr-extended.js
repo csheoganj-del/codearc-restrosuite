@@ -5,12 +5,12 @@
 (function (global) {
   'use strict';
 
-  var LEAVE_KEY = 'rs_leave_requests_v1';
-  var ADV_KEY = 'rs_salary_advances_v1';
-  var PAY_KEY = 'rs_salary_payments_v1';
+  const LEAVE_KEY = 'rs_leave_requests_v1';
+  const ADV_KEY = 'rs_salary_advances_v1';
+  const PAY_KEY = 'rs_salary_payments_v1';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -20,7 +20,7 @@
       .replace(/"/g, '&quot;');
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function employees() {
@@ -41,7 +41,7 @@
 
   async function putColl(coll, row) {
     try {
-      if (global.RS_DB && RS_DB.put) await RS_DB.put(coll, row.id, row);
+      if (global.RS_DB && RS_DB.put) {await RS_DB.put(coll, row.id, row);}
     } catch (e) {
       console.warn('[HR] put', coll, e);
     }
@@ -50,7 +50,7 @@
   async function listColl(coll, lsKey) {
     try {
       if (global.RS_DB && RS_DB.list) {
-        var rows = await RS_DB.list(coll);
+        const rows = await RS_DB.list(coll);
         if (Array.isArray(rows) && rows.length) {
           saveLS(lsKey, rows);
           return rows;
@@ -61,7 +61,7 @@
   }
 
   async function notifyEmployee(emp, text, pdfOpts) {
-    var phone = String((emp && (emp.phone || emp.mobile || emp.whatsapp || emp.email)) || '').replace(
+    let phone = String((emp && (emp.phone || emp.mobile || emp.whatsapp || emp.email)) || '').replace(
       /\D/g,
       ''
     );
@@ -70,15 +70,16 @@
       phone = String(emp.email).replace(/\D/g, '');
     }
     if (!phone || phone.length < 10) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('No WhatsApp for ' + ((emp && emp.name) || 'staff') + ' — copy message', 'fa-copy');
       try {
-        if (navigator.clipboard) navigator.clipboard.writeText(text);
+        if (navigator.clipboard) {navigator.clipboard.writeText(text);}
       } catch (_) {}
       return { noPhone: true };
     }
     if (pdfOpts && global.RSReportPdf) {
       try {
-        var dataUri = await RSReportPdf.buildReportPdf(pdfOpts);
+        const dataUri = await RSReportPdf.buildReportPdf(pdfOpts);
         return await RSReportPdf.sendReportWhatsApp(
           phone,
           text,
@@ -118,9 +119,9 @@
   }
 
   function openLeaveModal(emp) {
-    if (!global.RSModal) return;
-    var emps = employees();
-    var opts = emps
+    if (!global.RSModal) {return;}
+    const emps = employees();
+    const opts = emps
       .map(function (e) {
         return (
           '<option value="' +
@@ -158,17 +159,19 @@
       onMount: function (modal, close) {
         modal.querySelector('[data-x]').onclick = close;
         modal.querySelector('[data-ok]').onclick = async function () {
-          var empId = modal.querySelector('#lv-emp').value;
-          var e = emps.find(function (x) {
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
+          const empId = modal.querySelector('#lv-emp').value;
+          const e = emps.find(function (x) {
             return String(x.id) === String(empId);
           });
-          var from = modal.querySelector('#lv-from').value;
-          var to = modal.querySelector('#lv-to').value || from;
+          const from = modal.querySelector('#lv-from').value;
+          const to = modal.querySelector('#lv-to').value || from;
           if (!e || !from) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Pick employee and dates', 'fa-circle-exclamation');
             return;
           }
-          var row = {
+          const row = {
             id: 'leave-' + Date.now(),
             employeeId: e.id,
             employeeName: e.name,
@@ -182,11 +185,12 @@
             days: dayCount(from, to),
             createdAt: new Date().toISOString(),
           };
-          var list = await listLeaves();
+          const list = await listLeaves();
           list.unshift(row);
           saveLS(LEAVE_KEY, list);
           await putColl('leave_requests', row);
           close();
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
           toast('Leave request saved', 'fa-calendar-check');
           renderHrPanels();
         };
@@ -195,8 +199,8 @@
   }
 
   async function setLeaveStatus(id, status) {
-    var list = await listLeaves();
-    var row = null;
+    let list = await listLeaves();
+    let row = null;
     list = list.map(function (r) {
       if (String(r.id) === String(id)) {
         r.status = status;
@@ -206,20 +210,20 @@
       return r;
     });
     saveLS(LEAVE_KEY, list);
-    if (row) await putColl('leave_requests', row);
+    if (row) {await putColl('leave_requests', row);}
     if (row && (status === 'approved' || status === 'rejected')) {
-      var emp = employees().find(function (e) {
+      const emp = employees().find(function (e) {
         return String(e.id) === String(row.employeeId);
       });
       if (emp) {
         // Deduct leave balance on approve
         if (status === 'approved' && row.type !== 'unpaid') {
-          var balKey =
+          const balKey =
             row.type === 'sick' ? 'sickLeave' : row.type === 'earned' ? 'earnedLeave' : 'casualLeave';
           emp[balKey] = Math.max(0, (Number(emp[balKey]) || 12) - (Number(row.days) || 1));
           try {
-            if (global.RS && RS.saveOne) await RS.saveOne('employees', emp);
-            else if (global.RS_DB) await RS_DB.put('employees', emp.id, emp);
+            if (global.RS && RS.saveOne) {await RS.saveOne('employees', emp);}
+            else if (global.RS_DB) {await RS_DB.put('employees', emp.id, emp);}
           } catch (_) {}
         }
         await notifyEmployee(
@@ -238,14 +242,15 @@
         );
       }
     }
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     toast('Leave ' + status, 'fa-check');
     renderHrPanels();
   }
 
   function openAdvanceModal(emp) {
-    if (!global.RSModal) return;
-    var emps = employees();
-    var opts = emps
+    if (!global.RSModal) {return;}
+    const emps = employees();
+    const opts = emps
       .map(function (e) {
         return (
           '<option value="' +
@@ -280,16 +285,17 @@
       onMount: function (modal, close) {
         modal.querySelector('[data-x]').onclick = close;
         modal.querySelector('[data-ok]').onclick = async function () {
-          var empId = modal.querySelector('#ad-emp').value;
-          var e = emps.find(function (x) {
+          const empId = modal.querySelector('#ad-emp').value;
+          const e = emps.find(function (x) {
             return String(x.id) === String(empId);
           });
-          var amt = parseFloat(modal.querySelector('#ad-amt').value);
+          const amt = parseFloat(modal.querySelector('#ad-amt').value);
           if (!e || !(amt > 0)) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Employee and amount required', 'fa-circle-exclamation');
             return;
           }
-          var row = {
+          const row = {
             id: 'adv-' + Date.now(),
             employeeId: e.id,
             employeeName: e.name,
@@ -300,7 +306,7 @@
             paidAt: new Date().toISOString(),
             remaining: amt,
           };
-          var list = await listAdvances();
+          const list = await listAdvances();
           list.unshift(row);
           saveLS(ADV_KEY, list);
           await putColl('salary_advances', row);
@@ -322,6 +328,7 @@
               filename: 'advance-' + e.name.replace(/\s+/g, '-') + '.pdf',
             }
           );
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
           toast('Advance paid & notified', 'fa-whatsapp');
           renderHrPanels();
         };
@@ -336,29 +343,30 @@
   }
 
   function openSalaryPayModal() {
-    if (!global.RSModal) return;
-    var emps = employees().filter(function (e) {
+    if (!global.RSModal) {return;}
+    const emps = employees().filter(function (e) {
       return parsePay(e) > 0;
     });
     if (!emps.length) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('Set monthly payroll on employees first', 'fa-circle-info');
       return;
     }
     listAdvances().then(function (allAdv) {
-      var body =
+      const body =
         '<p style="font-size:12.5px;color:var(--text-soft);margin:0 0 10px">Mark salaries paid. Payslip PDF is sent on WhatsApp when a phone is on file.</p>' +
         '<div style="max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:8px">' +
         emps
           .map(function (e, i) {
-            var base = parsePay(e);
-            var adv = allAdv
+            const base = parsePay(e);
+            const adv = allAdv
               .filter(function (a) {
                 return String(a.employeeId) === String(e.id) && (Number(a.remaining) || 0) > 0;
               })
               .reduce(function (s, a) {
                 return s + (Number(a.remaining) || 0);
               }, 0);
-            var net = Math.max(0, base - Math.min(adv, base));
+            const net = Math.max(0, base - Math.min(adv, base));
             return (
               '<label style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--stroke-2);border-radius:10px">' +
               '<input type="checkbox" data-i="' +
@@ -386,17 +394,18 @@
         onMount: function (modal, close) {
           modal.querySelector('[data-x]').onclick = close;
           modal.querySelector('[data-ok]').onclick = async function () {
-            var month = new Date().toISOString().slice(0, 7);
-            var payments = await listPayments();
-            var selected = [];
+            const month = new Date().toISOString().slice(0, 7);
+            const payments = await listPayments();
+            const selected = [];
             modal.querySelectorAll('input[data-i]:checked').forEach(function (cb) {
               selected.push(emps[+cb.getAttribute('data-i')]);
             });
             if (!selected.length) {
+              try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
               toast('Select at least one person', 'fa-circle-exclamation');
               return;
             }
-            var prog =
+            const prog =
               global.RSProgress &&
               RSProgress.open({
                 title: 'Paying salaries…',
@@ -404,24 +413,24 @@
                 total: selected.length,
                 unit: 'staff',
               });
-            var advs = await listAdvances();
-            for (var i = 0; i < selected.length; i++) {
-              var e = selected[i];
-              var base = parsePay(e);
-              var deduct = 0;
+            const advs = await listAdvances();
+            for (let i = 0; i < selected.length; i++) {
+              const e = selected[i];
+              const base = parsePay(e);
+              let deduct = 0;
               advs.forEach(function (a) {
-                if (String(a.employeeId) !== String(e.id) || !(Number(a.remaining) > 0)) return;
-                var take = Math.min(Number(a.remaining) || 0, base - deduct);
+                if (String(a.employeeId) !== String(e.id) || !(Number(a.remaining) > 0)) {return;}
+                const take = Math.min(Number(a.remaining) || 0, base - deduct);
                 if (take > 0) {
                   a.remaining = (Number(a.remaining) || 0) - take;
-                  if (a.remaining <= 0) a.status = 'recovered';
+                  if (a.remaining <= 0) {a.status = 'recovered';}
                   deduct += take;
                   putColl('salary_advances', a);
                 }
               });
               saveLS(ADV_KEY, advs);
-              var net = Math.max(0, base - deduct);
-              var pay = {
+              const net = Math.max(0, base - deduct);
+              const pay = {
                 id: 'pay-' + e.id + '-' + month,
                 employeeId: e.id,
                 employeeName: e.name,
@@ -462,11 +471,12 @@
                   filename: 'payslip-' + month + '-' + e.name.replace(/\s+/g, '-') + '.pdf',
                 }
               );
-              if (prog) prog.update({ done: i + 1 });
+              if (prog) {prog.update({ done: i + 1 });}
             }
             saveLS(PAY_KEY, payments);
-            if (prog) prog.close();
+            if (prog) {prog.close();}
             close();
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
             toast(selected.length + ' salaries paid · payslips sent', 'fa-circle-check');
             renderHrPanels();
           };
@@ -476,18 +486,18 @@
   }
 
   async function renderHrPanels() {
-    var sec = document.getElementById('employees-tab');
-    if (!sec) return;
-    var wrap = document.getElementById('rs-hr-extended');
+    const sec = document.getElementById('employees-tab');
+    if (!sec) {return;}
+    let wrap = document.getElementById('rs-hr-extended');
     if (!wrap) {
       wrap = document.createElement('div');
       wrap.id = 'rs-hr-extended';
       wrap.style.marginTop = '16px';
       sec.appendChild(wrap);
     }
-    var leaves = (await listLeaves()).slice(0, 15);
-    var advs = (await listAdvances()).slice(0, 15);
-    var pays = (await listPayments()).slice(0, 8);
+    const leaves = (await listLeaves()).slice(0, 15);
+    const advs = (await listAdvances()).slice(0, 15);
+    const pays = (await listPayments()).slice(0, 8);
     wrap.innerHTML =
       '<div class="panel panel-pad" style="margin-bottom:14px">' +
       '<div class="panel-head" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' +
@@ -572,19 +582,26 @@
       '</div></div></div>';
 
     wrap.querySelector('#hr-leave').onclick = function () {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
       openLeaveModal();
     };
     wrap.querySelector('#hr-adv').onclick = function () {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
       openAdvanceModal();
     };
-    wrap.querySelector('#hr-pay').onclick = openSalaryPayModal;
+    wrap.querySelector('#hr-pay').onclick = function () {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
+      openSalaryPayModal();
+    };
     wrap.querySelectorAll('.hr-lv-ok').forEach(function (b) {
       b.onclick = function () {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
         setLeaveStatus(b.dataset.id, 'approved');
       };
     });
     wrap.querySelectorAll('.hr-lv-no').forEach(function (b) {
       b.onclick = function () {
+        try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
         setLeaveStatus(b.dataset.id, 'rejected');
       };
     });

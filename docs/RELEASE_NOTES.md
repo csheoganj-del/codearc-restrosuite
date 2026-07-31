@@ -601,7 +601,7 @@ Verified in Chromium like a real cashier. Fixes from measurements:
 
 ```powershell
 npm run check:prod-assets
-$env:E2E_OUTLET_SLUG='bbb'; $env:E2E_USERNAME='bbb'; $env:E2E_PASSWORD='Harry@1234'
+$env:E2E_OUTLET_SLUG='<test-outlet>'; $env:E2E_USERNAME='<test-user>'; $env:E2E_PASSWORD='<set-locally-never-commit>'; $env:E2E_BASE_URL='http://127.0.0.1:8001'; npm run test:e2e:browser
 npx playwright test tests/e2e/
 ```
 

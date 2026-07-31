@@ -33,19 +33,19 @@
         const cutover = new Date('2026-07-01');
         return { percent: date >= cutover ? 9.0 : 13.5, itc_allowed: true, label: 'VAT Hot Food' };
       }
-      if (rateCode === 'IE_DRINK_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Drinks' };
-      if (rateCode === 'IE_COLD_0') return { percent: 0.0, itc_allowed: true, label: 'VAT Cold Takeaway' };
-      if (rateCode === 'IE_DELIVERY_23') return { percent: 23.0, itc_allowed: true, label: 'VAT Delivery' };
-      if (rateCode === 'IE_ACCOM_135') return { percent: 13.5, itc_allowed: true, label: 'VAT Accommodation' };
+      if (rateCode === 'IE_DRINK_23') {return { percent: 23.0, itc_allowed: true, label: 'VAT Drinks' };}
+      if (rateCode === 'IE_COLD_0') {return { percent: 0.0, itc_allowed: true, label: 'VAT Cold Takeaway' };}
+      if (rateCode === 'IE_DELIVERY_23') {return { percent: 23.0, itc_allowed: true, label: 'VAT Delivery' };}
+      if (rateCode === 'IE_ACCOM_135') {return { percent: 13.5, itc_allowed: true, label: 'VAT Accommodation' };}
     }
     if (String(country).toUpperCase() === 'IN') {
-      if (rateCode === 'IN_REST_5') return { percent: 5.0, itc_allowed: false, label: 'GST Standalone' };
-      if (rateCode === 'IN_REST_18') return { percent: 18.0, itc_allowed: true, label: 'GST Specified' };
-      if (rateCode === 'IN_CATER_18') return { percent: 18.0, itc_allowed: true, label: 'GST Catering' };
-      if (rateCode === 'IN_COMP_5') return { percent: 5.0, itc_allowed: false, label: 'GST Composition' };
-      if (rateCode === 'IN_GOODS_5') return { percent: 5.0, itc_allowed: false, label: 'GST Goods' };
-      if (rateCode === 'IN_GOODS_18') return { percent: 18.0, itc_allowed: true, label: 'GST Goods' };
-      if (rateCode === 'IN_NIL_0') return { percent: 0.0, itc_allowed: false, label: 'GST Nil Rated' };
+      if (rateCode === 'IN_REST_5') {return { percent: 5.0, itc_allowed: false, label: 'GST Standalone' };}
+      if (rateCode === 'IN_REST_18') {return { percent: 18.0, itc_allowed: true, label: 'GST Specified' };}
+      if (rateCode === 'IN_CATER_18') {return { percent: 18.0, itc_allowed: true, label: 'GST Catering' };}
+      if (rateCode === 'IN_COMP_5') {return { percent: 5.0, itc_allowed: false, label: 'GST Composition' };}
+      if (rateCode === 'IN_GOODS_5') {return { percent: 5.0, itc_allowed: false, label: 'GST Goods' };}
+      if (rateCode === 'IN_GOODS_18') {return { percent: 18.0, itc_allowed: true, label: 'GST Goods' };}
+      if (rateCode === 'IN_NIL_0') {return { percent: 0.0, itc_allowed: false, label: 'GST Nil Rated' };}
     }
     const m = String(rateCode).match(/_(\d+)(?:5)?$/);
     const pct = m ? Number(m[1]) : 5;
@@ -136,11 +136,11 @@
     ];
     const salesTaxCodes = ['US'];
     let taxSystem;
-    if (vatCountries.includes(country)) taxSystem = 'VAT';
-    else if (salesTaxCodes.includes(country)) taxSystem = 'Sales Tax';
-    else taxSystem = 'GST';
+    if (vatCountries.includes(country)) {taxSystem = 'VAT';}
+    else if (salesTaxCodes.includes(country)) {taxSystem = 'Sales Tax';}
+    else {taxSystem = 'GST';}
 
-    if (settings.set_tax_label) taxSystem = settings.set_tax_label;
+    if (settings.set_tax_label) {taxSystem = settings.set_tax_label;}
 
     let profile = {};
     try {

@@ -9,7 +9,6 @@
     "sourceType": "script"
   },
   "rules": {
-    // ── Errors that indicate definite bugs ──────────────────────────────────
     "no-irregular-whitespace": "error",
     "no-unreachable": "error",
     "no-duplicate-case": "error",
@@ -29,8 +28,6 @@
     "no-constant-condition": ["error", { "checkLoops": false }],
     "no-loss-of-precision": "error",
     "no-promise-executor-return": "error",
-
-    // ── Code quality — warn (fail CI on new violations, don't block old code) ─
     "no-unused-vars": [
       "warn",
       {
@@ -47,73 +44,33 @@
     "no-useless-return": "warn",
     "no-useless-concat": "warn",
     "no-useless-rename": "warn",
-
-    // ── Best-practice enforcement ────────────────────────────────────────────
-    // Prefer === over == to avoid type-coercion bugs
     "eqeqeq": ["error", "always", { "null": "ignore" }],
-
-    // Require braces on all control-flow bodies to prevent dangling-else bugs
     "curly": ["error", "all"],
-
-    // Disallow var — use const/let for block-scoped, predictable bindings
     "no-var": "error",
-
-    // Prefer const where the binding is never reassigned
     "prefer-const": ["warn", { "destructuring": "any" }],
-
-    // Avoid accidental globals: all variables must be declared
     "no-implicit-globals": "error",
-
-    // Prevent accidental number → string type coercion in arithmetic
     "no-implicit-coercion": ["warn", { "boolean": false, "string": true, "number": true }],
-
-    // Guard against calling eval() or Function() with a string argument
     "no-eval": "error",
     "no-implied-eval": "error",
     "no-new-func": "error",
-
-    // Prevent extending native prototypes (breaks polyfill assumptions)
     "no-extend-native": "error",
-
-    // Disallow reassigning function parameters (makes tracing data flow harder)
     "no-param-reassign": ["warn", { "props": false }],
-
-    // Disallow console.log in production code (use a logger utility instead).
-    // warn (not error) so existing gateway debug logs don't block CI.
     "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
-
-    // Disallow alert/confirm/prompt in browser code
     "no-alert": "warn",
-
-    // Require default case in switch statements
     "default-case": "warn",
-
-    // Disallow fallthrough in switch without explicit comment
     "no-fallthrough": "error",
-
-    // Prevent return before variable declaration (temporal dead zone confusion)
     "no-use-before-define": ["warn", { "functions": false, "classes": true, "variables": true }],
-
-    // Radix: always supply the base argument to parseInt()
     "radix": "error",
-
-    // Yoda conditions are confusing: prefer `x === 1` over `1 === x`
     "yoda": ["warn", "never"],
-
-    // ── Async / Promise safety ───────────────────────────────────────────────
     "no-async-promise-executor": "error",
     "no-await-in-loop": "warn",
     "require-atomic-updates": "warn",
-
-    // ── Style consistency (enforced but not blocking) ─────────────────────
     "no-trailing-spaces": "warn",
     "no-multiple-empty-lines": ["warn", { "max": 3, "maxEOF": 1 }],
     "eol-last": ["warn", "always"],
     "semi": ["warn", "always"],
     "quotes": ["warn", "single", { "avoidEscape": true, "allowTemplateLiterals": false }]
   },
-
-  // Shared globals defined by the RestroSuite runtime (IIFEs attached to window)
   "globals": {
     "RS_API": "readonly",
     "RS_AUTH": "readonly",
@@ -121,12 +78,54 @@
     "RSLicense": "readonly",
     "RSSkel": "readonly",
     "supabase": "readonly",
-    "CONFIG": "readonly"
+    "CONFIG": "readonly",
+    "RS": "readonly",
+    "RS_DB": "readonly",
+    "RSModal": "readonly",
+    "RSRecipeUnits": "readonly",
+    "RSOps": "readonly",
+    "RSReceipt": "readonly",
+    "RS_SYNC": "readonly",
+    "RSMenuIntel": "readonly",
+    "RSSecurityShield": "readonly",
+    "RSViewMode": "readonly",
+    "RSInventoryBatches": "readonly",
+    "RSReportPdf": "readonly",
+    "RSKitchenLinkCoach": "readonly",
+    "RSWaQueue": "readonly",
+    "RSPinModal": "readonly",
+    "RSPOS": "readonly",
+    "RSOpsMode": "readonly",
+    "RS_SETTINGS": "readonly",
+    "RSStaffTableScanner": "readonly",
+    "RSProgress": "readonly",
+    "RSPrintBridge": "readonly",
+    "INVENTORY": "readonly",
+    "RSPosUI": "readonly",
+    "RSTaxCountry": "readonly",
+    "AndroidInterface": "readonly",
+    "RSAmend": "readonly",
+    "RSReceiptEngine": "readonly",
+    "RSXlsxLite": "readonly",
+    "RSInventoryToolbar": "readonly",
+    "RSInventoryLedger": "readonly",
+    "RSLanSync": "readonly",
+    "RSInventoryUI": "readonly",
+    "RSServiceAlerts": "readonly",
+    "RS_SAAS": "readonly",
+    "Image": "readonly",
+    "RS_getTenantTaxProfile": "readonly",
+    "RS_ROLE_DEFAULTS": "readonly",
+    "RS_getOutletLocale": "readonly",
+    "RS_getOutletTimezone": "readonly",
+    "EventSource": "readonly",
+    "playChime": "readonly",
+    "activateTab": "readonly",
+    "BarcodeDetector": "readonly",
+    "TextEncoder": "readonly"
   },
-
   "overrides": [
     {
-      // Gateway and Node scripts — allow console freely (it IS the logger there)
       "files": [
         "whatsapp-gateway.js",
         "gateway-modules/**/*.js",
@@ -142,7 +141,6 @@
       }
     },
     {
-      // Test files — relax a few rules that are intentionally violated in tests
       "files": ["tests/**/*.cjs", "tests/**/*.js"],
       "rules": {
         "no-unused-vars": "off",
@@ -150,14 +148,12 @@
       }
     },
     {
-      // ES module API routes (Vercel serverless — use ESM export default)
       "files": ["api/**/*.js"],
       "parserOptions": {
         "sourceType": "module"
       }
     },
     {
-      // Edge middleware (Vercel Edge Runtime — ESM + Next.js globals)
       "files": ["middleware.js"],
       "parserOptions": {
         "sourceType": "module"

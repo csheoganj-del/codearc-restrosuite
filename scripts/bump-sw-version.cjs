@@ -59,17 +59,17 @@ function hashFile(filePath) {
  */
 function resolveLocalPath(url) {
   // Skip external CDN URLs — we can't hash them locally
-  if (/^https?:\/\//.test(url)) return null;
+  if (/^https?:\/\//.test(url)) {return null;}
 
   // Strip query strings (?v=...)
   const cleanUrl = url.split('?')[0];
   const rel = cleanUrl.startsWith('/') ? cleanUrl.slice(1) : cleanUrl;
 
   const inPublish = path.join(PUBLISH_DIR, rel);
-  if (fs.existsSync(inPublish)) return inPublish;
+  if (fs.existsSync(inPublish)) {return inPublish;}
 
   const inSource = path.join(ASSETS_DIR, rel);
-  if (fs.existsSync(inSource)) return inSource;
+  if (fs.existsSync(inSource)) {return inSource;}
 
   return null;
 }
@@ -80,7 +80,7 @@ function resolveLocalPath(url) {
  */
 function extractAppShell(src) {
   const match = src.match(/const APP_SHELL\s*=\s*(\[[\s\S]*?\]);/);
-  if (!match) return null;
+  if (!match) {return null;}
   try {
     // Safe eval of a pure array literal (no function calls, no references)
     // eslint-disable-next-line no-new-func

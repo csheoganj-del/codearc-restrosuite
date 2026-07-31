@@ -43,7 +43,7 @@ function parseMajor(v) {
 }
 
 function replaceBuiltin(filePath, version) {
-  if (!fs.existsSync(filePath)) return false;
+  if (!fs.existsSync(filePath)) {return false;}
   let s = fs.readFileSync(filePath, 'utf8');
   const next = s.replace(
     /var builtin = ['"]v\d+[^'"]*['"]/,
@@ -55,7 +55,7 @@ function replaceBuiltin(filePath, version) {
       /builtin\s*=\s*['"]v\d+[^'"]*['"]/,
       "builtin = '" + version + "'"
     );
-    if (next2 === s) return false;
+    if (next2 === s) {return false;}
     s = next2;
   } else {
     s = next;
@@ -80,7 +80,7 @@ function main() {
   const isCi = args.includes('--ci') || process.env.VERCEL === '1' || process.env.CI === 'true';
   let slug = 'auto';
   const si = args.indexOf('--slug');
-  if (si >= 0 && args[si + 1]) slug = String(args[si + 1]).replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+  if (si >= 0 && args[si + 1]) {slug = String(args[si + 1]).replace(/[^a-z0-9-]+/gi, '-').toLowerCase();}
 
   const auPath = path.join(ROOT, 'app-update.json');
   const prev = readJson(auPath) || {};
@@ -143,7 +143,7 @@ function main() {
   ];
   for (const rel of auCopies) {
     const p = path.join(ROOT, rel);
-    if (!fs.existsSync(path.dirname(p))) continue;
+    if (!fs.existsSync(path.dirname(p))) {continue;}
     writeJson(p, nextAu);
     console.log('[bump-content] wrote', rel);
   }
@@ -152,7 +152,7 @@ function main() {
   const updatesPath = path.join(ROOT, 'downloads', 'updates.json');
   const updates = readJson(updatesPath);
   if (updates) {
-    if (!updates.web) updates.web = {};
+    if (!updates.web) {updates.web = {};}
     updates.web.version = version;
     updates.web.title = title;
     updates.web.summary = summary;

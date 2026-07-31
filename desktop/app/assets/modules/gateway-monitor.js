@@ -7,11 +7,11 @@
   let saasGatewayPollingInterval = null;
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
 
   function escHtml(str) {
-    if (!str) return '';
+    if (!str) {return '';}
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -21,9 +21,9 @@
   }
 
   function formatIncidentTime(value) {
-    if (!value) return 'Unknown time';
+    if (!value) {return 'Unknown time';}
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Unknown time';
+    if (Number.isNaN(date.getTime())) {return 'Unknown time';}
     return date.toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -34,9 +34,9 @@
   }
 
   function formatDateTimeIN(value) {
-    if (!value) return '—';
+    if (!value) {return '—';}
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '—';
+    if (Number.isNaN(date.getTime())) {return '—';}
     return date.toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -87,15 +87,15 @@
 
   function friendlyErrorMessage(msg) {
     const m = String(msg || '').trim();
-    if (!m || /^unknown/i.test(m)) return 'Application error (no message captured)';
-    if (m.length > 140) return m.slice(0, 137) + '…';
+    if (!m || /^unknown/i.test(m)) {return 'Application error (no message captured)';}
+    if (m.length > 140) {return m.slice(0, 137) + '…';}
     return m;
   }
 
   function shortPath(urlPath) {
-    if (!urlPath) return '';
+    if (!urlPath) {return '';}
     const s = String(urlPath);
-    if (s.includes('#')) return '#' + s.split('#').pop();
+    if (s.includes('#')) {return '#' + s.split('#').pop();}
     try {
       const u = new URL(s, typeof location !== 'undefined' ? location.origin : 'https://local');
       return (u.pathname + u.hash) || s;
@@ -105,7 +105,7 @@
   }
 
   function friendlyTenantLabel(slug) {
-    if (!slug) return 'Unknown workspace';
+    if (!slug) {return 'Unknown workspace';}
     return String(slug)
       .replace(/[-_]+/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase());
@@ -122,14 +122,14 @@
     const sendLike = list.filter((log) => {
       const ev = String(log.event || '').toUpperCase();
       const t = log.created_at ? new Date(log.created_at) : null;
-      if (!t || Number.isNaN(t.getTime()) || t < today) return false;
+      if (!t || Number.isNaN(t.getTime()) || t < today) {return false;}
       return /SEND|SENT|ALERT|APPROVAL_WHATSAPP|DISPATCH|MESSAGE/.test(ev);
     });
     const ok = sendLike.filter((l) => String(l.status || '').toLowerCase() === 'ok' || !l.status).length;
     const fail = sendLike.filter((l) => /err|fail|warn/i.test(String(l.status || ''))).length;
-    if (sentEl) sentEl.textContent = String(sendLike.length);
+    if (sentEl) {sentEl.textContent = String(sendLike.length);}
     if (rateEl) {
-      if (sendLike.length === 0) rateEl.textContent = 'n/a';
+      if (sendLike.length === 0) {rateEl.textContent = 'n/a';}
       else {
         const pct = Math.round((ok / Math.max(1, ok + fail)) * 100);
         rateEl.textContent = pct + '%';
@@ -164,7 +164,7 @@
 
 async function pollSuperAdminGateway() {
   const RS_API = global.RS_API;
-  if (!RS_API) return;
+  if (!RS_API) {return;}
   // Zero-cost launch still uses FREE platform Baileys (your PC + ngrok). No paid API.
   const isZeroCost = !!RS_API.zeroCostLaunchMode;
 
@@ -193,16 +193,16 @@ async function pollSuperAdminGateway() {
           statusBadge.className = 'pill pill-green';
           statusBadge.style.background = '';
           statusBadge.style.color = '';
-          if (qrContainer) qrContainer.style.display = 'none';
-          if (connectedView) connectedView.style.display = 'flex';
+          if (qrContainer) {qrContainer.style.display = 'none';}
+          if (connectedView) {connectedView.style.display = 'flex';}
         } else if (data.status === 'qr') {
           statusBadge.className = 'pill pill-amber';
           statusBadge.style.background = '';
           statusBadge.style.color = '';
-          if (connectedView) connectedView.style.display = 'none';
-          if (qrContainer) qrContainer.style.display = 'flex';
+          if (connectedView) {connectedView.style.display = 'none';}
+          if (qrContainer) {qrContainer.style.display = 'flex';}
           if (data.qr) {
-            if (qrSpinner) qrSpinner.style.display = 'none';
+            if (qrSpinner) {qrSpinner.style.display = 'none';}
             if (qrImg) {
               qrImg.src = data.qr;
               qrImg.style.display = 'block';
@@ -212,26 +212,26 @@ async function pollSuperAdminGateway() {
               qrSpinner.style.display = 'block';
               qrSpinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-bottom:6px;font-size:16px;color:#FF4F00"></i><br>Preparing QR…';
             }
-            if (qrImg) qrImg.style.display = 'none';
+            if (qrImg) {qrImg.style.display = 'none';}
           }
         } else if (st === 'connecting' || st === 'starting' || st === 'syncing' || st === 'authenticated') {
           statusBadge.className = 'pill pill-amber';
           statusBadge.style.background = '';
           statusBadge.style.color = '';
-          if (connectedView) connectedView.style.display = 'none';
-          if (qrContainer) qrContainer.style.display = 'flex';
+          if (connectedView) {connectedView.style.display = 'none';}
+          if (qrContainer) {qrContainer.style.display = 'flex';}
           if (qrSpinner) {
             qrSpinner.style.display = 'block';
             qrSpinner.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-bottom: 6px; font-size: 16px; color: #FF4F00;"></i><br>${escHtml(pretty)}…`;
           }
-          if (qrImg) qrImg.style.display = 'none';
+          if (qrImg) {qrImg.style.display = 'none';}
         } else {
           // disconnected / offline / closed / unknown — not "connecting"
           statusBadge.className = 'pill pill-red';
           statusBadge.style.background = '';
           statusBadge.style.color = '';
-          if (connectedView) connectedView.style.display = 'none';
-          if (qrContainer) qrContainer.style.display = 'flex';
+          if (connectedView) {connectedView.style.display = 'none';}
+          if (qrContainer) {qrContainer.style.display = 'flex';}
           if (qrSpinner) {
             qrSpinner.style.display = 'block';
             qrSpinner.innerHTML =
@@ -241,10 +241,10 @@ async function pollSuperAdminGateway() {
               'Click <b>Reset Gateway Connection</b> above, then scan the QR from WhatsApp → Linked devices.' +
               '</span>';
           }
-          if (qrImg) qrImg.style.display = 'none';
+          if (qrImg) {qrImg.style.display = 'none';}
         }
       }
-      if (phoneEl) phoneEl.textContent = data.number ? `+${data.number}` : 'Not Linked';
+      if (phoneEl) {phoneEl.textContent = data.number ? `+${data.number}` : 'Not Linked';}
       if (sessionEl) {
         if (data.sessionSavedAt) {
           sessionEl.textContent = formatDateTimeIN(data.sessionSavedAt);
@@ -263,16 +263,16 @@ async function pollSuperAdminGateway() {
       statusBadge.className = 'pill pill-red';
     }
     const statusLabelEl = document.getElementById('saas-gateway-status-label');
-    if (statusLabelEl) statusLabelEl.textContent = 'Offline';
-    if (phoneEl) phoneEl.textContent = 'Unknown';
-    if (sessionEl) sessionEl.textContent = 'Unknown';
-    if (connectedView) connectedView.style.display = 'none';
-    if (qrContainer) qrContainer.style.display = 'flex';
+    if (statusLabelEl) {statusLabelEl.textContent = 'Offline';}
+    if (phoneEl) {phoneEl.textContent = 'Unknown';}
+    if (sessionEl) {sessionEl.textContent = 'Unknown';}
+    if (connectedView) {connectedView.style.display = 'none';}
+    if (qrContainer) {qrContainer.style.display = 'flex';}
     if (qrSpinner) {
-      qrSpinner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-bottom: 6px; font-size: 16px; color: #EF4444;"></i><br>Gateway Server Offline<br><span style="font-size: 10px; color: #9CA3AF; margin-top: 4px; display: block;">Check cloud space status</span>`;
+      qrSpinner.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="margin-bottom: 6px; font-size: 16px; color: #EF4444;"></i><br>Gateway Server Offline<br><span style="font-size: 10px; color: #9CA3AF; margin-top: 4px; display: block;">Check cloud space status</span>';
       qrSpinner.style.display = 'block';
     }
-    if (qrImg) qrImg.style.display = 'none';
+    if (qrImg) {qrImg.style.display = 'none';}
   }
 
   // 2. Fetch Gateway Debug-Logs (human-readable primary, technical in title)
@@ -318,7 +318,7 @@ async function pollSuperAdminGateway() {
 }
 
 function startSaaSGatewayPolling() {
-  if (saasGatewayPollingInterval) clearInterval(saasGatewayPollingInterval);
+  if (saasGatewayPollingInterval) {clearInterval(saasGatewayPollingInterval);}
   pollSuperAdminGateway();
   saasGatewayPollingInterval = setInterval(pollSuperAdminGateway, 5000);
 }
@@ -340,18 +340,20 @@ function notifyIncident(msg, icon) {
     toast(msg, icon);
   } catch (_) {}
   // Always log so failures are visible in DevTools if toast is missing
-  if (icon && String(icon).includes('exclamation')) console.warn('[Incidents]', msg);
-  else console.info('[Incidents]', msg);
+  if (icon && String(icon).includes('exclamation')) {console.warn('[Incidents]', msg);}
+  else {console.info('[Incidents]', msg);}
 }
 
 async function resolveIncidentById(reportId, button) {
   const id = parseReportId(reportId);
   if (!id) {
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
     notifyIncident('Missing incident id — refresh the page and try again.', 'fa-circle-exclamation');
     return false;
   }
   const api = global.RS_API;
   if (!api || typeof api.admin !== 'function') {
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
     notifyIncident('Admin API not ready. Re-login as super-admin.', 'fa-circle-exclamation');
     return false;
   }
@@ -362,14 +364,17 @@ async function resolveIncidentById(reportId, button) {
   }
   try {
     const out = await api.admin({ action: 'resolve_error_report', report_id: id });
-    if (out && out.error) throw new Error(out.error);
+    if (out && out.error) {throw new Error(out.error);}
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     notifyIncident('Incident marked resolved.');
     return true;
   } catch (error) {
     const msg = (error && error.message) || 'Could not resolve incident.';
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
     notifyIncident(msg, 'fa-circle-exclamation');
     // Surface hard failures so a missing toast still informs the user
     if (/session expired|not ready|Valid report|Failed to resolve|401|403/i.test(msg)) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       try { toast('Resolve failed: ' + msg, 'fa-circle-exclamation'); } catch (_) {}
     }
     if (button) {
@@ -381,22 +386,24 @@ async function resolveIncidentById(reportId, button) {
 }
 
 function bindIncidentResolveButtons(list) {
-  if (!list) return;
+  if (!list) {return;}
   list.querySelectorAll('.app-incident-resolve-btn').forEach((btn) => {
-    if (btn.dataset.bound === '1') return;
+    if (btn.dataset.bound === '1') {return;}
     btn.dataset.bound = '1';
     btn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
       const id = btn.getAttribute('data-report-id');
       const ok = await resolveIncidentById(id, btn);
-      if (ok) await loadAppIncidents();
+      if (ok) {await loadAppIncidents();}
     });
   });
 }
 
 async function resolveAllOpenIncidents() {
   const api = global.RS_API;
+  try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
   if (!api || typeof api.admin !== 'function') {
     notifyIncident('Admin API not ready. Re-login as super-admin.', 'fa-circle-exclamation');
     return;
@@ -407,6 +414,7 @@ async function resolveAllOpenIncidents() {
     const result = await api.admin({ action: 'list_error_reports', status: 'open', limit: 100 });
     const reports = Array.isArray(result.reports) ? result.reports : [];
     if (!reports.length) {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       notifyIncident('No open incidents to clear.');
       await loadAppIncidents();
       return;
@@ -421,10 +429,11 @@ async function resolveAllOpenIncidents() {
       if (!id) { fail++; continue; }
       try {
         const out = await api.admin({ action: 'resolve_error_report', report_id: id });
-        if (out && out.error) throw new Error(out.error);
+        if (out && out.error) {throw new Error(out.error);}
         ok++;
       } catch (_) { fail++; }
     }
+    try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
     notifyIncident(fail ? ('Resolved ' + ok + ', failed ' + fail + '.') : ('Resolved ' + ok + ' incident(s).'));
     await loadAppIncidents();
   } catch (error) {
@@ -440,7 +449,7 @@ async function resolveAllOpenIncidents() {
 async function loadAppIncidents() {
   const list = document.getElementById('app-incidents-list');
   const filter = document.getElementById('app-incidents-status-filter');
-  if (!list) return;
+  if (!list) {return;}
   const RS_API = global.RS_API;
   list.innerHTML = renderIncidentEmpty('Loading incidents', 'Checking the latest platform error reports.', 'fa-spinner fa-spin');
   try {
@@ -450,7 +459,7 @@ async function loadAppIncidents() {
     }
     const status = filter ? filter.value : 'open';
     const result = await RS_API.admin({ action: 'list_error_reports', status: status === 'all' ? null : status });
-    if (result && result.error) throw new Error(result.error);
+    if (result && result.error) {throw new Error(result.error);}
     const reports = Array.isArray(result.reports) ? result.reports : [];
     if (!reports.length) {
       list.innerHTML = renderIncidentEmpty('No incidents found', 'This status queue is currently clear.');
@@ -474,7 +483,7 @@ async function loadAppIncidents() {
       const resolveButton = statusLabel === 'open' && rid
         ? `<button type="button" class="app-incident-resolve-btn" data-report-id="${rid}" title="Mark as reviewed (does not fix the original crash)">Resolve</button>`
         : (statusLabel === 'open'
-          ? `<span style="font-size:11px;color:var(--red)">No id</span>`
+          ? '<span style="font-size:11px;color:var(--red)">No id</span>'
           : '');
       return `
         <article class="app-incident-card" data-report-id="${rid || ''}" title="Client-side error report stored in app_error_reports">
@@ -508,12 +517,13 @@ function renderGateway() {
   if (resetBtn && !resetBtn.dataset.listenerBound) {
     resetBtn.dataset.listenerBound = 'true';
     resetBtn.addEventListener('click', async () => {
-      if (confirm("Are you absolutely sure you want to RESET the WhatsApp Gateway?\n\nThis will completely purge the WhatsApp session files from the gateway storage. You will need to scan a new QR code to re-link your device!")) {
+      if (confirm('Are you absolutely sure you want to RESET the WhatsApp Gateway?\n\nThis will completely purge the WhatsApp session files from the gateway storage. You will need to scan a new QR code to re-link your device!')) {
         try {
           resetBtn.disabled = true;
           resetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Resetting...';
 
           if (!RS_API) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('API not ready. Refresh and try again.', 'fa-circle-exclamation');
             return;
           }
@@ -521,13 +531,16 @@ function renderGateway() {
           const data = await RS_API.admin({ action: 'gateway_reset' });
 
           if (data && !data.error) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
             toast('WhatsApp Gateway reset successfully. Scan QR code to re-authenticate.', 'fa-circle-check');
             await pollSuperAdminGateway();
           } else {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Failed to reset gateway: ' + (data?.error || data?.message || 'Unknown error'), 'fa-circle-exclamation');
           }
         } catch (err) {
           console.error(err);
+          try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
           toast('Error communicating with gateway: ' + (err.message || err), 'fa-circle-exclamation');
         } finally {
           resetBtn.disabled = false;
@@ -541,8 +554,9 @@ function renderGateway() {
   if (refreshLogsBtn && !refreshLogsBtn.dataset.listenerBound) {
     refreshLogsBtn.dataset.listenerBound = 'true';
     refreshLogsBtn.addEventListener('click', async () => {
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {}
       const icon = refreshLogsBtn.querySelector('i');
-      if (icon) icon.classList.add('fa-spin');
+      if (icon) {icon.classList.add('fa-spin');}
       await pollSuperAdminGateway();
       if (icon) {
         setTimeout(() => {
@@ -555,13 +569,13 @@ function renderGateway() {
   const refreshIncidentsBtn = document.getElementById('btn-refresh-app-incidents');
   if (refreshIncidentsBtn && !refreshIncidentsBtn.dataset.listenerBound) {
     refreshIncidentsBtn.dataset.listenerBound = 'true';
-    refreshIncidentsBtn.addEventListener('click', loadAppIncidents);
+    refreshIncidentsBtn.addEventListener('click', () => { try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {} loadAppIncidents(); });
   }
 
   const resolveAllBtn = document.getElementById('btn-resolve-all-incidents');
   if (resolveAllBtn && !resolveAllBtn.dataset.listenerBound) {
     resolveAllBtn.dataset.listenerBound = 'true';
-    resolveAllBtn.addEventListener('click', resolveAllOpenIncidents);
+    resolveAllBtn.addEventListener('click', () => { try { if (window.RSActionFeedback) {window.RSActionFeedback.click();} } catch(_) {} resolveAllOpenIncidents(); });
   }
 
   const incidentFilter = document.getElementById('app-incidents-status-filter');
@@ -577,16 +591,16 @@ function renderGateway() {
     incidentsList.addEventListener('click', async (event) => {
       const target = event.target;
       const button = target && typeof target.closest === 'function' ? target.closest('.app-incident-resolve-btn') : null;
-      if (!button || button.dataset.bound === '1') return; // direct bind already handles
+      if (!button || button.dataset.bound === '1') {return;} // direct bind already handles
       event.preventDefault();
       const ok = await resolveIncidentById(button.getAttribute('data-report-id'), button);
-      if (ok) await loadAppIncidents();
+      if (ok) {await loadAppIncidents();}
     });
   }
 
   startSaaSGatewayPolling();
   loadAppIncidents();
-};
+}
 
   global.RSGatewayMonitor = {
     renderGateway,

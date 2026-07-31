@@ -47,7 +47,7 @@ function ensureDirs() {
 }
 
 function toDataUri(filePath) {
-  if (!fs.existsSync(filePath)) return '';
+  if (!fs.existsSync(filePath)) {return '';}
   const buf = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
   const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
@@ -108,7 +108,7 @@ async function dismissOverlays(page) {
 }
 
 async function highlight(page, selector) {
-  if (!selector) return;
+  if (!selector) {return;}
   await page.evaluate((sel) => {
     document.querySelectorAll('[data-ob-hi]').forEach((el) => {
       el.removeAttribute('data-ob-hi');
@@ -118,7 +118,7 @@ async function highlight(page, selector) {
     });
     const nodes = document.querySelectorAll(sel);
     nodes.forEach((el, i) => {
-      if (i > 4) return;
+      if (i > 4) {return;}
       el.setAttribute('data-ob-hi', '1');
       el.style.outline = '3px solid #FF4F00';
       el.style.outlineOffset = '3px';
@@ -198,16 +198,16 @@ async function openDashboardTab(page, tabId, settingsPanel) {
 
 /** Seed sample data in the live session so empty tabs look real */
 async function runSeed(page, name) {
-  if (!name) return;
+  if (!name) {return;}
   await page.evaluate(async (seedName) => {
     const RS = window.RS || {};
     const toast = (m) => {
       try {
-        if (RS.toast) RS.toast(m, 'fa-check');
+        if (RS.toast) {RS.toast(m, 'fa-check');}
       } catch (_) {}
     };
     function ensureArray(key, fallback) {
-      if (!Array.isArray(RS[key])) RS[key] = fallback || [];
+      if (!Array.isArray(RS[key])) {RS[key] = fallback || [];}
       return RS[key];
     }
 
@@ -221,7 +221,7 @@ async function runSeed(page, name) {
           { id: 9004, name: 'Soft Drink', price: 50, cat: 'Beverages', veg: true, gst: '18%', taxCategory: 'IN_GOODS_18', stock: 'ok' },
         ];
         samples.forEach((s) => {
-          if (!menu.find((m) => m.name === s.name)) menu.push(s);
+          if (!menu.find((m) => m.name === s.name)) {menu.push(s);}
         });
         if (RS.saveOne) {
           for (const s of samples) {
@@ -233,7 +233,7 @@ async function runSeed(page, name) {
         toast('Sample menu ready');
       }
       try {
-        if (typeof RS.renderPOS === 'function') RS.renderPOS();
+        if (typeof RS.renderPOS === 'function') {RS.renderPOS();}
       } catch (_) {}
     }
 
@@ -255,7 +255,7 @@ async function runSeed(page, name) {
           { id: 'inv-s3', name: 'Potato', unit: 'kg', qty: 12, reorder: 3 },
         ];
         rows.forEach((r) => {
-          if (!inv.find((x) => x.name === r.name)) inv.push(r);
+          if (!inv.find((x) => x.name === r.name)) {inv.push(r);}
         });
         toast('Sample stock ready');
       }
@@ -299,7 +299,7 @@ async function seedCartViaUi(page) {
     if (await tiles.count()) {
       for (let i = 0; i < 3; i++) {
         const t = page.locator('#pos-tab .pos-item, #pos-tab .menu-item, .pos-grid [data-id], .pos-grid button').nth(i);
-        if (await t.isVisible().catch(() => false)) await t.click({ timeout: 1000 }).catch(() => {});
+        if (await t.isVisible().catch(() => false)) {await t.click({ timeout: 1000 }).catch(() => {});}
         await page.waitForTimeout(250);
       }
     } else {
@@ -308,7 +308,7 @@ async function seedCartViaUi(page) {
         try {
           if (window.RS && Array.isArray(RS.MENU) && RS.MENU[0] && typeof RS.addToCart === 'function') {
             RS.addToCart(RS.MENU[0]);
-            if (RS.MENU[1]) RS.addToCart(RS.MENU[1]);
+            if (RS.MENU[1]) {RS.addToCart(RS.MENU[1]);}
           }
         } catch (_) {}
       });
@@ -320,7 +320,7 @@ async function login(page) {
   await page.goto(BASE + '/login.html', { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForTimeout(1000);
   const loginTab = page.locator('#tab-login-btn');
-  if (await loginTab.isVisible().catch(() => false)) await loginTab.click().catch(() => {});
+  if (await loginTab.isVisible().catch(() => false)) {await loginTab.click().catch(() => {});}
   await page.fill('#tenant-id', CREDS.outlet);
   await page.fill('#username', CREDS.user);
   await page.fill('#password', CREDS.pass);
@@ -333,9 +333,9 @@ async function login(page) {
   // Soft dismiss license lock if soft-path didn't — wait for lease
   for (let i = 0; i < 8; i++) {
     const lock = page.locator('#rs-license-lock');
-    if (!(await lock.isVisible().catch(() => false))) break;
+    if (!(await lock.isVisible().catch(() => false))) {break;}
     const retry = page.locator('#rs-license-retry');
-    if (await retry.isVisible().catch(() => false)) await retry.click().catch(() => {});
+    if (await retry.isVisible().catch(() => false)) {await retry.click().catch(() => {});}
     await page.waitForTimeout(1500);
   }
   console.log('Logged in', page.url());
@@ -365,7 +365,7 @@ async function captureStep(browser, page, s, index, total) {
         try {
           window.scrollTo(0, 0);
           const app = document.getElementById('app');
-          if (app) app.scrollTop = 0;
+          if (app) {app.scrollTop = 0;}
           document.querySelectorAll('.main, .tab-content.active, .pos-wrap').forEach((el) => {
             try {
               el.scrollTop = 0;
@@ -394,7 +394,7 @@ async function captureStep(browser, page, s, index, total) {
       await page.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForTimeout(2000);
       await page.evaluate(() => window.scrollTo(0, 0));
-      if (s.highlight) await highlight(page, s.highlight);
+      if (s.highlight) {await highlight(page, s.highlight);}
       await shotViewport();
       await clearHighlight(page);
       console.log('OK');
@@ -406,16 +406,16 @@ async function captureStep(browser, page, s, index, total) {
       await page.waitForTimeout(1200);
       if (s.where === 'register') {
         const reg = page.locator('#tab-register-btn');
-        if (await reg.isVisible().catch(() => false)) await reg.click();
+        if (await reg.isVisible().catch(() => false)) {await reg.click();}
         await page.waitForTimeout(600);
       } else {
         const log = page.locator('#tab-login-btn');
-        if (await log.isVisible().catch(() => false)) await log.click();
+        if (await log.isVisible().catch(() => false)) {await log.click();}
         await page.waitForTimeout(400);
         await page.fill('#tenant-id', CREDS.outlet).catch(() => {});
         await page.fill('#username', CREDS.user).catch(() => {});
       }
-      if (s.highlight) await highlight(page, s.highlight);
+      if (s.highlight) {await highlight(page, s.highlight);}
       await shotViewport();
       await clearHighlight(page);
       console.log('OK');
@@ -429,16 +429,16 @@ async function captureStep(browser, page, s, index, total) {
     if (s.prep !== 'openShiftUi' && s.prep !== 'openFloorQrPrint') {
       await dismissOverlays(page);
     }
-    if (s.seed) await runSeed(page, s.seed);
-    if (s.seed === 'ensureCartItems') await seedCartViaUi(page);
-    if (s.tab) await openDashboardTab(page, s.tab, s.settingsPanel);
+    if (s.seed) {await runSeed(page, s.seed);}
+    if (s.seed === 'ensureCartItems') {await seedCartViaUi(page);}
+    if (s.tab) {await openDashboardTab(page, s.tab, s.settingsPanel);}
     await page.waitForTimeout(500);
     await applyStepUi(page, s);
     const keepModal =
       s.prep &&
       /open|Shift|Qr|Recover|Help|Kitchen|More|Checkout|Split|Customer|Edit/i.test(s.prep);
-    if (!keepModal && !s.growthTile) await dismissOverlays(page);
-    if (s.highlight) await highlight(page, s.highlight);
+    if (!keepModal && !s.growthTile) {await dismissOverlays(page);}
+    if (s.highlight) {await highlight(page, s.highlight);}
     await shotViewport();
     await clearHighlight(page);
     if (s.prep || s.growthTile) {
@@ -527,7 +527,7 @@ function buildHtml() {
     ${
       uri
         ? `<figure class="fullshot-wide"><img src="${uri}" alt="${esc(s.title)}"><figcaption>Desktop web view (1440×900) · orange outline = focus control</figcaption></figure>`
-        : `<div class="fullshot-wide empty">Screenshot missing — open live site and follow the detail page for this step.</div>`
+        : '<div class="fullshot-wide empty">Screenshot missing — open live site and follow the detail page for this step.</div>'
     }
     <footer class="pf"><span>Step ${n} of ${STEPS.length} · Screen</span><span>${SUPPORT}</span></footer>
   </section>`);
@@ -793,7 +793,7 @@ async function writePdf(html) {
         margin: { top: '0', right: '0', bottom: '0', left: '0' },
       });
       console.warn('Wrote alternate PDF (file locked):', PDF_ALT);
-    } else throw e;
+    } else {throw e;}
   }
   await browser.close();
   console.log('PDF', out, ((fs.statSync(out).size / 1024 / 1024).toFixed(2)) + ' MB');
@@ -822,7 +822,7 @@ async function main() {
     const page = await context.newPage();
     page.setDefaultTimeout(45000);
 
-    let dashPage = page;
+    const dashPage = page;
     try {
       await login(dashPage);
     } catch (e) {

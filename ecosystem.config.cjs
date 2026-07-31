@@ -24,6 +24,10 @@
 
 'use strict';
 
+const { loadGatewayEnv } = require('./scripts/load-gateway-env');
+loadGatewayEnv(process.env);
+const gatewayPort = String(process.env.GATEWAY_PORT || process.env.PORT || '3000');
+
 module.exports = {
   apps: [
     {
@@ -65,7 +69,8 @@ module.exports = {
       // only sets non-secret defaults.
       env: {
         NODE_ENV: 'production',
-        PORT: '3000',
+        PORT: gatewayPort,
+        GATEWAY_PORT: gatewayPort,
       },
       // PM2 does not load .env.local automatically; the gateway's own
       // .env loader at the top of whatsapp-gateway.js handles that.
@@ -106,8 +111,30 @@ module.exports = {
 
       env: {
         NODE_ENV: 'production',
+        GATEWAY_PORT: gatewayPort,
       },
 
+      watch: false,
+      ignore_watch: ['node_modules', '.git', 'publish-static', '*.log'],
+    },
+    {
+      name: 'restrosuite-gateway-watchdog',
+      script: './scripts/gateway-watchdog.cjs',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_restarts: 999,
+      min_uptime: '10s',
+      restart_delay: 5000,
+      kill_timeout: 5000,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      max_size: '5M',
+      retain: 5,
+      env: {
+        NODE_ENV: 'production',
+        GATEWAY_PORT: gatewayPort,
+      },
       watch: false,
       ignore_watch: ['node_modules', '.git', 'publish-static', '*.log'],
     },

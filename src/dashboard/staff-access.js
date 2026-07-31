@@ -73,7 +73,7 @@
     const role = config.role || '';
     const panel = document.getElementById('staff-access-panel');
     if (!panel) {return null;}
-    if (role !== "admin") {
+    if (role !== 'admin') {
       panel.hidden = true;
       return null;
     }
@@ -206,7 +206,7 @@
           setBusy(save, true);
           try {
             const allowedTabs = Array.from(modules.querySelectorAll('input:checked')).map((input) => input.value);
-            await callStaff("update_user", {
+            await callStaff('update_user', {
               user_id: user.id,
               display_name: displayInput.value.trim(),
               role: roleSelect.value,
@@ -231,7 +231,7 @@
           }
           setBusy(reset, true);
           try {
-            await callStaff("reset_password", { user_id: user.id, password });
+            await callStaff('reset_password', { user_id: user.id, password });
             notify('Password reset and existing sessions revoked.');
             await loadUsers();
           } catch (error) {
@@ -245,7 +245,7 @@
           if (!window.confirm(`Sign ${user.display_name || user.username} out from all devices?`)) {return;}
           setBusy(revoke, true);
           try {
-            await callStaff("revoke_user_sessions", { user_id: user.id });
+            await callStaff('revoke_user_sessions', { user_id: user.id });
             notify('All sessions for this account were revoked.');
             await loadUsers();
           } catch (error) {
@@ -264,7 +264,7 @@
     async function loadUsers() {
       list.replaceChildren(emptyState('fa-spinner fa-spin', 'Loading accounts', 'Checking current workspace access.'));
       try {
-        const result = await callStaff("list_users");
+        const result = await callStaff('list_users');
         users = Array.isArray(result.users) ? result.users : [];
         usage = result.usage || null;
         plan = result.plan || null;
@@ -277,7 +277,7 @@
     async function loadActivity() {
       activityList.replaceChildren(emptyState('fa-spinner fa-spin', 'Loading activity', 'Retrieving the latest security events.'));
       try {
-        const result = await callStaff("audit_logs", { limit: 100 });
+        const result = await callStaff('audit_logs', { limit: 100 });
         const logs = Array.isArray(result.logs) ? result.logs : [];
         activityList.replaceChildren();
         if (!logs.length) {
@@ -306,7 +306,7 @@
       const button = document.getElementById('create-staff-account-btn');
       setBusy(button, true);
       try {
-        await callStaff("create_user", {
+        await callStaff('create_user', {
           display_name: document.getElementById('staff-display-name').value.trim(),
           username: document.getElementById('staff-username').value.trim(),
           password: document.getElementById('staff-password').value,

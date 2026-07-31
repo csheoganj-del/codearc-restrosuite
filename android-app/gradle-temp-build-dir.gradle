@@ -1,3 +1,4 @@
 allprojects {
-    layout.buildDirectory = file("${rootDir}/.tmp-gradle-build/${project.path.replace(':', '_')}")
+    def buildRoot = System.getenv("RESTROSUITE_ANDROID_BUILD_ROOT") ?: "${rootDir}/.tmp-gradle-build"
+    layout.buildDirectory = file("${buildRoot}/${project.path.replace(':', '_')}")
 }

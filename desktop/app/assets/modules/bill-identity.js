@@ -19,7 +19,7 @@
     const prefix = 'RS-' + key + '-';
     const maxFromList = (existingBills || []).reduce((highest, bill) => {
       const no = String((bill && (bill.no || bill.orderId || bill.id)) || '');
-      if (!no.includes(key)) return highest;
+      if (!no.includes(key)) {return highest;}
       const parts = no.split('-');
       const seq = Number.parseInt(parts[parts.length - 1], 10);
       return Number.isFinite(seq) ? Math.max(highest, seq) : highest;
@@ -39,9 +39,9 @@
 
   function channelCode(channel) {
     const c = String(channel || '').toLowerCase();
-    if (c.includes('deliver') || c.includes('online') || c.includes('swig') || c.includes('zom')) return 'DL';
-    if (c.includes('take') || c.includes('parcel')) return 'TK';
-    if (c.includes('agg')) return 'AG';
+    if (c.includes('deliver') || c.includes('online') || c.includes('swig') || c.includes('zom')) {return 'DL';}
+    if (c.includes('take') || c.includes('parcel')) {return 'TK';}
+    if (c.includes('agg')) {return 'AG';}
     return 'DI';
   }
 
@@ -52,9 +52,9 @@
       if (global.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
         const res = await Promise.race([
           RS_API.data({ operation: 'next_bill_no', day }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('next_bill_no timeout')), 4000)),
+          new Promise((_, rej) => { setTimeout(() => rej(new Error('next_bill_no timeout')), 4000); }),
         ]);
-        let no = (res && (res.no || res.order_id || res.data)) || null;
+        const no = (res && (res.no || res.order_id || res.data)) || null;
         if (no && typeof no === 'string' && /^RS-\d{6}-\d+$/i.test(no)) {
           try {
             const s = (RS_API.session && RS_API.session()) || {};
@@ -63,7 +63,7 @@
             if (Number.isFinite(seq)) {
               const seqKey = 'rs_bill_seq:' + tenant + ':' + day;
               const stored = Number(localStorage.getItem(seqKey) || 0) || 0;
-              if (seq > stored) localStorage.setItem(seqKey, String(seq));
+              if (seq > stored) {localStorage.setItem(seqKey, String(seq));}
             }
           } catch (_) {}
           return no.replace(/^RS-/, 'RS-' + chCode + '-');

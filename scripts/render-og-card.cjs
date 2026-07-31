@@ -15,7 +15,7 @@ async function main() {
   const outPublishImg = path.join(root, 'publish-static', 'images', 'restrosuite-social.png');
   const outDesktop = path.join(root, 'desktop', 'app', 'assets', 'restrosuite-social.png');
 
-  if (!fs.existsSync(htmlPath)) throw new Error('Missing scripts/og-card.html');
+  if (!fs.existsSync(htmlPath)) {throw new Error('Missing scripts/og-card.html');}
 
   const browser = await chromium.launch({ headless: true });
   try {
@@ -38,7 +38,7 @@ async function main() {
     });
 
     // Prefer smaller file for WhatsApp if sharp is available; else keep PNG
-    let finalPath = outAssets;
+    const finalPath = outAssets;
     try {
       const sharp = require('sharp');
       const buf = await sharp(outAssets)

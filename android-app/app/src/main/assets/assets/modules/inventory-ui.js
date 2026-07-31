@@ -6,10 +6,10 @@
   'use strict';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function esc(s) {
@@ -36,17 +36,17 @@
     return (global.RS && RS.stockCls) || { ok: 'stock-ok', low: 'stock-low', out: 'stock-out' };
   }
   function nextLogicalNo(prefix) {
-    if (global.RS && typeof RS.nextLogicalNo === 'function') return RS.nextLogicalNo(prefix);
+    if (global.RS && typeof RS.nextLogicalNo === 'function') {return RS.nextLogicalNo(prefix);}
     return prefix + '-' + Date.now().toString(36).toUpperCase();
   }
   function setOperationStatus(msg, state) {
-    if (global.RS && typeof RS.setOperationStatus === 'function') return RS.setOperationStatus(msg, state);
+    if (global.RS && typeof RS.setOperationStatus === 'function') {return RS.setOperationStatus(msg, state);}
   }
   function finishOperationStatus(msg, state) {
-    if (global.RS && typeof RS.finishOperationStatus === 'function') return RS.finishOperationStatus(msg, state);
+    if (global.RS && typeof RS.finishOperationStatus === 'function') {return RS.finishOperationStatus(msg, state);}
   }
   function getModalRoot() {
-    if (global.RS && typeof RS.getModalRoot === 'function') return RS.getModalRoot();
+    if (global.RS && typeof RS.getModalRoot === 'function') {return RS.getModalRoot();}
     let root = document.getElementById('rs-modal-root');
     if (!root) {
       root = document.createElement('div');
@@ -63,10 +63,10 @@
   /** Pretty label for keys like hoagie_roll → Hoagie roll */
   function displayInvName(raw) {
     const s = String(raw == null ? '' : raw).trim();
-    if (!s) return '—';
-    if (!/[_-]/.test(s) && !/^[a-z0-9]+$/i.test(s)) return s;
+    if (!s) {return '—';}
+    if (!/[_-]/.test(s) && !/^[a-z0-9]+$/i.test(s)) {return s;}
     // Only auto-prettify snake/kebab or all-lowercase keys
-    if (/[A-Z]/.test(s) && !/[_-]/.test(s) && s.includes(' ')) return s;
+    if (/[A-Z]/.test(s) && !/[_-]/.test(s) && s.includes(' ')) {return s;}
     return s
       .replace(/[_-]+/g, ' ')
       .replace(/\s+/g, ' ')
@@ -79,15 +79,15 @@
   }
 
   function findInvByRow(row) {
-    if (!row) return null;
+    if (!row) {return null;}
     const id = row.getAttribute('data-inv-id');
     const list = getInventory();
     if (id) {
       const byId = list.find((x) => String(x.id) === id || String(x.name) === id || String(x.key) === id);
-      if (byId) return byId;
+      if (byId) {return byId;}
     }
     const name = row.querySelector('b') && row.querySelector('b').textContent;
-    if (!name) return null;
+    if (!name) {return null;}
     return list.find(
       (x) =>
         x.name === name ||
@@ -98,7 +98,7 @@
 
   function rebuildCatFilterOptions(inventory) {
     const sel = $('#inv-cat-filter');
-    if (!sel) return;
+    if (!sel) {return;}
     const prev = sel.value || 'All';
     const cats = Array.from(
       new Set(
@@ -155,13 +155,13 @@
           badge.style.display = n > 0 ? '' : 'none';
           badge.classList.toggle('badge-urgent', n > 0);
           const bits = [];
-          if (nLow) bits.push(nLow + ' low stock');
-          if (nExp) bits.push(nExp + ' near expiry');
+          if (nLow) {bits.push(nLow + ' low stock');}
+          if (nExp) {bits.push(nExp + ' near expiry');}
           badge.title = bits.join(' · ') || '';
         }
       });
     try {
-      if (global.RS && typeof RS.updateTabAttentionBlinking === 'function') RS.updateTabAttentionBlinking();
+      if (global.RS && typeof RS.updateTabAttentionBlinking === 'function') {RS.updateTabAttentionBlinking();}
     } catch (_) {}
   }
 
@@ -170,7 +170,7 @@
     if (!bar) {
       const stockPanel = document.getElementById('inv-panel-stock');
       const host = stockPanel && stockPanel.parentElement;
-      if (!host) return;
+      if (!host) {return;}
       bar = document.createElement('div');
       bar.id = 'inv-expiry-banner';
       bar.className = 'banner warn inv-expiry-banner';
@@ -211,9 +211,9 @@
       <button type="button" class="btn btn-ghost btn-sm banner-cta" id="btn-show-expiring">View</button>`;
     const btn = bar.querySelector('#btn-show-expiring');
     if (btn)
-      btn.onclick = () => {
+      {btn.onclick = () => {
         openExpiringModal(list);
-      };
+      };}
   }
 
   function openExpiringModal(list) {
@@ -260,13 +260,13 @@
       foot: '<button type="button" class="btn btn-primary" data-ok style="flex:1">Got it</button>',
       onMount(m, close) {
         const ok = m.querySelector('[data-ok]');
-        if (ok) ok.onclick = close;
+        if (ok) {ok.onclick = close;}
       },
     });
   }
 
   function openBatchesModal(inv) {
-    if (!inv || !global.RSModal) return;
+    if (!inv || !global.RSModal) {return;}
     const Batches = global.RSInventoryBatches;
     const list =
       Batches && Batches.batchesForItem ? Batches.batchesForItem(inv) : [];
@@ -310,7 +310,7 @@
       foot: '<button type="button" class="btn btn-primary" data-ok style="flex:1">Close</button>',
       onMount(m, close) {
         const ok = m.querySelector('[data-ok]');
-        if (ok) ok.onclick = close;
+        if (ok) {ok.onclick = close;}
       },
     });
   }
@@ -318,7 +318,7 @@
     const bySup = {};
     (items || []).forEach((i) => {
       const sup = (i.supplier || i.vendor || i.cat || 'General') + '';
-      if (!bySup[sup]) bySup[sup] = [];
+      if (!bySup[sup]) {bySup[sup] = [];}
       bySup[sup].push(i);
     });
     const rows = [];
@@ -381,8 +381,8 @@
       <div style="display:flex;justify-content:space-between;font-weight:800;margin-top:12px;font-size:15px"><span>Total</span><span>${rs(po.value)}</span></div>
       <div style="text-align:center;font-size:11px;color:#888;margin-top:14px">RestroSuite · ${esc(po.status || 'pending')}</div>
     </div>`;
-    if (typeof global.RSPrint === 'function') global.RSPrint(html, 'PO ' + (po.poNumber || po.id));
-    else if (global.RSPrintBridge && RSPrintBridge.printHtml) RSPrintBridge.printHtml(html, 'PO');
+    if (typeof global.RSPrint === 'function') {global.RSPrint(html, 'PO ' + (po.poNumber || po.id));}
+    else if (global.RSPrintBridge && RSPrintBridge.printHtml) {RSPrintBridge.printHtml(html, 'PO');}
   }
   function unitCostOf(i) {
     return Math.max(0, Number(i && (i.cost != null ? i.cost : i.unit_cost)) || 0);
@@ -397,8 +397,8 @@
     inv.cost = Math.max(0, Number(newCost) || 0);
     // Keep alias for older payloads / exports
     inv.unit_cost = inv.cost;
-    if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
-    else if (global.RS && RS.saveOne) await RS.saveOne('inventory', inv);
+    if (global.RS_DB) {await RS_DB.put('inventory', inv.id, inv);}
+    else if (global.RS && RS.saveOne) {await RS.saveOne('inventory', inv);}
   }
 
   /**
@@ -406,7 +406,7 @@
    */
   function openSetCostModal(inv, opts) {
     opts = opts || {};
-    if (!inv || !global.RSModal) return;
+    if (!inv || !global.RSModal) {return;}
     const unit = inv.unit || 'unit';
     const cur = unitCostOf(inv);
     const stock = Math.max(0, Number(inv.stock) || 0);
@@ -454,18 +454,20 @@
         modal.querySelector('[data-ok]').onclick = async () => {
           const c = Math.max(0, Number(inp.value) || 0);
           if (!(c > 0)) {
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
             toast('Enter a unit cost greater than 0', 'fa-circle-exclamation');
             inp.focus();
             return;
           }
           try {
             await persistInvCost(inv, c);
+            try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
             toast(displayInvName(inv.name) + ' · cost ' + rs(c) + '/' + unit + ' linked', 'fa-link');
             close();
             renderInventory();
             if (opts.showNext) {
               const next = missingCostItems().find((x) => String(x.id) !== String(inv.id));
-              if (next) setTimeout(() => openSetCostModal(next, { showNext: true }), 280);
+              if (next) {setTimeout(() => openSetCostModal(next, { showNext: true }), 280);}
             }
           } catch (e) {
             console.warn(e);
@@ -503,9 +505,9 @@
       const host = stockPanel && stockPanel.parentElement;
       if (host) {
         const linkTip = document.getElementById('inv-link-tip');
-        if (linkTip && linkTip.parentElement === host) host.insertBefore(bar, linkTip.nextSibling);
-        else if (stockPanel) host.insertBefore(bar, stockPanel);
-        else host.appendChild(bar);
+        if (linkTip && linkTip.parentElement === host) {host.insertBefore(bar, linkTip.nextSibling);}
+        else if (stockPanel) {host.insertBefore(bar, stockPanel);}
+        else {host.appendChild(bar);}
       }
     }
     if (!getInventory().length) {
@@ -522,13 +524,13 @@
         <button type="button" class="btn btn-ghost btn-sm" id="inv-cost-filter">Show ₹0 only</button></div>`;
       const a = bar.querySelector('#inv-cost-set-all');
       const b = bar.querySelector('#inv-cost-filter');
-      if (a) a.onclick = () => openMissingCostsWizard();
+      if (a) {a.onclick = () => openMissingCostsWizard();}
       if (b)
-        b.onclick = () => {
+        {b.onclick = () => {
           toast('Amber rows = missing cost — click ₹0 · set cost on each row', 'fa-circle-info');
           const row = document.querySelector('#inv-table-body .inv-cost-btn.is-zero');
-          if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        };
+          if (row) {row.scrollIntoView({ block: 'center', behavior: 'smooth' });}
+        };}
     } else {
       bar.style.display = 'flex';
       bar.className = 'banner inv-cost-banner inv-cost-banner-ok';
@@ -537,12 +539,12 @@
         <button type="button" class="btn btn-ghost btn-sm" id="inv-cost-dismiss">OK</button>`;
       const d = bar.querySelector('#inv-cost-dismiss');
       if (d)
-        d.onclick = () => {
+        {d.onclick = () => {
           bar.style.display = 'none';
           try {
-            if (global.sessionStorage) sessionStorage.setItem('rs_inv_cost_ok_hide', '1');
+            if (global.sessionStorage) {sessionStorage.setItem('rs_inv_cost_ok_hide', '1');}
           } catch (_) {}
-        };
+        };}
       try {
         if (global.sessionStorage && sessionStorage.getItem('rs_inv_cost_ok_hide') === '1') {
           bar.style.display = 'none';
@@ -589,7 +591,7 @@
   }
   async function confirmAndDraftPos() {
     const lowItems = lowStockItems();
-    if (!lowItems.length) return toast('All inventory levels are healthy', 'fa-circle-check');
+    if (!lowItems.length) {return toast('All inventory levels are healthy', 'fa-circle-check');}
     const drafts = buildPoRowsFromLow(lowItems);
     const totalVal = drafts.reduce((a, p) => a + (p.value || 0), 0);
     const preview = drafts
@@ -637,6 +639,7 @@
         n++;
       }
       finishOperationStatus('Drafted ' + n + ' PO(s)');
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {}
       toast(`Created ${n} purchase order${n === 1 ? '' : 's'}`, 'fa-truck');
       // Offer print / jump to Purchase orders
       if (drafts[0]) {
@@ -648,10 +651,11 @@
       }
       document.dispatchEvent(new CustomEvent('rs:render-inventory'));
       renderInventory();
-      if (global.RS && RS.render) RS.render('inventory-tab');
+      if (global.RS && RS.render) {RS.render('inventory-tab');}
     } catch (e) {
       console.warn('Auto-draft POs failed', e);
       finishOperationStatus('Auto-draft failed', 'error');
+      try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
       toast('Could not create all POs', 'fa-circle-exclamation');
     }
   }
@@ -712,31 +716,31 @@
           const b = tip.querySelector('#inv-tip-recipes');
           const c = tip.querySelector('#inv-tip-check');
           if (a)
-            a.onclick = () => {
-              if (global.RSKitchenLinkCoach) RSKitchenLinkCoach.openLinkWizard();
-            };
+            {a.onclick = () => {
+              if (global.RSKitchenLinkCoach) {RSKitchenLinkCoach.openLinkWizard();}
+            };}
           if (c)
-            c.onclick = () => {
+            {c.onclick = () => {
               if (global.RSKitchenLinkCoach && RSKitchenLinkCoach.openSetupChecklist)
-                RSKitchenLinkCoach.openSetupChecklist();
-            };
+                {RSKitchenLinkCoach.openSetupChecklist();}
+            };}
           if (b)
-            b.onclick = () => {
-              if (global.RSKitchenLinkCoach) RSKitchenLinkCoach.goInventoryTab('recipes');
+            {b.onclick = () => {
+              if (global.RSKitchenLinkCoach) {RSKitchenLinkCoach.goInventoryTab('recipes');}
               else {
                 const btn = document.querySelector('#inv-seg [data-inv-tab="recipes"]');
-                if (btn) btn.click();
+                if (btn) {btn.click();}
               }
-            };
+            };}
         } else {
           tip.style.display = 'none';
         }
       }
     } catch (_) {}
     const banner = $('#inv-banner');
-    if (banner) banner.style.display = low.length ? 'flex' : 'none';
+    if (banner) {banner.style.display = low.length ? 'flex' : 'none';}
     const lowCount = $('#inv-low-count');
-    if (lowCount) lowCount.textContent = low.length;
+    if (lowCount) {lowCount.textContent = low.length;}
 
     const btnAutoDraft = $('#btn-auto-draft-pos');
     if (btnAutoDraft) {
@@ -779,7 +783,7 @@
       const q = (($('#inv-stock-search') && $('#inv-stock-search').value) || '').toLowerCase().trim();
 
       try {
-        if (global.RSSkel && RSSkel.clear) RSSkel.clear(invBody);
+        if (global.RSSkel && RSSkel.clear) {RSSkel.clear(invBody);}
       } catch (_) {}
 
       let filtered = INVENTORY;
@@ -830,25 +834,25 @@
         </td></tr>`;
         const clear = document.getElementById('inv-clear-filters');
         if (clear)
-          clear.onclick = () => {
+          {clear.onclick = () => {
             const c = document.getElementById('inv-cat-filter');
             const s = document.getElementById('inv-status-filter');
             const se = document.getElementById('inv-stock-search');
-            if (c) c.value = 'All';
-            if (s) s.value = 'All';
-            if (se) se.value = '';
+            if (c) {c.value = 'All';}
+            if (s) {s.value = 'All';}
+            if (se) {se.value = '';}
             renderInventory();
-          };
+          };}
         const add = document.getElementById('inv-empty-add');
         if (add)
-          add.onclick = () => {
+          {add.onclick = () => {
             openAddStockModal({ typeId: 'food' });
-          };
+          };}
         const addPack = document.getElementById('inv-empty-pack');
         if (addPack)
-          addPack.onclick = () => {
+          {addPack.onclick = () => {
             openAddStockModal({ typeId: 'packaging' });
-          };
+          };}
       } else {
       invBody.innerHTML = filtered
         .map((i) => {
@@ -907,7 +911,7 @@
         btn.onclick = () => {
           const row = btn.closest('tr');
           const inv = findInvByRow(row);
-          if (inv) openBatchesModal(inv);
+          if (inv) {openBatchesModal(inv);}
         };
       });
       $$('#inv-table-body [data-set-cost]').forEach((btn) => {
@@ -916,7 +920,7 @@
           e.stopPropagation();
           const row = btn.closest('tr');
           const inv = findInvByRow(row);
-          if (inv) openSetCostModal(inv, { showNext: !(unitCostOf(inv) > 0) });
+          if (inv) {openSetCostModal(inv, { showNext: !(unitCostOf(inv) > 0) });}
         };
       });
 
@@ -924,7 +928,7 @@
         b.addEventListener('click', () => {
           const row = b.closest('tr');
           const inv = findInvByRow(row);
-          if (!inv) return;
+          if (!inv) {return;}
           const qtyToOrder = Math.max(1, Math.round(inv.min * 2 - inv.stock));
           const estimatedCost = Math.round(qtyToOrder * inv.cost);
 
@@ -1025,8 +1029,8 @@
                 };
                 close();
                 try {
-                  if (global.RS && RS.saveOne) await RS.saveOne('purchase_orders', poRow);
-                  else if (global.RS_DB) await RS_DB.put('purchase_orders', poRow.id, poRow);
+                  if (global.RS && RS.saveOne) {await RS.saveOne('purchase_orders', poRow);}
+                  else if (global.RS_DB) {await RS_DB.put('purchase_orders', poRow.id, poRow);}
                   toast('PO raised · receive later with expiry', 'fa-circle-check');
                   document.dispatchEvent(new CustomEvent('rs:render-inventory'));
                   renderInventory();
@@ -1054,7 +1058,7 @@
                     inv.unit_cost = inv.cost;
                     inv.lastBuyCost = unitCost;
                   }
-                  if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
+                  if (global.RS_DB) {await RS_DB.put('inventory', inv.id, inv);}
                   if (global.RSInventoryBatches && RSInventoryBatches.receiveBatch) {
                     await RSInventoryBatches.receiveBatch({
                       item: inv,
@@ -1095,7 +1099,7 @@
         b.addEventListener('click', () => {
           const row = b.closest('tr');
           const inv = findInvByRow(row);
-          if (!inv) return;
+          if (!inv) {return;}
 
           if (!global.RSModal) {
             toast('Modal module is unavailable', 'fa-circle-exclamation');
@@ -1172,7 +1176,7 @@
             icon: 'fa-pen',
             size: 'sm',
             body,
-            foot: `<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-danger" style="flex:0" data-delete title="Remove from stock"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-circle-check"></i> Save changes</button>`,
+            foot: '<button class="btn btn-ghost" style="flex:1" data-cancel>Cancel</button><button class="btn btn-danger" style="flex:0" data-delete title="Remove from stock"><i class="fa-solid fa-trash"></i></button><button class="btn btn-primary" style="flex:1" data-confirm><i class="fa-solid fa-circle-check"></i> Save changes</button>',
             onMount(modal, close) {
               const catSel = modal.querySelector('#edit-ing-cat');
               const catCustom = modal.querySelector('#edit-ing-cat-custom');
@@ -1180,28 +1184,28 @@
               const valEl = modal.querySelector('#edit-ing-val');
               const stockEl = modal.querySelector('#edit-ing-stock');
               const refreshVal = () => {
-                if (!valEl) return;
+                if (!valEl) {return;}
                 const c = Math.max(0, Number(costEl.value) || 0);
                 const s = Math.max(0, Number(stockEl.value) || 0);
                 valEl.textContent = rs(Math.round(c * s * 100) / 100);
               };
-              if (costEl) costEl.addEventListener('input', refreshVal);
-              if (stockEl) stockEl.addEventListener('input', refreshVal);
+              if (costEl) {costEl.addEventListener('input', refreshVal);}
+              if (stockEl) {stockEl.addEventListener('input', refreshVal);}
               if (catSel)
-                catSel.onchange = () => {
+                {catSel.onchange = () => {
                   if (catSel.value === '__custom__') {
                     catCustom.style.display = '';
                     catCustom.focus();
-                  } else catCustom.style.display = 'none';
-                };
+                  } else {catCustom.style.display = 'none';}
+                };}
               modal.querySelector('[data-cancel]').onclick = close;
               modal.querySelector('[data-delete]').onclick = async () => {
                 close();
                 setOperationStatus('Removing stock item...');
                 try {
                   const idx = INVENTORY.findIndex((x) => x.id === inv.id);
-                  if (idx > -1) INVENTORY.splice(idx, 1);
-                  if (global.RS_DB) await RS_DB.del('inventory', inv.id);
+                  if (idx > -1) {INVENTORY.splice(idx, 1);}
+                  if (global.RS_DB) {await RS_DB.del('inventory', inv.id);}
                   finishOperationStatus('Stock item removed');
                   toast(`${inv.name} removed from inventory`, 'fa-circle-check');
                   renderInventory();
@@ -1213,10 +1217,10 @@
               };
               modal.querySelector('[data-confirm]').onclick = async () => {
                 const newName = modal.querySelector('#edit-ing-name').value.trim();
-                if (!newName) return toast('Enter item name', 'fa-circle-exclamation');
+                if (!newName) {return toast('Enter item name', 'fa-circle-exclamation');}
                 inv.name = newName;
                 let cat = modal.querySelector('#edit-ing-cat').value;
-                if (cat === '__custom__') cat = (catCustom.value || '').trim() || 'Other';
+                if (cat === '__custom__') {cat = (catCustom.value || '').trim() || 'Other';}
                 inv.cat = cat || 'General';
                 inv.unit = modal.querySelector('#edit-ing-unit').value.trim() || 'unit';
                 inv.stock = +modal.querySelector('#edit-ing-stock').value || 0;
@@ -1232,7 +1236,7 @@
                 close();
                 setOperationStatus('Saving changes...');
                 try {
-                  if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
+                  if (global.RS_DB) {await RS_DB.put('inventory', inv.id, inv);}
                   finishOperationStatus('Stock item updated');
                   toast(`${displayInvName(inv.name)} updated · cost ${rs(inv.cost)}/${inv.unit || 'unit'}`, 'fa-link');
                   renderInventory();
@@ -1277,10 +1281,10 @@
 
       $$('#recipe-table-body [data-recipe-edit]').forEach((btn) => {
         btn.onclick = () => {
-          if (global.RS && RS.activateTab) RS.activateTab('editor-tab');
+          if (global.RS && RS.activateTab) {RS.activateTab('editor-tab');}
           setTimeout(() => {
             const m = MENU.find((x) => String(x.id) === String(btn.dataset.recipeEdit));
-            if (m && global.buildFormLoad) global.buildFormLoad(m);
+            if (m && global.buildFormLoad) {global.buildFormLoad(m);}
           }, 200);
         };
       });
@@ -1309,7 +1313,7 @@
         };
         wrap.querySelector('#bulk-rec-cancel').onclick = close;
         wrap.addEventListener('click', (e) => {
-          if (e.target === wrap) close();
+          if (e.target === wrap) {close();}
         });
         wrap.querySelector('#bulk-rec-go').onclick = async () => {
           const raw = (wrap.querySelector('#bulk-rec-ta').value || '').trim();
@@ -1322,7 +1326,7 @@
           const errors = [];
           raw.split(/\r?\n/).forEach((line, idx) => {
             const t = line.trim();
-            if (!t) return;
+            if (!t) {return;}
             const parts = t.split(',').map((s) => s.trim());
             if (parts.length < 3) {
               errors.push('Line ' + (idx + 1) + ': need Item, Ingredient, Qty, Unit');
@@ -1372,11 +1376,11 @@
           try {
             for (let i = 0; i < ids.length; i++) {
               const row = byItem[ids[i]];
-              if (global.RS && RS.saveOne) await RS.saveOne('menu', row.m);
-              if (prog) prog.update({ done: i + 1 });
+              if (global.RS && RS.saveOne) {await RS.saveOne('menu', row.m);}
+              if (prog) {prog.update({ done: i + 1 });}
             }
-            if (global.RS && RS.save && !global.RS.saveOne) await RS.save('menu');
-            if (prog) prog.close();
+            if (global.RS && RS.save && !global.RS.saveOne) {await RS.save('menu');}
+            if (prog) {prog.close();}
             toast('Recipes imported: ' + ids.length + ' item(s), ' + links + ' ingredient links', 'fa-circle-check');
             if (errors.length) {
               out.innerHTML =
@@ -1391,7 +1395,7 @@
               renderInventory();
             }
           } catch (e) {
-            if (prog) prog.close();
+            if (prog) {prog.close();}
             console.warn('Recipe import save failed', e);
             out.innerHTML = '<span style="color:var(--red)">Save failed -- recipes were not saved. Try again.</span>';
             toast('Recipe import failed to save -- try again', 'fa-circle-exclamation');
@@ -1440,7 +1444,7 @@
             ];
             stockOnly.forEach((id) => {
               const el = document.getElementById(id);
-              if (!el) return;
+              if (!el) {return;}
               if (id === 'inv-stock-search') {
                 const wrap = el.closest('.inv-search-wrap') || el;
                 wrap.style.display = tab === 'stock' ? '' : 'none';
@@ -1470,7 +1474,7 @@
         ];
         stockOnly.forEach((id) => {
           const el = document.getElementById(id);
-          if (!el) return;
+          if (!el) {return;}
           if (id === 'inv-stock-search') {
             const wrap = el.closest('.inv-search-wrap') || el;
             wrap.style.display = isStock ? '' : 'none';
@@ -1529,7 +1533,7 @@
     async function saveStockItem(item) {
       INVENTORY.push(item);
       try {
-        if (global.RS_DB) await RS_DB.put('inventory', item.id, item);
+        if (global.RS_DB) {await RS_DB.put('inventory', item.id, item);}
         toast(item.name + ' added · synced', 'fa-circle-check');
       } catch (e) {
         console.warn('add stock save', e);
@@ -1545,7 +1549,7 @@
 
     function openAddStockModal(opts) {
       opts = opts || {};
-      if (!global.RSModal) return;
+      if (!global.RSModal) {return;}
       let typeId = opts.typeId || 'food';
       const preset0 = STOCK_TYPE_PRESETS.find((t) => t.id === typeId) || STOCK_TYPE_PRESETS[0];
 
@@ -1608,7 +1612,7 @@
               </div>
             </div>
           </div>`,
-        foot: `<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-circle-check"></i> Add to stock</button>`,
+        foot: '<button class="btn btn-ghost" style="flex:1" data-x>Cancel</button><button class="btn btn-primary" style="flex:1.2" data-ok><i class="fa-solid fa-circle-check"></i> Add to stock</button>',
         onMount(modal, close) {
           modal.querySelector('[data-x]').onclick = close;
           const nameEl = modal.querySelector('#add-ing-name');
@@ -1622,10 +1626,10 @@
             const p = STOCK_TYPE_PRESETS.find((t) => t.id === id) || STOCK_TYPE_PRESETS[0];
             modal.querySelectorAll('.inv-type-chip').forEach((b) => b.classList.toggle('active', b.getAttribute('data-type') === id));
             if (catEl && !catCustom.value) {
-              if ([...catEl.options].some((o) => o.value === p.cat)) catEl.value = p.cat;
+              if ([...catEl.options].some((o) => o.value === p.cat)) {catEl.value = p.cat;}
             }
-            if (unitEl && UNIT_OPTIONS.includes(p.unit)) unitEl.value = p.unit;
-            if (nameEl && !nameEl.value) nameEl.placeholder = p.ph;
+            if (unitEl && UNIT_OPTIONS.includes(p.unit)) {unitEl.value = p.unit;}
+            if (nameEl && !nameEl.value) {nameEl.placeholder = p.ph;}
             // Higher default min for packaging/disposables
             if (minEl && (id === 'packaging' || id === 'disposables') && (!minEl.value || minEl.value === '10')) {
               minEl.value = '50';
@@ -1636,19 +1640,19 @@
             btn.onclick = () => applyType(btn.getAttribute('data-type'));
           });
           if (catEl)
-            catEl.onchange = () => {
+            {catEl.onchange = () => {
               if (catEl.value === '__custom__') {
                 catCustom.style.display = '';
                 catCustom.focus();
               } else {
                 catCustom.style.display = 'none';
               }
-            };
+            };}
 
           modal.querySelectorAll('[data-quick]').forEach((chip) => {
             chip.onclick = async () => {
               const q = PACKAGING_QUICK[+chip.getAttribute('data-quick')];
-              if (!q) return;
+              if (!q) {return;}
               const exists = INVENTORY.find((x) => String(x.name).toLowerCase() === q.name.toLowerCase());
               if (exists) {
                 toast(q.name + ' is already in stock', 'fa-circle-info');
@@ -1673,10 +1677,10 @@
 
           modal.querySelector('[data-ok]').onclick = async () => {
             const name = nameEl.value.trim();
-            if (!name) return toast('Enter item name', 'fa-circle-exclamation');
+            if (!name) {return toast('Enter item name', 'fa-circle-exclamation');}
             let cat = catEl.value;
-            if (cat === '__custom__') cat = (catCustom.value || '').trim() || 'Other';
-            if (!cat) cat = 'General';
+            if (cat === '__custom__') {cat = (catCustom.value || '').trim() || 'Other';}
+            if (!cat) {cat = 'General';}
             const costVal = +modal.querySelector('#add-ing-cost').value || 0;
             if (!(costVal > 0)) {
               toast('Add unit cost (₹ per unit) so this item links to plate cost', 'fa-indian-rupee-sign');
@@ -1697,13 +1701,13 @@
             await saveStockItem(item);
             close();
           };
-          if (nameEl) nameEl.focus();
+          if (nameEl) {nameEl.focus();}
         },
       });
     }
 
     function openVarianceReport() {
-      if (!global.RSModal) return;
+      if (!global.RSModal) {return;}
       const bills = (global.RS && RS.BILLS) || [];
       const menu = (global.RS && RS.MENU) || [];
       const now = Date.now();
@@ -1711,7 +1715,7 @@
       function inRange(b, days) {
         const t = b.dateTime || b.created_at || b.time;
         const ms = t ? new Date(t).getTime() : 0;
-        if (!ms) return days >= 30; // include undated in long window
+        if (!ms) {return days >= 30;} // include undated in long window
         return now - ms <= days * dayMs;
       }
       const periods = [
@@ -1791,9 +1795,9 @@
             });
             const csvBtn = m.querySelector('[data-csv]');
             if (csvBtn)
-              csvBtn.onclick = () => {
+              {csvBtn.onclick = () => {
                 const { usage } = rowsFor();
-                if (!usage.length) return toast('Nothing to export', 'fa-circle-info');
+                if (!usage.length) {return toast('Nothing to export', 'fa-circle-info');}
                 const escC = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
                 const csv =
                   '\uFEFF' +
@@ -1820,9 +1824,9 @@
                     })
                     .join('\r\n');
                 if (global.RS && RS.downloadFile)
-                  RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'stock-variance.csv');
+                  {RS.downloadFile(csv, 'text/csv;charset=utf-8;', 'stock-variance.csv');}
                 toast('Variance CSV exported', 'fa-file-csv');
-              };
+              };}
           },
         });
       }
@@ -1830,12 +1834,12 @@
     }
 
     function openPrepBatchModal() {
-      if (!global.RSModal) return;
+      if (!global.RSModal) {return;}
       if (!INVENTORY.length) {
         toast('Add stock items first', 'fa-boxes-stacked');
         return;
       }
-      let inputs = [];
+      const inputs = [];
       RSModal.open({
         title: 'Run prep batch',
         sub: 'Use stock to make more stock (gravy, batter, sauce…) — industry prep recipe',
@@ -1945,8 +1949,8 @@
               sub: 'Stock consumed to make the batch',
               icon: 'fa-cube',
               size: 'sm',
-              body: `<input class="form-input" id="prep-q" placeholder="Search…" style="margin-bottom:10px"><div id="prep-pick" class="klc-pick-list"></div>`,
-              foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>`,
+              body: '<input class="form-input" id="prep-q" placeholder="Search…" style="margin-bottom:10px"><div id="prep-pick" class="klc-pick-list"></div>',
+              foot: '<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>',
               onMount(sm, sc) {
                 sm.querySelector('[data-x]').onclick = sc;
                 const q = sm.querySelector('#prep-q');
@@ -1991,8 +1995,8 @@
           modal.querySelector('[data-ok]').onclick = async () => {
             const out = INVENTORY.find((i) => String(i.id) === String(outSel.value));
             const pq = Math.max(0, Number(outQty.value) || 0);
-            if (!out || pq <= 0) return toast('Enter output quantity', 'fa-circle-exclamation');
-            if (!inputs.length) return toast('Add at least one input', 'fa-circle-exclamation');
+            if (!out || pq <= 0) {return toast('Enter output quantity', 'fa-circle-exclamation');}
+            if (!inputs.length) {return toast('Add at least one input', 'fa-circle-exclamation');}
             for (const g of inputs) {
               const inv = INVENTORY.find((i) => i.name === g.name);
               if (!inv || (Number(inv.stock) || 0) < (Number(g.qty) || 0)) {
@@ -2010,7 +2014,7 @@
                   await RSInventoryBatches.deductFefo(inv, q);
                 } catch (_) {}
               }
-              if (global.RS_DB) await RS_DB.put('inventory', inv.id, inv);
+              if (global.RS_DB) {await RS_DB.put('inventory', inv.id, inv);}
             }
             const oldQty = Math.max(0, Number(out.stock) || 0);
             const oldCost = unitCostOf(out);
@@ -2021,7 +2025,7 @@
                 ? RSRecipeUnits.weightedAverageCost(oldQty, oldCost, pq, unitC)
                 : unitC;
             out.unit_cost = out.cost;
-            if (global.RS_DB) await RS_DB.put('inventory', out.id, out);
+            if (global.RS_DB) {await RS_DB.put('inventory', out.id, out);}
             close();
             toast(
               'Prep done · +' + pq + ' ' + (out.unit || '') + ' ' + displayInvName(out.name) + ' · avg ' + rs(out.cost),
@@ -2055,7 +2059,7 @@
           return RSInventoryLedger.loadTakeawayPackConfig();
         }
         const raw = localStorage.getItem('rs_takeaway_pack');
-        if (raw) return JSON.parse(raw);
+        if (raw) {return JSON.parse(raw);}
       } catch (_) {}
       return { enabled: false, items: [], applyDelivery: true };
     }
@@ -2064,13 +2068,13 @@
         localStorage.setItem('rs_takeaway_pack', JSON.stringify(cfg));
       } catch (_) {}
       try {
-        if (!global.RS_SETTINGS) global.RS_SETTINGS = {};
+        if (!global.RS_SETTINGS) {global.RS_SETTINGS = {};}
         global.RS_SETTINGS.set_takeaway_pack = cfg;
-        if (global.RS && RS.saveSettings) await RS.saveSettings(global.RS_SETTINGS);
+        if (global.RS && RS.saveSettings) {await RS.saveSettings(global.RS_SETTINGS);}
       } catch (_) {}
     }
     function openTakeawayPackModal() {
-      if (!global.RSModal) return;
+      if (!global.RSModal) {return;}
       const cfg = loadTakeawayPackCfg();
       let items = (cfg.items || []).map((x) => ({
         name: x.name,
@@ -2175,8 +2179,8 @@
               sub: 'Pick from store room',
               icon: 'fa-box',
               size: 'sm',
-              body: `<input class="form-input" id="tk-q" placeholder="Search packaging…" style="margin-bottom:10px"><div id="tk-pick" class="klc-pick-list"></div>`,
-              foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>`,
+              body: '<input class="form-input" id="tk-q" placeholder="Search packaging…" style="margin-bottom:10px"><div id="tk-pick" class="klc-pick-list"></div>',
+              foot: '<button type="button" class="btn btn-ghost" style="flex:1" data-x>Close</button>',
               onMount(sm, sc) {
                 sm.querySelector('[data-x]').onclick = sc;
                 const q = sm.querySelector('#tk-q');
@@ -2243,7 +2247,7 @@
       packBtn.dataset.wired = '1';
       packBtn.onclick = () => openTakeawayPackModal();
     }
-    if (global.RSInventoryUI) global.RSInventoryUI._openAddStockModal = openAddStockModal;
+    if (global.RSInventoryUI) {global.RSInventoryUI._openAddStockModal = openAddStockModal;}
     document.dispatchEvent(new CustomEvent('rs:render-inventory'));
     try {
       if (global.RS && typeof RS.updateTabAttentionBlinking === 'function') {
@@ -2258,7 +2262,7 @@
       return global.RSInventoryUI._openAddStockModal(opts);
     }
     const btn = document.getElementById('btn-add-ingredient');
-    if (btn) btn.click();
+    if (btn) {btn.click();}
   }
 
   global.RSInventoryUI = {
@@ -2277,17 +2281,17 @@
   };
 
   function attachToRS() {
-    if (!global.RS) return;
+    if (!global.RS) {return;}
     global.RS.renderInventory = renderInventory;
     global.RS.exportLowStockCsv = exportLowStockCsv;
     global.RS.autoDraftPurchaseOrders = confirmAndDraftPos;
     global.RS.openAddStockModal = openAddStockModalPublic;
   }
-  if (global.RS) attachToRS();
+  if (global.RS) {attachToRS();}
   document.addEventListener('rs:ready', attachToRS);
   document.addEventListener('rs:hydrated', () => {
     try {
-      if (global.RSSkel && RSSkel.markHydrated) RSSkel.markHydrated();
+      if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
       renderInventory();
     } catch (_) {}
   });

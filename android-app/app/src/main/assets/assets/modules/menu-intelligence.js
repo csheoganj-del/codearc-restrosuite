@@ -6,11 +6,11 @@
 (function (global) {
   'use strict';
 
-  var PENDING_KEY = 'rs_pending_recipes_v1';
-  var POP_KEY = 'rs_item_popularity_v1';
+  const PENDING_KEY = 'rs_pending_recipes_v1';
+  const POP_KEY = 'rs_item_popularity_v1';
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -26,20 +26,20 @@
     return (global.RS && Array.isArray(RS.BILLS) ? RS.BILLS : []) || [];
   }
   function rs(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
 
   /* ---------- Popularity from bills ---------- */
   function rebuildPopularity() {
-    var counts = {};
+    const counts = {};
     getBills().forEach(function (b) {
-      var items = b.items || b._items || b.lines || [];
-      if (!Array.isArray(items)) return;
+      const items = b.items || b._items || b.lines || [];
+      if (!Array.isArray(items)) {return;}
       items.forEach(function (line) {
-        var name = String(line.name || line.item || '').trim();
-        if (!name) return;
-        var q = Number(line.qty) || 1;
+        const name = String(line.name || line.item || '').trim();
+        if (!name) {return;}
+        const q = Number(line.qty) || 1;
         counts[name] = (counts[name] || 0) + q;
       });
     });
@@ -49,39 +49,39 @@
     // Stamp orderCount onto live menu
     getMenu().forEach(function (m) {
       m.orderCount = counts[m.name] || Number(m.orderCount) || 0;
-      if (m.orderCount >= 10) m.bestseller = m.bestseller || true;
+      if (m.orderCount >= 10) {m.bestseller = m.bestseller || true;}
     });
     return counts;
   }
 
   function popularityMap() {
     try {
-      var raw = localStorage.getItem(POP_KEY);
-      if (raw) return JSON.parse(raw) || {};
+      const raw = localStorage.getItem(POP_KEY);
+      if (raw) {return JSON.parse(raw) || {};}
     } catch (_) {}
     return rebuildPopularity();
   }
 
   function sortMenu(items, mode) {
     mode = mode || 'popular';
-    var pop = popularityMap();
-    var list = (items || []).slice();
-    var score = function (m) {
+    const pop = popularityMap();
+    const list = (items || []).slice();
+    const score = function (m) {
       return Number(m.orderCount) || pop[m.name] || 0;
     };
     list.sort(function (a, b) {
       // Virtual categories always float specials / staples when using popular
       if (mode === 'popular' || mode === 'default') {
-        var as = (a.isSpecial ? 1e9 : 0) + (a.bestseller ? 1e6 : 0) + (a.isStaple ? 1e5 : 0) + score(a);
-        var bs = (b.isSpecial ? 1e9 : 0) + (b.bestseller ? 1e6 : 0) + (b.isStaple ? 1e5 : 0) + score(b);
-        if (bs !== as) return bs - as;
+        const as = (a.isSpecial ? 1e9 : 0) + (a.bestseller ? 1e6 : 0) + (a.isStaple ? 1e5 : 0) + score(a);
+        const bs = (b.isSpecial ? 1e9 : 0) + (b.bestseller ? 1e6 : 0) + (b.isStaple ? 1e5 : 0) + score(b);
+        if (bs !== as) {return bs - as;}
       }
-      if (mode === 'name-asc') return String(a.name || '').localeCompare(String(b.name || ''));
-      if (mode === 'name-desc') return String(b.name || '').localeCompare(String(a.name || ''));
-      if (mode === 'price-asc') return (Number(a.price) || 0) - (Number(b.price) || 0);
-      if (mode === 'price-desc') return (Number(b.price) || 0) - (Number(a.price) || 0);
-      if (mode === 'veg-first') return (b.veg ? 1 : 0) - (a.veg ? 1 : 0) || score(b) - score(a);
-      if (mode === 'nonveg-first') return (a.veg ? 1 : 0) - (b.veg ? 1 : 0) || score(b) - score(a);
+      if (mode === 'name-asc') {return String(a.name || '').localeCompare(String(b.name || ''));}
+      if (mode === 'name-desc') {return String(b.name || '').localeCompare(String(a.name || ''));}
+      if (mode === 'price-asc') {return (Number(a.price) || 0) - (Number(b.price) || 0);}
+      if (mode === 'price-desc') {return (Number(b.price) || 0) - (Number(a.price) || 0);}
+      if (mode === 'veg-first') {return (b.veg ? 1 : 0) - (a.veg ? 1 : 0) || score(b) - score(a);}
+      if (mode === 'nonveg-first') {return (a.veg ? 1 : 0) - (b.veg ? 1 : 0) || score(b) - score(a);}
       return score(b) - score(a) || String(a.name || '').localeCompare(String(b.name || ''));
     });
     return list;
@@ -100,17 +100,17 @@
 
   /* ---------- Water pairing for bread staples ---------- */
   function isBreadStaple(item) {
-    if (!item) return false;
-    if (item.pairWater === false) return false;
-    if (item.pairWater === true) return true;
-    var n = String(item.name || '').toLowerCase();
+    if (!item) {return false;}
+    if (item.pairWater === false) {return false;}
+    if (item.pairWater === true) {return true;}
+    const n = String(item.name || '').toLowerCase();
     return /roti|chapati|naan|paratha|kulcha|bhakri|phulka/.test(n);
   }
 
   function waterOptions() {
-    var settings = (global.RS_SETTINGS || {});
-    var bottle = Number(settings.set_bottle_water_price);
-    if (!Number.isFinite(bottle) || bottle < 0) bottle = 20;
+    const settings = (global.RS_SETTINGS || {});
+    let bottle = Number(settings.set_bottle_water_price);
+    if (!Number.isFinite(bottle) || bottle < 0) {bottle = 20;}
     return [
       { id: 'tap', name: 'Normal water (complimentary)', price: 0, free: true },
       { id: 'bottle', name: 'Bottled water', price: bottle, free: false },
@@ -118,11 +118,11 @@
   }
 
   async function promptWaterPairing(menuItem) {
-    if (!isBreadStaple(menuItem)) return null;
-    if (!global.RSModal) return { id: 'tap', name: 'Normal water (complimentary)', price: 0, free: true };
+    if (!isBreadStaple(menuItem)) {return null;}
+    if (!global.RSModal) {return { id: 'tap', name: 'Normal water (complimentary)', price: 0, free: true };}
     return new Promise(function (resolve) {
-      var opts = waterOptions();
-      var body =
+      const opts = waterOptions();
+      const body =
         '<p style="font-size:13px;color:var(--text-soft);margin:0 0 12px;line-height:1.45">' +
         'Most guests with <b>' +
         esc(menuItem.name) +
@@ -164,7 +164,7 @@
             resolve(null);
           };
           modal.querySelector('[data-ok]').onclick = function () {
-            var id = (modal.querySelector('input[name="rs-water"]:checked') || {}).value || 'tap';
+            const id = (modal.querySelector('input[name="rs-water"]:checked') || {}).value || 'tap';
             if (modal.querySelector('#rs-water-skip') && modal.querySelector('#rs-water-skip').checked) {
               try {
                 sessionStorage.setItem('rs_skip_water_prompt', '1');
@@ -182,9 +182,9 @@
 
   /* ---------- Add-ons picker ---------- */
   function itemAddons(menuItem) {
-    if (!menuItem) return [];
-    var raw = menuItem.addons || menuItem.customizations || [];
-    if (!Array.isArray(raw)) return [];
+    if (!menuItem) {return [];}
+    const raw = menuItem.addons || menuItem.customizations || [];
+    if (!Array.isArray(raw)) {return [];}
     return raw
       .map(function (a) {
         return {
@@ -198,10 +198,10 @@
   }
 
   async function promptAddons(menuItem) {
-    var addons = itemAddons(menuItem);
-    if (!addons.length || !global.RSModal) return [];
+    const addons = itemAddons(menuItem);
+    if (!addons.length || !global.RSModal) {return [];}
     return new Promise(function (resolve) {
-      var body =
+      const body =
         '<p style="font-size:13px;color:var(--text-soft);margin:0 0 12px">Optional extras for <b>' +
         esc(menuItem.name) +
         '</b></p><div style="display:flex;flex-direction:column;gap:8px">' +
@@ -234,10 +234,10 @@
             resolve([]);
           };
           modal.querySelector('[data-ok]').onclick = function () {
-            var picked = [];
+            const picked = [];
             modal.querySelectorAll('input[data-ai]:checked').forEach(function (cb) {
-              var a = addons[+cb.getAttribute('data-ai')];
-              if (a) picked.push(a);
+              const a = addons[+cb.getAttribute('data-ai')];
+              if (a) {picked.push(a);}
             });
             close();
             resolve(picked);
@@ -250,12 +250,12 @@
   /* ---------- Custom / off-menu cart item ---------- */
   function openCustomCartItem(opts) {
     opts = opts || {};
-    var presetName = opts.name || '';
+    const presetName = opts.name || '';
     if (!global.RSModal) {
-      var n = window.prompt('Item name', presetName);
-      if (!n) return;
-      var p = parseFloat(window.prompt('Price', '0'));
-      if (!(p >= 0)) return;
+      const n = window.prompt('Item name', presetName);
+      if (!n) {return;}
+      const p = parseFloat(window.prompt('Price', '0'));
+      if (!(p >= 0)) {return;}
       pushCustomLine({ name: n.trim(), price: p, recipeNow: false });
       return;
     }
@@ -286,13 +286,13 @@
         '<button class="btn btn-primary" style="flex:1" data-ok><i class="fa-solid fa-cart-plus"></i> Add to cart</button>',
       onMount: function (modal, close) {
         modal.querySelector('[data-x]').onclick = close;
-        var nameEl = modal.querySelector('#ci-name');
-        if (nameEl) nameEl.focus();
+        const nameEl = modal.querySelector('#ci-name');
+        if (nameEl) {nameEl.focus();}
         modal.querySelector('[data-ok]').onclick = async function () {
-          var name = (modal.querySelector('#ci-name').value || '').trim();
-          var price = parseFloat(modal.querySelector('#ci-price').value);
-          var qty = Math.max(1, parseInt(modal.querySelector('#ci-qty').value, 10) || 1);
-          var recipeMode = modal.querySelector('#ci-recipe').value || 'later';
+          const name = (modal.querySelector('#ci-name').value || '').trim();
+          const price = parseFloat(modal.querySelector('#ci-price').value);
+          const qty = Math.max(1, parseInt(modal.querySelector('#ci-qty').value, 10) || 1);
+          const recipeMode = modal.querySelector('#ci-recipe').value || 'later';
           if (!name) {
             toast('Enter item name', 'fa-circle-exclamation');
             return;
@@ -309,8 +309,8 @@
   }
 
   async function pushCustomLine(data) {
-    var id = 'custom-' + Date.now();
-    var line = {
+    const id = 'custom-' + Date.now();
+    const line = {
       id: id,
       name: data.name,
       price: Number(data.price) || 0,
@@ -328,13 +328,13 @@
       if (global.RSPOS && typeof RSPOS.addCustomLine === 'function') {
         RSPOS.addCustomLine(line);
       } else if (global.RSPOS && typeof RSPOS.getCart === 'function' && typeof RSPOS.setCart === 'function') {
-        var cart = RSPOS.getCart() || [];
+        const cart = RSPOS.getCart() || [];
         cart.push(line);
         RSPOS.setCart(cart);
       } else if (global.RS && typeof RS.getCart === 'function') {
-        var cart2 = RS.getCart() || [];
+        const cart2 = RS.getCart() || [];
         cart2.push(line);
-        if (typeof RS.setCart === 'function') RS.setCart(cart2);
+        if (typeof RS.setCart === 'function') {RS.setCart(cart2);}
       }
     } catch (e) {
       console.warn('[MenuIntel] cart inject failed', e);
@@ -343,8 +343,8 @@
     // Optionally save as menu item for future
     if (data.saveToMenu !== false) {
       try {
-        var menu = getMenu();
-        var rec = {
+        const menu = getMenu();
+        const rec = {
           id: id,
           name: data.name,
           price: Number(data.price) || 0,
@@ -360,9 +360,9 @@
           recipePending: data.recipeMode === 'later',
         };
         menu.push(rec);
-        if (global.RS) RS.MENU = menu;
-        if (global.RS && RS.saveOne) await RS.saveOne('menu', rec);
-        else if (global.RS_DB) await RS_DB.put('menu', rec.id, rec);
+        if (global.RS) {RS.MENU = menu;}
+        if (global.RS && RS.saveOne) {await RS.saveOne('menu', rec);}
+        else if (global.RS_DB) {await RS_DB.put('menu', rec.id, rec);}
       } catch (e) {
         console.warn('[MenuIntel] save custom menu failed', e);
       }
@@ -376,7 +376,7 @@
       try {
         RS.activateTab('editor-tab');
         setTimeout(function () {
-          if (global.buildFormLoad) global.buildFormLoad(getMenu().find(function (m) { return String(m.id) === String(id); }));
+          if (global.buildFormLoad) {global.buildFormLoad(getMenu().find(function (m) { return String(m.id) === String(id); }));}
         }, 250);
       } catch (_) {}
     } else {
@@ -401,7 +401,7 @@
     } catch (_) {}
   }
   function addPendingRecipe(row) {
-    var list = loadPending();
+    const list = loadPending();
     list.unshift({
       id: 'pr-' + Date.now(),
       menuId: row.menuId || null,
@@ -415,7 +415,7 @@
   function resolvePending(id) {
     savePending(
       loadPending().map(function (p) {
-        if (p.id === id) p.status = 'done';
+        if (p.id === id) {p.status = 'done';}
         return p;
       })
     );
@@ -428,13 +428,13 @@
 
   function scanMenuForMissingRecipes() {
     getMenu().forEach(function (m) {
-      if (m.recipePending) return;
-      if (Array.isArray(m.ingredients) && m.ingredients.length) return;
+      if (m.recipePending) {return;}
+      if (Array.isArray(m.ingredients) && m.ingredients.length) {return;}
       if (m.custom || m.isCustom) {
-        var already = listPendingOpen().some(function (p) {
+        const already = listPendingOpen().some(function (p) {
           return p.menuId === m.id || p.name === m.name;
         });
-        if (!already) addPendingRecipe({ menuId: m.id, name: m.name, reason: 'no_recipe' });
+        if (!already) {addPendingRecipe({ menuId: m.id, name: m.name, reason: 'no_recipe' });}
       }
     });
   }
@@ -458,12 +458,12 @@
   };
 
   function renderPendingRecipesPanel() {
-    var host = document.getElementById('inventory-tab') || document.getElementById('editor-tab');
-    if (!host) return;
-    var open = listPendingOpen();
-    var wrap = document.getElementById('rs-pending-recipes');
+    const host = document.getElementById('inventory-tab') || document.getElementById('editor-tab');
+    if (!host) {return;}
+    const open = listPendingOpen();
+    let wrap = document.getElementById('rs-pending-recipes');
     if (!open.length) {
-      if (wrap) wrap.remove();
+      if (wrap) {wrap.remove();}
       return;
     }
     if (!wrap) {
@@ -504,12 +504,12 @@
         })
         .join('') +
       '</div>';
-    var scan = wrap.querySelector('#pr-scan');
+    const scan = wrap.querySelector('#pr-scan');
     if (scan)
-      scan.onclick = function () {
+      {scan.onclick = function () {
         scanMenuForMissingRecipes();
         renderPendingRecipesPanel();
-      };
+      };}
     wrap.querySelectorAll('.pr-done').forEach(function (b) {
       b.onclick = function () {
         resolvePending(b.dataset.id);
@@ -519,13 +519,13 @@
     wrap.querySelectorAll('.pr-go').forEach(function (b) {
       b.onclick = function () {
         resolvePending(b.dataset.id);
-        if (global.RS && RS.activateTab) RS.activateTab('editor-tab');
+        if (global.RS && RS.activateTab) {RS.activateTab('editor-tab');}
         setTimeout(function () {
-          var m = getMenu().find(function (x) {
+          const m = getMenu().find(function (x) {
             return x.name === b.dataset.name;
           });
-          if (m && global.buildFormLoad) global.buildFormLoad(m);
-          else if (m && global.RS && RS.buildFormLoad) RS.buildFormLoad(m);
+          if (m && global.buildFormLoad) {global.buildFormLoad(m);}
+          else if (m && global.RS && RS.buildFormLoad) {RS.buildFormLoad(m);}
         }, 300);
         renderPendingRecipesPanel();
       };

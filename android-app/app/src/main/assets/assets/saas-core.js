@@ -22,8 +22,26 @@
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  function isAdminRoleForPin() {
+    try {
+      const role = String(
+        (window.RS_API && RS_API.session && RS_API.session()?.role) ||
+        sessionStorage.getItem('logged_in_role') || ''
+      ).toLowerCase();
+      return role === 'admin' || role === 'manager' || role === 'owner' || role === 'superadmin' || !role;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function getStoredHash() {
-    try { return (window.RS_SETTINGS || {}).admin_pin_hash || ''; } catch (e) { return ''; }
+    try {
+      // Staff sessions must never validate against a leaked/stale PIN hash
+      if (!isAdminRoleForPin()) return '';
+      return (window.RS_SETTINGS || {}).admin_pin_hash || localStorage.getItem('rs:admin_pin_hash') || '';
+    } catch (e) {
+      return '';
+    }
   }
 
   function getAttempts()   { return Number(sessionStorage.getItem(ATTEMPT_KEY) || 0); }

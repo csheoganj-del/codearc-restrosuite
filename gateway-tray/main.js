@@ -23,8 +23,25 @@ const http = require('http');
 const { spawn, execFile } = require('child_process');
 
 const HEALTH_HOST = '127.0.0.1';
-const HEALTH_PORT = Number(process.env.GATEWAY_PORT || 3000);
+function readConfiguredGatewayPort() {
+  if (process.env.GATEWAY_PORT) return Number(process.env.GATEWAY_PORT);
+  const candidates = [
+    path.join(process.env.USERPROFILE || '', '.restrosuite', 'gateway.env'),
+    path.resolve(__dirname, '..', '.env.local'),
+    path.resolve(__dirname, '..', '.env'),
+  ];
+  for (const file of candidates) {
+    try {
+      const match = fs.readFileSync(file, 'utf8').match(/^\s*GATEWAY_PORT\s*=\s*["']?(\d+)["']?\s*$/m);
+      if (match) return Number(match[1]);
+    } catch (_) {}
+  }
+  return 3000;
+}
+const HEALTH_PORT = readConfiguredGatewayPort();
 const POLL_MS = 10000;
+const RECOVERY_FAILURE_THRESHOLD = 3;
+const RECOVERY_COOLDOWN_MS = 60000;
 
 let tray = null;
 let statusWindow = null;
@@ -38,6 +55,9 @@ let lastStatus = {
 };
 let pollTimer = null;
 let repoRoot = null;
+let consecutiveHealthFailures = 0;
+let lastRecoveryAt = 0;
+let recoveryInFlight = false;
 
 // --- paths -----------------------------------------------------------------
 
@@ -193,9 +213,12 @@ function trayImage() {
 
 // --- process helpers -------------------------------------------------------
 
+function shellCommand(cmd) {
+  return process.platform === 'win32' && /\s/.test(cmd) ? `"${cmd}"` : cmd;
+}
 function run(cmd, args, opts = {}) {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
+    const child = spawn(shellCommand(cmd), args, {
       cwd: opts.cwd || repoRoot,
       shell: true,
       windowsHide: true,
@@ -203,14 +226,30 @@ function run(cmd, args, opts = {}) {
     });
     let out = '';
     let err = '';
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch (_) {}
+      finish({ code: 124, out, err: `${err}\nCommand timed out after ${opts.timeoutMs || 30000}ms`.trim() });
+    }, opts.timeoutMs || 30000);
     child.stdout && child.stdout.on('data', (d) => { out += d.toString(); });
     child.stderr && child.stderr.on('data', (d) => { err += d.toString(); });
-    child.on('close', (code) => resolve({ code, out, err }));
-    child.on('error', (e) => resolve({ code: 1, out, err: String(e.message || e) }));
+    child.on('close', (code) => finish({ code, out, err }));
+    child.on('error', (e) => finish({ code: 1, out, err: String(e.message || e) }));
   });
 }
 
 function whichPm2() {
+  const known = process.platform === 'win32'
+    ? path.join(process.env.APPDATA || '', 'npm', 'pm2.cmd')
+    : '';
+  if (known && fs.existsSync(known)) return Promise.resolve(known);
+
   return new Promise((resolve) => {
     execFile(
       process.platform === 'win32' ? 'where' : 'which',
@@ -219,31 +258,57 @@ function whichPm2() {
       (err, stdout) => {
         if (err || !stdout) return resolve(null);
         const line = String(stdout).split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0];
-        resolve(line || 'pm2');
+        resolve(line || null);
       }
     );
   });
 }
 
+function commandFailure(label, result) {
+  const detail = String(result.err || result.out || 'unknown error').trim().slice(0, 400);
+  return new Error(`${label} failed (exit ${result.code}): ${detail}`);
+}
+
+async function startPm2Ecosystem(pm2Command = 'pm2') {
+  const started = await run(pm2Command, ['start', 'ecosystem.config.cjs', '--update-env'], { cwd: repoRoot });
+  if (started.code !== 0) throw commandFailure('PM2 ecosystem start', started);
+  const saved = await run(pm2Command, ['save']);
+  if (saved.code !== 0) throw commandFailure('PM2 save', saved);
+}
 async function ensureGatewayRunning() {
   const pm2 = await whichPm2();
   if (pm2) {
     // Prefer ecosystem so both gateway + ngrok start with durable env
-    let r = await run('pm2', ['describe', 'restrosuite-gateway']);
+    let r = await run(pm2, ['describe', 'restrosuite-gateway']);
     if (r.code !== 0) {
-      await run('pm2', ['start', 'ecosystem.config.cjs'], { cwd: repoRoot });
-      await run('pm2', ['save']);
+      await startPm2Ecosystem(pm2);
       return { mode: 'pm2', started: true };
     }
     // Ensure online
-    await run('pm2', ['start', 'restrosuite-gateway']).catch(() => {});
-    await run('pm2', ['start', 'restrosuite-ngrok']).catch(() => {});
+    r = await run(pm2, ['start', 'restrosuite-gateway']);
+    if (r.code !== 0) throw commandFailure('PM2 gateway start', r);
     // If ngrok missing, start full ecosystem
-    const n = await run('pm2', ['describe', 'restrosuite-ngrok']);
+    const n = await run(pm2, ['describe', 'restrosuite-ngrok']);
     if (n.code !== 0) {
-      await run('pm2', ['start', 'ecosystem.config.cjs'], { cwd: repoRoot });
+      await startPm2Ecosystem(pm2);
+    } else {
+      const tunnel = await run(pm2, ['start', 'restrosuite-ngrok']);
+      if (tunnel.code !== 0) throw commandFailure('PM2 ngrok start', tunnel);
+      const saved = await run(pm2, ['save']);
+      if (saved.code !== 0) throw commandFailure('PM2 save', saved);
     }
-    await run('pm2', ['save']);
+const watchdog = await run(pm2, ['describe', 'restrosuite-gateway-watchdog']);
+    if (watchdog.code !== 0) {
+      const started = await run(
+        pm2,
+        ['start', 'ecosystem.config.cjs', '--only', 'restrosuite-gateway-watchdog', '--update-env'],
+        { cwd: repoRoot }
+      );
+      if (started.code !== 0) throw commandFailure('PM2 watchdog start', started);
+      const saved = await run(pm2, ['save']);
+      if (saved.code !== 0) throw commandFailure('PM2 save', saved);
+    }
+
     return { mode: 'pm2', started: false };
   }
 
@@ -257,6 +322,7 @@ async function ensureGatewayRunning() {
     stdio: 'ignore',
     windowsHide: true,
     shell: true,
+    env: { ...process.env, PORT: String(HEALTH_PORT), GATEWAY_PORT: String(HEALTH_PORT) },
   }).unref();
 
   if (fs.existsSync(path.join(repoRoot, 'ngrok-service.js'))) {
@@ -275,8 +341,11 @@ async function ensureGatewayRunning() {
 async function restartGateway() {
   const pm2 = await whichPm2();
   if (pm2) {
-    await run('pm2', ['restart', 'restrosuite-gateway']);
-    await run('pm2', ['restart', 'restrosuite-ngrok']);
+    const gateway = await run(pm2, ['restart', 'restrosuite-gateway', '--update-env']);
+    const tunnel = await run(pm2, ['restart', 'restrosuite-ngrok', '--update-env']);
+    if (gateway.code !== 0 || tunnel.code !== 0) {
+      await startPm2Ecosystem(pm2);
+    }
     return true;
   }
   // best-effort: start again
@@ -287,9 +356,10 @@ async function restartGateway() {
 async function stopGatewayOnQuit() {
   const pm2 = await whichPm2();
   if (!pm2) return;
-  // Only stop our named apps — do not pm2 kill all (user may have others)
-  await run('pm2', ['stop', 'restrosuite-gateway']);
-  await run('pm2', ['stop', 'restrosuite-ngrok']);
+  // Stop watchdog first so an intentional quit does not trigger recovery.
+  await run(pm2, ['stop', 'restrosuite-gateway-watchdog']);
+  await run(pm2, ['stop', 'restrosuite-gateway']);
+  await run(pm2, ['stop', 'restrosuite-ngrok']);
 }
 
 // --- health ----------------------------------------------------------------
@@ -350,6 +420,31 @@ function fetchHealth() {
 
 async function pollStatus() {
   lastStatus = await fetchHealth();
+
+  if (lastStatus.ok) {
+    consecutiveHealthFailures = 0;
+  } else {
+    consecutiveHealthFailures += 1;
+    const cooldownElapsed = Date.now() - lastRecoveryAt >= RECOVERY_COOLDOWN_MS;
+    if (
+      consecutiveHealthFailures >= RECOVERY_FAILURE_THRESHOLD &&
+      cooldownElapsed &&
+      !recoveryInFlight
+    ) {
+      recoveryInFlight = true;
+      lastRecoveryAt = Date.now();
+      lastStatus.message = 'Gateway unavailable — automatic recovery started';
+      try {
+        await restartGateway();
+      } catch (error) {
+        lastStatus.message = `Automatic recovery failed: ${String(error && error.message || error).slice(0, 180)}`;
+      } finally {
+        consecutiveHealthFailures = 0;
+        recoveryInFlight = false;
+      }
+    }
+  }
+
   updateTrayTooltip();
   return lastStatus;
 }

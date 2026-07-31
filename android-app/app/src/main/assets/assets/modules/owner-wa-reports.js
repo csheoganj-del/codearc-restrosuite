@@ -6,8 +6,8 @@
 (function (global) {
   'use strict';
 
-  var CFG_KEY = 'rs_owner_wa_reports_v1';
-  var SENT_KEY = 'rs_owner_wa_sent_v1';
+  const CFG_KEY = 'rs_owner_wa_reports_v1';
+  const SENT_KEY = 'rs_owner_wa_sent_v1';
 
   function defaults() {
     return {
@@ -25,15 +25,15 @@
   }
 
   function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') RS.toast(msg, icon);
+    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
   function rs(n) {
-    if (global.RSReportPdf) return RSReportPdf.money(n);
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RSReportPdf) {return RSReportPdf.money(n);}
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');
   }
   function outletName() {
-    var s = global.RS_SETTINGS || {};
+    const s = global.RS_SETTINGS || {};
     return s.set_outlet_name || s.set_restaurant_name || 'RestroSuite';
   }
   function bills() {
@@ -54,7 +54,7 @@
     }
   }
   function markSent(key) {
-    var s = loadSent();
+    const s = loadSent();
     s[key] = new Date().toISOString();
     try {
       localStorage.setItem(SENT_KEY, JSON.stringify(s));
@@ -66,8 +66,8 @@
 
   function loadCfgLocal() {
     try {
-      var raw = localStorage.getItem(CFG_KEY);
-      if (!raw) return defaults();
+      const raw = localStorage.getItem(CFG_KEY);
+      if (!raw) {return defaults();}
       return Object.assign(defaults(), JSON.parse(raw));
     } catch (_) {
       return defaults();
@@ -75,12 +75,12 @@
   }
 
   async function loadCfg() {
-    var local = loadCfgLocal();
+    let local = loadCfgLocal();
     try {
       if (global.RS_DB && RS_DB.list) {
-        var rows = await RS_DB.list('owner_report_prefs');
+        const rows = await RS_DB.list('owner_report_prefs');
         if (rows && rows[0]) {
-          var r = rows[0];
+          const r = rows[0];
           local = Object.assign(local, {
             enabled: r.enabled !== false,
             ownerPhone: r.ownerPhone || local.ownerPhone,
@@ -105,7 +105,7 @@
     } catch (_) {}
     try {
       if (global.RS_DB && RS_DB.put) {
-        var tid =
+        const tid =
           (global.RS_API && RS_API.session && RS_API.session() && RS_API.session().tenant_id) ||
           sessionStorage.getItem('tenant_id') ||
           'local';
@@ -118,41 +118,41 @@
 
   function billsInRange(fromMs, toMs) {
     return bills().filter(function (b) {
-      if (b.status === 'refunded' || b.status === 'void' || b.status === 'voided') return false;
-      var t = new Date(b.time || b.dateTime || b.created_at || b.createdAt || 0).getTime();
-      if (!t || isNaN(t)) return false;
+      if (b.status === 'refunded' || b.status === 'void' || b.status === 'voided') {return false;}
+      const t = new Date(b.time || b.dateTime || b.created_at || b.createdAt || 0).getTime();
+      if (!t || isNaN(t)) {return false;}
       return t >= fromMs && t <= toMs;
     });
   }
 
   function sumBills(list) {
-    var gross = 0;
-    var count = list.length;
-    var cash = 0;
-    var upi = 0;
-    var card = 0;
-    var due = 0;
-    var tax = 0;
+    let gross = 0;
+    const count = list.length;
+    let cash = 0;
+    let upi = 0;
+    let card = 0;
+    let due = 0;
+    let tax = 0;
     list.forEach(function (b) {
-      var g = Number(b.grand != null ? b.grand : b.amount != null ? b.amount : b.total) || 0;
+      const g = Number(b.grand != null ? b.grand : b.amount != null ? b.amount : b.total) || 0;
       gross += g;
       tax += Number(b.gst) || 0;
       if (Array.isArray(b.tenders) && b.tenders.length) {
         b.tenders.forEach(function (t) {
-          var m = String(t.method || '').toLowerCase();
-          var a = Number(t.amount) || 0;
-          if (m.indexOf('cash') >= 0) cash += a;
-          else if (m.indexOf('upi') >= 0) upi += a;
-          else if (m.indexOf('card') >= 0) card += a;
-          else if (m.indexOf('due') >= 0) due += a;
+          const m = String(t.method || '').toLowerCase();
+          const a = Number(t.amount) || 0;
+          if (m.indexOf('cash') >= 0) {cash += a;}
+          else if (m.indexOf('upi') >= 0) {upi += a;}
+          else if (m.indexOf('card') >= 0) {card += a;}
+          else if (m.indexOf('due') >= 0) {due += a;}
         });
       } else {
-        var method = String(b.pay || b.paymentMethod || b.payMethod || '').toLowerCase();
-        if (method.indexOf('cash') >= 0) cash += g;
-        else if (method.indexOf('upi') >= 0) upi += g;
-        else if (method.indexOf('card') >= 0) card += g;
-        else if (method.indexOf('due') >= 0) due += g;
-        else cash += g;
+        const method = String(b.pay || b.paymentMethod || b.payMethod || '').toLowerCase();
+        if (method.indexOf('cash') >= 0) {cash += g;}
+        else if (method.indexOf('upi') >= 0) {upi += g;}
+        else if (method.indexOf('card') >= 0) {card += g;}
+        else if (method.indexOf('due') >= 0) {due += g;}
+        else {cash += g;}
       }
     });
     return {
@@ -169,35 +169,35 @@
 
   function lowStockRows() {
     return inventory().filter(function (i) {
-      var stock = Number(i.stock != null ? i.stock : i.current) || 0;
-      var min = Number(i.min != null ? i.min : 0) || 0;
-      var max = Number(i.max != null ? i.max : i.max_stock) || 0;
-      if (stock <= 0) return true;
-      if (min > 0 && stock <= min) return true;
+      const stock = Number(i.stock != null ? i.stock : i.current) || 0;
+      const min = Number(i.min != null ? i.min : 0) || 0;
+      const max = Number(i.max != null ? i.max : i.max_stock) || 0;
+      if (stock <= 0) {return true;}
+      if (min > 0 && stock <= min) {return true;}
       if (max > 0) {
-        var thr = Number(i.threshold) || 15;
-        if ((stock / max) * 100 <= thr) return true;
+        const thr = Number(i.threshold) || 15;
+        if ((stock / max) * 100 <= thr) {return true;}
       }
       return false;
     });
   }
 
   function estimateCogs(list) {
-    var cost = 0;
-    var menu = (global.RS && RS.MENU) || [];
-    var inv = inventory();
+    let cost = 0;
+    const menu = (global.RS && RS.MENU) || [];
+    const inv = inventory();
     list.forEach(function (b) {
       (b.items || b._items || []).forEach(function (line) {
-        var m = menu.find(function (x) {
+        const m = menu.find(function (x) {
           return x.name === line.name || String(x.id) === String(line.id);
         });
-        if (!m || !Array.isArray(m.ingredients)) return;
-        var qty = Number(line.qty) || 1;
-        var portion = Number(line.portion || line.servings) || 1;
-        var base = Math.max(1, Number(m.recipeServings) || 1);
+        if (!m || !Array.isArray(m.ingredients)) {return;}
+        const qty = Number(line.qty) || 1;
+        const portion = Number(line.portion || line.servings) || 1;
+        const base = Math.max(1, Number(m.recipeServings) || 1);
         m.ingredients.forEach(function (ing) {
-          var need = ((Number(ing.qty) || 0) / base) * qty * portion;
-          var row = inv.find(function (i) {
+          const need = ((Number(ing.qty) || 0) / base) * qty * portion;
+          const row = inv.find(function (i) {
             return i.name === ing.name;
           });
           cost += need * (row ? Number(row.cost) || 0 : 0);
@@ -210,8 +210,8 @@
   async function sendPdfOrText(phone, caption, pdfOpts, filename) {
     if (global.RSReportPdf && RSReportPdf.buildReportPdf) {
       try {
-        var dataUri = await RSReportPdf.buildReportPdf(pdfOpts);
-        var res = await RSReportPdf.sendReportWhatsApp(phone, caption, dataUri, filename);
+        const dataUri = await RSReportPdf.buildReportPdf(pdfOpts);
+        const res = await RSReportPdf.sendReportWhatsApp(phone, caption, dataUri, filename);
         return res;
       } catch (e) {
         console.warn('[OwnerWA] PDF path failed', e);
@@ -226,15 +226,15 @@
   }
 
   async function sendDailySales(force) {
-    var cfg = await loadCfg();
-    if (!cfg.enabled || !cfg.dailySales) return { skipped: true };
-    var key = 'daily-' + dayKey();
-    if (!force && wasSent(key)) return { skipped: true, reason: 'already_sent' };
-    var start = new Date();
+    const cfg = await loadCfg();
+    if (!cfg.enabled || !cfg.dailySales) {return { skipped: true };}
+    const key = 'daily-' + dayKey();
+    if (!force && wasSent(key)) {return { skipped: true, reason: 'already_sent' };}
+    const start = new Date();
     start.setHours(0, 0, 0, 0);
-    var list = billsInRange(start.getTime(), Date.now());
-    var s = sumBills(list);
-    var caption =
+    const list = billsInRange(start.getTime(), Date.now());
+    const s = sumBills(list);
+    const caption =
       '*' +
       outletName() +
       ' — Daily sales ' +
@@ -245,7 +245,7 @@
       rs(s.gross) +
       '\nAvg: ' +
       rs(s.avg);
-    var pdfOpts = {
+    const pdfOpts = {
       brand: outletName(),
       title: 'Daily Sales Report',
       subtitle: dayKey() + ' · generated ' + new Date().toLocaleString('en-IN'),
@@ -268,25 +268,25 @@
       ],
       footer: 'RestroSuite automatic owner report',
     };
-    var res = await sendPdfOrText(cfg.ownerPhone, caption, pdfOpts, 'daily-sales-' + dayKey() + '.pdf');
+    const res = await sendPdfOrText(cfg.ownerPhone, caption, pdfOpts, 'daily-sales-' + dayKey() + '.pdf');
     markSent(key);
     toast(res.mode === 'pdf' ? 'Daily sales PDF sent' : 'Daily sales sent', 'fa-whatsapp');
     return { ok: true, summary: s, mode: res.mode };
   }
 
   async function sendStockAlert(force) {
-    var cfg = await loadCfg();
-    if (!cfg.enabled || !cfg.stockAlerts) return { skipped: true };
-    var rows = lowStockRows();
-    if (!rows.length && !force) return { skipped: true, reason: 'no_low_stock' };
-    var key = 'stock-' + dayKey();
-    if (!force && wasSent(key)) return { skipped: true, reason: 'already_sent' };
-    var caption =
+    const cfg = await loadCfg();
+    if (!cfg.enabled || !cfg.stockAlerts) {return { skipped: true };}
+    const rows = lowStockRows();
+    if (!rows.length && !force) {return { skipped: true, reason: 'no_low_stock' };}
+    const key = 'stock-' + dayKey();
+    if (!force && wasSent(key)) {return { skipped: true, reason: 'already_sent' };}
+    const caption =
       '*' +
       outletName() +
       ' — Stock alert*\n' +
       (rows.length ? rows.length + ' item(s) low / out' : 'All stock above threshold');
-    var pdfOpts = {
+    const pdfOpts = {
       brand: outletName(),
       title: 'Stock Alert',
       subtitle: dayKey(),
@@ -295,14 +295,14 @@
         {
           heading: 'Items needing attention',
           rows: rows.slice(0, 40).map(function (i) {
-            var stock = Number(i.stock != null ? i.stock : i.current) || 0;
+            const stock = Number(i.stock != null ? i.stock : i.current) || 0;
             return [(i.name || i.label || i.key) + (stock <= 0 ? ' OUT' : ''), stock + ' ' + (i.unit || '')];
           }),
         },
       ],
       footer: 'RestroSuite inventory',
     };
-    var res = await sendPdfOrText(cfg.ownerPhone, caption, pdfOpts, 'stock-alert-' + dayKey() + '.pdf');
+    const res = await sendPdfOrText(cfg.ownerPhone, caption, pdfOpts, 'stock-alert-' + dayKey() + '.pdf');
     markSent(key);
     toast('Stock report sent', 'fa-boxes-stacked');
     return { ok: true, count: rows.length, mode: res.mode };
@@ -310,28 +310,28 @@
 
   function getWeekKey(d) {
     d = new Date(d);
-    var onejan = new Date(d.getFullYear(), 0, 1);
-    var week = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7);
+    const onejan = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil(((d - onejan) / 86400000 + onejan.getDay() + 1) / 7);
     return d.getFullYear() + '-W' + String(week).padStart(2, '0');
   }
 
   async function sendPL(period, force) {
-    var cfg = await loadCfg();
-    var isWeek = period === 'weekly';
-    if (isWeek && (!cfg.enabled || !cfg.weeklyPL)) return { skipped: true };
-    if (!isWeek && (!cfg.enabled || !cfg.monthlyPL)) return { skipped: true };
-    var now = new Date();
-    var key = isWeek ? 'wpl-' + getWeekKey(now) : 'mpl-' + now.toISOString().slice(0, 7);
-    if (!force && wasSent(key)) return { skipped: true, reason: 'already_sent' };
-    var start = new Date();
-    if (isWeek) start.setDate(start.getDate() - 7);
-    else start = new Date(now.getFullYear(), now.getMonth(), 1);
-    var list = billsInRange(start.getTime(), Date.now());
-    var s = sumBills(list);
-    var cogs = estimateCogs(list);
-    var profit = s.gross - cogs;
-    var label = isWeek ? 'Weekly P&L · ' + getWeekKey(now) : 'Monthly P&L · ' + now.toISOString().slice(0, 7);
-    var caption =
+    const cfg = await loadCfg();
+    const isWeek = period === 'weekly';
+    if (isWeek && (!cfg.enabled || !cfg.weeklyPL)) {return { skipped: true };}
+    if (!isWeek && (!cfg.enabled || !cfg.monthlyPL)) {return { skipped: true };}
+    const now = new Date();
+    const key = isWeek ? 'wpl-' + getWeekKey(now) : 'mpl-' + now.toISOString().slice(0, 7);
+    if (!force && wasSent(key)) {return { skipped: true, reason: 'already_sent' };}
+    let start = new Date();
+    if (isWeek) {start.setDate(start.getDate() - 7);}
+    else {start = new Date(now.getFullYear(), now.getMonth(), 1);}
+    const list = billsInRange(start.getTime(), Date.now());
+    const s = sumBills(list);
+    const cogs = estimateCogs(list);
+    const profit = s.gross - cogs;
+    const label = isWeek ? 'Weekly P&L · ' + getWeekKey(now) : 'Monthly P&L · ' + now.toISOString().slice(0, 7);
+    const caption =
       '*' +
       outletName() +
       ' — ' +
@@ -342,7 +342,7 @@
       rs(cogs) +
       '\nEst. profit: ' +
       rs(profit);
-    var pdfOpts = {
+    const pdfOpts = {
       brand: outletName(),
       title: label,
       subtitle: start.toISOString().slice(0, 10) + ' → ' + dayKey(),
@@ -369,7 +369,7 @@
       ],
       footer: 'COGS uses recipe costs when ingredients are linked; otherwise 0 for unlinked dishes.',
     };
-    var res = await sendPdfOrText(
+    const res = await sendPdfOrText(
       cfg.ownerPhone,
       caption,
       pdfOpts,
@@ -388,10 +388,10 @@
   }
 
   async function tick() {
-    var cfg = await loadCfg();
-    if (!cfg.enabled || !cfg.ownerPhone) return;
-    var now = new Date();
-    var h = now.getHours();
+    const cfg = await loadCfg();
+    if (!cfg.enabled || !cfg.ownerPhone) {return;}
+    const now = new Date();
+    const h = now.getHours();
     if (cfg.dailySales && h >= (cfg.dailySalesHour || 22)) {
       sendDailySales(false).catch(function (e) {
         console.warn('[OwnerWA] daily', e);
@@ -411,14 +411,14 @@
   }
 
   function notifyStockNowIfCritical() {
-    var rows = lowStockRows().filter(function (i) {
+    const rows = lowStockRows().filter(function (i) {
       return (Number(i.stock != null ? i.stock : i.current) || 0) <= 0;
     });
-    if (!rows.length) return;
+    if (!rows.length) {return;}
     loadCfg().then(function (cfg) {
-      if (!cfg.enabled || !cfg.stockAlerts || !cfg.ownerPhone) return;
-      var key = 'stock-crit-' + dayKey();
-      if (wasSent(key)) return;
+      if (!cfg.enabled || !cfg.stockAlerts || !cfg.ownerPhone) {return;}
+      const key = 'stock-crit-' + dayKey();
+      if (wasSent(key)) {return;}
       sendStockAlert(true)
         .then(function () {
           markSent(key);
@@ -430,7 +430,7 @@
   function openSettingsModal() {
     loadCfg().then(function (cfg) {
       if (!global.RSModal) {
-        var p = window.prompt('Owner WhatsApp (digits with country code)', cfg.ownerPhone || '');
+        const p = window.prompt('Owner WhatsApp (digits with country code)', cfg.ownerPhone || '');
         if (p != null) {
           cfg.ownerPhone = String(p).replace(/\D/g, '');
           saveCfg(cfg);
@@ -483,22 +483,22 @@
           modal.querySelector('[data-test]').onclick = async function () {
             cfg.ownerPhone = String(modal.querySelector('#ow-phone').value || '').replace(/\D/g, '');
             await saveCfg(cfg);
-            var prog =
+            const prog =
               global.RSProgress &&
               RSProgress.open({ title: 'Sending owner reports…', total: 4, unit: 'reports' });
             try {
               await sendDailySales(true);
-              if (prog) prog.update({ done: 1 });
+              if (prog) {prog.update({ done: 1 });}
               await sendStockAlert(true);
-              if (prog) prog.update({ done: 2 });
+              if (prog) {prog.update({ done: 2 });}
               await sendWeeklyPL(true);
-              if (prog) prog.update({ done: 3 });
+              if (prog) {prog.update({ done: 3 });}
               await sendMonthlyPL(true);
-              if (prog) prog.update({ done: 4 });
+              if (prog) {prog.update({ done: 4 });}
             } catch (e) {
               toast(e.message || 'Send failed', 'fa-circle-exclamation');
             } finally {
-              if (prog) prog.close();
+              if (prog) {prog.close();}
             }
           };
         },

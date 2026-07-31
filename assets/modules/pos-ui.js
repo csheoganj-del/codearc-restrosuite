@@ -1564,6 +1564,9 @@ function ensureCartActionDelegation(){
   document.addEventListener('click', e => {
     const btn = e.target.closest('#btn-kot, #btn-checkout');
     if (!btn) {return;}
+    // features-pos owns these actions when its guarded handler is active.
+    // Keep this listener only as a fallback for partial/module-load failures.
+    if (document.documentElement.dataset.rsPosActionsBound) {return;}
     e.preventDefault();
     // Soft-blocked (empty cart / cash short): prefer features-pos checkout which explains why
     if (btn.id === 'btn-checkout') {

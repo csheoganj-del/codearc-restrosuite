@@ -2823,7 +2823,9 @@ async function performReset(req, res, format = 'json') {
             try {
                 console.log(`[Reset] Closing active Puppeteer browser session for tenant ${tenantId}...`);
                 const destroyPromise = tenantData.client.destroy();
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Destroy timeout')), 5000));
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Destroy timeout')), 5000);
+                });
                 await Promise.race([destroyPromise, timeoutPromise]);
             } catch (destroyErr) {
                 console.log(`[Reset Warning] Failed to destroy client cleanly or timed out for tenant ${tenantId} (safe to ignore):`, destroyErr.message);
@@ -3150,7 +3152,9 @@ app.post('/supabase-webhook', async (req, res) => {
     }
 
     // Wait for POS /send (PDF) first; then act as backup
-    await new Promise(r => setTimeout(r, 8000));
+    await new Promise((resolve) => {
+        setTimeout(resolve, 8000);
+    });
 
     // Skip if the POS frontend already handled this order via /send (e.g. PDF mode)
     if (orderId && realtimeSkipOrders.has(`${tenantId}:${orderId}`)) {
@@ -4326,7 +4330,7 @@ app.get('/health', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+const gatewayServer = app.listen(PORT, async () => {
     console.log('\n======================================================');
     console.log(' RestroSuite WhatsApp Gateway running at:');
     console.log(` http://localhost:${PORT}`);
@@ -4357,7 +4361,9 @@ app.listen(PORT, async () => {
     }
 
     try {
-        const healthTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000));
+        const healthTimeout = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), 10000);
+        });
         await Promise.race([logHealthEvent('startup', 'ok', { port: PORT, platform: os.platform() }), healthTimeout]);
     } catch (err) {
         console.warn('[Startup Health Log Warning] Skipped:', err.message);
@@ -4370,7 +4376,9 @@ app.listen(PORT, async () => {
     // Attempt to restore WhatsApp sessions from Supabase Storage
     console.log('[Startup] Attempting to restore WhatsApp sessions from Supabase Storage...');
     try {
-        const restoreTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30000));
+        const restoreTimeout = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('timeout')), 30000);
+        });
         await Promise.race([restoreSessionsFromSupabase(), restoreTimeout]);
     } catch (err) {
         console.warn('[Startup Session Restore Warning] Timed out or failed:', err.message);
@@ -4521,4 +4529,9 @@ app.listen(PORT, async () => {
     }, 60_000);
 
     console.log(`[Stability] Watchdog started (probe every ${STABILITY_PROBE_MS / 1000}s)`);
+});
+gatewayServer.on('error', (err) => {
+    console.error(`[Startup Fatal] Cannot listen on port ${PORT}:`, err && err.message ? err.message : err);
+    process.exitCode = 1;
+    setTimeout(() => process.exit(1), 50);
 });

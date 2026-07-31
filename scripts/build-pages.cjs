@@ -45,13 +45,13 @@ function copyFile(src, dest) {
 }
 
 function copyDir(src, dest) {
-  if (!fs.existsSync(src)) return;
+  if (!fs.existsSync(src)) {return;}
   fs.mkdirSync(dest, { recursive: true });
   for (const ent of fs.readdirSync(src, { withFileTypes: true })) {
-    if (ent.name === 'node_modules' || ent.name === '.git') continue;
+    if (ent.name === 'node_modules' || ent.name === '.git') {continue;}
     const s = path.join(src, ent.name);
     const d = path.join(dest, ent.name);
-    if (ent.isDirectory()) copyDir(s, d);
+    if (ent.isDirectory()) {copyDir(s, d);}
     else if (ent.isFile()) {
       // Skip huge accidental binaries inside assets
       const st = fs.statSync(s);
@@ -70,7 +70,7 @@ function main() {
 
   for (const f of ROOT_FILES) {
     const src = path.join(ROOT, f);
-    if (fs.existsSync(src)) copyFile(src, path.join(OUT, f));
+    if (fs.existsSync(src)) {copyFile(src, path.join(OUT, f));}
   }
   for (const d of DIRS) {
     copyDir(path.join(ROOT, d), path.join(OUT, d));
@@ -85,8 +85,8 @@ function main() {
       const src = path.join(dl, name);
       const st = fs.statSync(src);
       if (st.isFile()) {
-        if (/\.exe$/i.test(name) || /\.blockmap$/i.test(name)) continue;
-        if (st.size > 20 * 1024 * 1024) continue;
+        if (/\.exe$/i.test(name) || /\.blockmap$/i.test(name)) {continue;}
+        if (st.size > 20 * 1024 * 1024) {continue;}
         copyFile(src, path.join(dlOut, name));
       }
     }
@@ -148,7 +148,7 @@ function main() {
   function walk(dir) {
     for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, ent.name);
-      if (ent.isDirectory()) walk(p);
+      if (ent.isDirectory()) {walk(p);}
       else {
         count++;
         total += fs.statSync(p).size;

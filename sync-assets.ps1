@@ -45,7 +45,8 @@ $FilesToCopy = @(
     "privacy.html",
     "refund-policy.html",
     "robots.txt",
-    "sitemap.xml"
+    "sitemap.xml",
+    "supabase_migration.sql"
 )
 
 $DirectoriesToCopy = @(
@@ -97,7 +98,6 @@ $StaleRoot = @(
     "features-shell.js",
     "saas-core.js",
     "theme-luxe.css",
-    "supabase_migration.sql",
     "vercel.json"
 )
 foreach ($s in $StaleRoot) {

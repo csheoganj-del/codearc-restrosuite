@@ -2,7 +2,7 @@
 /**
  * Browser smoke — public guest surfaces (no login).
  * Run: npx playwright test tests/e2e/guest-ux.spec.cjs
- * Optional: E2E_BASE_URL=https://codearc-restrosuite.vercel.app
+ * Optional: E2E_BASE_URL=https://restrosuite.codearc.co.in
  */
 const { test, expect } = require('@playwright/test');
 

@@ -28,7 +28,7 @@ blocked by the browser (CORS).
 
 In Supabase → **Edge Functions → Secrets** (or your env config), set:
 ```
-ALLOWED_ORIGINS = https://your-app-domain.com,https://codearc-restrosuite.vercel.app
+ALLOWED_ORIGINS = https://your-app-domain.com,https://restrosuite.codearc.co.in
 ```
 Add every domain you open the app from (your live site, and a localhost origin
 for testing if you run it locally). Re-deploy the functions if your platform

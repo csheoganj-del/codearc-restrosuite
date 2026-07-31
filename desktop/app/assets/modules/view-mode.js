@@ -5,19 +5,19 @@
 (function (global) {
   'use strict';
 
-  var PREFIX = 'rs_view_mode_';
+  const PREFIX = 'rs_view_mode_';
 
   function get(key, fallback) {
-    var fb = fallback === 'cards' ? 'cards' : 'list';
+    const fb = fallback === 'cards' ? 'cards' : 'list';
     try {
-      var v = localStorage.getItem(PREFIX + key);
-      if (v === 'list' || v === 'cards') return v;
+      const v = localStorage.getItem(PREFIX + key);
+      if (v === 'list' || v === 'cards') {return v;}
     } catch (e) {}
     return fb;
   }
 
   function set(key, mode) {
-    var m = mode === 'cards' ? 'cards' : 'list';
+    const m = mode === 'cards' ? 'cards' : 'list';
     try {
       localStorage.setItem(PREFIX + key, m);
     } catch (e) {}
@@ -26,7 +26,7 @@
 
   /** Toggle control HTML — place in toolbars next to filters/sort. */
   function toggleHtml(key, current) {
-    var mode = current === 'cards' ? 'cards' : 'list';
+    const mode = current === 'cards' ? 'cards' : 'list';
     return (
       '<div class="rs-view-toggle" role="group" aria-label="View mode" data-rs-view-key="' +
       String(key || '').replace(/"/g, '') +
@@ -48,19 +48,19 @@
    * Returns current mode.
    */
   function wire(root, key, onChange, fallback) {
-    var mode = get(key, fallback);
-    if (!root) return mode;
-    var group = root.querySelector('[data-rs-view-key="' + key + '"]') || root.querySelector('.rs-view-toggle');
-    if (!group) return mode;
+    let mode = get(key, fallback);
+    if (!root) {return mode;}
+    const group = root.querySelector('[data-rs-view-key="' + key + '"]') || root.querySelector('.rs-view-toggle');
+    if (!group) {return mode;}
     group.querySelectorAll('[data-rs-view]').forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-rs-view') === mode);
       btn.onclick = function () {
-        var next = btn.getAttribute('data-rs-view') === 'cards' ? 'cards' : 'list';
+        const next = btn.getAttribute('data-rs-view') === 'cards' ? 'cards' : 'list';
         mode = set(key, next);
         group.querySelectorAll('[data-rs-view]').forEach(function (b) {
           b.classList.toggle('active', b.getAttribute('data-rs-view') === mode);
         });
-        if (typeof onChange === 'function') onChange(mode);
+        if (typeof onChange === 'function') {onChange(mode);}
       };
     });
     return mode;

@@ -7,9 +7,9 @@
 
   function loadJsPdf() {
     return new Promise(function (resolve, reject) {
-      if (global.jspdf && global.jspdf.jsPDF) return resolve(global.jspdf.jsPDF);
-      if (global.jsPDF) return resolve(global.jsPDF);
-      var existing = document.querySelector('script[data-rs-jspdf="1"]');
+      if (global.jspdf && global.jspdf.jsPDF) { resolve(global.jspdf.jsPDF); return; }
+      if (global.jsPDF) { resolve(global.jsPDF); return; }
+      const existing = document.querySelector('script[data-rs-jspdf="1"]');
       if (existing) {
         existing.addEventListener('load', function () {
           resolve((global.jspdf && global.jspdf.jsPDF) || global.jsPDF);
@@ -17,7 +17,7 @@
         existing.addEventListener('error', reject);
         return;
       }
-      var s = document.createElement('script');
+      const s = document.createElement('script');
       s.src = 'assets/lib/jspdf.umd.min.js';
       s.dataset.rsJspdf = '1';
       s.onload = function () {
@@ -35,7 +35,7 @@
   }
 
   function money(n) {
-    if (global.RS && typeof RS.rs === 'function') return RS.rs(n);
+    if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return 'Rs ' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   }
 
@@ -45,13 +45,13 @@
    */
   async function buildReportPdf(opts) {
     opts = opts || {};
-    var JsPDF = await loadJsPdf();
-    if (!JsPDF) throw new Error('jsPDF unavailable');
-    var doc = new JsPDF({ unit: 'mm', format: 'a4' });
-    var y = 18;
-    var margin = 16;
-    var pageW = doc.internal.pageSize.getWidth();
-    var maxY = doc.internal.pageSize.getHeight() - 16;
+    const JsPDF = await loadJsPdf();
+    if (!JsPDF) {throw new Error('jsPDF unavailable');}
+    const doc = new JsPDF({ unit: 'mm', format: 'a4' });
+    let y = 18;
+    const margin = 16;
+    const pageW = doc.internal.pageSize.getWidth();
+    const maxY = doc.internal.pageSize.getHeight() - 16;
 
     function ensureSpace(need) {
       if (y + need > maxY) {
@@ -86,7 +86,7 @@
       ensureSpace(6);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(11);
-      var parts = doc.splitTextToSize(String(line), pageW - margin * 2);
+      const parts = doc.splitTextToSize(String(line), pageW - margin * 2);
       parts.forEach(function (p) {
         ensureSpace(5.5);
         doc.text(p, margin, y);
@@ -107,10 +107,10 @@
       doc.setFontSize(10);
       (sec.rows || []).forEach(function (row) {
         ensureSpace(5.5);
-        var left = String(row[0] != null ? row[0] : '');
-        var right = String(row[1] != null ? row[1] : '');
+        const left = String(row[0] != null ? row[0] : '');
+        const right = String(row[1] != null ? row[1] : '');
         doc.text(left, margin, y);
-        if (right) doc.text(right, pageW - margin, y, { align: 'right' });
+        if (right) {doc.text(right, pageW - margin, y, { align: 'right' });}
         y += 5.5;
       });
     });
@@ -123,17 +123,17 @@
       doc.text(String(opts.footer), margin, y);
     }
 
-    var dataUri = doc.output('datauristring');
+    const dataUri = doc.output('datauristring');
     return dataUri;
   }
 
   async function sendReportWhatsApp(phone, caption, dataUri, filename) {
     phone = String(phone || '').replace(/\D/g, '');
-    if (phone.length < 10) throw new Error('Invalid phone');
-    var base64 = String(dataUri || '').includes(',')
+    if (phone.length < 10) {throw new Error('Invalid phone');}
+    const base64 = String(dataUri || '').includes(',')
       ? String(dataUri).split(',')[1]
       : String(dataUri || '');
-    if (!base64 || base64.length < 50) throw new Error('Empty PDF');
+    if (!base64 || base64.length < 50) {throw new Error('Empty PDF');}
 
     if (global.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode) {
       await RS_API.data({
@@ -147,7 +147,7 @@
       return { mode: 'pdf' };
     }
     // Fallback: open caption in wa.me (PDF cannot attach without gateway)
-    var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(caption || 'Report ready');
+    const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(caption || 'Report ready');
     window.open(url, '_blank', 'noopener,noreferrer');
     return { mode: 'wa.me', warning: 'Gateway offline — opened chat without PDF' };
   }

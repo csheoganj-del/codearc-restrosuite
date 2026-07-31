@@ -60,7 +60,7 @@
 
     function installGlobalHandlers(getContext) {
       const context = typeof getContext === 'function' ? getContext : function () { return {}; };
-      window.addEventListener("error", (event) => {
+      window.addEventListener('error', (event) => {
         const info = context();
         report({
           ...info,

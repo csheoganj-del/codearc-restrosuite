@@ -651,7 +651,7 @@
       return `<div class="rcp-center"><div class="rcp-logo">${esc(receiptProfile.name || 'Outlet')}</div></div>
         <hr class="rcp-hr"><div class="rcp-meta"><span>${esc(bill.no)}</span><span>${esc(bill.time)}</span></div>
         <div class="rcp-tot"><span>TOTAL</span><span>${rs(bill.grand)}</span></div>
-        <div class="rcp-foot">Thank you!<br><b>Powered by RestroSuite</b></div>`;
+        <div class="rcp-foot">Thank you!<br><b>Powered by CodeArc RestroSuite</b></div>`;
     }
 
     function receiptText(bill) {
@@ -791,12 +791,19 @@
         }
         y += 7.5;
 
-        // Sub lines (address, phone, etc.)
+        // Sub lines (address, phone, etc.) — tax IDs only when Calculate taxes is ON
+        const taxesOnHeader =
+          typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_calculate_taxes === true ||
+              window.RS_SETTINGS?.set_calculate_taxes === 'true';
         const subLinesData = [
           receiptProfile.address,
           receiptProfile.phone ? 'Phone ' + receiptProfile.phone : '',
-          (country === 'IN' && profile.state_code) ? 'State Code: ' + profile.state_code : '',
-          profile.tax_registration_no ? (profile.tax_system || 'GST') + ' No: ' + profile.tax_registration_no : ''
+          (taxesOnHeader && country === 'IN' && profile.state_code) ? 'State Code: ' + profile.state_code : '',
+          (taxesOnHeader && profile.tax_registration_no)
+            ? (profile.tax_system || 'GST') + ' No: ' + profile.tax_registration_no
+            : ''
         ].filter(Boolean);
 
         setFont('normal', 8.5); // matches 11px
@@ -849,9 +856,14 @@
         bill.items.forEach(i => {
           const catLabel  = i.taxCategory || i.tax_category;
           const rateLabel = isIreland ? (catLabel === 'IE_DRINK_23' ? '23%' : '9%') : '5%';
-          
+          const taxesOnItem =
+            typeof window.RS_featureOn === 'function'
+              ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false)
+              : window.RS_SETTINGS?.set_calculate_taxes === true ||
+                window.RS_SETTINGS?.set_calculate_taxes === 'true';
+
           const qtyStr = `${i.qty}\u00d7 `;
-          const nameStr = i.name + (isIreland ? ` (${rateLabel})` : '');
+          const nameStr = i.name + (taxesOnItem && isIreland ? ` (${rateLabel})` : '');
           const priceStr = rs(i.price * i.qty);
 
           const actualDoc = doc || new jsPDF();
@@ -953,24 +965,82 @@
           y += 5.5;
         });
 
-        // Tax breakdown
-        if (profile.gst_scheme === 'composition' && country === 'IN') {
-          setFont('italic', 8.2);
-          colorMuted();
-          const msg = 'Composition taxable person, not eligible to collect tax';
-          const actualDoc = doc || new jsPDF();
-          const scLines = actualDoc.splitTextToSize(msg, CW);
-          scLines.forEach(sl => {
-            if (!isMeasurePass) {
-              doc.text(sl, W / 2, y + 3, { align: 'center' });
-            }
-            y += 4.5;
-          });
-        } else {
-          const summary = bill.taxSummary || [];
-          if (summary.length > 0) {
-            drawHrThin();
-            if (country === 'IN') {
+        // Tax breakdown — only when Settings → Calculate taxes is ON
+        const taxesOnPdf =
+          typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_calculate_taxes', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_calculate_taxes === true ||
+              window.RS_SETTINGS?.set_calculate_taxes === 'true';
+        const hsnOnPdf =
+          taxesOnPdf &&
+          (typeof window.RS_featureOn === 'function'
+            ? window.RS_featureOn('set_show_hsn_codes', window.RS_SETTINGS, false)
+            : window.RS_SETTINGS?.set_show_hsn_codes === true ||
+              window.RS_SETTINGS?.set_show_hsn_codes === 'true');
+        if (taxesOnPdf) {
+          if (profile.gst_scheme === 'composition' && country === 'IN') {
+            setFont('italic', 8.2);
+            colorMuted();
+            const msg = 'Composition taxable person, not eligible to collect tax';
+            const actualDoc = doc || new jsPDF();
+            const scLines = actualDoc.splitTextToSize(msg, CW);
+            scLines.forEach(sl => {
+              if (!isMeasurePass) {
+                doc.text(sl, W / 2, y + 3, { align: 'center' });
+              }
+              y += 4.5;
+            });
+          } else {
+            const summary = bill.taxSummary || [];
+            const hasTax =
+              Number(bill.gst) > 0 || summary.some((b) => Number(b && b.tax) > 0);
+            if (hasTax && summary.length > 0) {
+              drawHrThin();
+              if (country === 'IN') {
+                setFont('normal', 9.4);
+                colorInk();
+                const halfGst = Math.round((bill.gst || 0) / 2);
+                const gstLines = [
+                  { left: 'CGST (2.5%)', right: rs(halfGst) },
+                  { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
+                ];
+                gstLines.forEach(row => {
+                  if (!isMeasurePass) {
+                    doc.text(row.left, PAD, y + 4);
+                    doc.text(row.right, W - PAD, y + 4, { align: 'right' });
+                  }
+                  y += 5.5;
+                });
+
+                if (hsnOnPdf) {
+                  setFont('normal', 8.2);
+                  colorMuted();
+                  if (!isMeasurePass) {
+                    doc.text('SAC 9963', PAD, y + 3);
+                  }
+                  y += 4.5;
+                }
+              } else {
+                setFont('bold', 8.2);
+                colorMuted();
+                if (!isMeasurePass) {
+                  doc.text('VAT Breakout', PAD, y + 3);
+                }
+                y += 4.5;
+
+                setFont('normal', 8.2);
+                summary.forEach(band => {
+                  const leftText = 'Rate ' + band.percent + '%';
+                  const rightText = 'Net ' + rs(band.net) + ' | VAT ' + rs(band.tax);
+                  if (!isMeasurePass) {
+                    doc.text(leftText, PAD, y + 3);
+                    doc.text(rightText, W - PAD, y + 3, { align: 'right' });
+                  }
+                  y += 4.5;
+                });
+              }
+            } else if (bill.gst > 0) {
+              drawHrThin();
               setFont('normal', 9.4);
               colorInk();
               const halfGst = Math.round((bill.gst || 0) / 2);
@@ -985,48 +1055,7 @@
                 }
                 y += 5.5;
               });
-              
-              setFont('normal', 8.2);
-              colorMuted();
-              if (!isMeasurePass) {
-                doc.text('SAC 9963', PAD, y + 3);
-              }
-              y += 4.5;
-            } else {
-              setFont('bold', 8.2);
-              colorMuted();
-              if (!isMeasurePass) {
-                doc.text('VAT Breakout', PAD, y + 3);
-              }
-              y += 4.5;
-
-              setFont('normal', 8.2);
-              summary.forEach(band => {
-                const leftText = 'Rate ' + band.percent + '%';
-                const rightText = 'Net ' + rs(band.net) + ' | VAT ' + rs(band.tax);
-                if (!isMeasurePass) {
-                  doc.text(leftText, PAD, y + 3);
-                  doc.text(rightText, W - PAD, y + 3, { align: 'right' });
-                }
-                y += 4.5;
-              });
             }
-          } else if (bill.gst > 0) {
-            drawHrThin();
-            setFont('normal', 9.4);
-            colorInk();
-            const halfGst = Math.round((bill.gst || 0) / 2);
-            const gstLines = [
-              { left: 'CGST (2.5%)', right: rs(halfGst) },
-              { left: 'SGST (2.5%)', right: rs(bill.gst - halfGst) }
-            ];
-            gstLines.forEach(row => {
-              if (!isMeasurePass) {
-                doc.text(row.left, PAD, y + 4);
-                doc.text(row.right, W - PAD, y + 4, { align: 'right' });
-              }
-              y += 5.5;
-            });
           }
         }
 
@@ -1081,7 +1110,7 @@
         setFont('bold', 8.5); // matches 11px
         colorInk();
         if (!isMeasurePass) {
-          doc.text('Powered by RestroSuite', W / 2, y + 3.5, { align: 'center' });
+          doc.text('Powered by CodeArc RestroSuite', W / 2, y + 3.5, { align: 'center' });
         }
         y += 9.5; // margin-bottom
 
@@ -2635,6 +2664,7 @@
     }
     // Hard debounce — industry POS never double-finalizes payment
     let checkoutInFlight = false;
+    let checkoutAttemptInFlight = false;
 
     function confirmKotMissing() {
       return new Promise((resolve) => {
@@ -2676,7 +2706,7 @@
       });
     }
 
-    async function checkout(){
+    async function checkoutImpl(){
       if (checkoutInFlight) {
         return RS.toast('Checkout already in progress…', 'fa-spinner');
       }
@@ -3125,16 +3155,34 @@
               const draftToDel = draftsList.find(d => d.draftName === draftName);
               if (draftToDel) await RS_DB.del('drafts', draftToDel.id).catch(() => {});
 
+              // Close ALL open KOTs for this table so reconnect never re-opens them as new kitchen work
               const rows = await RS_DB.list('pending_orders').catch(() => []);
-              const matched = rows.find(r =>
-                (r.tableNumber === custSnap.table || r.tableNumber === String(custSnap.table || '').replace('Table ', '')) &&
-                (r.status === 'Pending Review' || r.status === 'Accepted' || r.status === 'preparing'
-                  || r.status === 'served' || r.status === 'Ready' || r.status === 'DineIn Active')
+              const tableSnap = String(custSnap.table || '');
+              const tableAlt = tableSnap.replace(/^Table\s+/i, '');
+              const openish = (st) =>
+                /Pending Review|Accepted|preparing|served|Ready|DineIn Active/i.test(String(st || ''));
+              const matched = rows.filter(
+                (r) =>
+                  (r.tableNumber === tableSnap ||
+                    r.tableNumber === tableAlt ||
+                    String(r.tableNumber || '') === tableSnap) &&
+                  openish(r.status)
               );
-              if (matched) {
-                await RS_DB.del('pending_orders', matched.id);
-                if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
+              for (const m of matched) {
+                try {
+                  m.status = 'Ready';
+                  m.kitchenHandled = true;
+                  m.manualFulfilled = true;
+                  m.skipKdsAlarm = true;
+                  m.reconcileReason = 'bill_settled';
+                  m.kitchenHandledAt = new Date().toISOString();
+                  await RS_DB.put('pending_orders', m.id, m);
+                  if (window.RSLanSync && RSLanSync.pushRow) RSLanSync.pushRow(m);
+                } catch (_) {
+                  try { await RS_DB.del('pending_orders', m.id); } catch (__) {}
+                }
               }
+              if (matched.length && window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
               await loadHeldFromDB();
               await renderPosTableGrid();
             } catch (e) {
@@ -3431,6 +3479,16 @@
       }
     }
 
+    function checkout() {
+      if (checkoutAttemptInFlight) {
+        return Promise.resolve(RS.toast('Checkout already in progress…', 'fa-spinner'));
+      }
+      checkoutAttemptInFlight = true;
+      return checkoutImpl().finally(() => {
+        checkoutAttemptInFlight = false;
+      });
+    }
+
     /* ---------------- KOT (mode-aware: full / kitchen printer / billing) ---------------- */
     function opsMode() {
       if (window.RSOpsMode && typeof RSOpsMode.getMode === 'function') return RSOpsMode.getMode();
@@ -3581,8 +3639,12 @@
             priority: 'normal',
             source: 'waiter_pos',
             kitchenRoute: mode === 'kitchen_printer' ? 'print_only' : 'kds',
+            offlineCreated: typeof navigator !== 'undefined' && navigator.onLine === false,
           };
           await RS_DB.put('pending_orders', tempId, orderData);
+          try {
+            if (window.RSLanSync && typeof RSLanSync.pushRow === 'function') RSLanSync.pushRow(orderData);
+          } catch (_) {}
           if (window.RS_SYNC) window.RS_SYNC.syncPendingOrders();
         } catch (e) {
           console.warn('KOT save failed', e);
