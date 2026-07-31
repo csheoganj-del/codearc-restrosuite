@@ -1252,6 +1252,7 @@
     try {
       if (isPlatformConsole()) {return false;}
       const role = String(
+        (window.RS_ROLE && window.RS_ROLE.staffRole) ||
         (window.RS_API && RS_API.session && RS_API.session()?.role) ||
         sessionStorage.getItem('logged_in_role') || ''
       ).toLowerCase().trim();

@@ -2628,8 +2628,28 @@
   // Pulled into a function so a live role change (see setupSupabaseRealtime's
   // tenant_users subscription) can re-run this instantly instead of only
   // taking effect after the next login.
+  function applyKitchenSetupAccess(role, tabs) {
+    const normalizedRole = String(role || '').toLowerCase().trim();
+    const allowed = !isSuper && !isBrandAdmin && (
+      tabs == null
+        ? UNRESTRICTED_ROLES.includes(normalizedRole)
+        : Array.isArray(tabs) && (
+          tabs.includes('editor-tab') || tabs.includes('inventory-tab')
+        )
+    );
+    document.documentElement.classList.toggle('rs-kitchen-setup-denied', !allowed);
+    const link = document.getElementById('klc-sidebar-setup');
+    const mobile = document.getElementById('klc-mobile-setup');
+    if (link) link.style.display = allowed ? '' : 'none';
+    if (mobile) mobile.style.display = allowed ? '' : 'none';
+    return allowed;
+  }
+
   function applyStaffRoleTabFiltering(role, tabs) {
     if (isSuper || isBrandAdmin) return;
+    // Set the guard before any generic nav reset. This prevents the access
+    // poll from flashing Kitchen Setup for a frame while permissions settle.
+    applyKitchenSetupAccess(role, tabs);
     function roleGateAllows(el, allowed) {
       const raw = el.getAttribute('data-role-gate') || '';
       if (!raw) return null; // null = no gate attribute
@@ -2642,8 +2662,9 @@
       // left hidden from a previous, more restrictive role.
       const roleStyle = document.getElementById('rs-role-filter-style');
       if (roleStyle) roleStyle.remove();
-      $$('.sidebar-link, .mnav-link, .mnav-more-btn, .more-sheet-link[data-tab], [data-role-gate]').forEach(link => { link.style.display = ''; });
+      $$('.sidebar-link:not([data-klc-nav="setup"]), .mnav-link:not([data-klc-nav="setup"]), .mnav-more-btn:not([data-klc-nav="setup"]), .more-sheet-link[data-tab], [data-role-gate]:not([data-klc-nav="setup"])').forEach(link => { link.style.display = ''; });
       $$('.sb-section').forEach((sec) => { sec.style.display = ''; });
+      applyKitchenSetupAccess(role, tabs);
       // Operating mode owns Kitchen visibility. Re-apply it after role access
       // clears stale inline styles so the two systems never fight.
       try { applyPosOnlyModeUI(); } catch (_) {}
@@ -2664,7 +2685,7 @@
       ? `.sidebar-link[data-tab]:not(${allowedSelectors}), .mnav-link[data-tab]:not(${allowedSelectors}), .mnav-more-btn[data-tab]:not(${allowedSelectors}), .more-sheet-link[data-tab]:not(${allowedSelectors}) { display: none !important; }`
       : `.sidebar-link[data-tab], .mnav-link[data-tab], .mnav-more-btn[data-tab], .more-sheet-link[data-tab] { display: none !important; }`;
     // Hide sidebar links not in allowed list
-    $$('.sidebar-link').forEach(link => {
+    $$('.sidebar-link:not([data-klc-nav="setup"])').forEach(link => {
       const gate = roleGateAllows(link, tabs);
       if (gate === false) { link.style.display = 'none'; return; }
       if (gate === true) { link.style.display = ''; return; }
@@ -2673,7 +2694,7 @@
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Hide mobile bottom nav links not in allowed list
-    $$('.mnav-link').forEach(link => {
+    $$('.mnav-link:not([data-klc-nav="setup"])').forEach(link => {
       const gate = roleGateAllows(link, tabs);
       if (gate === false) { link.style.display = 'none'; return; }
       if (gate === true) { link.style.display = ''; return; }
@@ -2683,7 +2704,7 @@
     });
     // Hide mobile "More" sheet entries not in allowed list (built later by
     // features-shell, so this also re-runs on rs:hydrated below)
-    $$('.mnav-more-btn[data-tab], .more-sheet-link[data-tab], .mnav-more-btn[data-role-gate], [data-klc-nav="setup"]').forEach(link => {
+    $$('.mnav-more-btn[data-tab]:not([data-klc-nav="setup"]), .more-sheet-link[data-tab], .mnav-more-btn[data-role-gate]:not([data-klc-nav="setup"])').forEach(link => {
       const gate = roleGateAllows(link, tabs);
       if (gate === false) { link.style.display = 'none'; return; }
       if (gate === true) { link.style.display = ''; return; }
@@ -2692,16 +2713,7 @@
       link.style.display = tabs.includes(tabId) ? '' : 'none';
     });
     // Explicit Kitchen Setup (coach modal) — never show for POS-only staff
-    const klc = document.getElementById('klc-sidebar-setup');
-    if (klc) {
-      const ok = roleGateAllows(klc, tabs);
-      klc.style.display = ok === false ? 'none' : (ok === true || tabs.includes('editor-tab') || tabs.includes('inventory-tab') ? '' : 'none');
-    }
-    const klcMob = document.getElementById('klc-mobile-setup');
-    if (klcMob) {
-      const ok = tabs.includes('editor-tab') || tabs.includes('inventory-tab');
-      klcMob.style.display = ok ? '' : 'none';
-    }
+    applyKitchenSetupAccess(role, tabs);
     // Hide empty sidebar section labels (e.g. Manage when only Kitchen Setup was visible)
     $$('.sb-nav .sb-section').forEach((sec) => {
       let n = sec.nextElementSibling;
@@ -2739,6 +2751,7 @@
     // Kitchen printer modes keep KDS hidden).
     try { applyPosOnlyModeUI(); } catch (_) {}
   }
+  window.RS_ROLE = { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };
   applyStaffRoleTabFiltering(staffRole, allowedTabs);
   // Re-apply after hydration: some nav elements (mobile "More" sheet links,
   // late-rendered footer buttons) don't exist yet on the first pass, and the
@@ -2763,8 +2776,15 @@
     const changed = prevRole !== resolvedRole || prevTabs !== nextTabs;
     sessionStorage.setItem('logged_in_role', resolvedRole);
     sessionStorage.setItem('allowed_tabs', JSON.stringify(resolvedTabs || []));
+    // Publish the new role first so Kitchen Setup and any other listeners see
+    // one coherent permission snapshot during this refresh.
+    window.RS_ROLE = {
+      staffRole: resolvedRole,
+      allowedTabs: resolvedTabs,
+      ROLE_TAB_MAP,
+      ROLE_LABELS,
+    };
     applyStaffRoleTabFiltering(resolvedRole, resolvedTabs);
-    window.RS_ROLE = { staffRole: resolvedRole, allowedTabs: resolvedTabs, ROLE_TAB_MAP, ROLE_LABELS };
     // Keep keep-me-signed-in blob in sync so next cold start has new tabs
     try {
       if (window.RS_API && typeof RS_API.applyLocalRoleTabs === 'function') {
@@ -2833,7 +2853,7 @@
   }
 
   // Expose role helpers globally for other modules
-  window.RS_ROLE = { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };
+  window.RS_ROLE = window.RS_ROLE || { staffRole, allowedTabs, ROLE_TAB_MAP, ROLE_LABELS };
 
   function bindGlobalImportExportEvents() {
     const escHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));

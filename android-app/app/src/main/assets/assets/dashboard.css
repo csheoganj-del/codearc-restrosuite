@@ -2039,6 +2039,11 @@ body.rs-role-superadmin #klc-mobile-setup,
 body.rs-role-brandadmin #klc-mobile-setup {
   display: none !important;
 }
+/* Role refreshes update this guard before touching generic navigation. */
+html.rs-kitchen-setup-denied #klc-sidebar-setup,
+html.rs-kitchen-setup-denied #klc-mobile-setup {
+  display: none !important;
+}
 /* Add stock: food + packaging types */
 .inv-add-stock .klc-p { margin-bottom: 8px; }
 .inv-type-chips {

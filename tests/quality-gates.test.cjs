@@ -108,3 +108,30 @@ test('role refresh cannot fight operating mode over Kitchen tab visibility', () 
   );
   assert.match(roleFilter, /applyPosOnlyModeUI\(\)/);
 });
+
+test('Kitchen Setup has one guarded permission state during live role refresh', () => {
+  const dashboard = read('assets/dashboard.js');
+  const coach = read('assets/modules/kitchen-link-coach.js');
+  const css = read('assets/dashboard.css');
+  const roleFilter = dashboard.slice(
+    dashboard.indexOf('function applyKitchenSetupAccess'),
+    dashboard.indexOf('applyStaffRoleTabFiltering(staffRole')
+  );
+  assert.match(roleFilter, /classList\.toggle\('rs-kitchen-setup-denied'/);
+  assert.match(
+    roleFilter,
+    /\.sidebar-link:not\(\[data-klc-nav="setup"\]\)/
+  );
+  assert.match(
+    dashboard,
+    /window\.RS_ROLE = \{[\s\S]*staffRole: resolvedRole[\s\S]*applyStaffRoleTabFiltering\(resolvedRole, resolvedTabs\)/
+  );
+  assert.match(
+    coach,
+    /\(window\.RS_ROLE && window\.RS_ROLE\.staffRole\)[\s\S]*RS_API\.session/
+  );
+  assert.match(
+    css,
+    /html\.rs-kitchen-setup-denied #klc-sidebar-setup[\s\S]*display: none !important/
+  );
+});
