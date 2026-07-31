@@ -217,11 +217,13 @@ test('desktop answers bounded zero-touch UDP discovery without exposing an outle
   await new Promise((resolve) => { probe.close(resolve); });
 
   const discovery = startLanDiscovery(() => 8123, discoveryPort);
-  t.after(() => discovery.close());
+  t.after(async () => { await discovery.close(); });
   assert.equal(await discovery.ready, true);
 
   const client = dgram.createSocket('udp4');
-  t.after(() => { try { client.close(); } catch (_) {} });
+  t.after(() => new Promise((resolve) => {
+    try { client.close(resolve); } catch (_) { resolve(); }
+  }));
   const response = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('LAN discovery timed out')), 1500);
     client.once('message', (message) => {
