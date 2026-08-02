@@ -1537,16 +1537,18 @@
       <div><b style="color:var(--text)">F8</b> / <b>Ctrl+Enter</b> — Checkout</div>
       <div><b style="color:var(--text)">F9</b> — Clear cart</div>
       <div style="margin-top:10px;font-size:12px">Station: <b>${esc(getStationLabel())}</b> · Shift: <b>${getOpenShift() ? 'OPEN' : 'closed'}</b></div>
-      <div style="margin-top:8px;font-size:12px">Use <b>Day pack</b> for today's sales CSV · <b>Demo</b> for the 15-min checklist</div>
+      <div style="margin-top:8px;font-size:12px">Use <b>Day pack</b> in POS tools for today's sales CSV.</div>
     </div>`;
     if (global.RSModal) {
+      const showDemo = canShowDemoTools();
       RSModal.open({
         title: 'POS keyboard',
         icon: 'fa-keyboard',
         size: 'sm',
         body,
-        foot:
-          '<button class="btn btn-ghost" id="kh-demo">Demo</button><button class="btn btn-primary" id="kh-ok">Got it</button>',
+        foot: showDemo
+          ? '<button class="btn btn-ghost" id="kh-demo">Demo</button><button class="btn btn-primary" id="kh-ok">Got it</button>'
+          : '<button class="btn btn-primary" id="kh-ok">Got it</button>',
         onMount(m, c) {
           const ok = m.querySelector('#kh-ok');
           if (ok) ok.onclick = c;
@@ -1769,12 +1771,14 @@
   }
 
   function canShowDemoTools() {
+    // Never expose demo/dev checklist to restaurant customers on production.
     try {
       if (global.RS_API && RS_API.enableDemoTools) return true;
       const sess = global.RS_API && RS_API.session && RS_API.session();
       if (sess && sess.role === 'superadmin') return true;
-      if (new URLSearchParams(location.search).get('demo') === '1') return true;
       if (sess && String(sess.username || '').indexOf('superadmin:') === 0) return true;
+      const h = String(location.hostname || '');
+      if (h === 'localhost' || h === '127.0.0.1') return true;
     } catch (_) {}
     return false;
   }
@@ -1884,15 +1888,47 @@
       const pos = document.getElementById('pos-tab');
       if (!pos || !pos.classList.contains('active')) return;
       sessionStorage.setItem('rs_shift_prompted', '1');
-      // Soft reminder only when outlet requires shifts
+      // One-tap open with default float — first POS visit of session when shifts required
       setTimeout(() => {
-        if (isShiftRequired() && !getOpenShift()) {
-          toast(
-            'Shift is closed — open Shift before Print & Pay (float + Z-report)',
-            'fa-unlock'
-          );
+        if (!isShiftRequired() || getOpenShift()) return;
+        const DEFAULT_FLOAT = 2000;
+        if (global.RSModal && typeof RSModal.open === 'function') {
+          RSModal.open({
+            title: 'Open shift to start billing',
+            icon: 'fa-unlock',
+            size: 'sm',
+            body:
+              '<p style="margin:0 0 10px;font-size:13.5px;line-height:1.5;color:var(--text-soft)">' +
+              'Your outlet requires an open shift for accurate cash and Z-report. ' +
+              'Open with float <b>₹' + DEFAULT_FLOAT.toLocaleString('en-IN') + '</b> (you can change it), or use ₹0.</p>',
+            foot:
+              '<button type="button" class="btn btn-ghost" style="flex:1" data-later>Later</button>' +
+              '<button type="button" class="btn btn-ghost" style="flex:1" data-zero>₹0 float</button>' +
+              '<button type="button" class="btn btn-primary" style="flex:1.3" data-open>' +
+              '<i class="fa-solid fa-unlock"></i> Open ₹' + DEFAULT_FLOAT.toLocaleString('en-IN') + '</button>',
+            onMount(modal, close) {
+              const later = modal.querySelector('[data-later]');
+              const zero = modal.querySelector('[data-zero]');
+              const openBtn = modal.querySelector('[data-open]');
+              if (later) later.onclick = close;
+              if (zero) {
+                zero.onclick = () => {
+                  close();
+                  openShift(0);
+                };
+              }
+              if (openBtn) {
+                openBtn.onclick = () => {
+                  close();
+                  openShift(DEFAULT_FLOAT);
+                };
+              }
+            },
+          });
+        } else {
+          toast('Shift is closed — open Shift before Print & Pay', 'fa-unlock');
         }
-      }, 1200);
+      }, 900);
     } catch (_) {}
   }
 

@@ -36,7 +36,24 @@
     if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
 
+  function canOpenDemoScript() {
+    try {
+      if (global.RS_API && RS_API.enableDemoTools) return true;
+      const sess = global.RS_API && RS_API.session && RS_API.session();
+      if (sess && String(sess.role || '').toLowerCase() === 'superadmin') return true;
+      // Owner/manager learn-by-doing (customer training checklist)
+      const role = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+      if (role === 'owner' || role === 'admin' || role === 'manager') return true;
+      if (sessionStorage.getItem('rs_learn_mode') === '1') return true;
+      const h = String(location.hostname || '');
+      if (h === 'localhost' || h === '127.0.0.1') return true;
+    } catch (_) {}
+    return false;
+  }
+
   function openDemoScript() {
+    // Owners get learn-by-doing; internal demo tools still available on localhost/SA
+    if (!canOpenDemoScript()) return;
     document.getElementById('rs-demo-overlay')?.remove();
     const state = loadState();
     const overlay = document.createElement('div');
@@ -49,8 +66,8 @@
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,79,0,.12);display:grid;place-items:center;color:#FF4F00"><i class="fa-solid fa-clapperboard"></i></div>
           <div style="flex:1">
-            <div style="font-weight:800;font-size:16px;color:var(--text,#111)">15-min demo checklist</div>
-            <div style="font-size:12px;color:var(--text-soft,#6b7280)">${done}/${STEPS.length} complete · see docs/DEMO_SCRIPT.md</div>
+            <div style="font-weight:800;font-size:16px;color:var(--text,#111)">Learn by doing</div>
+            <div style="font-size:12px;color:var(--text-soft,#6b7280)">${done}/${STEPS.length} complete · sell → bills → reports</div>
           </div>
           <button type="button" id="rs-demo-x" style="border:0;background:transparent;font-size:18px;cursor:pointer;color:var(--text-soft)">×</button>
         </div>

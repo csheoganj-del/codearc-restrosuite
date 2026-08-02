@@ -1564,7 +1564,9 @@
       window.RS_LAST_CLOUD_ERROR = { method, collection:c, message:e.message, time:Date.now(), schema: !!isSchemaCacheError };
       window.dispatchEvent(new CustomEvent('rs:cloud-fallback', { detail:window.RS_LAST_CLOUD_ERROR }));
       if (method === 'put' || method === 'del' || method === 'bulkPut') {
-        if (!isSchemaCacheError || isMoneyCritical) {
+        // Queue menu/settings-critical writes too — never silent-drop owner catalog edits
+        const isCatalogCritical = c === 'menu' || c === 'inventory' || c === 'pending_orders';
+        if (!isSchemaCacheError || isMoneyCritical || isCatalogCritical) {
           addToSyncQueue(method, c, args);
         }
       }

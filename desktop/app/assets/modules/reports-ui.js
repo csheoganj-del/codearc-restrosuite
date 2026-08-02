@@ -193,12 +193,14 @@
 
   tab.innerHTML = `
     <div class="toolbar-row" style="margin-bottom:4px">
-      <span class="eyebrow">${period}${serverSummary ? ' · <span style="color:var(--green);font-weight:700">server totals</span>' : ' · local bills'}</span>
+      <span class="eyebrow">${period}${serverSummary ? ' · <span style="color:var(--green);font-weight:700">server totals</span>' : ' · local bills'} · day sales &amp; tax</span>
       <div class="grow"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${['Today','This week','This month','Last 30 days','Last 90 days'].map(p=>
           `<button class="btn btn-sm ${p===period?'btn-primary':'btn-ghost'}" onclick="window._renderReports('${p}')">${p}</button>`
         ).join('')}
+        <button type="button" class="btn btn-primary btn-sm" id="rs-fx-ca-pack" title="GSTR CSV + day sales for your accountant"><i class="fa-solid fa-file-zipper"></i> CA pack</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="rs-fx-open-trends" title="Longer-range trends"><i class="fa-solid fa-chart-pie"></i> Trends</button>
       </div>
     </div>
 
@@ -299,6 +301,32 @@
   // Animate bars
   setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
   setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+
+  // CA pack = GSTR + day sales in one click
+  const caPackBtn = document.getElementById('rs-fx-ca-pack');
+  if (caPackBtn) {
+    caPackBtn.onclick = () => {
+      try {
+        if (global.RSFrictionless && typeof RSFrictionless.downloadCaPack === 'function') {
+          RSFrictionless.downloadCaPack();
+          return;
+        }
+      } catch (_) {}
+      const g = document.getElementById('btn-download-gstr');
+      if (g) g.click();
+      try {
+        if (window.RSFrictionless && RSFrictionless.markActivation) RSFrictionless.markActivation('reports');
+      } catch (_) {}
+    };
+  }
+  const trendsBtn = document.getElementById('rs-fx-open-trends');
+  if (trendsBtn) {
+    trendsBtn.onclick = () => {
+      try {
+        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('analytics-tab');
+      } catch (_) {}
+    };
+  }
 
   // GSTR CSV download — richer columns for accountant handoff
   const gstrBtn = document.getElementById('btn-download-gstr');

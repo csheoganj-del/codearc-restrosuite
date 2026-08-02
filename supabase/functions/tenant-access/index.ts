@@ -7,6 +7,11 @@ import {
   effectiveTabs,
   ALL_MODULE_TABS,
 } from "../_shared/role-defaults.ts";
+import {
+  issueAndDeliverInvoice,
+  makeInvoiceNumber,
+  planDisplayName,
+} from "../_shared/billing-invoice.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist. Add extra origins (e.g. preview deploys, custom domain)
@@ -72,7 +77,118 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const DEFAULT_ALLOWED_TABS = ALL_MODULE_TABS;
 
 function activeSubscription(status: unknown) {
-  return ["active", "trialing"].includes(String(status || "active"));
+  // past_due = soft renew fail while days may still remain (handled with period check)
+  return ["active", "trialing", "past_due"].includes(String(status || "active").toLowerCase());
+}
+
+/** True when period end is still in the future (or missing → treat as open). */
+function periodStillOpen(endIso: string | null | undefined): boolean {
+  if (!endIso) return true;
+  const endMs = new Date(endIso).getTime();
+  if (!Number.isFinite(endMs)) return true;
+  return Date.now() <= endMs;
+}
+
+/**
+ * Safety net: never lock a tenant that still has paid/trial days because a
+ * Razorpay subscription was cancelled (mandate abandon, admin cancel, etc.).
+ * Returns healed row fields to use for the rest of the request.
+ */
+async function healFalseSuspendIfNeeded(tenant: {
+  id: string;
+  status?: string | null;
+  subscription_status?: string | null;
+  subscription_current_period_end?: string | null;
+}): Promise<{
+  status: string;
+  subscription_status: string;
+  healed: boolean;
+}> {
+  const status = String(tenant.status || "");
+  const sub = String(tenant.subscription_status || "active").toLowerCase();
+  const open = periodStillOpen(tenant.subscription_current_period_end);
+  const falseLock =
+    open &&
+    (status === "suspended" ||
+      status === "payment_failed" ||
+      sub === "canceled" ||
+      sub === "cancelled");
+
+  if (!falseLock) {
+    return {
+      status: status || "approved",
+      subscription_status: sub || "active",
+      healed: false,
+    };
+  }
+
+  const nextStatus = "approved";
+  const nextSub = "active";
+  try {
+    await supabaseAdmin
+      .from("saas_tenants")
+      .update({
+        status: nextStatus,
+        subscription_status: nextSub,
+        // leave period end and plan alone
+      })
+      .eq("id", tenant.id);
+    console.log(
+      `[healFalseSuspend] tenant ${tenant.id} restored (status=${status} sub=${sub} → approved/active)`,
+    );
+  } catch (e) {
+    console.error("[healFalseSuspend] failed", e);
+  }
+  return { status: nextStatus, subscription_status: nextSub, healed: true };
+}
+
+/** No grace: access ends the moment subscription_current_period_end is past. */
+function subscriptionAllowsAccess(tenant: {
+  subscription_status?: string | null;
+  subscription_current_period_end?: string | null;
+  status?: string | null;
+}): { ok: true } | { ok: false; code: string; error: string } {
+  // Hard lock only when truly suspended AND period is over (or no period).
+  // Paid-period false locks are healed before this runs.
+  if (tenant.status === "suspended" || tenant.status === "payment_failed") {
+    return {
+      ok: false,
+      code: "subscription_inactive",
+      error:
+        "Access Denied: Account suspended. Open Plan & billing to renew, or contact RestroSuite support.",
+    };
+  }
+  const sub = String(tenant.subscription_status || "active").toLowerCase();
+  // canceled + still in period is allowed (auto-renew off, days remaining)
+  if (sub === "canceled" || sub === "cancelled") {
+    if (periodStillOpen(tenant.subscription_current_period_end)) {
+      return { ok: true };
+    }
+    return {
+      ok: false,
+      code: "subscription_expired",
+      error: "Access Denied: Your plan period has ended. Renew now to reopen POS.",
+    };
+  }
+  if (!activeSubscription(tenant.subscription_status)) {
+    return {
+      ok: false,
+      code: "subscription_inactive",
+      error: "Access Denied: Subscription is not active. Please renew your plan to continue.",
+    };
+  }
+  const endIso = tenant.subscription_current_period_end;
+  if (endIso) {
+    const endMs = new Date(endIso).getTime();
+    if (Number.isFinite(endMs) && Date.now() > endMs) {
+      return {
+        ok: false,
+        code: "subscription_expired",
+        error: "Access Denied: Your plan period has ended. Renew now to reopen POS.",
+      };
+    }
+  }
+  return { ok: true };
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
@@ -688,12 +804,31 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
     return jsonResponse({ error: "Access Denied: Your registration request is pending CodeArc approval." }, 403, req);
   }
 
+  // Auto-heal false suspends (e.g. Razorpay cancel webhook while paid days remain)
+  const healed = await healFalseSuspendIfNeeded(tenant);
+  tenant.status = healed.status;
+  tenant.subscription_status = healed.subscription_status;
+
   if (tenant.status === "suspended") {
-    return jsonResponse({ error: "Access Denied: Account suspended. Please contact CodeArc support." }, 403, req);
+    return jsonResponse({
+      error:
+        "Access Denied: Account suspended. Open Plan & billing to renew, or contact RestroSuite support.",
+    }, 403, req);
   }
 
-  if (!activeSubscription(tenant.subscription_status)) {
-    return jsonResponse({ error: "Access Denied: Subscription is not active. Please contact CodeArc support." }, 402, req);
+  const subGate = subscriptionAllowsAccess(tenant);
+  if (!subGate.ok) {
+    // Mark expired so reminders / admin dashboards stay accurate (no grace).
+    if (subGate.code === "subscription_expired") {
+      try {
+        await supabaseAdmin
+          .from("saas_tenants")
+          .update({ subscription_status: "expired" })
+          .eq("id", tenant.id)
+          .in("subscription_status", ["trialing", "active", "past_due", "canceled", "cancelled"]);
+      } catch (_) { /* best-effort */ }
+    }
+    return jsonResponse({ error: subGate.error, code: subGate.code }, 402, req);
   }
 
   const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
@@ -876,9 +1011,24 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
   }
 
   if (!tenant) return jsonResponse({ error: "Workspace no longer exists.", code: "session_revoked" }, 401, req);
-  if (tenant.status !== "approved") return jsonResponse({ error: "Workspace access is not active.", code: "session_revoked" }, 403, req);
-  if (!activeSubscription(tenant.subscription_status)) {
-    return jsonResponse({ error: "Workspace subscription is not active.", code: "subscription_inactive" }, 402, req);
+  const healedSession = await healFalseSuspendIfNeeded(tenant);
+  tenant.status = healedSession.status;
+  tenant.subscription_status = healedSession.subscription_status;
+  if (tenant.status !== "approved") {
+    return jsonResponse({ error: "Workspace access is not active.", code: "session_revoked" }, 403, req);
+  }
+  const subGateV = subscriptionAllowsAccess(tenant);
+  if (!subGateV.ok) {
+    if (subGateV.code === "subscription_expired") {
+      try {
+        await supabaseAdmin
+          .from("saas_tenants")
+          .update({ subscription_status: "expired" })
+          .eq("id", tenant.id)
+          .in("subscription_status", ["trialing", "active", "past_due", "canceled", "cancelled"]);
+      } catch (_) { /* best-effort */ }
+    }
+    return jsonResponse({ error: subGateV.error, code: subGateV.code }, 402, req);
   }
   const userId = String(sessionPayload.user_id || "");
   if (!userId && Number(sessionPayload.auth_version) !== Number(tenant.auth_version)) {
@@ -1043,7 +1193,8 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
   const phone = String(payload.phone || "").trim();
   const username = normalizeUsername(String(payload.username || ""));
   const password = String(payload.password || "");
-  const planCode = String(payload.plan_code || "starter").trim().toLowerCase();
+  // New outlets always start on Serve with a 30-day free trial (no card).
+  const planCode = "serve";
   const country = String(payload.country || "India").trim();
 
   if (!name || !slug || !username || !password) {
@@ -1108,9 +1259,28 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
 
   const otpCheck = await consumeRegistrationOtp(payload, cleanPhone, req);
   if (!otpCheck.ok) return otpCheck.response;
- 
+
+  // One free trial per WhatsApp number (prevents re-register abuse).
+  const { data: priorTrial } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("id, slug, trial_started_at")
+    .eq("phone", cleanPhone)
+    .not("trial_started_at", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (priorTrial) {
+    return jsonResponse({
+      error: "A free trial was already used with this WhatsApp number. Sign in to your existing outlet or contact support to renew.",
+      code: "trial_already_used",
+    }, 409, req);
+  }
+
   const passwordHash = await hashPassword(password);
-  const { error: insertErr } = await supabaseAdmin.from("saas_tenants").insert({
+  const trialStart = new Date();
+  const trialEnd = new Date(trialStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const plan = planFor(planCode);
+
+  const { data: inserted, error: insertErr } = await supabaseAdmin.from("saas_tenants").insert({
     name,
     slug,
     outlet_type: outletType,
@@ -1118,20 +1288,146 @@ async function handleRegister(payload: Record<string, unknown>, req: Request) {
     phone: cleanPhone,
     username,
     password_hash: passwordHash,
-    status: "pending",
+    // Trial starts immediately — no pending approval gate for new outlets.
+    status: "approved",
     plan_code: planCode,
-    allowed_tabs: planFor(planCode).allowedTabs,
+    allowed_tabs: plan.allowedTabs,
     country,
-  });
+    subscription_status: "trialing",
+    subscription_current_period_end: trialEnd.toISOString(),
+    trial_started_at: trialStart.toISOString(),
+    billing_interval: "monthly",
+  }).select("id").maybeSingle();
 
   if (insertErr) {
     console.error("register insert failed:", insertErr);
     return jsonResponse({ error: "Registration failed. Please try again." }, 500, req);
   }
 
+  const tenantId = inserted?.id || null;
+  // Pre-allocate invoice number so client can reference it; PDF/email/WA go in background
+  // so OTP "Creating…" does not block 20–40s on gateway/email.
+  const invoiceNumber = makeInvoiceNumber("trial");
+  const buyerAddress = String(payload.address || country || "").trim() || null;
+
+  // Quick billing event (must not wait on PDF/gateway)
+  try {
+    await supabaseAdmin.from("saas_billing_events").insert({
+      tenant_id: tenantId,
+      event_type: "trial_started",
+      channel: "system",
+      payload: {
+        slug,
+        plan_code: planCode,
+        trial_ends_at: trialEnd.toISOString(),
+        phone: cleanPhone,
+        email,
+        invoice_number: invoiceNumber,
+        pdf_status: "queued",
+      },
+    });
+  } catch (evErr) {
+    console.error("trial_started event insert failed:", evErr);
+  }
+
+  // Background: build PDF + deliver email/WhatsApp + store invoice row
+  const deliverTrialPdf = async () => {
+    try {
+      const delivered = await issueAndDeliverInvoice({
+        kind: "trial",
+        invoiceNumber,
+        invoiceDate: trialStart,
+        buyerName: name,
+        buyerSlug: slug,
+        buyerEmail: email,
+        buyerPhone: cleanPhone,
+        buyerAddress,
+        planCode,
+        planName: planDisplayName(planCode) + " (Trial)",
+        billingInterval: "trial",
+        periodStart: trialStart.toISOString(),
+        periodEnd: trialEnd.toISOString(),
+        amountTotal: 0,
+        currency: "INR",
+        paymentMethod: "Trial — no charge",
+        notes:
+          "30-day Serve trial. Sign in immediately. No approval wait. PDF is your official confirmation.",
+      });
+      if (tenantId) {
+        await supabaseAdmin.from("saas_invoices").insert({
+          tenant_id: tenantId,
+          invoice_number: invoiceNumber,
+          kind: "trial",
+          plan_code: planCode,
+          billing_interval: "trial",
+          currency: "INR",
+          amount_subtotal: 0,
+          amount_tax: 0,
+          amount_total: 0,
+          period_start: trialStart.toISOString(),
+          period_end: trialEnd.toISOString(),
+          buyer_name: name,
+          buyer_email: email,
+          buyer_phone: cleanPhone,
+          buyer_slug: slug,
+          status: "issued",
+          pdf_sent_email: delivered.email,
+          pdf_sent_whatsapp: delivered.whatsapp,
+          meta: { type: "trial_confirmation" },
+        });
+      }
+      await supabaseAdmin.from("saas_billing_events").insert({
+        tenant_id: tenantId,
+        event_type: "trial_pdf_delivered",
+        channel: "system",
+        payload: {
+          slug,
+          invoice_number: invoiceNumber,
+          pdf_email: delivered.email,
+          pdf_whatsapp: delivered.whatsapp,
+        },
+      });
+    } catch (invErr) {
+      console.error("trial invoice delivery failed (background):", invErr);
+      try {
+        await supabaseAdmin.from("saas_billing_events").insert({
+          tenant_id: tenantId,
+          event_type: "trial_pdf_failed",
+          channel: "system",
+          payload: {
+            slug,
+            invoice_number: invoiceNumber,
+            invoice_error: String(invErr),
+          },
+        });
+      } catch (_) { /* ignore */ }
+    }
+  };
+
+  // Prefer EdgeRuntime.waitUntil so the isolate stays alive after response.
+  // Fall back to fire-and-forget (still much faster for the client).
+  try {
+    // deno-lint-ignore no-explicit-any
+    const er = (globalThis as any).EdgeRuntime;
+    if (er && typeof er.waitUntil === "function") {
+      er.waitUntil(deliverTrialPdf());
+    } else {
+      void deliverTrialPdf();
+    }
+  } catch (_) {
+    void deliverTrialPdf();
+  }
+
   return jsonResponse({
     success: true,
-    message: "Registration submitted successfully! Please wait for CodeArc to approve your account.",
+    trial: true,
+    plan_code: planCode,
+    plan_name: plan.name,
+    subscription_status: "trialing",
+    subscription_current_period_end: trialEnd.toISOString(),
+    invoice_number: invoiceNumber,
+    message:
+      "Welcome! Your 30-day Serve trial is active — sign in now (no approval). A confirmation PDF is on its way to your email and WhatsApp.",
   }, 200, req);
 }
 

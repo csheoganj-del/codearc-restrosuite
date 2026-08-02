@@ -1,0 +1,156 @@
+{
+  "base": "https://restrosuite.codearc.co.in",
+  "pass": 21,
+  "fail": 0,
+  "skip": 0,
+  "results": [
+    {
+      "id": "A1",
+      "title": "Login page loads with trial messaging",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:25.921Z"
+    },
+    {
+      "id": "A2",
+      "title": "dashboard.html reachable",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.154Z"
+    },
+    {
+      "id": "A3",
+      "title": "dashboard loads frictionless-10x.js",
+      "status": "pass",
+      "detail": "script tag present",
+      "at": "2026-08-02T05:49:26.155Z"
+    },
+    {
+      "id": "A4",
+      "title": "frictionless-10x.js 200",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.207Z"
+    },
+    {
+      "id": "A5",
+      "title": "module exports RSFrictionless API",
+      "status": "pass",
+      "detail": "",
+      "at": "2026-08-02T05:49:26.208Z"
+    },
+    {
+      "id": "A6",
+      "title": "sample café menu + workspace modes",
+      "status": "pass",
+      "detail": "",
+      "at": "2026-08-02T05:49:26.208Z"
+    },
+    {
+      "id": "A7",
+      "title": "CA pack + gateway health helpers",
+      "status": "pass",
+      "detail": "",
+      "at": "2026-08-02T05:49:26.208Z"
+    },
+    {
+      "id": "A8",
+      "title": "reports-ui has CA pack button",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.257Z"
+    },
+    {
+      "id": "A9",
+      "title": "QR bill handoff (markTableOccupied / re-apply cart)",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.308Z"
+    },
+    {
+      "id": "A10",
+      "title": "Growth Hub job groups",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.364Z"
+    },
+    {
+      "id": "A11",
+      "title": "Shift one-tap open (₹2000 default)",
+      "status": "pass",
+      "detail": "found in competitive-ops or critical.bundle",
+      "at": "2026-08-02T05:49:26.497Z"
+    },
+    {
+      "id": "A12",
+      "title": "session remember-blob multi-outlet guard",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.547Z"
+    },
+    {
+      "id": "A13",
+      "title": "critical.bundle.js present",
+      "status": "pass",
+      "detail": "status=200 bytes=360385",
+      "at": "2026-08-02T05:49:26.547Z"
+    },
+    {
+      "id": "A14",
+      "title": "api/health (if configured)",
+      "status": "pass",
+      "detail": "status=200",
+      "at": "2026-08-02T05:49:26.825Z"
+    },
+    {
+      "id": "B1",
+      "title": "Login to demo outlet",
+      "status": "pass",
+      "detail": "bbb",
+      "at": "2026-08-02T05:49:38.826Z"
+    },
+    {
+      "id": "B2",
+      "title": "RSFrictionless global after load",
+      "status": "pass",
+      "detail": "ok",
+      "at": "2026-08-02T05:49:38.831Z"
+    },
+    {
+      "id": "B3",
+      "title": "Counter/Tables/Full mode switcher visible",
+      "status": "pass",
+      "detail": "count=1",
+      "at": "2026-08-02T05:49:38.838Z"
+    },
+    {
+      "id": "B4",
+      "title": "Reports CA pack control",
+      "status": "pass",
+      "detail": "count=1",
+      "at": "2026-08-02T05:49:40.102Z"
+    },
+    {
+      "id": "B5",
+      "title": "WhatsApp status control present",
+      "status": "pass",
+      "detail": "count=2",
+      "at": "2026-08-02T05:49:40.117Z"
+    },
+    {
+      "id": "B6",
+      "title": "POS tab usable",
+      "status": "pass",
+      "detail": "",
+      "at": "2026-08-02T05:49:40.982Z"
+    },
+    {
+      "id": "B7",
+      "title": "Analytics renamed Trends (or still Analytics on old deploy)",
+      "status": "pass",
+      "detail": "label=Trends",
+      "at": "2026-08-02T05:49:41.024Z"
+    }
+  ],
+  "at": "2026-08-02T05:49:41.140Z"
+}

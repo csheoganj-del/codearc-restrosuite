@@ -542,7 +542,13 @@
         // outlet that must be approved before login. Storing a session here would bypass
         // the approval gate and auto-redirect to dashboard.
         await new Promise(r => setTimeout(r, 600));
-        return { message: 'Registration submitted! Once CodeArc approves your outlet you can sign in.' };
+        return {
+          success: true,
+          trial: true,
+          plan_code: 'serve',
+          subscription_status: 'trialing',
+          message: 'Welcome! Your 30-day Serve trial is active. Sign in now — no approval needed. Confirmation PDF is sent to email & WhatsApp.',
+        };
       }
       return post('tenant-access', { action:'register', ...payload }, ANON, 'Registration failed');
     },
@@ -704,11 +710,28 @@
       if (!CONFIGURED) absorbRuntimeConfig();
       return post('razorpay-route', { action: 'get_plans' }, token, 'Could not load plans');
     },
-    async subscribe(planCode){
+    async subscribe(planCode, billingInterval){
       const token = ssGet(K.token);
       if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
       if (!CONFIGURED) absorbRuntimeConfig();
-      return post('razorpay-route', { action: 'create_subscription', plan_code: planCode }, token, 'Could not start checkout');
+      return post('razorpay-route', {
+        action: 'create_subscription',
+        plan_code: planCode,
+        billing_interval: billingInterval || 'monthly',
+      }, token, 'Could not start checkout');
+    },
+    /** After one-time Razorpay pay — activate plan and extend period from expiry. */
+    async activatePlan({ plan_code, billing_interval, razorpay_payment_id, razorpay_order_id }){
+      const token = ssGet(K.token);
+      if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
+      if (!CONFIGURED) absorbRuntimeConfig();
+      return post('razorpay-route', {
+        action: 'activate_plan',
+        plan_code,
+        billing_interval: billing_interval || 'monthly',
+        razorpay_payment_id,
+        razorpay_order_id,
+      }, token, 'Could not activate plan');
     },
 
     /* ---------------- SUPER-ADMIN (tenant-admin) ---------------- */

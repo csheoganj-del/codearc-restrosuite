@@ -31,6 +31,8 @@
 <link rel="icon" type="image/svg+xml" href="assets/restrosuite-mark.svg?v=8">
 <link rel="icon" href="assets/restrosuite-mark.png?v=8" type="image/png">
 <meta name="theme-color" content="#FF4F00">
+<meta name="rs-app-version" content="v236-20260801-pay-now">
+<script>window.__RESTROSUITE_ASSET_VERSION__ = 'v236-20260801-pay-now';</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <!-- Native shells (Android offline / early inject): sets ENV_SUPABASE_* before config.js -->
 <script src="env-config.js"></script>
@@ -429,8 +431,12 @@
               </select>
             </div>
           </div>
-          <!-- Plan picker hidden during free-trial period — auto-set to "starter" -->
-          <input type="hidden" id="reg-plan" value="starter">
+          <!-- Plan: 30-day Serve trial starts automatically (no approval queue) -->
+          <input type="hidden" id="reg-plan" value="serve">
+          <div class="note" style="margin:0 0 14px;font-size:12.5px;line-height:1.5;color:var(--text-soft)">
+            <i class="fa-solid fa-gift" style="color:var(--orange);margin-right:6px"></i>
+            <span><strong>30-day free Serve trial</strong> — tables, QR &amp; kitchen included. No card. Sign in right after WhatsApp OTP. No waiting for approval.</span>
+          </div>
           <div class="step-actions">
             <button type="button" class="btn btn-primary btn-block btn-lg" id="reg-next">Continue to owner details <i class="fa-solid fa-arrow-right"></i></button>
           </div>
@@ -1649,14 +1655,30 @@
     const payload = _pendingRegPayload;
     if(!payload) return;
     const btn=document.getElementById('reg-otp-verify'); const orig=btn.innerHTML;
-    btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Creating…'; btn.disabled=true;
+    let statusTimer = null;
+    const setCreatingLabel = (msg) => {
+      if (btn) btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + msg;
+    };
+    setCreatingLabel('Creating outlet…');
+    btn.disabled=true;
+    // Progressive labels so a slow network does not feel like a freeze
+    statusTimer = setTimeout(() => setCreatingLabel('Almost done…'), 4000);
     try{
       if(window.RS_API && RS_API.configured){
         const registrationPayload = { ...payload, otp_challenge_id:_pendingRegOtpChallenge, otp_code:otpCode };
         const r = await RS_API.register(registrationPayload);
-        showOk(r.message || 'Registration submitted! Once CodeArc approves your outlet you can sign in.');
-        setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=payload.email; }, 2200);
+        if (statusTimer) clearTimeout(statusTimer);
+        const trialEnd = r.subscription_current_period_end
+          ? (()=>{ try { return new Date(r.subscription_current_period_end).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}); } catch(_){ return ''; } })()
+          : '';
+        showOk(
+          r.message ||
+          ('Welcome! Your 30-day Serve trial is active' + (trialEnd ? ' until ' + trialEnd : '') +
+            '. Sign in now — no approval needed. Confirmation PDF is on its way to email & WhatsApp.')
+        );
+        setTimeout(()=>{ tabLogin.click(); const t=document.getElementById('tenant-id'); if(t)t.value=payload.slug; const un=document.getElementById('username'); if(un)un.value=payload.email; }, 1800);
       } else {
+        if (statusTimer) clearTimeout(statusTimer);
         const tenantId = payload.slug;
         const activeKey = 'rs_v2:' + tenantId + ':settings';
         const taxInfo = window.RS_getCountryTaxInfo ? window.RS_getCountryTaxInfo(payload.country) : { label:'GST', rate:5 };
@@ -1676,6 +1698,7 @@
         setTimeout(()=>location.href=(window.RS_LOCAL_PAGE?RS_LOCAL_PAGE('dashboard'):'dashboard.html'),900);
       }
     }catch(err){
+      if (statusTimer) clearTimeout(statusTimer);
       btn.innerHTML=orig; btn.disabled=false;
       showErr(err.message||'Could not create the outlet. Try again.');
     }

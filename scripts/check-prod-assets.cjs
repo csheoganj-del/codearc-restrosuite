@@ -56,6 +56,7 @@ const MODULES = [
   { file: 'employees-ui.js', marker: /RSEmployeesUI/ },
   { file: 'bill-identity.js', marker: /RSBillIdentity/ },
   { file: 'inventory-ledger.js', marker: /RSInventoryLedger/ },
+  { file: 'frictionless-10x.js', marker: /RSFrictionless|loadStartSellingPack/ },
 ];
 
 (async () => {
@@ -71,6 +72,10 @@ const MODULES = [
   console.log('asset version:', ver || '(unknown)');
   if (!/tax-helpers\.js/.test(dash.body)) {fails.push('dashboard missing tax-helpers.js script');}
   if (!/pos-ui\.js/.test(dash.body)) {fails.push('dashboard missing pos-ui.js script');}
+  // Frictionless pack is a static script tag (not only critical.bundle)
+  if (!/frictionless-10x\.js/.test(dash.body || '')) {
+    fails.push('dashboard missing frictionless-10x.js script');
+  }
 
   for (const m of MODULES) {
     const r = await get(base + '/assets/modules/' + m.file);

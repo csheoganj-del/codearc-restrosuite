@@ -340,28 +340,40 @@
       return;
     }
     const tableName = qrTableName(order.table);
+    // Tag cart lines so checkout can link back to this QR order
+    items.forEach((it) => {
+      it.source = 'qr_order';
+      it.qrOrderId = order.id || order.orderId || '';
+      it.table = tableName;
+    });
+    try {
+      window.__rsBillingQrOrderId = order.id || order.orderId || null;
+      window.__rsBillingQrTable = tableName;
+    } catch (_) {}
+
     activateTab('pos-tab');
     // Wait for POS tab DOM + cart helpers (RS.setCart) to be ready after tab switch.
-    await new Promise((resolve) => { setTimeout(resolve, 120); });
+    await new Promise((resolve) => { setTimeout(resolve, 160); });
     let attempts = 0;
-    while (attempts < 8 && !(window.RS && typeof RS.setCart === 'function')) {
-      await new Promise((resolve) => { setTimeout(resolve, 60); });
+    while (attempts < 12 && !(window.RS && typeof RS.setCart === 'function')) {
+      await new Promise((resolve) => { setTimeout(resolve, 80); });
       attempts += 1;
     }
 
     // Block showMenuGridForTable from clearing/replacing this cart on table change
+    // Longer window: table hydrate can race on slow devices
     if (typeof window.RS_PRESERVE_CART_LOAD === 'function') {
-      window.RS_PRESERVE_CART_LOAD(2000);
+      window.RS_PRESERVE_CART_LOAD(5000);
     } else {
-      window.__rsPreserveCartUntil = Date.now() + 2000;
+      window.__rsPreserveCartUntil = Date.now() + 5000;
     }
 
     const applyCart = () => {
       if (window.RS && typeof RS.setCart === 'function') {
-        RS.setCart(items);
+        RS.setCart(items.map((it) => Object.assign({}, it)));
       } else if (window.RS && Array.isArray(RS.cart)) {
         RS.cart.length = 0;
-        items.forEach((it) => RS.cart.push(it));
+        items.forEach((it) => RS.cart.push(Object.assign({}, it)));
       }
       try {
         if (window.RS && typeof RS.renderCart === 'function') {RS.renderCart();}
@@ -369,6 +381,17 @@
       try {
         if (typeof window.saveActiveCart === 'function') {window.saveActiveCart();}
       } catch (e) {}
+      // Switch order type to dine-in when billing a table QR
+      try {
+        const ot =
+          document.getElementById('pos-cart-order-types') ||
+          document.getElementById('pos-menu-order-types');
+        if (ot) {
+          const dine = ot.querySelector('[data-type="dine-in"], [data-order-type="dine-in"], button[value="dine-in"]');
+          if (dine && dine.click) dine.click();
+        }
+        if (window.RS && typeof RS.setOrderType === 'function') RS.setOrderType('dine-in');
+      } catch (_) {}
     };
 
     const tableSelect =
@@ -402,6 +425,11 @@
         RS.setTable(tableName);
       } catch (e) {}
     }
+    // Mark table occupied in floor settings so Floor map matches POS
+    try {
+      await markTableOccupiedForBill(tableName, order);
+    } catch (_) {}
+
     const nameEl = document.getElementById('cust-name') || document.getElementById('cust-input-name');
     const phoneEl = document.getElementById('cust-phone') || document.getElementById('cust-input-phone');
     if (nameEl && order.customerName) {
@@ -412,11 +440,61 @@
       phoneEl.value = order.customerPhone;
       phoneEl.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    // Apply after table hydrate; re-apply once async showMenuGridForTable may have finished
+    // Apply after table hydrate; re-apply several times (async floor/menu races)
     applyCart();
-    await new Promise((resolve) => { setTimeout(resolve, 350); });
+    await new Promise((resolve) => { setTimeout(resolve, 200); });
     applyCart();
-    toast(`Loaded ${tableName} in POS`, 'fa-receipt');
+    await new Promise((resolve) => { setTimeout(resolve, 450); });
+    applyCart();
+    // Verify cart not empty after races
+    let cartLen = 0;
+    try {
+      cartLen = (window.RS && Array.isArray(RS.cart) && RS.cart.length) || 0;
+    } catch (_) {}
+    if (!cartLen) {
+      applyCart();
+      toast('Re-loaded QR items into cart — check total before pay', 'fa-rotate');
+    } else {
+      toast(`Loaded ${tableName} · ${items.length} item(s) in POS`, 'fa-receipt');
+    }
+  }
+
+  async function markTableOccupiedForBill(tableName, order) {
+    if (!tableName || !window.RS_DB || typeof RS_DB.getSettings !== 'function') return;
+    try {
+      const settings = (await RS_DB.getSettings()) || {};
+      const tables = Array.isArray(settings.custom_tables) ? settings.custom_tables.slice() : null;
+      if (!tables || !tables.length) {
+        // Still notify floor UI to refresh occupancy from pending orders
+        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (_) {}
+        return;
+      }
+      const dig = (v) => parseInt(String(v == null ? '' : v).replace(/\D/g, ''), 10);
+      const want = dig(tableName);
+      let changed = false;
+      tables.forEach((t) => {
+        const label = String(t.n != null ? t.n : t.name || '');
+        const match =
+          label === tableName ||
+          tableName === 'Table ' + label ||
+          tableName.indexOf(label) >= 0 ||
+          (Number.isFinite(want) && dig(label) === want);
+        if (match) {
+          t.state = 'billed';
+          t.qrOpen = t.qrOpen;
+          t.billingOrderId = order && (order.id || order.orderId) || null;
+          changed = true;
+        }
+      });
+      if (changed) {
+        settings.custom_tables = tables;
+        try { window.RS_SETTINGS = Object.assign({}, window.RS_SETTINGS || {}, settings); } catch (_) {}
+        await RS_DB.setSettings(settings);
+        try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (_) {}
+      }
+    } catch (e) {
+      console.warn('[QR] mark table occupied failed', e);
+    }
   }
 
   function emptyQrHtml() {
@@ -815,6 +893,18 @@
     try {
       if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
       renderQR();
+    } catch (_) {}
+  });
+  // Always repaint board when pending orders sync (even if tab not active — badges)
+  document.addEventListener('rs:pending_orders_synced', () => {
+    try {
+      renderQR();
+    } catch (_) {}
+  });
+  window.addEventListener('rs:db-sync', (ev) => {
+    try {
+      const c = ev && ev.detail && ev.detail.collection;
+      if (c === 'pending_orders' || !c) renderQR();
     } catch (_) {}
   });
 })(typeof window !== 'undefined' ? window : globalThis);

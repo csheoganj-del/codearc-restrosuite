@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-30T04:59:11.607Z",
+  "generatedAt": "2026-08-02T05:47:17.847Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v231-20260730-auto",
-    "title": "Live update v231-20260730-auto",
+    "version": "v235-20260802-frictionless",
+    "title": "Live update v235-20260802-frictionless",
     "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
@@ -19,8 +19,8 @@
       "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Setup.exe",
       "feedFile": "RestroSuite-2.0.8-x64.exe",
       "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe",
-      "size": 85474287,
-      "sizeLabel": "81.5 MB"
+      "size": 106800927,
+      "sizeLabel": "101.9 MB"
     },
     "portable": null,
     "mac": {
@@ -40,8 +40,8 @@
     "versionName": "2.0.4",
     "versionCode": 5,
     "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Android.apk",
-    "size": 13095416,
-    "sizeLabel": "12.5 MB",
-    "notes": "Print & Pay settles on one card with a live skeleton, main screens show loading skeletons instead of hanging, and tab switches paint first so the cursor no longer freezes 2–3s. Desktop content updater also gets automatic version bumps on every deploy."
+    "size": 13523849,
+    "sizeLabel": "12.9 MB",
+    "notes": "Automatic deploy update — installed desktop apps will download this UI content."
   }
 }

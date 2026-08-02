@@ -415,6 +415,14 @@
     try {
       if (sessionStorage.getItem(tourSessionSkipKey()) === '1') {return false;}
     } catch (_) {}
+    // Frictionless 10x welcome + start-selling checklist replaces the long tour on day 1
+    try {
+      if (window.RSFrictionless && !window.__rsForceFullOnboardingTour) {
+        const menuN = (window.RS && Array.isArray(RS.MENU)) ? RS.MENU.length : 0;
+        const billsN = (window.RS && Array.isArray(RS.BILLS)) ? RS.BILLS.length : 0;
+        if (menuN < 8 && billsN < 5) {return false;}
+      }
+    } catch (_) {}
     return true;
   }
 
@@ -1146,6 +1154,26 @@
   }
 
   function startTour() {
+    // Frictionless pack shows a sell-first welcome — skip the long module tour on day 1
+    // unless the owner opens Help → Product Guide explicitly.
+    try {
+      const fxKey = 'rs_frictionless_welcome_v1';
+      let slug = '';
+      try {
+        const sess = window.RS_API && RS_API.session && RS_API.session();
+        slug = String((sess && (sess.tenant_slug || sess.slug)) || sessionStorage.getItem('tenant_slug') || 'local');
+      } catch (_) { slug = 'local'; }
+      const seenFx = localStorage.getItem(fxKey + ':' + slug) === '1' || localStorage.getItem(fxKey) === '1';
+      const menuN = (window.RS && Array.isArray(RS.MENU)) ? RS.MENU.length : 0;
+      const billsN = (window.RS && Array.isArray(RS.BILLS)) ? RS.BILLS.length : 0;
+      // Auto first-run: prefer frictionless checklist over 5-module tour
+      if (!seenFx && menuN < 4 && billsN === 0 && !window.__rsForceFullOnboardingTour) {
+        if (window.RSFrictionless) {
+          // Welcome modal / checklist already handles activation
+          return;
+        }
+      }
+    } catch (_) {}
     // Calm first-run tour (core modules only). Help → Product Guide lists everything.
     steps = [WELCOME_STEP, ...coreOnboardingFeatures()];
     if (steps.length < 2) {return;}

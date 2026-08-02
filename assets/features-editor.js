@@ -282,14 +282,22 @@
         };
         
         try {
+          const cloudErrBefore = (window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time) || 0;
           if(editingId){
             const m=RS.MENU.find(x=>String(x.id)===String(editingId));
+            if (!m) throw new Error('Item not found — refresh and try again');
             Object.assign(m,data);
             if (RS.saveOne) {
               const saved = await RS.saveOne('menu', m);
               if (saved) Object.assign(m, saved);
+              else throw new Error('Save returned empty — not stored');
             }
-            RS.toast('"'+name+'" updated','fa-circle-check');
+            const cloudErr = window.RS_LAST_CLOUD_ERROR;
+            if (cloudErr && cloudErr.collection === 'menu' && cloudErr.time > cloudErrBefore) {
+              RS.toast('"'+name+'" saved on this device · cloud sync pending', 'fa-cloud-arrow-up');
+            } else {
+              RS.toast('"'+name+'" updated','fa-circle-check');
+            }
           }
           else {
             const id=Math.max(0,...RS.MENU.map(x=>Number.isFinite(Number(x.id))?Number(x.id):0))+1;
@@ -298,13 +306,21 @@
             if (RS.saveOne) {
               const saved = await RS.saveOne('menu', rec);
               if (saved) Object.assign(rec, saved);
+              else throw new Error('Save returned empty — not stored');
             }
-            RS.toast('"'+name+'" added to menu','fa-circle-plus');
+            const cloudErr = window.RS_LAST_CLOUD_ERROR;
+            if (cloudErr && cloudErr.collection === 'menu' && cloudErr.time > cloudErrBefore) {
+              RS.toast('"'+name+'" on this device · will sync when cloud is ready', 'fa-cloud-arrow-up');
+            } else {
+              RS.toast('"'+name+'" added to menu','fa-circle-plus');
+            }
           }
           resetForm(); renderList(); try{ RS.renderPOS(); if(window.refreshPosCats) window.refreshPosCats(); }catch(e){}
+          try { if (window.RSFrictionless && RSFrictionless.markActivation) RSFrictionless.markActivation('sample'); } catch(_) {}
         } catch(err) {
           console.error(err);
-          RS.toast('Failed to save item: ' + err.message, 'fa-circle-exclamation');
+          try { if (window.RSActionFeedback) window.RSActionFeedback.error(); } catch(_) {}
+          RS.toast('Failed to save item: ' + (err && err.message ? err.message : 'unknown error'), 'fa-circle-exclamation');
         }
       };
       // expose for edit

@@ -23,18 +23,47 @@
     return Array.from(document.querySelectorAll(sel));
   }
 
-  // Neutral meta — no vanity fake counts. Live modules open via openGrowthHubScreen.
-  const HUB = [
-    { ic: 'fa-calendar-check', bg: 'bg-o', t: 'Reservations', d: 'Manage table bookings & waitlist', m: 'Open' },
-    { ic: 'fa-headset', bg: 'bg-v', t: 'Support Tickets', d: 'Customer queries & complaints', m: 'Open' },
-    { ic: 'fa-truck-ramp-box', bg: 'bg-t', t: 'Purchase Orders', d: 'Raise & track supplier POs', m: 'Open' },
-    { ic: 'fa-flask-vial', bg: 'bg-g', t: 'Recipe Costing', d: 'Plate cost & margin calculator', m: 'Open' },
-    { ic: 'fa-tags', bg: 'bg-a', t: 'Offers & Coupons', d: 'Build promos & festival deals', m: 'Open' },
-    { ic: 'fa-bullhorn', bg: 'bg-o', t: 'WhatsApp Campaigns', d: 'Broadcast to your customer list', m: 'Open' },
-    { ic: 'fa-star', bg: 'bg-v', t: 'Feedback & Reviews', d: 'Collect & respond to ratings', m: 'Open' },
-    { ic: 'fa-gift', bg: 'bg-g', t: 'Loyalty Program', d: 'Points, tiers & rewards', m: 'Open' },
-    { ic: 'fa-graduation-cap', bg: 'bg-a', t: 'Learning Center', d: 'PDFs, videos & training for your team', m: 'Open' },
+  // Job-grouped tiles — owners think in tasks, not a junk drawer
+  const HUB_GROUPS = [
+    {
+      id: 'front',
+      title: 'Front of house',
+      sub: 'Bookings & guest experience',
+      items: [
+        { ic: 'fa-calendar-check', bg: 'bg-o', t: 'Reservations', d: 'Table bookings & waitlist', m: 'Open' },
+        { ic: 'fa-star', bg: 'bg-v', t: 'Feedback & Reviews', d: 'Collect & respond to ratings', m: 'Open' },
+        { ic: 'fa-gift', bg: 'bg-g', t: 'Loyalty Program', d: 'Points, tiers & rewards', m: 'Open' },
+      ],
+    },
+    {
+      id: 'buy',
+      title: 'Buying & kitchen money',
+      sub: 'What you spend to make food',
+      items: [
+        { ic: 'fa-truck-ramp-box', bg: 'bg-t', t: 'Purchase Orders', d: 'Raise & track supplier POs', m: 'Open' },
+        { ic: 'fa-flask-vial', bg: 'bg-g', t: 'Recipe Costing', d: 'Plate cost & margin calculator', m: 'Open' },
+      ],
+    },
+    {
+      id: 'grow',
+      title: 'Grow sales',
+      sub: 'Offers & outreach',
+      items: [
+        { ic: 'fa-tags', bg: 'bg-a', t: 'Offers & Coupons', d: 'Promos & festival deals', m: 'Open' },
+        { ic: 'fa-bullhorn', bg: 'bg-o', t: 'WhatsApp Campaigns', d: 'Broadcast to customers', m: 'Open' },
+      ],
+    },
+    {
+      id: 'help',
+      title: 'Help & support',
+      sub: 'Tickets & training',
+      items: [
+        { ic: 'fa-headset', bg: 'bg-v', t: 'Support Tickets', d: 'Customer queries & complaints', m: 'Open' },
+        { ic: 'fa-graduation-cap', bg: 'bg-a', t: 'Learning Center', d: 'PDFs, videos & staff training', m: 'Open' },
+      ],
+    },
   ];
+  const HUB = HUB_GROUPS.reduce((a, g) => a.concat(g.items), []);
 
   function liveMeta(title) {
     try {
@@ -50,17 +79,36 @@
     return null;
   }
 
-  function renderHub() {
-    const grid = $('#hub-grid');
-    if (!grid) {return;}
-    grid.innerHTML = HUB.map((h) => {
-      const meta = liveMeta(h.t) || h.m;
-      return `
+  function cardHtml(h) {
+    const meta = liveMeta(h.t) || h.m;
+    return `
       <div class="hub-card" role="button" tabindex="0" data-hub="${_e(h.t)}">
         <div class="hub-ic ${h.bg}"><i class="fa-solid ${h.ic}"></i></div>
         <h4>${_e(h.t)}</h4><p>${_e(h.d)}</p>
         <span class="hub-meta"><span class="dot" style="color:var(--orange)"></span>${_e(meta)}</span>
       </div>`;
+  }
+
+  function renderHub() {
+    const grid = $('#hub-grid');
+    if (!grid) {return;}
+    // Prefer grouped layout; keep #hub-grid as host
+    grid.innerHTML = HUB_GROUPS.map((g) => {
+      return (
+        '<div class="hub-group" data-hub-group="' +
+        _e(g.id) +
+        '" style="grid-column:1/-1;margin-bottom:4px">' +
+        '<div style="margin:8px 2px 10px">' +
+        '<div style="font-weight:800;font-size:14px;color:var(--text)">' +
+        _e(g.title) +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-soft);margin-top:2px">' +
+        _e(g.sub) +
+        '</div></div>' +
+        '<div class="hub-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">' +
+        g.items.map(cardHtml).join('') +
+        '</div></div>'
+      );
     }).join('');
     $$('#hub-grid .hub-card').forEach((c) => {
       const open = () => {

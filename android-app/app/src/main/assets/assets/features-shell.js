@@ -998,7 +998,7 @@
       payments: { title: 'Payments', sub: 'Card / UPI settlement to your bank account' },
       security: { title: 'Security & PIN', sub: 'Admin PIN and which actions require manager approval' },
       team: { title: 'Team & roles', sub: 'Staff permissions and cashier restrictions' },
-      plan: { title: 'Plan & billing', sub: 'Your workspace plan, limits, and how to upgrade' },
+      plan: { title: 'Plan & billing', sub: 'Pay the full plan amount now · unlocks immediately · period extends from expiry' },
       danger: { title: 'Danger zone', sub: 'Irreversible actions for this outlet' },
     };
     const skey = s => 'set_'+s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
@@ -1181,8 +1181,7 @@
           `${toggle('Require PIN for refunds','Manager PIN needed to issue refunds',true)}
           ${toggle('Cashier can edit prices','Allow price overrides at POS',false)}
           ${toggle('Lock reports for staff','Only admins can view sales reports',true)}`),
-      plan: setBlock('Your workspace plan', 'What you are on today, limits, and upgrade options',
-          `<div id="rs-plan-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div></div>`),
+      plan: `<div id="rs-plan-container" class="rs-plan-root"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div></div>`,
       payments: setBlock('Card &amp; UPI settlement', 'Optional — auto bank settlement when Razorpay / Stripe is enabled',
           `<div id="rzp-route-container"><div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Checking payment status…</div></div>`),
       security: `<div id="rs-security-panel" class="set-security-host"></div>`,
@@ -1292,45 +1291,91 @@
       });
     }
 
-    // -- Plan & billing panel (tenant self-serve + graceful offline catalogue) -
+    // -- Plan & billing panel (Monthly/Yearly toggle + self-serve up/down) -
     async function initPlanPanel(body) {
       const container = body.querySelector('#rs-plan-container');
       if (!container) return;
 
       const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
       const fmtDate = (iso) => {
-        if (!iso) return 'Managed by RestroSuite';
+        if (!iso) return '—';
         try {
           const d = new Date(iso);
-          if (Number.isNaN(d.getTime())) return 'Managed by RestroSuite';
+          if (Number.isNaN(d.getTime())) return '—';
           return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
-        } catch (e) { return 'Managed by RestroSuite'; }
+        } catch (e) { return '—'; }
       };
       const money = (amt, cur) => {
         const n = Number(amt) || 0;
-        if (n <= 0) return 'Included';
-        const sym = cur === 'INR' ? '₹' : (cur === 'EUR' ? '€' : (cur === 'USD' ? '$' : (cur ? cur + ' ' : '')));
-        return `${sym}${n.toLocaleString()}`;
+        if (n <= 0) return '₹0';
+        const sym = cur === 'INR' || !cur ? '₹' : (cur === 'EUR' ? '€' : (cur === 'USD' ? '$' : (cur + ' ')));
+        return `${sym}${n.toLocaleString('en-IN')}`;
       };
       const STATUS_STYLE = {
         active: ['#22c55e', 'Active'],
         trialing: ['#3b82f6', 'Trial'],
         past_due: ['#f59e0b', 'Payment due'],
+        expired: ['#ef4444', 'Expired'],
         canceled: ['#ef4444', 'Cancelled'],
         cancelled: ['#ef4444', 'Cancelled'],
       };
       const SUPPORT_EMAIL = 'support@codearc.co.in';
-      const FEATURES = {
-        starter: ['POS + bills', 'QR orders', 'Kitchen display', 'Up to 5 staff', '300 orders / month', 'Standard support'],
-        growth: ['Everything in Starter', 'Reports & analytics', 'CRM / customers', 'Up to 15 staff', '8,000 orders / month', 'Priority support'],
-        enterprise: ['Everything in Growth', 'Multi-outlet ready', 'Up to 75 staff', 'High order volume', 'Dedicated support', 'Custom rollout help'],
+      const PLAN_RANK = { express: 1, serve: 2, command: 3 };
+      const PLAN_TAGLINE = {
+        express: 'Counter & takeaway',
+        serve: 'Cafe & floor ops',
+        command: 'Full restaurant control',
       };
-      // Standard Checkout prices (INR/mo) when SaaS catalogue has no razorpay_plan_id yet
+      const FEATURES = {
+        express: [
+          'Fast POS + offline billing',
+          'Cash · UPI · card · wallet',
+          'Print receipts',
+          'Up to 3 staff logins',
+          '1 outlet',
+          'Standard support',
+        ],
+        serve: [
+          'Everything in Express',
+          'Tables + running bills',
+          'QR table ordering',
+          'Kitchen display (KDS)',
+          'Unlimited staff devices',
+          'Priority support',
+        ],
+        command: [
+          'Everything in Serve',
+          'Full inventory + recipes',
+          'Deep reports & analytics',
+          'Staff + multi-outlet',
+          'Loyalty / CRM',
+          'Phone + dedicated support',
+        ],
+      };
+      /** Short “what you unlock” line when moving up from current plan */
+      const YOU_GAIN = {
+        express: '',
+        serve: 'Unlock tables, QR ordering & kitchen display',
+        command: 'Unlock inventory, multi-outlet, loyalty & dedicated support',
+      };
       const FALLBACK_PLANS = [
-        { plan_code: 'starter', name: 'Starter', price_monthly: 0, currency: 'INR', max_staff: 5, monthly_order_limit: 300, support_level: 'standard', checkout_available: false },
-        { plan_code: 'growth', name: 'Growth', price_monthly: 999, currency: 'INR', max_staff: 15, monthly_order_limit: 8000, support_level: 'priority', checkout_available: true, standard_checkout: true },
-        { plan_code: 'enterprise', name: 'Enterprise', price_monthly: 2499, currency: 'INR', max_staff: 75, monthly_order_limit: 100000, support_level: 'dedicated', checkout_available: true, standard_checkout: true },
+        { plan_code: 'express', name: 'Express', price_monthly: 499, price_yearly: 4999, currency: 'INR', max_staff: 3, monthly_order_limit: 6000, support_level: 'standard', checkout_available: true, description: PLAN_TAGLINE.express },
+        { plan_code: 'serve', name: 'Serve', price_monthly: 999, price_yearly: 9999, currency: 'INR', max_staff: 50, monthly_order_limit: 100000, support_level: 'priority', checkout_available: true, description: PLAN_TAGLINE.serve },
+        { plan_code: 'command', name: 'Command', price_monthly: 2499, price_yearly: 24999, currency: 'INR', max_staff: 200, monthly_order_limit: 1000000, support_level: 'dedicated', checkout_available: true, description: PLAN_TAGLINE.command },
       ];
+      const canonPlan = (code) => {
+        const c = String(code || '').toLowerCase();
+        if (c === 'starter' || c === 'basic') return 'express';
+        if (c === 'growth' || c === 'standard' || c === 'pro') return 'serve';
+        if (c === 'enterprise' || c === 'scale') return 'command';
+        return c || 'serve';
+      };
+      const yearlySave = (mo, yr) => {
+        const m = Number(mo) || 0;
+        const y = Number(yr) || 0;
+        if (!m || !y) return 0;
+        return Math.max(0, m * 12 - y);
+      };
 
       const sess = (window.RS_API && RS_API.session && RS_API.session()) || {};
       const localCurrent = {
@@ -1338,368 +1383,434 @@
         plan_name: sess.plan_name || '',
         subscription_status: sess.subscription_status || 'active',
         subscription_current_period_end: sess.subscription_current_period_end || null,
+        billing_interval: sess.billing_interval || 'monthly',
         plan_limits: sess.plan_limits || {},
       };
 
-      let remoteOk = false;
       let data = null;
       let loadNote = '';
       try {
         if (window.RS_API && typeof RS_API.getPlans === 'function') {
           data = await RS_API.getPlans();
-          remoteOk = !!(data && (Array.isArray(data.plans) || data.current));
         }
       } catch (e) {
-        remoteOk = false;
-        loadNote = 'Live catalogue is temporarily unavailable. Showing your workspace plan from this session.';
+        loadNote = 'Live catalogue is temporarily unavailable. Showing catalogue prices — checkout still works when online.';
       }
 
       const current = Object.assign({}, localCurrent, (data && data.current) || {});
+      // After successful pay, session may lag — prefer optimistic local flags briefly
+      try {
+        const sc = sessionStorage.getItem('rs_plan_code');
+        const se = sessionStorage.getItem('rs_subscription_period_end');
+        const ss = sessionStorage.getItem('rs_subscription_status');
+        const sn = sessionStorage.getItem('rs_plan_name');
+        if (sc) current.plan_code = sc;
+        if (sn) current.plan_name = sn;
+        if (se) current.subscription_current_period_end = se;
+        if (ss) current.subscription_status = ss;
+      } catch (_) {}
       let plans = (data && Array.isArray(data.plans) && data.plans.length) ? data.plans.slice() : FALLBACK_PLANS.slice();
-      // Ensure current plan always appears in the list
-      const curCode = String(current.plan_code || localCurrent.plan_code || 'starter').toLowerCase() || 'starter';
-      if (!plans.some(p => String(p.plan_code).toLowerCase() === curCode)) {
-        const fb = FALLBACK_PLANS.find(p => p.plan_code === curCode) || {
-          plan_code: curCode,
-          name: current.plan_name || curCode,
-          price_monthly: 0,
-          currency: 'INR',
-          max_staff: (current.plan_limits && current.plan_limits.max_staff) || '—',
-          monthly_order_limit: (current.plan_limits && current.plan_limits.monthly_order_limit) || 0,
-          support_level: 'standard',
-          checkout_available: false,
-        };
-        plans = [fb].concat(plans);
-      }
+      plans = plans.filter((p) => ['express', 'serve', 'command'].includes(canonPlan(p.plan_code)));
+      // Ensure all 3 cards always exist, ordered
+      plans = ['express', 'serve', 'command'].map((code) => {
+        const remote = plans.find((p) => canonPlan(p.plan_code) === code);
+        const fb = FALLBACK_PLANS.find((p) => p.plan_code === code);
+        return Object.assign({}, fb, remote || {}, {
+          plan_code: code,
+          name: (remote && remote.name) || fb.name,
+          price_monthly: Number(remote && remote.price_monthly) > 0 ? Number(remote.price_monthly) : fb.price_monthly,
+          price_yearly: Number(remote && remote.price_yearly) > 0 ? Number(remote.price_yearly) : fb.price_yearly,
+          description: PLAN_TAGLINE[code],
+          currency: (remote && remote.currency) || 'INR',
+          checkout_available: true,
+        });
+      });
 
+      const curCode = canonPlan(current.plan_code || localCurrent.plan_code || 'serve');
+      const curRank = PLAN_RANK[curCode] || 2;
       const st = STATUS_STYLE[String(current.subscription_status || 'active').toLowerCase()] || STATUS_STYLE.active;
       const sColor = st[0], sLabel = st[1];
-      const curPlan = plans.find(p => String(p.plan_code).toLowerCase() === curCode)
-        || { name: current.plan_name || curCode, price_monthly: 0, currency: 'INR', max_staff: localCurrent.plan_limits.max_staff, monthly_order_limit: localCurrent.plan_limits.monthly_order_limit, support_level: 'standard' };
+      const curPlan = plans.find((p) => p.plan_code === curCode) || plans[1];
       const displayName = current.plan_name || curPlan.name || curCode;
       const renews = current.subscription_current_period_end;
-      const maxStaff = curPlan.max_staff != null ? curPlan.max_staff : (localCurrent.plan_limits.max_staff || '—');
-      const orderLim = curPlan.monthly_order_limit != null ? curPlan.monthly_order_limit : (localCurrent.plan_limits.monthly_order_limit || 0);
-      const anyCheckout = plans.some(p => p.checkout_available && Number(p.price_monthly) > 0);
-      const priceLabel = (p) => {
-        if (Number(p.price_monthly) > 0) return `${money(p.price_monthly, p.currency || 'INR')}<span style="font-size:12px;color:var(--text-soft);font-weight:600"> / mo</span>`;
-        if (p.checkout_available) return 'Included';
-        return '<span style="font-size:15px;font-weight:700;color:var(--text-soft)">Talk to us</span>';
-      };
+      const daysLeft = (() => {
+        if (current.days_left != null) return Number(current.days_left);
+        if (!renews) return null;
+        try { return Math.ceil((new Date(renews).getTime() - Date.now()) / 86400000); } catch (_) { return null; }
+      })();
+      const statusLower = String(current.subscription_status || '').toLowerCase();
+      const isTrial = statusLower === 'trialing';
+      const isExpired = statusLower === 'expired' || (daysLeft != null && daysLeft <= 0);
+      // Default toggle: yearly if they already pay yearly, else monthly
+      let billingInterval = (String(current.billing_interval || '').toLowerCase() === 'yearly') ? 'yearly' : 'monthly';
+      try {
+        const saved = sessionStorage.getItem('rs_plan_ui_interval');
+        if (saved === 'monthly' || saved === 'yearly') billingInterval = saved;
+      } catch (_) {}
 
-      const banner = loadNote
-        ? `<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin-bottom:16px;border-radius:var(--r-sm);background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.18);font-size:12.5px;line-height:1.55;color:var(--text)">
-            <i class="fa-solid fa-circle-info" style="color:#3b82f6;margin-top:2px"></i>
-            <div style="flex:1">${esc(loadNote)} Your POS keeps working as normal.</div>
-            <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-retry" style="flex-shrink:0"><i class="fa-solid fa-rotate"></i> Retry</button>
-          </div>`
-        : '';
+      const maxYearSave = Math.max(...plans.map((p) => yearlySave(p.price_monthly, p.price_yearly)));
 
-      const header = `
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px">
-          <div style="flex:1.2;min-width:220px;border:1.5px solid var(--orange);border-radius:var(--r-md);padding:18px;background:var(--orange-tint)">
-            <div style="font-weight:800;font-size:12px;color:var(--orange);text-transform:uppercase;letter-spacing:.06em">Current plan</div>
-            <div style="font-family:var(--font-display);font-weight:800;font-size:26px;margin:6px 0">${esc(displayName)}</div>
-            <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:${sColor}">
-              <span style="width:7px;height:7px;border-radius:50%;background:${sColor};display:inline-block"></span>${esc(sLabel)}
-            </div>
-          </div>
-          <div style="flex:1;min-width:180px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:18px;background:var(--glass)">
-            <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em">${renews ? 'Renews on' : 'Billing'}</div>
-            <div style="font-family:var(--font-display);font-weight:800;font-size:${renews ? '22px' : '16px'};margin:8px 0;line-height:1.25">${esc(fmtDate(renews))}</div>
-            <div style="font-size:12px;color:var(--text-soft)">${Number(curPlan.price_monthly) > 0 ? `${money(curPlan.price_monthly, curPlan.currency)} / month` : 'Plan assigned by RestroSuite'}</div>
-          </div>
-          <div style="flex:1;min-width:180px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:18px;background:var(--glass)">
-            <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em">Workspace limits</div>
-            <div style="margin-top:10px;font-size:13px;line-height:1.7;color:var(--text)">
-              <div><i class="fa-solid fa-users" style="width:16px;color:var(--text-soft)"></i> <strong>${esc(maxStaff)}</strong> staff seats</div>
-              <div><i class="fa-solid fa-receipt" style="width:16px;color:var(--text-soft)"></i> <strong>${esc((Number(orderLim) || 0).toLocaleString() || '—')}</strong> orders / month</div>
-              <div><i class="fa-solid fa-headset" style="width:16px;color:var(--text-soft)"></i> ${esc(curPlan.support_level || 'standard')} support</div>
-            </div>
-          </div>
-        </div>`;
-
-      const included = FEATURES[curCode] || FEATURES.starter;
-      const includedBlock = `
-        <div style="margin-bottom:20px;border:1px solid var(--stroke-2);border-radius:var(--r-md);padding:14px 16px;background:var(--panel)">
-          <div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Included with ${esc(displayName)}</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 14px">
-            ${included.map(f => `<div style="font-size:12.5px;color:var(--text);display:flex;gap:8px;align-items:flex-start"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-top:2px"></i><span>${esc(f)}</span></div>`).join('')}
-          </div>
-        </div>`;
-
-      // Merge fallback prices when remote plans are free / missing checkout
-      plans = plans.map((p) => {
-        const code = String(p.plan_code || '').toLowerCase();
-        const fb = FALLBACK_PLANS.find((x) => x.plan_code === code);
-        if (!fb) return p;
-        const price = Number(p.price_monthly) > 0 ? Number(p.price_monthly) : Number(fb.price_monthly) || 0;
-        const canStd = price > 0 && (p.checkout_available || fb.standard_checkout || fb.checkout_available);
-        return Object.assign({}, p, {
-          price_monthly: price,
-          currency: p.currency || fb.currency || 'INR',
-          checkout_available: !!(p.checkout_available || canStd),
-          standard_checkout: !!(p.standard_checkout || fb.standard_checkout || (canStd && !p.razorpay_plan_id)),
-        });
-      });
-
-      const cards = plans.map(p => {
-        const code = String(p.plan_code || '').toLowerCase();
-        const isCurrent = code === curCode;
-        const priceMo = Number(p.price_monthly) || 0;
-        const canCheckout = priceMo > 0 && !isCurrent && code !== 'starter';
-        const feats = FEATURES[code] || [
-          `Up to ${p.max_staff != null ? p.max_staff : '—'} staff`,
-          `${(Number(p.monthly_order_limit) || 0).toLocaleString()} orders/mo`,
-          `${p.support_level || 'standard'} support`,
-        ];
-        let cta;
-        if (isCurrent) {
-          cta = `<button type="button" class="btn btn-ghost btn-sm" disabled style="width:100%;opacity:.75"><i class="fa-solid fa-check"></i> Your plan</button>`;
-        } else if (canCheckout) {
-          cta = `<button type="button" class="btn btn-primary btn-sm rs-upgrade-btn" data-plan="${esc(p.plan_code)}" data-plan-name="${esc(p.name)}" data-price="${priceMo}" data-currency="${esc(p.currency || 'INR')}" style="width:100%"><i class="fa-solid fa-lock"></i> Pay ${esc(money(priceMo, p.currency || 'INR'))}/mo · ${esc(p.name)}</button>`;
-        } else {
-          cta = `<button type="button" class="btn btn-ghost btn-sm rs-contact-btn" data-plan="${esc(p.plan_code)}" data-plan-name="${esc(p.name)}" style="width:100%"><i class="fa-solid fa-headset"></i> Request ${esc(p.name)}</button>`;
-        }
-        return `
-          <div style="flex:1;min-width:200px;max-width:320px;border:1.5px solid ${isCurrent ? 'var(--orange)' : 'var(--stroke-2)'};border-radius:var(--r-md);padding:16px;background:var(--panel);display:flex;flex-direction:column;gap:8px;box-shadow:${isCurrent ? '0 0 0 1px color-mix(in srgb,var(--orange) 25%,transparent)' : 'none'}">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-              <div style="font-weight:800;font-size:15px">${esc(p.name)}</div>
-              ${isCurrent ? '<span class="set-chip set-chip-warn" style="font-size:10px">Current</span>' : ''}
-            </div>
-            <div style="font-family:var(--font-display);font-weight:800;font-size:22px;min-height:32px">${priceLabel(p)}</div>
-            <ul style="margin:0;padding:0;list-style:none;font-size:11.5px;color:var(--text-soft);line-height:1.65;flex:1">
-              ${feats.slice(0, 5).map(f => `<li style="display:flex;gap:6px"><i class="fa-solid fa-check" style="color:var(--orange);margin-top:3px;font-size:10px"></i><span>${esc(f)}</span></li>`).join('')}
-            </ul>
-            <div style="padding-top:6px">${cta}</div>
-          </div>`;
-      }).join('');
-
-      const footerNote = anyCheckout
-        ? 'Secure online checkout is available when configured for your region. Subscriptions renew automatically while billing is current.'
-        : 'Plan changes are managed by RestroSuite. Online self-serve checkout is not required — email us and we will update your workspace.';
-
-      const helpRow = `
-        <div style="margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--stroke-2);border-radius:var(--r-md);background:var(--glass)">
-          <div style="min-width:200px">
-            <div style="font-weight:700;font-size:13px">Need a plan change or invoice?</div>
-            <div style="font-size:12px;color:var(--text-soft);margin-top:3px;line-height:1.5">We handle upgrades, renewals, and billing questions for your outlet.</div>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px">
-            <a class="btn btn-primary btn-sm" href="mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Plan upgrade — ' + (sess.tenant_name || sess.tenant_slug || 'RestroSuite'))}"><i class="fa-solid fa-envelope"></i> Email support</a>
-            <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-copy-id"><i class="fa-solid fa-copy"></i> Copy outlet ID</button>
-          </div>
-        </div>
-        <div style="margin-top:14px;padding:14px 16px;border:1px dashed color-mix(in srgb,var(--orange) 35%,var(--stroke));border-radius:var(--r-md);background:color-mix(in srgb,var(--orange) 6%,var(--panel))">
-          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
-            <div style="min-width:200px;flex:1">
-              <div style="font-weight:800;font-size:13px"><i class="fa-solid fa-shield-halved" style="color:var(--orange);margin-right:6px"></i>Razorpay Standard Checkout</div>
-              <div style="font-size:12px;color:var(--text-soft);margin-top:4px;line-height:1.5">Secure one-time payment (test mode). Order is created on the server; signature is verified before marking success.</div>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-              <label style="font-size:11px;color:var(--text-soft);font-weight:700">₹
-                <input type="number" id="rs-rzp-amount" min="1" step="1" value="1" style="width:72px;margin-left:4px;padding:7px 8px;border-radius:8px;border:1px solid var(--stroke);background:var(--panel);color:var(--text)">
-              </label>
-              <button type="button" class="btn btn-primary btn-sm" id="rs-rzp-pay-btn"><i class="fa-solid fa-lock"></i> Pay with Razorpay</button>
-              <a class="btn btn-ghost btn-sm" href="pay.html" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open pay page</a>
-            </div>
-          </div>
-        </div>
-        <p style="font-size:11.5px;color:var(--text-soft);margin-top:12px;line-height:1.6">${esc(footerNote)}</p>`;
-
-      container.innerHTML = banner + header + includedBlock +
-        `<div style="font-weight:800;font-size:12px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Compare plans</div>
-         <div style="display:flex;gap:12px;flex-wrap:wrap">${cards}</div>` + helpRow;
-
-      container.querySelector('#rs-plan-retry')?.addEventListener('click', () => {
-        container.innerHTML = `<div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading your plan…</div>`;
-        initPlanPanel(body);
-      });
-
-      container.querySelector('#rs-plan-copy-id')?.addEventListener('click', async () => {
-        const id = sess.tenant_slug || sess.tenant_id || '';
-        if (!id) { RS.toast('Outlet ID not available on this session.', 'fa-circle-info'); return; }
+      const previewEndIso = (interval) => {
         try {
-          await navigator.clipboard.writeText(String(id));
-          RS.toast('Outlet ID copied', 'fa-copy');
+          const now = Date.now();
+          const existing = renews ? new Date(renews).getTime() : 0;
+          const base = Number.isFinite(existing) && existing > now ? existing : now;
+          const d = new Date(base);
+          if (interval === 'yearly') d.setFullYear(d.getFullYear() + 1);
+          else d.setMonth(d.getMonth() + 1);
+          return d.toISOString();
         } catch (_) {
-          RS.toast(String(id), 'fa-circle-info');
-        }
-      });
-
-      const runStandardPlanCheckout = async (planCode, planName, priceInr) => {
-        const api = await ensureRazorpayHelper();
-        const rupees = Math.max(1, Number(priceInr) || 1);
-        const result = await api.payRupees(rupees, {
-          name: 'RestroSuite',
-          description: (planName || planCode) + ' · monthly',
-          purpose: 'plan',
-          prefillName: sess.display_name || sess.username || '',
-          prefillEmail: sess.email || '',
-          prefillContact: sess.phone || '',
-          notes: {
-            purpose: 'plan',
-            plan_code: planCode || '',
-            plan_name: planName || '',
-            tenant: sess.tenant_slug || sess.tenant_id || '',
-            tenant_name: sess.tenant_name || '',
-          },
-          meta: {
-            plan_code: planCode || '',
-            tenant: sess.tenant_slug || sess.tenant_id || '',
-          },
-        });
-        if (result && result.cancelled) {
-          RS.toast('Payment cancelled', 'fa-circle-info');
           return null;
         }
-        if (result && result.verified) {
-          try {
-            // Optimistic local plan marker until admin/webhook activates entitlements
-            sessionStorage.setItem('rs_plan_code', planCode || '');
-            sessionStorage.setItem('rs_plan_name', planName || planCode || '');
-            sessionStorage.setItem('rs_subscription_status', 'active');
-            sessionStorage.setItem(
-              'rs_last_plan_payment',
-              JSON.stringify({
-                plan_code: planCode,
-                payment_id: result.payment_id,
-                order_id: result.order_id,
-                at: new Date().toISOString(),
-              })
-            );
-          } catch (_) {}
-          RS.toast(
-            'Paid · ' + (planName || planCode) + ' · ' + (result.payment_id || 'ok'),
-            'fa-circle-check'
-          );
-          setTimeout(() => initPlanPanel(body), 600);
-          return result;
-        }
-        throw new Error('Payment not verified');
       };
 
-      container.querySelectorAll('.rs-upgrade-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const plan = btn.getAttribute('data-plan');
-          const planName = btn.getAttribute('data-plan-name') || plan;
-          const price = Number(btn.getAttribute('data-price')) || 0;
-          btn.disabled = true;
-          const orig = btn.innerHTML;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Starting checkout…';
-          try {
-            // Prefer legacy subscription short_url when configured
-            if (window.RS_API && typeof RS_API.subscribe === 'function') {
-              try {
-                const res = await RS_API.subscribe(plan);
-                if (res && res.short_url) {
-                  window.open(res.short_url, '_blank', 'noopener');
-                  RS.toast('Complete payment in the new tab to activate your plan.', 'fa-arrow-up-right-from-square');
-                  return;
-                }
-              } catch (subErr) {
-                // Fall through to Standard Checkout
-                console.warn('[plan] subscription checkout unavailable', subErr);
-              }
-            }
-            if (price > 0) {
-              await runStandardPlanCheckout(plan, planName, price);
-            } else {
-              throw new Error('No price configured for this plan. Email support to upgrade.');
-            }
-          } catch (e) {
-            RS.toast((e && e.message) || 'Could not start checkout. Email support to upgrade.', 'fa-headset');
-          } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
+      function renderCards(interval) {
+        const isYearly = interval === 'yearly';
+        const afterPayLabel = fmtDate(previewEndIso(isYearly ? 'yearly' : 'monthly'));
+        return plans.map((p) => {
+          const code = p.plan_code;
+          const rank = PLAN_RANK[code] || 0;
+          const price = isYearly ? Number(p.price_yearly) : Number(p.price_monthly);
+          const strike = isYearly ? Number(p.price_monthly) * 12 : 0;
+          const save = yearlySave(p.price_monthly, p.price_yearly);
+          const feats = FEATURES[code] || [];
+          const isCurrent = code === curCode && !isTrial && !isExpired && statusLower === 'active';
+          const popular = code === 'serve';
+          let action = 'subscribe';
+          let ctaLabel = 'Choose ' + p.name;
+          if (isExpired || isTrial) {
+            action = code === 'serve' && isTrial ? 'start' : (rank > curRank ? 'upgrade' : (rank < curRank ? 'switch' : 'subscribe'));
+            ctaLabel = isTrial
+              ? (code === curCode ? 'Keep ' + p.name + ' after trial' : (rank > curRank ? 'Upgrade to ' + p.name : 'Switch to ' + p.name))
+              : (code === curCode ? 'Renew ' + p.name : (rank > curRank ? 'Upgrade to ' + p.name : 'Switch to ' + p.name));
+          } else if (isCurrent) {
+            action = 'current';
+            ctaLabel = 'Current plan';
+          } else if (rank > curRank) {
+            action = 'upgrade';
+            ctaLabel = 'Upgrade to ' + p.name;
+          } else if (rank < curRank) {
+            action = 'downgrade';
+            ctaLabel = 'Switch to ' + p.name;
+          } else {
+            action = 'renew';
+            ctaLabel = 'Renew ' + p.name;
           }
+
+          const gain = (action === 'upgrade' || (action === 'start' && rank > curRank) || (action === 'switch' && rank > curRank))
+            ? (YOU_GAIN[code] || '')
+            : (action === 'renew' || (action === 'start' && code === curCode)
+              ? 'Keeps remaining days · extends from expiry'
+              : (action === 'downgrade' || (action === 'switch' && rank < curRank)
+                ? 'Period still extends from your current expiry'
+                : ''));
+
+          const cta = action === 'current'
+            ? `<button type="button" class="rs-plan-cta rs-plan-cta-current" disabled><i class="fa-solid fa-check"></i> ${esc(ctaLabel)}</button>`
+            : `<button type="button" class="rs-plan-cta rs-plan-cta-pay rs-upgrade-btn"
+                  data-plan="${esc(code)}" data-plan-name="${esc(p.name)}" data-price="${price}"
+                  data-interval="${isYearly ? 'yearly' : 'monthly'}" data-action="${action}"
+                  aria-label="${esc(ctaLabel)} for ${esc(money(price, p.currency))}">
+                  <span class="rs-plan-cta-main">${esc(ctaLabel)}</span>
+                  <span class="rs-plan-cta-amt">${esc(money(price, p.currency))}</span>
+                </button>`;
+
+          return `
+            <div class="rs-plan-card ${isCurrent ? 'is-current' : ''} ${popular ? 'is-popular' : ''}" data-plan="${esc(code)}">
+              ${popular && !isCurrent ? '<div class="rs-plan-popular-pill">Most popular</div>' : ''}
+              ${isCurrent ? '<div class="rs-plan-current-pill">Your plan</div>' : ''}
+              <div class="rs-plan-card-name">${esc(p.name)}</div>
+              <div class="rs-plan-card-tag">${esc(p.description || PLAN_TAGLINE[code] || '')}</div>
+              <div class="rs-plan-card-price">
+                <span class="rs-plan-price-big">${esc(money(price, p.currency))}</span>
+                <span class="rs-plan-price-unit">/ ${isYearly ? 'year' : 'month'}</span>
+              </div>
+              ${isYearly && strike > price
+                ? `<div class="rs-plan-strike"><s>₹${strike.toLocaleString('en-IN')}/yr</s> · save ${esc(money(save, p.currency))}</div>`
+                : `<div class="rs-plan-strike">${isYearly ? 'Pay once · full year' : 'Pay once · full month'}</div>`}
+              ${cta}
+              ${action !== 'current' && afterPayLabel && afterPayLabel !== '—'
+                ? `<div class="rs-plan-until"><i class="fa-regular fa-calendar-check"></i> Active until <strong>${esc(afterPayLabel)}</strong> after pay</div>`
+                : ''}
+              ${gain ? `<div class="rs-plan-gain"><i class="fa-solid fa-bolt"></i> ${esc(gain)}</div>` : ''}
+              <ul class="rs-plan-feats">
+                ${feats.map((f) => `<li><i class="fa-solid fa-check"></i><span>${esc(f)}</span></li>`).join('')}
+              </ul>
+            </div>`;
+        }).join('');
+      }
+
+      function paint(interval, opts) {
+        billingInterval = interval === 'yearly' ? 'yearly' : 'monthly';
+        try { sessionStorage.setItem('rs_plan_ui_interval', billingInterval); } catch (_) {}
+        const successMsg = (opts && opts.success) || '';
+
+        const statusLine = isTrial
+          ? `Trial · ${daysLeft != null ? daysLeft + ' days left' : 'active'} · ends ${fmtDate(renews)}`
+          : isExpired
+            ? 'Expired · pay a plan below to reopen POS'
+            : `${sLabel} · ${displayName} · ends ${fmtDate(renews)}`;
+
+        container.innerHTML = `
+          <style>
+            #rs-plan-container{max-width:980px;margin:0 auto}
+            #rs-plan-container .rs-plan-hero{text-align:center;margin:0 0 8px;padding:4px 8px 0}
+            #rs-plan-container .rs-plan-hero h3{font-family:var(--font-display);font-size:clamp(22px,3vw,28px);font-weight:800;margin:0 0 8px;letter-spacing:-.02em;color:var(--text)}
+            #rs-plan-container .rs-plan-hero p{margin:0 auto;max-width:520px;color:var(--text-soft);font-size:13.5px;line-height:1.55}
+            #rs-plan-container .rs-plan-status{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:8px 14px;border-radius:999px;background:var(--glass);border:1px solid var(--stroke-2);font-size:12.5px;font-weight:700}
+            #rs-plan-container .rs-plan-status i{color:${sColor}}
+            #rs-plan-container .rs-plan-trust{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 16px;margin:14px 0 4px;font-size:11.5px;font-weight:600;color:var(--text-soft)}
+            #rs-plan-container .rs-plan-trust span{display:inline-flex;align-items:center;gap:5px}
+            #rs-plan-container .rs-plan-trust i{color:#16a34a;font-size:11px}
+            #rs-plan-container .rs-bill-toggle{display:inline-flex;align-items:center;gap:0;padding:4px;border-radius:999px;background:var(--panel);border:1px solid var(--stroke-2);margin:16px auto 4px;box-shadow:var(--shadow-sm,0 2px 8px rgba(0,0,0,.04))}
+            #rs-plan-container .rs-bill-toggle button{border:0;background:transparent;padding:10px 18px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;color:var(--text-soft);transition:.15s}
+            #rs-plan-container .rs-bill-toggle button.on{background:#141210;color:#fff}
+            #rs-plan-container .rs-bill-save{font-size:11.5px;font-weight:800;color:#16a34a;margin-left:6px}
+            #rs-plan-container .rs-bill-toggle button.on .rs-bill-save{color:#86efac}
+            #rs-plan-container .rs-plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:20px;align-items:stretch}
+            @media(max-width:960px){#rs-plan-container .rs-plan-grid{grid-template-columns:1fr;max-width:420px;margin-left:auto;margin-right:auto}}
+            #rs-plan-container .rs-plan-card{position:relative;display:flex;flex-direction:column;gap:5px;padding:24px 18px 18px;border-radius:18px;border:1.5px solid var(--stroke-2);background:var(--panel);min-height:100%;transition:border-color .15s,box-shadow .15s}
+            #rs-plan-container .rs-plan-card.is-popular{border-color:var(--orange);box-shadow:0 0 0 1px color-mix(in srgb,var(--orange) 35%,transparent),0 14px 32px rgba(255,79,0,.1)}
+            #rs-plan-container .rs-plan-card.is-current{border-color:#22c55e;background:color-mix(in srgb,#22c55e 4%,var(--panel))}
+            #rs-plan-container .rs-plan-popular-pill,#rs-plan-container .rs-plan-current-pill{position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:4px 12px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+            #rs-plan-container .rs-plan-popular-pill{background:var(--orange);color:#fff}
+            #rs-plan-container .rs-plan-current-pill{background:#16a34a;color:#fff}
+            #rs-plan-container .rs-plan-card-name{font-family:var(--font-display);font-size:22px;font-weight:800;margin-top:6px;letter-spacing:-.02em}
+            #rs-plan-container .rs-plan-card-tag{font-size:12.5px;color:var(--text-soft);font-weight:600}
+            #rs-plan-container .rs-plan-card-price{display:flex;align-items:baseline;gap:6px;margin:12px 0 2px}
+            #rs-plan-container .rs-plan-price-big{font-family:var(--font-display);font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1}
+            #rs-plan-container .rs-plan-price-unit{font-size:13px;color:var(--text-soft);font-weight:600}
+            #rs-plan-container .rs-plan-strike{font-size:11.5px;color:var(--text-soft);min-height:16px;margin-bottom:6px}
+            #rs-plan-container .rs-plan-strike s{opacity:.65}
+            #rs-plan-container .rs-plan-cta{width:100%;border:0;border-radius:12px;padding:13px 14px;font-weight:800;font-size:13.5px;cursor:pointer;margin:6px 0 6px;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s,transform .1s}
+            #rs-plan-container .rs-plan-cta-pay{background:#141210;color:#fff}
+            #rs-plan-container .rs-plan-cta-pay:hover{background:var(--orange)}
+            #rs-plan-container .rs-plan-cta-pay:active{transform:scale(.98)}
+            #rs-plan-container .rs-plan-cta-pay:disabled{opacity:.7;cursor:wait}
+            #rs-plan-container .rs-plan-cta-amt{opacity:.92;font-variant-numeric:tabular-nums}
+            #rs-plan-container .rs-plan-cta-current{background:rgba(34,197,94,.1);color:#15803d;cursor:default;border:1px solid rgba(34,197,94,.25)}
+            #rs-plan-container .rs-plan-until{font-size:11.5px;color:var(--text-soft);font-weight:600;display:flex;align-items:center;gap:6px;margin:0 0 2px}
+            #rs-plan-container .rs-plan-until i{color:#16a34a;font-size:11px}
+            #rs-plan-container .rs-plan-gain{font-size:12px;font-weight:700;color:#9a3412;background:rgba(255,79,0,.08);border:1px solid rgba(255,79,0,.18);border-radius:10px;padding:8px 10px;line-height:1.35;display:flex;align-items:flex-start;gap:7px;margin:2px 0 6px}
+            #rs-plan-container .rs-plan-gain i{color:var(--orange);margin-top:2px;font-size:11px}
+            #rs-plan-container .rs-plan-feats{list-style:none;margin:0;padding:12px 0 0;border-top:1px solid var(--stroke-2);display:flex;flex-direction:column;gap:9px;flex:1}
+            #rs-plan-container .rs-plan-feats li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--text);line-height:1.4}
+            #rs-plan-container .rs-plan-feats i{color:#22c55e;margin-top:2px;font-size:11px}
+            #rs-plan-container .rs-plan-foot{margin-top:22px;padding:16px 18px;border-radius:14px;border:1px solid var(--stroke-2);background:var(--glass)}
+            #rs-plan-container .rs-plan-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 14px}
+            @media(max-width:700px){#rs-plan-container .rs-plan-steps{grid-template-columns:1fr}}
+            #rs-plan-container .rs-plan-step{display:flex;gap:10px;align-items:flex-start}
+            #rs-plan-container .rs-plan-step b{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:#141210;color:#fff;font-size:11px;flex:none}
+            #rs-plan-container .rs-plan-step span{font-size:12px;color:var(--text-soft);line-height:1.4;font-weight:600}
+            #rs-plan-container .rs-plan-step span strong{color:var(--text);font-weight:700}
+            #rs-plan-container .rs-plan-foot-actions{display:flex;flex-wrap:wrap;gap:8px}
+            #rs-plan-container .rs-plan-alert{margin-bottom:14px;padding:12px 14px;border-radius:12px;font-size:12.5px;line-height:1.5;display:flex;gap:10px;align-items:flex-start}
+            #rs-plan-container .rs-plan-alert i{margin-top:2px}
+            #rs-plan-container .rs-plan-alert.trial{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.22)}
+            #rs-plan-container .rs-plan-alert.warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28)}
+            #rs-plan-container .rs-plan-alert.danger{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.22)}
+            #rs-plan-container .rs-plan-alert.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.28);color:#14532d}
+            #rs-plan-container .rs-plan-alert.ok strong{color:#15803d}
+          </style>
+
+          ${successMsg ? `<div class="rs-plan-alert ok" role="status"><i class="fa-solid fa-circle-check"></i><div><strong>${esc(successMsg.title || 'Payment successful')}</strong><br>${esc(successMsg.detail || '')}</div></div>` : ''}
+          ${loadNote ? `<div class="rs-plan-alert warn"><i class="fa-solid fa-circle-info"></i><div>${esc(loadNote)}</div></div>` : ''}
+          ${isTrial ? `<div class="rs-plan-alert trial"><i class="fa-solid fa-gift"></i><div><strong>30-day Serve trial</strong> — choose any plan below before it ends. You pay the full amount once; remaining trial days are kept.</div></div>` : ''}
+          ${!isTrial && daysLeft != null && daysLeft > 0 && daysLeft <= 3 ? `<div class="rs-plan-alert warn"><i class="fa-solid fa-clock"></i><div><strong>${daysLeft} day${daysLeft === 1 ? '' : 's'} left</strong> — renew now. No grace after expiry. Reminder also on WhatsApp & email.</div></div>` : ''}
+          ${isExpired ? `<div class="rs-plan-alert danger"><i class="fa-solid fa-lock"></i><div><strong>Plan expired</strong> — POS is locked. Pay a plan below to reopen instantly.</div></div>` : ''}
+
+          <div class="rs-plan-hero">
+            <h3>Choose your plan</h3>
+            <p>Pay the full plan amount now. Features unlock immediately. Your period always extends from the current expiry — early pay keeps remaining days.</p>
+            <div class="rs-plan-status"><i class="fa-solid fa-circle" style="font-size:8px"></i> ${esc(statusLine)}</div>
+            <div class="rs-plan-trust" aria-hidden="true">
+              <span><i class="fa-solid fa-shield-halved"></i> Secure Razorpay</span>
+              <span><i class="fa-solid fa-file-invoice"></i> Tax invoice PDF</span>
+              <span><i class="fa-brands fa-whatsapp"></i> Email + WhatsApp</span>
+            </div>
+            <div style="display:flex;justify-content:center">
+              <div class="rs-bill-toggle" role="group" aria-label="Billing period">
+                <button type="button" data-interval="monthly" class="${billingInterval === 'monthly' ? 'on' : ''}" aria-pressed="${billingInterval === 'monthly' ? 'true' : 'false'}">Monthly</button>
+                <button type="button" data-interval="yearly" class="${billingInterval === 'yearly' ? 'on' : ''}" aria-pressed="${billingInterval === 'yearly' ? 'true' : 'false'}">
+                  Annually
+                  ${maxYearSave > 0 ? `<span class="rs-bill-save">Save up to ${esc(money(maxYearSave))}</span>` : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="rs-plan-grid" id="rs-plan-grid">${renderCards(billingInterval)}</div>
+
+          <div class="rs-plan-foot">
+            <div class="rs-plan-steps">
+              <div class="rs-plan-step"><b>1</b><span><strong>Pick a plan</strong> and pay the full amount in one checkout (UPI / card).</span></div>
+              <div class="rs-plan-step"><b>2</b><span><strong>Unlock instantly</strong> — features switch on as soon as payment succeeds.</span></div>
+              <div class="rs-plan-step"><b>3</b><span><strong>Invoice arrives</strong> on email & WhatsApp. Last 3 days: reminders. No grace after expiry.</span></div>
+            </div>
+            <div class="rs-plan-foot-actions">
+              <a class="btn btn-ghost btn-sm" href="mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Plan help — ' + (sess.tenant_slug || ''))}"><i class="fa-solid fa-envelope"></i> Email support</a>
+              <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-copy-id"><i class="fa-solid fa-copy"></i> Copy outlet ID</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="rs-plan-retry"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            </div>
+          </div>`;
+
+        // Toggle
+        container.querySelectorAll('.rs-bill-toggle button').forEach((btn) => {
+          btn.onclick = () => paint(btn.getAttribute('data-interval'));
         });
-      });
+        container.querySelector('#rs-plan-retry')?.addEventListener('click', () => {
+          container.innerHTML = `<div class="set-loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading plans…</div>`;
+          initPlanPanel(body);
+        });
+        container.querySelector('#rs-plan-copy-id')?.addEventListener('click', async () => {
+          const id = sess.tenant_slug || sess.tenant_id || '';
+          if (!id) { RS.toast('Outlet ID not available', 'fa-circle-info'); return; }
+          try { await navigator.clipboard.writeText(String(id)); RS.toast('Outlet ID copied', 'fa-copy'); }
+          catch (_) { RS.toast(String(id), 'fa-circle-info'); }
+        });
 
-      // Razorpay Standard Checkout (one-time pay) — server create-order + verify-payment
-      const ensureRazorpayHelper = () => new Promise((resolve, reject) => {
-        if (window.RSRazorpay && typeof RSRazorpay.openCheckout === 'function') {
-          resolve(window.RSRazorpay);
-          return;
-        }
-        const existing = document.querySelector('script[data-rs-razorpay]');
-        if (existing) {
-          existing.addEventListener('load', () => {
-            window.RSRazorpay ? resolve(window.RSRazorpay) : reject(new Error('Razorpay helper failed to load'));
-          });
-          existing.addEventListener('error', () => reject(new Error('Could not load Razorpay helper')));
-          return;
-        }
-        const s = document.createElement('script');
-        s.src = 'assets/razorpay-checkout.js';
-        s.async = true;
-        s.dataset.rsRazorpay = '1';
-        s.onload = () => {
-          window.RSRazorpay ? resolve(window.RSRazorpay) : reject(new Error('Razorpay helper failed to load'));
-        };
-        s.onerror = () => reject(new Error('Could not load Razorpay helper'));
-        document.head.appendChild(s);
-      });
+        const ensureRazorpayHelper = () => new Promise((resolve, reject) => {
+          if (window.RSRazorpay && typeof RSRazorpay.openCheckout === 'function') {
+            resolve(window.RSRazorpay); return;
+          }
+          const existing = document.querySelector('script[data-rs-razorpay]');
+          if (existing) {
+            existing.addEventListener('load', () => {
+              window.RSRazorpay ? resolve(window.RSRazorpay) : reject(new Error('Razorpay helper failed to load'));
+            });
+            existing.addEventListener('error', () => reject(new Error('Could not load Razorpay helper')));
+            return;
+          }
+          const s = document.createElement('script');
+          s.src = 'assets/razorpay-checkout.js';
+          s.async = true;
+          s.dataset.rsRazorpay = '1';
+          s.onload = () => { window.RSRazorpay ? resolve(window.RSRazorpay) : reject(new Error('Razorpay helper failed to load')); };
+          s.onerror = () => reject(new Error('Could not load Razorpay helper'));
+          document.head.appendChild(s);
+        });
 
-      container.querySelector('#rs-rzp-pay-btn')?.addEventListener('click', async () => {
-        const btn = container.querySelector('#rs-rzp-pay-btn');
-        const amtEl = container.querySelector('#rs-rzp-amount');
-        const rupees = Math.max(1, Number(amtEl && amtEl.value) || 1);
-        const orig = btn ? btn.innerHTML : '';
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Opening…';
-        }
-        try {
+        const runStandardPlanCheckout = async (planCode, planName, priceInr, interval) => {
           const api = await ensureRazorpayHelper();
+          const rupees = Math.max(1, Number(priceInr) || 1);
+          const billInterval = interval === 'yearly' ? 'yearly' : 'monthly';
+          const periodWord = billInterval === 'yearly' ? 'yearly' : 'monthly';
+          const logoUrl = (function () {
+            try {
+              return new URL('assets/restrosuite_logo.png', window.location.href).href;
+            } catch (_) {
+              return 'assets/restrosuite_logo.png';
+            }
+          })();
+          RS.toast('Opening secure checkout · ' + money(rupees) + ' for ' + (planName || planCode), 'fa-lock');
           const result = await api.payRupees(rupees, {
             name: 'RestroSuite',
-            description: 'Plan / workspace payment · ₹' + rupees,
+            description: (planName || planCode) + ' plan · ' + periodWord + ' · full amount',
+            image: logoUrl,
+            themeColor: '#FF4F00',
             purpose: 'plan',
-            prefillName: sess.display_name || sess.username || '',
-            prefillEmail: sess.email || '',
-            prefillContact: sess.phone || '',
+            prefillName: sess.display_name || sess.username || sess.tenant_name || '',
+            prefillEmail: sess.email || current.email || '',
+            prefillContact: sess.phone || current.phone || '',
             notes: {
               purpose: 'plan',
+              plan_code: planCode || '',
+              plan_name: planName || '',
+              billing_interval: billInterval,
               tenant: sess.tenant_slug || sess.tenant_id || '',
-              source: 'settings_plan_quick_pay',
+              tenant_name: sess.tenant_name || '',
+              product: 'RestroSuite',
             },
-            meta: { tenant: sess.tenant_slug || sess.tenant_id || '' },
+            meta: {
+              plan_code: planCode || '',
+              billing_interval: billInterval,
+              tenant: sess.tenant_slug || sess.tenant_id || '',
+            },
           });
           if (result && result.cancelled) {
-            RS.toast('Payment cancelled', 'fa-circle-info');
-          } else if (result && result.verified) {
-            RS.toast(
-              'Payment verified · ' + (result.payment_id || 'success'),
-              'fa-circle-check'
-            );
-          } else {
-            RS.toast('Payment not confirmed', 'fa-circle-exclamation');
+            RS.toast('Checkout closed — no charge', 'fa-circle-info');
+            return null;
           }
-        } catch (e) {
-          RS.toast((e && e.message) || 'Payment failed', 'fa-circle-exclamation');
-        } finally {
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = orig;
+          if (result && result.verified) {
+            let endIso = null;
+            try {
+              if (window.RS_API && typeof RS_API.activatePlan === 'function') {
+                const act = await RS_API.activatePlan({
+                  plan_code: planCode,
+                  billing_interval: billInterval,
+                  razorpay_payment_id: result.payment_id,
+                  razorpay_order_id: result.order_id,
+                });
+                if (act && act.subscription_current_period_end) {
+                  endIso = act.subscription_current_period_end;
+                  try {
+                    sessionStorage.setItem('rs_plan_code', planCode || '');
+                    sessionStorage.setItem('rs_plan_name', planName || planCode || '');
+                    sessionStorage.setItem('rs_subscription_status', 'active');
+                    sessionStorage.setItem('rs_subscription_period_end', endIso);
+                  } catch (_) {}
+                }
+              }
+            } catch (actErr) {
+              console.warn('[plan] activate_plan', actErr);
+              RS.toast((actErr && actErr.message) || 'Paid — activation pending. Contact support with payment id.', 'fa-circle-info');
+            }
+            const until = endIso ? fmtDate(endIso) : fmtDate(previewEndIso(billInterval));
+            RS.toast((planName || planCode) + ' is live · invoice on email & WhatsApp', 'fa-circle-check');
+            try {
+              sessionStorage.setItem('rs_plan_success', JSON.stringify({
+                title: (planName || planCode) + ' is active',
+                detail: 'Paid ' + money(rupees) + '. Active until ' + until + '. Tax invoice PDF sent to email & WhatsApp.',
+                at: Date.now(),
+              }));
+            } catch (_) {}
+            setTimeout(() => { initPlanPanel(body); }, 350);
+            return result;
           }
-        }
-      });
+          throw new Error('Payment not verified');
+        };
 
-      container.querySelectorAll('.rs-contact-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const planName = btn.getAttribute('data-plan-name') || btn.getAttribute('data-plan') || 'a new plan';
-          const subject = encodeURIComponent(`Request ${planName} plan — ${sess.tenant_name || sess.tenant_slug || 'outlet'}`);
-          const bodyTxt = encodeURIComponent(
-            `Hi RestroSuite,\n\nPlease upgrade our workspace.\n\nOutlet: ${sess.tenant_name || ''}\nSlug: ${sess.tenant_slug || ''}\nRequested plan: ${planName}\n\nThank you.`
-          );
-          window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${bodyTxt}`;
-          RS.toast('Opening email to request this plan…', 'fa-envelope');
+        container.querySelectorAll('.rs-upgrade-btn').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const plan = btn.getAttribute('data-plan');
+            const planName = btn.getAttribute('data-plan-name') || plan;
+            const price = Number(btn.getAttribute('data-price')) || 0;
+            const interval = btn.getAttribute('data-interval') || 'monthly';
+            btn.disabled = true;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Opening checkout…';
+            try {
+              if (price > 0) {
+                await runStandardPlanCheckout(plan, planName, price, interval);
+                return;
+              }
+              throw new Error('No price configured for this plan.');
+            } catch (e) {
+              RS.toast((e && e.message) || 'Could not start checkout.', 'fa-headset');
+            } finally {
+              if (btn.isConnected) {
+                btn.disabled = false;
+                btn.innerHTML = orig;
+              }
+            }
+          });
         });
-      });
+      }
 
-      // Quiet success path marker for support / diagnostics
-      try { container.dataset.planSource = remoteOk ? 'live' : 'session-fallback'; } catch (_) {}
+      // One-shot success banner after pay
+      let successOpt = null;
+      try {
+        const raw = sessionStorage.getItem('rs_plan_success');
+        if (raw) {
+          const j = JSON.parse(raw);
+          if (j && j.at && (Date.now() - Number(j.at)) < 120000) {
+            successOpt = { title: j.title, detail: j.detail };
+          }
+          sessionStorage.removeItem('rs_plan_success');
+        }
+      } catch (_) {}
+
+      paint(billingInterval, successOpt ? { success: successOpt } : null);
     }
 
     // -- Razorpay Route onboarding panel --------------------------------------
@@ -2481,12 +2592,13 @@
         // Hide sticky save on panes that are mostly live/action (still works if shown)
         const saveBar = sec.querySelector('.set-save-bar');
         if (saveBar) {
-          const hideSave = key === 'plan' || key === 'danger';
-          saveBar.classList.toggle('is-muted', hideSave);
+          const hideBar = key === 'plan' || key === 'danger' || key === 'payments' || key === 'security';
+          saveBar.classList.toggle('is-hidden', hideBar);
+          saveBar.classList.toggle('is-muted', hideBar);
           const hint = sec.querySelector('#set-save-hint');
           if (hint) {
             if (key === 'danger') hint.textContent = 'Destructive actions below — not saved as settings';
-            else if (key === 'plan') hint.textContent = 'Plan changes are handled by RestroSuite support';
+            else if (key === 'plan') hint.textContent = 'Pay now on a plan card · no settings to save';
             else if (key === 'gateway') hint.textContent = 'Connection is live · toggles apply instantly';
             else hint.textContent = 'Toggles apply instantly · Save also syncs to cloud';
           }
@@ -2959,6 +3071,7 @@
         ['analytics-tab','Advanced Analytics','chart-mixed'],
         ['growth-hub-tab','Growth Hub','rocket'],
         ['settings-tab','Settings','gear'],
+        ['device-display','Display (this device)','text-height'],
         ['logout','Sign Out','right-from-bracket']
       ];
       moreBtn.addEventListener('click', (e)=>{
@@ -2983,9 +3096,10 @@
         } else if (Array.isArray(roleInfo.allowedTabs)) {
           allowed = roleInfo.allowedTabs.slice();
           if (rRole === 'manager') allowed.push('settings-tab');
+          allowed.push('device-display');
           allowed.push('logout');
         } else if (!unrestricted) {
-          allowed = ['pos-tab', 'logout'];
+          allowed = ['pos-tab', 'device-display', 'logout'];
         }
         const VISIBLE = allowed ? MORE.filter(m => allowed.includes(m[0])) : MORE;
         RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
@@ -3002,6 +3116,12 @@
                 close();
                 if (typeof window.RS_REQUEST_LOGOUT === 'function') window.RS_REQUEST_LOGOUT();
                 else if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
+              } else if (b.dataset.go === 'device-display') {
+                close();
+                if (typeof window.RS_openDeviceDisplay === 'function') window.RS_openDeviceDisplay();
+                else if (window.RSProductPolish18 && typeof RSProductPolish18.openDensityPrefs === 'function') {
+                  RSProductPolish18.openDensityPrefs();
+                }
               } else {
                 close();
                 if (legacy) legacy.style.display = 'none';
@@ -3063,7 +3183,7 @@
 
     /**
      * Open the right place to link / manage WhatsApp.
-     * Super-admin shell only allows super-admin-tab + gateway-monitor-tab
+     * Super-admin shell only allows super-admin-tab + sa-reports-tab + gateway-monitor-tab
      * (settings-tab is CSS-hidden and activateTab remaps it away).
      * Outlet roles go to Settings → WhatsApp.
      */
@@ -3251,43 +3371,42 @@
         window.__rsGatewayNumber = (res && (res.number || res.phone || res.wa_number)) || window.__rsGatewayNumber || '';
         window.__rsGatewayStatusRaw = res || null;
         window.__rsWaSendMode = (res && res.sendMode) || 'none';
-        window.__rsPlatformReady = !!(res && res.platformReady);
-        // Platform central number can deliver bills even when this outlet has not linked WhatsApp
-        // (or is stuck on Scan QR). Prefer canAutomate / platformReady so the bill modal allows PDF auto-send.
-        const canAuto = !!(res && (
-          res.canAutomate === true
-          || res.status === 'ready'
-          || res.status === 'linked'
-          || res.platformReady === true
-          || res.sendMode === 'platform'
-          || res.sendMode === 'own'
-        ));
-        if (res && res.status === 'ready' && res.sendMode !== 'platform') {
-          // Own linked number (live)
+        // Truthy helpers: proxies sometimes stringify booleans
+        const truthy = (v) => v === true || v === 'true' || v === 1 || v === '1';
+        const sendMode = String((res && res.sendMode) || '').toLowerCase();
+        const platformReady = !!(res && truthy(res.platformReady));
+        const canAutomateFlag = !!(res && truthy(res.canAutomate));
+        window.__rsPlatformReady = platformReady;
+        // Brand-new outlets have status "disconnected" for THEIR line only.
+        // That must NOT hide central WhatsApp when platformReady / sendMode=platform.
+        const usePlatform =
+          sendMode === 'platform' ||
+          (platformReady && sendMode !== 'own') ||
+          (canAutomateFlag && sendMode !== 'own' && !truthy(res && res.linked) &&
+            res && res.status !== 'ready' && res.status !== 'linked');
+        const useOwn =
+          sendMode === 'own' ||
+          (res && res.status === 'ready' && sendMode !== 'platform') ||
+          (res && (res.status === 'linked' || (truthy(res.linked) && sendMode === 'own')));
+        if (res && useOwn && !(usePlatform && sendMode === 'platform')) {
+          // Own linked number (live or cold lazy)
           window.__rsGatewayReady = true;
-          const n = window.__rsGatewayNumber;
+          const n = window.__rsGatewayNumber || (res && res.number) || '';
           const short = n ? ('+' + String(n).slice(-4)) : 'On';
+          const cold = res.status === 'linked' || (truthy(res.linked) && !truthy(res.live));
           setTopbarWhatsAppBadge(
             'wa-linked',
-            short,
-            n ? 'WhatsApp connected · +' + n + ' · bills send from your number' : 'WhatsApp connected · ready to send bills',
+            cold ? 'On' : short,
+            cold
+              ? 'Your WhatsApp is linked · connects automatically when sending a bill'
+              : (n ? 'WhatsApp connected · +' + n + ' · bills send from your number' : 'WhatsApp connected · ready to send bills'),
             false
           );
-        } else if (res && (res.status === 'linked' || (res.linked && res.sendMode === 'own'))) {
-          // Own number linked (lazy cold) — still can auto-send
+        } else if (res && (usePlatform || platformReady || canAutomateFlag || sendMode === 'platform')) {
+          // Central / platform line — including brand-new outlets with no own QR
           window.__rsGatewayReady = true;
           window.__rsGatewayLastStatus = 'ready';
-          setTopbarWhatsAppBadge(
-            'wa-linked',
-            'On',
-            'Your WhatsApp is linked · connects automatically when sending a bill',
-            false
-          );
-        } else if (canAuto && (res.sendMode === 'platform' || res.platformReady === true || res.canAutomate === true)) {
-          // Central / platform line only — NOT own number (blue badge, not green)
-          window.__rsGatewayReady = true;
-          window.__rsGatewayLastStatus = 'ready';
-          window.__rsWaSendMode = res.sendMode || 'platform';
+          window.__rsWaSendMode = 'platform';
           const pn = res.platformNumber || res.number;
           const short = pn ? ('+' + String(pn).slice(-4)) : 'Hub';
           setTopbarWhatsAppBadge(

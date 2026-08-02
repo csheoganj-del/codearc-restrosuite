@@ -88,7 +88,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v234-20260730-auto';
+    var builtin = 'v235-20260802-frictionless';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -331,6 +331,9 @@
   html.rs-role-superadmin .tb-search,
   html.rs-role-superadmin #rs-station-chip,
   html.rs-role-superadmin #rs-printer-chip,
+  /* Build tag is support-only — not for restaurant customers */
+  html:not(.rs-dev-ui) #app-version-pill,
+  body:not(.rs-dev-ui) #app-version-pill,
   html.rs-role-superadmin #app-version-pill,
   html.rs-role-superadmin #cash-drawer,
   html.rs-role-superadmin #cpay-drawer-backdrop,
@@ -348,8 +351,8 @@
   body.rs-role-superadmin #app-version-pill {
     display: none !important;
   }
-  html.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#gateway-monitor-tab),
-  body.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#gateway-monitor-tab) {
+  html.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#sa-reports-tab):not(#gateway-monitor-tab),
+  body.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#sa-reports-tab):not(#gateway-monitor-tab) {
     display: none !important;
   }
   html.rs-role-superadmin .user-pill .ur::before {
@@ -437,8 +440,8 @@
       <a class="sidebar-link" data-tab="tax-tab" title="Tax &amp; GST profile"><i class="fa-solid fa-percent"></i><span>Tax &amp; GST</span></a>
 
       <div class="sb-section">Grow</div>
-      <a class="sidebar-link" data-tab="reports-tab" title="Sales reports"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
-      <a class="sidebar-link" data-tab="analytics-tab" title="Advanced analytics"><i class="fa-solid fa-chart-pie"></i><span>Analytics</span></a>
+      <a class="sidebar-link" data-tab="reports-tab" title="Sales, tax &amp; CA pack"><i class="fa-solid fa-chart-line"></i><span>Reports</span></a>
+      <a class="sidebar-link" data-tab="analytics-tab" title="Longer trends (same data as Reports)"><i class="fa-solid fa-chart-pie"></i><span>Trends</span></a>
       <a class="sidebar-link" id="sidebar-growth-hub-link" data-tab="growth-hub-tab" title="Growth Hub"><i class="fa-solid fa-rocket"></i><span>Growth Hub</span></a>
 
       <div class="sb-section brandadmin-only" style="display:none">Chain</div>
@@ -446,6 +449,7 @@
 
       <div class="sb-section superadmin-only" style="display:none">Platform</div>
       <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none" title="Super-Admin"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="sa-reports-tab" style="display:none" title="Platform reports"><i class="fa-solid fa-chart-column"></i><span>SA Reports</span></a>
       <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none" title="Gateway monitor"><i class="fa-solid fa-server"></i><span>Gateway</span></a>
     </nav>
 
@@ -1080,7 +1084,7 @@
 
       <!-- ============ GROWTH HUB ============ -->
       <section class="tab-content" id="growth-hub-tab" data-screen-label="Growth Hub">
-        <div class="toolbar-row"><div class="grow"><span class="eyebrow">Mini-apps to grow your outlet</span></div></div>
+        <div class="toolbar-row"><div class="grow"><span class="eyebrow">Jobs for your outlet</span><div style="font-size:12.5px;color:var(--text-soft);margin-top:4px;font-weight:500">Grouped by work: bookings, buying, offers, help — not a random list.</div></div></div>
         <div class="hub-grid" id="hub-grid"></div>
         <div style="display:none;">
           <div id="growth-onboarding-list"></div>
@@ -1102,7 +1106,7 @@
       <section class="tab-content" id="settings-tab" data-screen-label="Settings"></section>
       <section class="tab-content" id="tokens-tab" data-screen-label="Token Display"></section>
       <section class="tab-content" id="tax-tab" data-screen-label="Tax & GST"></section>
-      <section class="tab-content" id="analytics-tab" data-screen-label="Advanced Analytics"></section>
+      <section class="tab-content" id="analytics-tab" data-screen-label="Trends (longer range)"></section>
 
       <!-- ============ EMPLOYEES ============ -->
       <section class="tab-content" id="employees-tab" data-screen-label="Employees">
@@ -1201,6 +1205,13 @@
         <div class="stat-row" id="saas-platform-summary" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px">
           <!-- Dynamic snapshot cards -->
         </div>
+        <div class="panel panel-pad" style="margin-bottom:14px">
+          <div class="panel-head" style="margin-bottom:10px">
+            <h3 style="display:flex;align-items:center;gap:8px;font-size:15px"><i class="fa-solid fa-chart-pie" style="color:var(--orange)"></i> Platform snapshot</h3>
+            <button type="button" class="btn btn-ghost btn-sm" id="sa-open-reports-btn" title="Open full reports"><i class="fa-solid fa-arrow-up-right-from-square"></i> Full reports</button>
+          </div>
+          <div id="sa-inline-reports" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;font-size:12px"></div>
+        </div>
         <div class="panel panel-pad">
           <div class="panel-head" style="flex-wrap:wrap;gap:10px">
             <h3 style="display:flex;align-items:center;gap:8px">
@@ -1244,6 +1255,42 @@
             </tr></thead>
             <tbody id="tenant-table-body"></tbody>
           </table></div>
+        </div>
+      </section>
+
+      <!-- ============ SUPER-ADMIN PLATFORM REPORTS ============ -->
+      <section class="tab-content" id="sa-reports-tab" data-screen-label="Platform Reports">
+        <div class="panel panel-pad" style="margin-bottom:14px">
+          <div class="panel-head">
+            <h3 style="display:flex;align-items:center;gap:8px"><i class="fa-solid fa-chart-column" style="color:var(--orange)"></i> Platform reports</h3>
+            <button type="button" class="btn btn-ghost btn-sm" id="sa-reports-refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+          </div>
+          <p style="font-size:12.5px;color:var(--text-mute);margin:0 0 14px;line-height:1.5">Revenue, plans, trials, and risk across every outlet. Super-admin can change any tenant plan from Tenant directory → Manage.</p>
+          <div id="sa-reports-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:18px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="panel panel-pad" style="margin:0">
+              <h4 style="margin:0 0 10px;font-size:13px">Plan mix</h4>
+              <div id="sa-reports-plan-mix"></div>
+            </div>
+            <div class="panel panel-pad" style="margin:0">
+              <h4 style="margin:0 0 10px;font-size:13px">Billing health</h4>
+              <div id="sa-reports-billing-health"></div>
+            </div>
+          </div>
+          <div class="panel panel-pad" style="margin:14px 0 0">
+            <div class="panel-head" style="margin-bottom:8px">
+              <h4 style="margin:0;font-size:13px">Expiring within 14 days</h4>
+              <button type="button" class="btn btn-ghost btn-sm" id="sa-reports-export-csv"><i class="fa-solid fa-download"></i> CSV</button>
+            </div>
+            <div class="table-scroll"><table class="data-table" id="sa-reports-expiring-table">
+              <thead><tr><th>Outlet</th><th>Plan</th><th>Status</th><th>Ends</th><th>Days</th><th></th></tr></thead>
+              <tbody id="sa-reports-expiring-body"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-mute)">Open this tab to load…</td></tr></tbody>
+            </table></div>
+          </div>
+          <div class="panel panel-pad" style="margin:14px 0 0">
+            <h4 style="margin:0 0 10px;font-size:13px">Recent billing events</h4>
+            <div id="sa-reports-events" style="font-size:12px;color:var(--text-soft)">—</div>
+          </div>
         </div>
       </section>
 
@@ -1396,9 +1443,9 @@
         <div>
           <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Plan</label>
           <select id="ct-plan" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
-            <option value="starter">Starter</option>
-            <option value="growth">Growth</option>
-            <option value="enterprise">Enterprise</option>
+            <option value="express">Express — counter (₹499/mo)</option>
+            <option value="serve" selected>Serve — floor + kitchen (₹999/mo)</option>
+            <option value="command">Command — full ops (₹2,499/mo)</option>
           </select>
         </div>
       </div>
@@ -1512,25 +1559,40 @@
           <div>
             <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Plan</label>
             <select id="manage-plan-code" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
-              <option value="starter">Starter (5 staff)</option>
-              <option value="growth">Growth (15 staff)</option>
-              <option value="enterprise">Enterprise (75 staff)</option>
+              <option value="express">Express — counter (₹499)</option>
+              <option value="serve">Serve — floor + kitchen (₹999)</option>
+              <option value="command">Command — full ops (₹2,499)</option>
             </select>
           </div>
           <div>
-            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Billing</label>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Billing status</label>
             <select id="manage-subscription-status" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
               <option value="trialing">Trialing</option>
-              <option value="active">Active</option>
+              <option value="active">Active (paid)</option>
               <option value="past_due">Past due</option>
+              <option value="expired">Expired</option>
               <option value="canceled">Canceled</option>
             </select>
           </div>
           <div>
-            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Renews on (paid until)</label>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Interval</label>
+            <select id="manage-billing-interval" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Paid / trial until</label>
             <input type="date" id="manage-period-end" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);box-sizing:border-box">
           </div>
         </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+          <button type="button" class="btn btn-ghost btn-sm" id="manage-grant-trial-btn" title="Start/reset 30-day Serve trial"><i class="fa-solid fa-gift"></i> Grant 30d trial</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="manage-extend-7-btn" title="Add 7 days to current period"><i class="fa-solid fa-calendar-plus"></i> +7 days</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="manage-extend-30-btn" title="Add 30 days to current period"><i class="fa-solid fa-calendar-plus"></i> +30 days</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="manage-activate-paid-btn" title="Mark active paid on selected plan"><i class="fa-solid fa-bolt"></i> Activate paid</button>
+        </div>
+        <p style="margin:8px 0 0;font-size:11px;color:var(--text-mute);line-height:1.45">Super-admin can change plan, interval, and dates freely — features unlock with the plan. Save still required after edits (quick buttons save immediately).</p>
       </div>
 
       <!-- Licensing & devices -->
@@ -1734,9 +1796,11 @@
 <script src="assets/modules/security-shield.js"></script>
 <script src="assets/modules/growth-hub-shell.js"></script>
 <script src="assets/modules/demo-script.js"></script>
+<script src="assets/modules/frictionless-10x.js?v=20260802-fx"></script>
 <script src="assets/saas-core.js"></script>
 <script src="assets/license-config.js?v=20260720-iphone-lease"></script>
 <script src="assets/license-guard.js?v=20260720-iphone-lease"></script>
+<script src="assets/modules/billing-nudge.js?v=20260801-billing"></script>
 <script>
   (function () {
     function boot() {
@@ -1746,6 +1810,9 @@
       } catch (e) {}
       if (window.RSLicense && typeof RSLicense.enforce === 'function') {
         RSLicense.enforce().catch(function (e) { console.warn('[RSLicense] enforce failed', e); });
+      }
+      if (window.RSBillingNudge && typeof RSBillingNudge.run === 'function') {
+        RSBillingNudge.run().catch(function () {});
       }
     }
     (window.__configReady || Promise.resolve()).then(boot, boot);

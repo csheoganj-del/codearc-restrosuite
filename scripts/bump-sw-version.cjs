@@ -103,12 +103,13 @@ function main() {
   const stamp = `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}`;
   const nextCacheName = `restrosuite-shell-v${stamp}`;
 
-  const cacheNamePattern = /const CACHE_NAME = "restrosuite-shell-v[^"]*";/;
+  // Accept single or double quotes (current SW uses single quotes)
+  const cacheNamePattern = /const CACHE_NAME\s*=\s*['"]restrosuite-shell-v[^'"]*['"]\s*;/;
   if (!cacheNamePattern.test(src)) {
     console.error('[bump-sw-version] Could not find CACHE_NAME declaration — update service-worker.js manually.');
     process.exit(1);
   }
-  let updated = src.replace(cacheNamePattern, `const CACHE_NAME = "${nextCacheName}";`);
+  let updated = src.replace(cacheNamePattern, `const CACHE_NAME = '${nextCacheName}';`);
 
   // 2. Build per-file content-hash manifest
   const appShell = extractAppShell(src);
@@ -152,8 +153,8 @@ function main() {
   } else {
     // Insert right after CACHE_NAME line
     updated = updated.replace(
-      `const CACHE_NAME = "${nextCacheName}";`,
-      `const CACHE_NAME = "${nextCacheName}";\n\n// Per-file content hashes for stale-check in fetch handler (auto-generated — do not edit).\n${manifestConst}`
+      `const CACHE_NAME = '${nextCacheName}';`,
+      `const CACHE_NAME = '${nextCacheName}';\n\n// Per-file content hashes for stale-check in fetch handler (auto-generated — do not edit).\n${manifestConst}`
     );
   }
 

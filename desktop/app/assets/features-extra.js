@@ -1040,11 +1040,16 @@
             '<div class="rs-empty" style="padding:56px 20px">' +
               '<i class="fa-solid fa-chart-line"></i>' +
               '<h4>No sales yet</h4>' +
-              '<p>Ring up your first bill on Point of Sale. Revenue, payment mix, and top items will show up here automatically.</p>' +
+              '<p>Ring up your first bill on Point of Sale. For day-to-day numbers and CA export, use <b>Reports</b> — Analytics fills in after you have sales history.</p>' +
+              '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px">' +
               '<button type="button" class="btn btn-primary" id="an-goto-pos"><i class="fa-solid fa-cash-register"></i> Open Point of Sale</button>' +
+              '<button type="button" class="btn btn-ghost" id="an-goto-reports"><i class="fa-solid fa-file-invoice"></i> Open Reports</button>' +
+              '</div>' +
             '</div>';
           const go = document.getElementById('an-goto-pos');
           if (go) go.onclick = function(){ if (window.RS && RS.activateTab) RS.activateTab('pos-tab'); };
+          const gr = document.getElementById('an-goto-reports');
+          if (gr) gr.onclick = function(){ if (window.RS && RS.activateTab) RS.activateTab('reports-tab'); };
           return;
         }
 

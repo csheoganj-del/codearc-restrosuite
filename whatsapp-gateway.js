@@ -1780,7 +1780,11 @@ function getSystemClientData() {
 }
 
 function isClientReady(data) {
-    return !!(data && data.status === 'ready' && data.client);
+    // Match /health "ready" labels so tray Online·Ready and dashboard platformReady agree.
+    // Require a live client object so we don't report ready during a half-init.
+    if (!data || !data.client) return false;
+    const st = String(data.status || '').toLowerCase();
+    return st === 'ready' || st === 'connected' || st === 'online' || st === 'open';
 }
 
 function countHotTenantSessions() {
@@ -2691,19 +2695,29 @@ app.get('/status', (req, res) => {
         ? 'own'
         : (platformReady && tenantId !== 'system' && PLATFORM_SEND_FALLBACK ? 'platform' : 'none');
 
+    // CRITICAL: brand-new / never-linked outlets have tenantData.status = "disconnected".
+    // That is the OUTLET line, not central. If central can send (platform mode), do NOT
+    // leave status as "disconnected" — the dashboard treats that as WA off and other
+    // already-linked outlets still look fine (own line). Surface platform clearly.
+    if (sendMode === 'platform' && platformReady && !ownLive && !ownLinked) {
+        status = 'ready';
+    }
+
     const payload = {
         status,
-        authenticated: ownLive || ownLinked,
+        authenticated: ownLive || ownLinked || (sendMode === 'platform' && platformReady),
         live: ownLive,
         linked: ownLinked,
-        number: tenantData.number || null,
+        number: (ownLive || ownLinked)
+            ? (tenantData.number || null)
+            : (sendMode === 'platform' && platformReady ? (sys && sys.number) || null : tenantData.number || null),
         qr: tenantData.status === 'qr' ? tenantData.qr : null,
         sessionSavedAt: tenantData.sessionSavedAt,
         reconnectAttempts: tenantData.reconnectAttempts,
-        platformReady,
-        platformNumber: platformReady ? sys.number : null,
+        platformReady: !!platformReady,
+        platformNumber: platformReady && sys ? (sys.number || null) : null,
         sendMode,
-        canAutomate,
+        canAutomate: !!canAutomate,
         lazyMode: true,
         hotTenants: countHotTenantSessions(),
         maxHotTenants: LAZY_MAX_HOT_TENANTS,
@@ -2712,7 +2726,7 @@ app.get('/status', (req, res) => {
             : ownLinked
                 ? 'Your WhatsApp is linked — connects automatically when you send a bill (lazy, saves RAM)'
                 : (platformReady && PLATFORM_SEND_FALLBACK && tenantId !== 'system'
-                    ? 'Optional platform fallback — link your number for bills from your WhatsApp'
+                    ? 'Bills use central platform WhatsApp until you link your own number'
                     : 'Scan QR once to link your restaurant WhatsApp'),
     };
 
@@ -2894,6 +2908,60 @@ async function performReset(req, res, format = 'json') {
 
 app.post('/reset', (req, res) => performReset(req, res, 'json'));
 app.get('/reset', (req, res) => performReset(req, res, 'html'));
+
+// Email relay proxy (Edge Functions often get 404 from Google Apps Script;
+// home-network gateway can reach the same relay reliably.)
+app.post('/email', async (req, res) => {
+    if (!verifyToken(req)) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Invalid Gateway Token' });
+    }
+    try {
+        const { to, subject, html, pdfBase64, pdfFilename, filename, attachments } = req.body || {};
+        if (!to || !subject) {
+            return res.status(400).json({ status: 'error', error: 'Missing to or subject' });
+        }
+        const relayUrl = process.env.EMAIL_RELAY_URL || '';
+        if (!relayUrl) {
+            return res.status(503).json({ status: 'error', error: 'EMAIL_RELAY_URL not configured on gateway' });
+        }
+        const relayToken = process.env.EMAIL_RELAY_TOKEN || '';
+        const payload = {
+            to,
+            subject,
+            html: html || '<p>RestroSuite notification</p>',
+        };
+        if (pdfBase64) {
+            payload.pdfBase64 = pdfBase64;
+            payload.pdfFilename = pdfFilename || filename || 'invoice.pdf';
+            payload.filename = payload.pdfFilename;
+            payload.attachments = attachments || [{
+                filename: payload.pdfFilename,
+                content: pdfBase64,
+                encoding: 'base64',
+                mimeType: 'application/pdf',
+                type: 'application/pdf',
+            }];
+        }
+        const r = await fetch(relayUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(relayToken ? { Authorization: `Bearer ${relayToken}` } : {}),
+            },
+            body: JSON.stringify(payload),
+        });
+        const text = await r.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = { raw: text }; }
+        if (!r.ok) {
+            return res.status(502).json({ status: 'error', error: 'Relay failed', http: r.status, body: text.slice(0, 300) });
+        }
+        return res.json({ status: 'success', ok: true, relay: json });
+    } catch (err) {
+        console.error('[email proxy]', err);
+        return res.status(500).json({ status: 'error', error: err.message || String(err) });
+    }
+});
 
 // HTTP API Endpoint to send receipts manually in the background
 app.post('/send', async (req, res) => {
@@ -3309,7 +3377,7 @@ async function handleNewRegistrationNotification(record) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
 
-        const msgText = `🎉 *CodeArc RestroSuite Registration Received*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n⏳ *Status:* Pending Approval\n\nWe are reviewing your registration.\nYou will receive login details after approval.\n\nNeed help?\n📞 +91 99837 21179\n🌐 codearc.co.in\n\n-- *CodeArc RestroSuite*`;
+        const msgText = `🎉 *RestroSuite — Trial active!*\n\n🏪 *Outlet:* ${name}\n🍽️ *Type:* ${displayType}\n🆔 *Outlet ID:* ${slug}\n👤 *Admin:* ${username}\n\n✅ *Status:* Auto-approved\n🎁 *Plan:* Serve — 30-day free trial\n\nSign in now (no waiting):\nhttps://restrosuite.codearc.co.in/login\n\nUse Outlet ID + your password.\nNo card required. Last 3 days of trial we remind you on WhatsApp & email.\n\nNeed help?\n📞 +91 99837 21179\n🌐 restrosuite.codearc.co.in\n\n-- *CodeArc RestroSuite*`;
 
         try {
             await humanSend(systemData.client, chatId, escapeLinks(msgText), { linkPreview: false }, 'system');
@@ -3330,7 +3398,7 @@ async function handleNewRegistrationNotification(record) {
     if (REGISTRATION_EMAILS_ENABLED && email && (transporter || emailConfig.relayUrl)) {
         const typeStr = (outlet_type || 'cafe').toUpperCase();
         const displayType = typeStr === 'RESTAURANT' ? 'Restaurant' : typeStr === 'CAFE' ? 'Cafe' : typeStr;
-        const emailSubject = `Registration Received - CodeArc RestroSuite (Outlet: ${name})`;
+        const emailSubject = `RestroSuite trial active — sign in now (${name})`;
         const emailHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3354,11 +3422,11 @@ async function handleNewRegistrationNotification(record) {
             <td style="padding:35px 40px 20px 40px; text-align:center;">
 
               <div style="font-size:24px; font-weight:700; color:#111827; margin-bottom:8px;">
-                Registration Received
+                Your trial is active
               </div>
 
               <div style="font-size:15px; color:#6b7280; line-height:24px;">
-                We have successfully received your request to register on the CodeArc RestroSuite platform.
+                Welcome to CodeArc RestroSuite — auto-approved. Sign in and start billing today.
               </div>
 
             </td>
@@ -3483,7 +3551,7 @@ async function handleNewRegistrationNotification(record) {
                       font-size:13px;
                       font-weight:600;
                       border:1px solid #fdba74;">
-                      Pending Approval
+                      Active · 30-day Serve trial
                     </span>
                   </td>
                 </tr>
@@ -3498,9 +3566,8 @@ async function handleNewRegistrationNotification(record) {
             <td style="padding:10px 40px 20px 40px;">
 
               <div style="font-size:15px; color:#4b5563; line-height:28px;">
-                Our team is currently reviewing your registration request.
-                Once approved, you will receive another email and WhatsApp
-                notification with your login access and onboarding details.
+                Sign in now with your Outlet ID and password. No card required for the trial.
+                A professional confirmation PDF is issued on email and WhatsApp for your records.
               </div>
 
             </td>
@@ -3510,7 +3577,7 @@ async function handleNewRegistrationNotification(record) {
           <tr>
             <td align="center" style="padding:10px 40px 35px 40px;">
 
-              <a href="https://codearc.co.in"
+              <a href="https://restrosuite.codearc.co.in/login"
                 style="
                   background:#FF4F00;
                   color:#ffffff;
@@ -3520,7 +3587,7 @@ async function handleNewRegistrationNotification(record) {
                   font-size:15px;
                   font-weight:600;
                   display:inline-block;">
-                Visit CodeArc
+                Sign in to RestroSuite
               </a>
 
             </td>

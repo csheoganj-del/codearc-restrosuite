@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RestroSuite — Razorpay Checkout</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    :root {
+      --orange: #ff4f00;
+      --bg: #0f1115;
+      --panel: #171a21;
+      --text: #f3f4f6;
+      --mute: #9ca3af;
+      --stroke: #2a2f3a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(255,79,0,.18), transparent 55%), var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: -.02em; }
+    p.sub { margin: 0 0 20px; color: var(--mute); font-size: 13.5px; line-height: 1.5; }
+    label { display: block; font-size: 12px; font-weight: 700; color: var(--mute); margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: #0f131a;
+      color: var(--text);
+      font-size: 15px;
+      margin-bottom: 14px;
+    }
+    input:focus { outline: 2px solid rgba(255,79,0,.45); border-color: var(--orange); }
+    .btn {
+      width: 100%;
+      border: 0;
+      border-radius: 11px;
+      padding: 13px 16px;
+      font-weight: 800;
+      font-size: 14.5px;
+      cursor: pointer;
+      background: var(--orange);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-ghost {
+      margin-top: 10px;
+      background: transparent;
+      border: 1px solid var(--stroke);
+      color: var(--mute);
+    }
+    #status {
+      margin-top: 16px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--mute);
+      min-height: 1.4em;
+    }
+    #status.ok { color: #34d399; }
+    #status.err { color: #f87171; }
+    .hint { font-size: 11.5px; color: var(--mute); margin-top: 14px; line-height: 1.45; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; color: var(--orange); font-weight: 800; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand"><i class="fa-solid fa-mug-hot"></i> RestroSuite Pay</div>
+    <h1>Razorpay Standard Checkout</h1>
+    <p class="sub">Test one-time payment (amount in INR). Uses server-side order create + signature verify. Secret key never reaches the browser.</p>
+
+    <label for="amount">Amount (INR)</label>
+    <input id="amount" type="number" min="1" step="1" value="1" />
+
+    <label for="name">Name (optional)</label>
+    <input id="name" type="text" placeholder="Guest name" autocomplete="name" />
+
+    <label for="email">Email (optional)</label>
+    <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
+
+    <label for="phone">Phone (optional)</label>
+    <input id="phone" type="tel" placeholder="10-digit mobile" autocomplete="tel" />
+
+    <button type="button" class="btn" id="pay-btn">
+      <i class="fa-solid fa-lock"></i> Pay securely
+    </button>
+    <button type="button" class="btn btn-ghost" id="back-btn" onclick="location.href='dashboard.html'">
+      Back to dashboard
+    </button>
+
+    <div id="status" role="status" aria-live="polite"></div>
+    <div class="hint" style="margin-top:16px;padding:12px;border-radius:10px;border:1px solid var(--stroke);background:#0f131a">
+      <div style="font-weight:800;color:var(--text);margin-bottom:8px">Razorpay test cards (Test Mode only)</div>
+      <div style="margin-bottom:6px"><b>Visa</b>: <code style="color:#fbbf24">4718 6091 0820 4366</code></div>
+      <div style="margin-bottom:6px"><b>Mastercard</b>: <code style="color:#fbbf24">5104 0600 0000 0008</code></div>
+      <div style="margin-bottom:6px"><b>Expiry</b>: any future date (e.g. 12/30)</div>
+      <div style="margin-bottom:6px"><b>CVV</b>: any 3 digits (e.g. 123)</div>
+      <div style="margin-top:8px;opacity:.9">Do <b>not</b> use Stripe-style 4111… if it fails. Name can be anything. Min amount ₹1.</div>
+    </div>
+  </div>
+
+  <script src="assets/razorpay-checkout.js"></script>
+  <script>
+    (function () {
+      var btn = document.getElementById('pay-btn');
+      var statusEl = document.getElementById('status');
+
+      function setStatus(msg, kind) {
+        statusEl.textContent = msg || '';
+        statusEl.className = kind || '';
+      }
+
+      btn.addEventListener('click', async function () {
+        var rupees = Number(document.getElementById('amount').value);
+        if (!Number.isFinite(rupees) || rupees < 1) {
+          setStatus('Enter at least ₹1', 'err');
+          return;
+        }
+        btn.disabled = true;
+        setStatus('Creating order…');
+        try {
+          var result = await window.RSRazorpay.payRupees(rupees, {
+            name: 'RestroSuite',
+            description: 'Test payment · ₹' + rupees,
+            prefillName: document.getElementById('name').value.trim(),
+            prefillEmail: document.getElementById('email').value.trim(),
+            prefillContact: document.getElementById('phone').value.trim(),
+            notes: { source: 'pay.html', purpose: 'standard_checkout_test' },
+          });
+          if (result && result.cancelled) {
+            setStatus('Payment cancelled — you can try again anytime.', 'err');
+          } else if (result && result.verified) {
+            setStatus(
+              'Payment verified ✓  Payment ID: ' + (result.payment_id || '') +
+              ' · Order: ' + (result.order_id || ''),
+              'ok'
+            );
+          } else {
+            setStatus('Unexpected response — payment not confirmed.', 'err');
+          }
+        } catch (e) {
+          setStatus((e && e.message) || 'Payment failed', 'err');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

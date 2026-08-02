@@ -164,6 +164,25 @@
   }
   function writeRememberBlobFromSession(){
     try {
+      // Do not overwrite a different outlet's remember blob from this tab.
+      // Multi-tab: tab A (outlet X) must not clobber tab B's keep-me-signed-in for Y.
+      try {
+        const existingRaw = readRememberBlobRaw();
+        if (existingRaw) {
+          const existing = JSON.parse(existingRaw);
+          const existingSlug = String((existing && (existing.tenant_slug || existing.slug || existing[K.slug])) || '');
+          const thisSlug = String(SS.getItem(K.slug) || SS.getItem('tenant_slug') || '');
+          const thisTok = String(SS.getItem(K.token) || '');
+          const existTok = String((existing && (existing[K.token] || existing.tenant_session_token || existing.token)) || '');
+          if (existingSlug && thisSlug && existingSlug !== thisSlug && existTok && thisTok && existTok !== thisTok) {
+            // Keep the other outlet's blob; this tab stays sessionStorage-only
+            try {
+              console.info('[session] skip remember-blob write — other outlet already saved:', existingSlug);
+            } catch (_) {}
+            return;
+          }
+        }
+      } catch (_) {}
       const blob = {};
       SESSION_KEYS.forEach(k => {
         const value = SS.getItem(k);
@@ -542,7 +561,13 @@
         // outlet that must be approved before login. Storing a session here would bypass
         // the approval gate and auto-redirect to dashboard.
         await new Promise(r => setTimeout(r, 600));
-        return { message: 'Registration submitted! Once CodeArc approves your outlet you can sign in.' };
+        return {
+          success: true,
+          trial: true,
+          plan_code: 'serve',
+          subscription_status: 'trialing',
+          message: 'Welcome! Your 30-day Serve trial is active. Sign in now — no approval needed. Confirmation PDF is on its way to email & WhatsApp.',
+        };
       }
       return post('tenant-access', { action:'register', ...payload }, ANON, 'Registration failed');
     },
@@ -704,11 +729,28 @@
       if (!CONFIGURED) absorbRuntimeConfig();
       return post('razorpay-route', { action: 'get_plans' }, token, 'Could not load plans');
     },
-    async subscribe(planCode){
+    async subscribe(planCode, billingInterval){
       const token = ssGet(K.token);
       if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
       if (!CONFIGURED) absorbRuntimeConfig();
-      return post('razorpay-route', { action: 'create_subscription', plan_code: planCode }, token, 'Could not start checkout');
+      return post('razorpay-route', {
+        action: 'create_subscription',
+        plan_code: planCode,
+        billing_interval: billingInterval || 'monthly',
+      }, token, 'Could not start checkout');
+    },
+    /** After one-time Razorpay pay — activate plan and extend period from expiry. */
+    async activatePlan({ plan_code, billing_interval, razorpay_payment_id, razorpay_order_id }){
+      const token = ssGet(K.token);
+      if (!token) { const e = new Error('Not signed in'); e.status = 401; throw e; }
+      if (!CONFIGURED) absorbRuntimeConfig();
+      return post('razorpay-route', {
+        action: 'activate_plan',
+        plan_code,
+        billing_interval: billing_interval || 'monthly',
+        razorpay_payment_id,
+        razorpay_order_id,
+      }, token, 'Could not activate plan');
     },
 
     /* ---------------- SUPER-ADMIN (tenant-admin) ---------------- */

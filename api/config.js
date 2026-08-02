@@ -32,9 +32,19 @@ export default function handler(req, res) {
 
   const enableDemoTools = process.env.ENABLE_DEMO_TOOLS === 'true';
   const zeroCostLaunchMode = process.env.ZERO_COST_LAUNCH_MODE === 'true';
+  // Public Razorpay key only (never expose RAZORPAY_KEY_SECRET)
+  const razorpayKeyId = String(process.env.RAZORPAY_KEY_ID || '').trim() || null;
+  const razorpayCheckoutEnabled = !!razorpayKeyId;
 
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
   res.setHeader('Content-Type', 'application/json');
 
-  return res.status(200).json({ supabaseUrl, supabaseAnonKey, enableDemoTools, zeroCostLaunchMode });
+  return res.status(200).json({
+    supabaseUrl,
+    supabaseAnonKey,
+    enableDemoTools,
+    zeroCostLaunchMode,
+    razorpayKeyId,
+    razorpayCheckoutEnabled,
+  });
 }
