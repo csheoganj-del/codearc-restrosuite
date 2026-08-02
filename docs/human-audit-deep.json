@@ -1,0 +1,59 @@
+{
+  "r": [
+    {
+      "id": "S1",
+      "t": "Shift state",
+      "s": "info",
+      "d": "{\"shiftText\":\"\",\"shiftOpen\":false}"
+    },
+    {
+      "id": "S2",
+      "t": "Bills list has settled bill",
+      "s": "pass",
+      "d": "rows=3 snip=₹ ₹ 1,080 Today's sales 2 Today's bills ₹ 540 Avg order value 0 Refunds today Today Yesterday 7 days All Custom - Apply 2 bills Filter Excel"
+    },
+    {
+      "id": "S3",
+      "t": "Reports content",
+      "s": "pass",
+      "d": "ca=true snip=LAST 30 DAYS · SERVER TOTALS · DAY SALES & TAX Today This week This month Last 30 days Last 90 days CA pack Trends ₹ 1,080 Revenue Last 30 d"
+    },
+    {
+      "id": "S4",
+      "t": "POS re-add cart",
+      "s": "pass",
+      "d": "{\"tiles\":12,\"cartSnippet\":\"Butter Chicken ⚠ ₹ 220 ½ Full ×2 1 ₹ 220 Cold Coffee ⚠ ₹ 80 ½ Full ×2 1 ₹ 80\",\"total\":\"\",\"checkoutDisabled\":false,\"checkoutText\":\"Print & Pay\"}"
+    },
+    {
+      "id": "S5",
+      "t": "Print & Pay result",
+      "s": "pass",
+      "d": "{\"hasOverlay\":true,\"overlayText\":\"Bill settled RS-TK-260802-003 | ₹ 300 Bill synced Human Audit Cafe RS-TK-260802-003 02 Aug 2001, 13:32 Table: Walk-in / Takeaway Customer: Walk-in 1x Butter Chicken ₹ 220 1x Cold Coffee ₹ 80 Subtotal ₹ 300 TOTAL ₹ 300 Cash ₹ 300 Scan to view digital \",\"checklist\":\"\""
+    },
+    {
+      "id": "S6",
+      "t": "WA hub badge detail",
+      "s": "pass",
+      "d": "{\"label\":\"+1179\",\"class\":\"tb-pill tb-wa-pill js-wa-status-pill wa-platform\",\"title\":\"Using central WhatsApp +919983721179 (not your number). Link your WhatsApp in Settings for green status and bills from your phone.\"}"
+    },
+    {
+      "id": "S7",
+      "t": "Floor has tables",
+      "s": "pass",
+      "d": "{\"n\":4,\"snip\":\"4 Free tables 0 Dining now 0 Awaiting payment 0 QR open Available Dining QR pending QR open Held Bill printed Scan table\"}"
+    },
+    {
+      "id": "S8",
+      "t": "Online synced pill",
+      "s": "pass",
+      "d": "count=4"
+    },
+    {
+      "id": "S9",
+      "t": "Menu editor has items",
+      "s": "pass",
+      "d": "{\"n\":13,\"snip\":\"Menu · Recipe · Stock First add store-room items (Stock), then link recipes so sales reduce stock. Help me 3 steps ? Add new item Item name \"}"
+    }
+  ],
+  "at": "2026-08-02T08:02:14.243Z"
+}

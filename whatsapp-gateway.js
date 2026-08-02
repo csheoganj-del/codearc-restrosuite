@@ -3012,7 +3012,73 @@ app.post('/send', async (req, res) => {
         // Baileys modern JID
         const chatId = `${phone}@s.whatsapp.net`;
 
-        // 1. Respond to the client immediately (within 10ms!)
+        const brandEarly = String(outletName || req.headers['x-outlet-name'] || '').trim().slice(0, 60);
+        const isSystemMsgEarly =
+            isSystemOrTransactionalMessage(message) || isSystemOrTransactionalMessage(caption);
+
+        // Self-chat (OTP to the same line that is sending) never shows as a normal WA chat.
+        // Reject early so register UI never claims "sent" when the owner won't see a bubble.
+        const fromDigits = String(route.number || '').replace(/\D/g, '');
+        const toDigits = String(phone || '').replace(/\D/g, '');
+        const norm = (d) => {
+            const x = String(d || '').replace(/\D/g, '');
+            if (x.length > 10 && x.startsWith('91')) return x.slice(-10);
+            return x.slice(-10);
+        };
+        if (fromDigits && toDigits && norm(fromDigits) === norm(toDigits)) {
+            return res.status(400).json({
+                status: 'error',
+                error:
+                    'Cannot send WhatsApp to the same number that is linked on the gateway. Use a different phone number (your personal WhatsApp), not the central/gateway line.',
+                code: 'SELF_CHAT',
+                fromNumber: route.number || null,
+            });
+        }
+
+        // System OTP/security: wait for real delivery so callers never get false sent:true
+        if (isSystemMsgEarly && !pdfData) {
+            try {
+                let textOut = String(message || caption || '').trim();
+                if (!textOut) {
+                    return res.status(400).json({ status: 'error', error: 'Missing OTP message body' });
+                }
+                await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
+                if (route.via === 'own') {touchTenantActivity(tenantId);}
+                console.log(
+                    `[OTP Sent] WhatsApp system text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)}`
+                );
+                await logHealthEvent('send_otp', 'ok', {
+                    tenant_id: tenantId,
+                    phone: maskPhone(phone),
+                    via: route.via,
+                    message: `OTP/system message delivered via ${route.via} to +${maskPhone(phone)}`,
+                });
+                return res.json({
+                    status: 'success',
+                    message: 'OTP delivered',
+                    via: route.via,
+                    fromNumber: route.number || null,
+                    delivered: true,
+                    sync: true,
+                });
+            } catch (otpErr) {
+                console.error(`[OTP Error] Failed system send to +${maskPhone(phone)}:`, otpErr.message);
+                await logHealthEvent('send_otp', 'error', {
+                    tenant_id: tenantId,
+                    phone: maskPhone(phone),
+                    error: otpErr.message,
+                    message: `Failed OTP/system send to +${maskPhone(phone)}: ${otpErr.message}`,
+                });
+                return res.status(502).json({
+                    status: 'error',
+                    error: otpErr.message || 'Failed to deliver WhatsApp OTP',
+                    code: 'OTP_DELIVERY_FAILED',
+                    delivered: false,
+                });
+            }
+        }
+
+        // 1. Respond to the client immediately (within 10ms!) — bills/PDFs only
         res.json({
             status: 'success',
             message: 'Message sending initiated',
@@ -3040,9 +3106,9 @@ app.post('/send', async (req, res) => {
 
             const hasPdf = pdfBase64.length > 64;
             let delivered = 'none';
-            const brand = String(outletName || req.headers['x-outlet-name'] || '').trim().slice(0, 60);
+            const brand = brandEarly;
             // OTP / security messages: send exactly as written — never wrap with bill greetings
-            const isSystemMsg = isSystemOrTransactionalMessage(message) || isSystemOrTransactionalMessage(caption);
+            const isSystemMsg = isSystemMsgEarly;
             const craftBills = HUMAN_CRAFT_MODE && !isSystemMsg;
 
             // Human-crafted caption (staff phrasing) — PDF body stays exact preview; bills only

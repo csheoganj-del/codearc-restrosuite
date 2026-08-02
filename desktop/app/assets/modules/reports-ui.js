@@ -23,21 +23,61 @@
     return Array.from((r || document).querySelectorAll(sel));
   }
 
+  // Keep last period + fingerprint so bill/realtime refresh does not
+  // re-paint identical charts (bar re-grow) or fire click/success chimes.
+  let _lastPeriod = 'Last 30 days';
+  let _lastLocalFp = '';
+  let _lastFingerprint = '';
+  let _renderSeq = 0;
+  let _inFlight = null;
+
+  function billsFingerprint(bills, period, days) {
+    const cutoff = Date.now() - days * 86400000;
+    let count = 0;
+    let sum = 0;
+    let maxT = 0;
+    (bills || []).forEach((b) => {
+      if (!b || b.status !== 'paid') return;
+      const t = b.dateTime ? new Date(b.dateTime).getTime() : (b.time ? new Date(b.time).getTime() : 0);
+      if (t < cutoff) return;
+      count += 1;
+      sum += Number(b.amount != null ? b.amount : b.total) || 0;
+      if (t > maxT) maxT = t;
+    });
+    return period + '|' + count + '|' + Math.round(sum * 100) + '|' + maxT + '|' + (bills || []).length;
+  }
+
   async function renderReports(period) {
     const BILLS = (global.RS && Array.isArray(RS.BILLS) ? RS.BILLS : []) || [];
     const MENU = (global.RS && RS.MENU) || [];
     const tabEl = document.getElementById('reports-tab');
 
-  period = period || 'Last 30 days';
+  // Preserve selected range when cloud/LAN re-triggers render without a period arg
+  const periodChanged = !!(period && period !== _lastPeriod);
+  period = period || _lastPeriod || 'Last 30 days';
   const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
   const now = Date.now();
   const cutoff = now - days * 86400000;
   const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
 
-  // Instant report shape while first hydrate/summary resolves (not when truly empty after hydrate)
+  const localFp = billsFingerprint(BILLS, period, days);
+  const alreadyPainted = !!(tabEl && tabEl.querySelector('.stat-card, .report-grid, #chart-revenue'));
+
+  // Skip full rebuild when visible chart already matches current local bills
+  // (realtime/LAN often re-lists the same bills every few seconds).
+  if (alreadyPainted && !periodChanged && localFp === _lastLocalFp) {
+    return;
+  }
+
+  // Coalesce overlapping renders (rapid bill sync + period click)
+  const seq = ++_renderSeq;
+  _lastPeriod = period;
+
+  // Instant report shape only on first paint — never wipe a live chart with skeleton
   try {
     if (
       tabEl &&
+      !alreadyPainted &&
       global.RSSkel &&
       RSSkel.reportsDash &&
       RSSkel.shouldShow &&
@@ -51,17 +91,24 @@
   let serverSummary = null;
   try {
     if (window.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
-      const res = await Promise.race([
+      const fetchP = Promise.race([
         RS_API.data({ operation: 'sales_summary', days }),
         new Promise((_, rej) => { setTimeout(() => rej(new Error('timeout')), 6000); }),
       ]);
+      _inFlight = fetchP;
+      const res = await fetchP;
       const payload = res && res.ok != null ? res : (res && res.data) || res;
       if (payload && payload.ok) {serverSummary = payload;}
     }
   } catch (e) {
-    try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {}
+    // Silent fallback — do not beep on every background refresh
     console.warn('[Reports] sales_summary unavailable, using local bills', e && e.message);
+  } finally {
+    if (_inFlight) _inFlight = null;
   }
+
+  // A newer render started while we awaited — drop this stale paint
+  if (seq !== _renderSeq) return;
 
   const paidBills = BILLS.filter(b => {
     if (b.status !== 'paid') {return false;}
@@ -125,6 +172,16 @@
   }
   const maxSlot = Math.max(...dailySlots,1);
   const hasDailyData = dailySlots.some(v=>v>0);
+
+  // Fingerprint includes server totals so first local→server upgrade still paints once
+  const serverFp = serverSummary
+    ? ('s|' + (Number(serverSummary.revenue) || 0) + '|' + (Number(serverSummary.orders) || 0) + '|' + (Number(serverSummary.gst) || 0))
+    : 'local';
+  const fullFp = localFp + '|' + serverFp;
+  if (alreadyPainted && !periodChanged && fullFp === _lastFingerprint) {
+    _lastLocalFp = localFp;
+    return;
+  }
 
   // Payment mix
   const payMap = {};
@@ -191,6 +248,10 @@
   const tab = document.getElementById('reports-tab');
   if (!tab) {return;}
 
+  // Animate bars only on first paint or period change — not on silent data refresh
+  const prevPaintedPeriod = tab.dataset.rsReportsPeriod || '';
+  const animateCharts = !alreadyPainted || periodChanged || period !== prevPaintedPeriod;
+
   tab.innerHTML = `
     <div class="toolbar-row" style="margin-bottom:4px">
       <span class="eyebrow">${period}${serverSummary ? ' · <span style="color:var(--green);font-weight:700">server totals</span>' : ' · local bills'} · day sales &amp; tax</span>
@@ -212,12 +273,12 @@
     </div>
     ${
       !totalOrders
-        ? (() => { try { if (window.RSActionFeedback) {window.RSActionFeedback.error();} } catch(_) {} return `<div class="sr-empty" style="margin:8px 0 16px;padding:28px;border:1px dashed var(--stroke);border-radius:var(--r-md)">
+        ? `<div class="sr-empty" style="margin:8px 0 16px;padding:28px;border:1px dashed var(--stroke);border-radius:var(--r-md)">
             <i class="fa-solid fa-chart-pie" style="font-size:22px;opacity:.4;display:block;margin-bottom:8px"></i>
             <div style="font-weight:700;margin-bottom:4px">No sales in this period</div>
             <div style="font-size:13px;color:var(--text-soft);max-width:360px;margin:0 auto">Ring a sale on POS or widen the date range to see revenue, tax, and top items.</div>
-          </div>`; })()
-        : (() => { try { if (window.RSActionFeedback) {window.RSActionFeedback.success();} } catch(_) {} return ''; })()
+          </div>`
+        : ''
     }
 
     <div class="report-grid report-grid-charts">
@@ -235,9 +296,11 @@
                 if (days > 14 && showLabel && lab.indexOf('/') !== -1) {
                   lab = String(lab).split('/')[0]; // "27" not "27/6"
                 }
+                // Final height immediately when not animating (avoids bar "reload" flicker)
+                const hStyle = animateCharts ? '0' : (h + '%');
                 return `<div class="cbar" title="${_e(dailyLabels[i])}: ${rs(v)}">
                   <div class="bar-track">
-                    <div class="bar" style="height:0" data-h="${h}"><span class="bv">${rs(v)}</span></div>
+                    <div class="bar" style="height:${hStyle}" data-h="${h}"><span class="bv">${rs(v)}</span></div>
                   </div>
                   <span class="bl${showLabel ? '' : ' is-muted'}">${showLabel ? _e(lab) : ''}</span>
                 </div>`;
@@ -269,7 +332,7 @@
           ${sortedCats.length>0
             ? sortedCats.map(c=>`<div style="margin-bottom:13px">
                 <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px"><span>${_e(c[0])}</span><b style="color:var(--text)">${c[1]}%</b></div>
-                <div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:0;background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div>
+                <div style="height:8px;background:var(--glass-2);border-radius:99px;overflow:hidden"><span style="display:block;height:100%;width:${animateCharts ? '0' : (c[1] + '%')};background:linear-gradient(90deg,var(--orange-soft),var(--orange-deep));transition:width 1s var(--ease)" data-w="${c[1]}"></span></div>
               </div>`).join('')
             : '<div style="color:var(--text-mute);font-size:12px;text-align:center;padding:20px">No category data yet</div>'
           }
@@ -298,9 +361,15 @@
     </div>`:''}
   `;
 
-  // Animate bars
-  setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
-  setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+  tab.dataset.rsReportsPeriod = period;
+  _lastLocalFp = localFp;
+  _lastFingerprint = fullFp;
+
+  // Animate bars only when intentional (first open / period change)
+  if (animateCharts) {
+    setTimeout(()=>$$('#chart-revenue .bar').forEach(b=>b.style.height=b.dataset.h+'%'),60);
+    setTimeout(()=>$$('#cat-bars [data-w]').forEach(s=>s.style.width=s.dataset.w+'%'),80);
+  }
 
   // CA pack = GSTR + day sales in one click
   const caPackBtn = document.getElementById('rs-fx-ca-pack');
@@ -399,7 +468,11 @@
   document.addEventListener('rs:hydrated', () => {
     try {
       if (global.RSSkel && RSSkel.markHydrated) {RSSkel.markHydrated();}
-      renderReports();
+      // Only re-render if Reports is the active tab (other screens fire rs:hydrated too)
+      const active = document.querySelector('.tab-content.active');
+      if (active && active.id === 'reports-tab') {
+        renderReports();
+      }
     } catch (_) {}
   });
 })(typeof window !== 'undefined' ? window : globalThis);

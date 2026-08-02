@@ -536,8 +536,39 @@
           });
         }
         if (opts.onMount) opts.onMount(ov.querySelector('.rs-modal'), close);
-        return { el: ov, modal: ov.querySelector('.rs-modal'), close };
-      }
+        return { el: ov, modal: ov.querySelector('.rs-modal'), close, forceClose: close };
+      },
+      /** Force-remove every open RS modal overlay (first-run / stacked modals). */
+      closeAll() {
+        try {
+          const root = RS.getModalRoot && RS.getModalRoot();
+          const nodes = root
+            ? root.querySelectorAll('.rs-overlay')
+            : document.querySelectorAll('#rs-modal-root .rs-overlay, .rs-overlay.show');
+          nodes.forEach((ov) => {
+            try {
+              ov.classList.remove('show');
+              ov.style.pointerEvents = 'none';
+              ov.remove();
+            } catch (_) {}
+          });
+          const pin = document.getElementById('rs-pin-overlay');
+          if (pin) {
+            try { pin.remove(); } catch (_) {}
+          }
+          const tour = document.getElementById('onboarding-overlay');
+          if (tour) {
+            tour.style.display = 'none';
+            tour.style.pointerEvents = 'none';
+            tour.classList.remove('is-visible', 'show');
+          }
+          const bd = document.getElementById('onboarding-backdrop');
+          if (bd) {
+            bd.style.pointerEvents = 'none';
+            bd.style.display = 'none';
+          }
+        } catch (_) {}
+      },
     };
 
     /* ---------------- print helper ---------------- */

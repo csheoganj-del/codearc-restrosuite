@@ -1452,9 +1452,9 @@
       // mustShift is true here (required + no open shift)
       bar.classList.add('rs-shift-bar-closed');
       bar.classList.remove('rs-shift-bar-open');
-      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — required before billing">
+      bar.innerHTML = `<div class="rs-shift-compact closed rs-shift-icons rs-shift-topbar" title="No shift open — open before billing if required">
         <span class="rs-shift-dot closed"></span>
-        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Shift</span></button>
+        <button type="button" class="btn btn-primary btn-sm" id="rs-shift-open" title="Open shift for this counter" aria-label="Open shift"><i class="fa-solid fa-unlock"></i><span class="rs-shift-open-lbl">Open shift</span></button>
       </div>`;
       const op = bar.querySelector('#rs-shift-open');
       if (op)

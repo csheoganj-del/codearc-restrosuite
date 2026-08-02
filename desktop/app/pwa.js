@@ -16,16 +16,50 @@
   // Update banner: self-contained (no dependency on dashboard-styles.css or
   // dashboard.js's toast()), so it works on every page that loads pwa.js.
   //
-  // Loop fix: previously sessionStorage kept the OLD version forever after
-  // "Reload now", so every poll re-showed the banner. We now:
-  //  1) Compare remote version to what THIS page is running (not only lastSeen)
-  //  2) Mark the remote version as applied when user reloads
-  //  3) Only show SW-waiting banner once per waiting worker lifecycle
+  // Loop fix (2026-08): continuous "Reload now" was caused by:
+  //  1) controllerchange auto-reloaded, then hardReload cleared RELOAD_GUARD,
+  //     so the next claim re-triggered the same path forever
+  //  2) hardReload both postMessage(SKIP_WAITING) AND location.replace, while
+  //     controllerchange also reloaded → double/triple reload
+  //  3) login / non-dashboard pages had no page version, so remoteIsNewer()
+  //     always returned true and re-showed the banner after every poll
+  //  4) updatefound onceKey used Date.now() so it never de-duplicated
   // ---------------------------------------------------------------------
   var RELOAD_GUARD_KEY = "__rsSwReloadedOnce";
   var WEB_VER_SEEN_KEY = "__rsWebVerSeen";
   var WEB_VER_APPLIED_KEY = "__rsWebVerApplied";
   var BANNER_SHOWN_KEY = "__rsUpdateBannerShown";
+  var PENDING_SKIP_KEY = "__rsSwPendingSkip";
+
+  // In-page flags (survive only this document lifecycle)
+  var reloading = false;
+  var bannerShownThisPage = false;
+
+  function storageGet(key) {
+    try {
+      return sessionStorage.getItem(key) || localStorage.getItem(key) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function storageSet(key, val) {
+    try {
+      sessionStorage.setItem(key, val);
+    } catch (_) {}
+    try {
+      localStorage.setItem(key, val);
+    } catch (_) {}
+  }
+
+  function storageRemove(key) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch (_) {}
+    try {
+      localStorage.removeItem(key);
+    } catch (_) {}
+  }
 
   function pageRunningVersion() {
     try {
@@ -50,17 +84,35 @@
     return m ? Number(m[1]) : 0;
   }
 
-  /** True when remote is newer than the version baked into this page. */
+  /**
+   * True when remote is newer than the version baked into this page.
+   * If the page has no version stamp, fall back to last applied / seen —
+   * never treat "unknown page version" as always-outdated (that caused
+   * endless banners on login.html and other unstamped pages).
+   */
   function remoteIsNewer(remoteVer, pageVer) {
     var r = String(remoteVer || "").trim();
     var p = String(pageVer || "").trim();
     if (!r) return false;
-    if (!p) return true;
-    if (r === p) return false;
-    var rr = versionRank(r);
-    var pr = versionRank(p);
-    if (rr && pr) return rr > pr;
-    return r !== p;
+
+    if (p) {
+      if (r === p) return false;
+      var rr = versionRank(r);
+      var pr = versionRank(p);
+      if (rr && pr) return rr > pr;
+      return r !== p;
+    }
+
+    // No page stamp: only nag if remote is newer than last applied/seen
+    var applied = storageGet(WEB_VER_APPLIED_KEY);
+    var seen = storageGet(WEB_VER_SEEN_KEY);
+    var baseline = applied || seen || "";
+    if (!baseline) return true; // first ever observation — allow one prompt
+    if (r === baseline) return false;
+    var rRank = versionRank(r);
+    var bRank = versionRank(baseline);
+    if (rRank && bRank) return rRank > bRank;
+    return r !== baseline;
   }
 
   function injectBannerStyles() {
@@ -82,18 +134,47 @@
   }
 
   function markVersionApplied(ver) {
-    if (!ver) return;
+    var v = String(ver || "").trim();
+    if (!v) {
+      // Still record a stable "user already reloaded" marker so empty-version
+      // pages (login) stop re-prompting for the same remote poll result.
+      v = storageGet(WEB_VER_SEEN_KEY) || "reloaded";
+    }
+    storageSet(WEB_VER_SEEN_KEY, v);
+    storageSet(WEB_VER_APPLIED_KEY, v);
+    // Do NOT clear RELOAD_GUARD here — that was half the reload loop.
     try {
-      sessionStorage.setItem(WEB_VER_SEEN_KEY, String(ver));
-      sessionStorage.setItem(WEB_VER_APPLIED_KEY, String(ver));
       sessionStorage.removeItem(BANNER_SHOWN_KEY);
-      sessionStorage.removeItem(RELOAD_GUARD_KEY);
     } catch (_) {}
   }
 
+  /**
+   * Activate waiting SW (if any) and reload the page once.
+   * Guard is set FIRST so controllerchange cannot start a second reload.
+   */
   function hardReload(appliedVer) {
+    if (reloading) return;
+    reloading = true;
+
     markVersionApplied(appliedVer || pageRunningVersion());
-    // Prefer controller swap when a waiting worker exists
+
+    try {
+      sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+      sessionStorage.setItem(PENDING_SKIP_KEY, "1");
+    } catch (_) {}
+
+    function doReplace() {
+      try {
+        var url = new URL(location.href);
+        // Drop previous bust token so we don't stack _rs_reload forever
+        url.searchParams.delete("_rs_reload");
+        url.searchParams.set("_rs_reload", String(Date.now()));
+        location.replace(url.pathname + url.search + url.hash);
+      } catch (_) {
+        location.reload();
+      }
+    }
+
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.controller) {
         navigator.serviceWorker.getRegistration().then(function (reg) {
@@ -101,35 +182,54 @@
             try {
               reg.waiting.postMessage({ type: "SKIP_WAITING" });
             } catch (_) {}
+            // Give the new worker a moment to claim, then navigate once.
+            // controllerchange will NOT reload again (guard is set).
+            setTimeout(doReplace, 400);
+            return;
           }
-          // Cache-bust so we don't land on a stale HTML shell
-          var url = new URL(location.href);
-          url.searchParams.set("_rs_reload", String(Date.now()));
-          location.replace(url.pathname + url.search + url.hash);
+          doReplace();
         }).catch(function () {
-          location.reload();
+          doReplace();
         });
         return;
       }
     } catch (_) {}
-    location.reload();
+    doReplace();
+  }
+
+  function versionAlreadyApplied(remote) {
+    if (!remote) return false;
+    var applied = storageGet(WEB_VER_APPLIED_KEY);
+    if (applied && String(applied) === String(remote)) return true;
+    // Major match: v234-... applied covers remote v234-...
+    var aRank = versionRank(applied);
+    var rRank = versionRank(remote);
+    if (aRank && rRank && aRank >= rRank) return true;
+    return false;
   }
 
   function showUpdateBanner(opts) {
     opts = opts || {};
+    if (bannerShownThisPage) return;
     if (document.getElementById("rs-update-banner")) return;
-
-    // Don't nag again for the same applied version in this tab session
+    if (reloading) return;
+    // Never nag while a reload is already in flight
     try {
-      var applied = sessionStorage.getItem(WEB_VER_APPLIED_KEY) || "";
-      var remote = opts.remoteVersion || "";
-      if (remote && applied && String(remote) === String(applied)) return;
+      if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") return;
+    } catch (_) {}
+
+    var remote = opts.remoteVersion || "";
+    if (remote && versionAlreadyApplied(remote)) return;
+
+    // Don't nag again for the same onceKey in this tab session
+    try {
       if (opts.onceKey) {
         if (sessionStorage.getItem(BANNER_SHOWN_KEY) === opts.onceKey) return;
         sessionStorage.setItem(BANNER_SHOWN_KEY, opts.onceKey);
       }
     } catch (_) {}
 
+    bannerShownThisPage = true;
     injectBannerStyles();
     var bar = document.createElement("div");
     bar.id = "rs-update-banner";
@@ -139,7 +239,7 @@
       '<button type="button" id="rs-update-reload-btn">Reload now</button>';
     document.body.appendChild(bar);
     document.getElementById("rs-update-reload-btn").addEventListener("click", function () {
-      hardReload(opts.remoteVersion || pageRunningVersion());
+      hardReload(opts.remoteVersion || pageRunningVersion() || storageGet(WEB_VER_SEEN_KEY));
     });
   }
 
@@ -201,17 +301,35 @@
     paintOfflineChip();
   }
 
-  // On load: if this page already matches applied/remote, clear reload guard
+  // On load: sync version state. Clear one-shot reload guard after a successful load
+  // so a *future* real update can still prompt — but only after a short quiet period
+  // so we don't immediately re-enter the loop if the SW claims again.
   try {
     var running = pageRunningVersion();
     if (running) {
-      var applied0 = sessionStorage.getItem(WEB_VER_APPLIED_KEY) || "";
-      if (applied0 && versionRank(running) >= versionRank(applied0)) {
-        sessionStorage.removeItem(RELOAD_GUARD_KEY);
-        sessionStorage.removeItem(BANNER_SHOWN_KEY);
+      storageSet(WEB_VER_SEEN_KEY, running);
+      var applied0 = storageGet(WEB_VER_APPLIED_KEY);
+      if (!applied0 || versionRank(running) >= versionRank(applied0)) {
+        storageSet(WEB_VER_APPLIED_KEY, running);
       }
-      // Sync "seen" to what this document is actually running
-      sessionStorage.setItem(WEB_VER_SEEN_KEY, running);
+    }
+    // Clear reload guard after page has stably loaded (not mid-loop)
+    if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1") {
+      setTimeout(function () {
+        try {
+          sessionStorage.removeItem(RELOAD_GUARD_KEY);
+          sessionStorage.removeItem(PENDING_SKIP_KEY);
+        } catch (_) {}
+      }, 5000);
+    }
+  } catch (_) {}
+
+  // Strip _rs_reload from the visible URL after load (keep history clean)
+  try {
+    var cleanUrl = new URL(location.href);
+    if (cleanUrl.searchParams.has("_rs_reload")) {
+      cleanUrl.searchParams.delete("_rs_reload");
+      history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
     }
   } catch (_) {}
 
@@ -219,9 +337,9 @@
     navigator.serviceWorker.register("/service-worker.js").then(function (registration) {
       if (!registration) return;
 
-      // Case 1: a worker is already waiting to activate when we register
+      // Case 1: a worker is already waiting — prompt once (do not auto-reload)
       if (registration.waiting && navigator.serviceWorker.controller) {
-        showUpdateBanner({ onceKey: "sw-waiting", remoteVersion: pageRunningVersion() });
+        showUpdateBanner({ onceKey: "sw-waiting", remoteVersion: pageRunningVersion() || storageGet(WEB_VER_SEEN_KEY) });
       }
 
       // Case 2: a new worker starts installing while this tab is open.
@@ -230,14 +348,17 @@
         if (!installingWorker) return;
         installingWorker.addEventListener("statechange", function () {
           if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
-            showUpdateBanner({ onceKey: "sw-installed-" + Date.now().toString(36).slice(-4) });
+            // Stable onceKey — NOT Date.now() (that bypassed de-dupe every time)
+            showUpdateBanner({ onceKey: "sw-installed" });
           }
         });
       });
 
       // Periodically ask the browser to check for a fresh service-worker.js
       setInterval(function () {
-        registration.update().catch(function () {});
+        if (document.visibilityState === "visible") {
+          registration.update().catch(function () {});
+        }
       }, 15 * 60 * 1000);
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "visible") {
@@ -248,10 +369,11 @@
       // Poll app-update.json — only banner if REMOTE is newer than THIS page
       var lastSeenWebVersion = null;
       try {
-        lastSeenWebVersion = sessionStorage.getItem(WEB_VER_SEEN_KEY);
+        lastSeenWebVersion = storageGet(WEB_VER_SEEN_KEY) || null;
       } catch (_) {}
 
       function pollAppUpdateJson() {
+        if (reloading) return;
         fetch("/app-update.json?v=" + Date.now(), { cache: "no-store" })
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (info) {
@@ -259,10 +381,17 @@
             var remote = String(info.version);
             var pageVer = pageRunningVersion();
 
-            // First observation: remember, do not nag if page already matches
-            if (lastSeenWebVersion == null) {
+            // Already applied this remote (or same major) — stay silent
+            if (versionAlreadyApplied(remote)) {
               lastSeenWebVersion = remote;
-              try { sessionStorage.setItem(WEB_VER_SEEN_KEY, remote); } catch (_) {}
+              storageSet(WEB_VER_SEEN_KEY, remote);
+              return;
+            }
+
+            // First observation: remember, do not nag if page already matches
+            if (lastSeenWebVersion == null || lastSeenWebVersion === "") {
+              lastSeenWebVersion = remote;
+              storageSet(WEB_VER_SEEN_KEY, remote);
               if (remoteIsNewer(remote, pageVer)) {
                 showUpdateBanner({ remoteVersion: remote, onceKey: "ver-" + remote });
               } else {
@@ -274,14 +403,14 @@
             // Page already on remote (or newer) — silence + sync storage
             if (!remoteIsNewer(remote, pageVer)) {
               lastSeenWebVersion = remote;
-              markVersionApplied(remote);
+              markVersionApplied(pageVer || remote);
               return;
             }
 
             // Remote actually newer than what this tab is running
             if (remote !== lastSeenWebVersion || remoteIsNewer(remote, pageVer)) {
               lastSeenWebVersion = remote;
-              try { sessionStorage.setItem(WEB_VER_SEEN_KEY, remote); } catch (_) {}
+              storageSet(WEB_VER_SEEN_KEY, remote);
               showUpdateBanner({ remoteVersion: remote, onceKey: "ver-" + remote });
             }
           })
@@ -293,20 +422,45 @@
       console.warn("PWA registration failed:", error);
     });
 
-    // Case 3: controller changed (new SW claimed). Reload once only — never loop.
-    var reloading = false;
+    // Case 3: controller changed (new SW claimed).
+    // Only auto-reload if WE requested skipWaiting (PENDING_SKIP). Otherwise
+    // just show the banner once — never loop-reload on every claim.
     navigator.serviceWorker.addEventListener("controllerchange", function () {
       if (reloading) return;
-      if (sessionStorage.getItem(RELOAD_GUARD_KEY)) return;
-      reloading = true;
+
+      var pending = false;
       try {
-        sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+        pending = sessionStorage.getItem(PENDING_SKIP_KEY) === "1";
       } catch (_) {}
-      // Soft path: show banner; user can reload. Auto-reload only once.
+
+      if (pending) {
+        // User (or hardReload) already asked for activate — finish with one navigation.
+        // Guard prevents any further controllerchange from stacking reloads.
+        if (sessionStorage.getItem(RELOAD_GUARD_KEY) === "1" && reloading) return;
+        reloading = true;
+        try {
+          sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
+          sessionStorage.removeItem(PENDING_SKIP_KEY);
+        } catch (_) {}
+        // hardReload already schedules navigation when it posts SKIP_WAITING;
+        // only navigate here if that path didn't (e.g. external skipWaiting).
+        setTimeout(function () {
+          if (document.getElementById("rs-update-banner")) return;
+          try {
+            var url = new URL(location.href);
+            url.searchParams.delete("_rs_reload");
+            url.searchParams.set("_rs_reload", String(Date.now()));
+            location.replace(url.pathname + url.search + url.hash);
+          } catch (_) {
+            location.reload();
+          }
+        }, 200);
+        return;
+      }
+
+      // SW claimed on its own (skipWaiting in install) — prompt once, do NOT auto-reload.
+      // Auto-reload here is what caused the continuous popup loop.
       showUpdateBanner({ onceKey: "controllerchange" });
-      setTimeout(function () {
-        hardReload(pageRunningVersion());
-      }, 900);
     });
   });
 })();

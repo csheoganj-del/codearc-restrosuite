@@ -292,6 +292,7 @@
     'growth-hub-tab':['Growth Hub','Reservations, offers, support & more'],
     'employees-tab':['Employee Ledger','Team, roles, shifts & payroll'],
     'super-admin-tab':['SaaS Super-Admin','Platform-wide tenants & metrics'],
+    'sa-reports-tab':['Platform Reports','Revenue, plans, trials & risk across all outlets'],
     'gateway-monitor-tab':['Gateway Monitor','WhatsApp gateway health & logs'],
     'chain-dashboard-tab':['Chain Dashboard','Consolidated reporting, catalog & logistics']
   };
@@ -320,7 +321,7 @@
     if (isSuper) {
       if (id === 'settings-tab' || id === 'open-settings') {
         id = 'gateway-monitor-tab';
-      } else if (id !== 'super-admin-tab' && id !== 'gateway-monitor-tab') {
+      } else if (id !== 'super-admin-tab' && id !== 'sa-reports-tab' && id !== 'gateway-monitor-tab') {
         id = 'super-admin-tab';
       }
     } else if (isBrandAdmin) {
@@ -328,7 +329,7 @@
         id = 'chain-dashboard-tab';
       }
     } else {
-      if (id === 'super-admin-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
+      if (id === 'super-admin-tab' || id === 'sa-reports-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
         id = 'pos-tab';
       }
       // Route-level role enforcement: hiding sidebar links is cosmetic --
@@ -540,10 +541,32 @@
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
-  // Quiet, trustworthy version chip  -  never show Systempatch; click copies build tag
+  // Version chip: support / localhost only — restaurant owners don't need build tags
   (function wireVersionPill() {
     const el = document.getElementById('app-version-pill');
     if (!el) return;
+    const allowVersionUi = (function () {
+      try {
+        const r = String((window.RS_API && RS_API.session && RS_API.session()?.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
+        if (r === 'superadmin') return true;
+        if (window.RS_API && RS_API.enableDemoTools) return true;
+        const h = String(location.hostname || '');
+        if (h === 'localhost' || h === '127.0.0.1') return true;
+        if (sessionStorage.getItem('rs_debug_ui') === '1' && new URLSearchParams(location.search).get('debug') === '1') return true;
+      } catch (_) {}
+      return false;
+    })();
+    if (!allowVersionUi) {
+      el.style.display = 'none';
+      el.setAttribute('hidden', '');
+      el.setAttribute('aria-hidden', 'true');
+      document.documentElement.classList.remove('rs-dev-ui');
+      return;
+    }
+    document.documentElement.classList.add('rs-dev-ui');
+    el.removeAttribute('hidden');
+    el.removeAttribute('aria-hidden');
+    el.style.display = '';
     const tip = 'RestroSuite ' + appVersionShort + ' | full build ' + appVersion + ' | click to copy';
     el.textContent = appVersionShort;
     el.classList.add('tb-version', 'tb-version-live');
@@ -1940,6 +1963,12 @@
       return RSGatewayMonitor.loadAppIncidents();
     }
   }
+  const renderSaReports = () => {
+    if (window.RSSuperAdmin && typeof window.RSSuperAdmin.renderPlatformReports === 'function') {
+      return window.RSSuperAdmin.renderPlatformReports();
+    }
+    if (typeof renderPlatformReports === 'function') return renderPlatformReports();
+  };
   const renderGateway = () => {
     if (window.RSGatewayMonitor && RSGatewayMonitor.renderGateway) {
       return RSGatewayMonitor.renderGateway();
@@ -1974,7 +2003,7 @@
       }
     },
     'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
-    'growth-hub-tab':renderGrowthHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'gateway-monitor-tab':renderGateway,
+    'growth-hub-tab':renderGrowthHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'sa-reports-tab':renderSaReports,'gateway-monitor-tab':renderGateway,
     'chain-dashboard-tab':() => { if(window.RestroSuite && RestroSuite.chain) RestroSuite.chain.init(window.RS_API); }
   };
 
@@ -2512,7 +2541,7 @@
     // 2. Hide all regular sidebar links (keep only superadmin ones)
     $$('.sidebar-link').forEach(link => {
       const tabId = link.dataset.tab || '';
-      if (tabId !== 'super-admin-tab' && tabId !== 'gateway-monitor-tab') {
+      if (tabId !== 'super-admin-tab' && tabId !== 'sa-reports-tab' && tabId !== 'gateway-monitor-tab') {
         link.style.display = 'none';
       }
     });

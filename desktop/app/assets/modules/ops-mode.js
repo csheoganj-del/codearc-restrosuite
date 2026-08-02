@@ -445,8 +445,8 @@
       btn.type = 'button';
       btn.id = 'rs-starter-nav-expand';
       btn.className = 'rs-starter-nav-expand';
-      btn.innerHTML = '<i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Show all modules</span>';
-      btn.title = 'Reveal QR, Floor, KDS, Inventory, and the rest';
+      btn.innerHTML = '<i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Show more features</span>';
+      btn.title = 'Show QR orders, floor, kitchen, inventory, and other tools';
       btn.addEventListener('click', function () { expandFullNav(true); });
       nav.appendChild(btn);
     }

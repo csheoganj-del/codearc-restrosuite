@@ -121,10 +121,13 @@ async function validateActiveSession(tenantId: string, tenantSlug: string, table
 }
 
 const PLAN_LIMITS: Record<string, { monthlyOrderLimit: number }> = {
+  express: { monthlyOrderLimit: 6000 },
+  serve: { monthlyOrderLimit: 100000 },
+  command: { monthlyOrderLimit: 1000000 },
   free: { monthlyOrderLimit: 50 },
-  starter: { monthlyOrderLimit: 300 },
-  growth: { monthlyOrderLimit: 8000 },
-  enterprise: { monthlyOrderLimit: 100000 },
+  starter: { monthlyOrderLimit: 6000 },
+  growth: { monthlyOrderLimit: 100000 },
+  enterprise: { monthlyOrderLimit: 1000000 },
 };
 
 const ZERO_COST_MENU_LIMIT = 300;
@@ -280,6 +283,28 @@ serve(async (req) => {
       if (!phone || phone.length < 10 || !["register", "recovery"].includes(purpose)) {
         return jsonResponse({ error: "Invalid OTP request." }, 400, req);
       }
+      // Block the central/gateway WhatsApp line — self-chat never delivers a normal OTP bubble
+      const platformRaw = (
+        Deno.env.get("PLATFORM_WA_NUMBER") ||
+        Deno.env.get("GATEWAY_WA_NUMBER") ||
+        Deno.env.get("SYSTEM_WA_NUMBER") ||
+        "919983721179"
+      ).replace(/\D/g, "");
+      const last10 = (d: string) => {
+        const x = String(d || "").replace(/\D/g, "");
+        return x.length > 10 ? x.slice(-10) : x;
+      };
+      if (platformRaw && last10(phone) === last10(platformRaw)) {
+        return jsonResponse(
+          {
+            error:
+              "That number is the RestroSuite central WhatsApp line — it cannot receive registration codes. Enter your personal WhatsApp mobile number instead.",
+            code: "PLATFORM_NUMBER_BLOCKED",
+          },
+          400,
+          req,
+        );
+      }
       // Rate limit: 5 OTPs per phone per 10 minutes
       const otpBucket = await sha256Hex(`otp:${phone}`);
       const { data: rlData, error: rlErr } = await supabaseAdmin.rpc("consume_api_rate_limit", {
@@ -334,22 +359,61 @@ serve(async (req) => {
         return jsonResponse({ error: "Failed to create OTP challenge." }, 500, req);
       }
       try {
-        const gwRes = await fetch(`${gatewayUrl}/send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${gatewayToken}` },
-          body: JSON.stringify({ phone, message }),
-        });
-        if (!gwRes.ok) {
-          const gwErr = await gwRes.text();
-          console.error("send_otp gateway error:", gwErr);
-          await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
-          return jsonResponse({ error: "Failed to send OTP via WhatsApp." }, 502, req);
+        const gwController = new AbortController();
+        const gwTimer = setTimeout(() => gwController.abort(), 45000);
+        let gwRes: Response;
+        try {
+          gwRes = await fetch(`${gatewayUrl}/send`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${gatewayToken}`,
+              "X-Tenant-Id": "system",
+            },
+            body: JSON.stringify({ phone, message }),
+            signal: gwController.signal,
+          });
+        } finally {
+          clearTimeout(gwTimer);
         }
-        return jsonResponse({ sent: true, challenge_id: challengeId, expires_at: expiresAt }, 200, req);
+        const gwBody = await gwRes.json().catch(() => ({} as Record<string, unknown>));
+        if (!gwRes.ok) {
+          const gwErr =
+            (gwBody && (gwBody.error as string)) ||
+            (typeof gwBody === "object" ? JSON.stringify(gwBody) : "gateway error");
+          console.error("send_otp gateway error:", gwRes.status, gwErr);
+          await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
+          const codeHint = String((gwBody && (gwBody as { code?: string }).code) || "");
+          let friendly = "Failed to send OTP via WhatsApp. Check the number is on WhatsApp and try again.";
+          if (codeHint === "SELF_CHAT" || /same number|self.?chat|central/i.test(String(gwErr))) {
+            friendly =
+              "That number is linked on the gateway and cannot receive the code. Use your personal WhatsApp number.";
+          } else if (codeHint === "OTP_DELIVERY_FAILED") {
+            friendly = "WhatsApp could not deliver the code right now. Wait 30 seconds and tap Resend.";
+          }
+          return jsonResponse({ error: friendly, code: codeHint || "GATEWAY_SEND_FAILED", detail: String(gwErr).slice(0, 200) }, 502, req);
+        }
+        // Prefer explicit delivery when gateway runs sync OTP path
+        if (gwBody && gwBody.delivered === false) {
+          await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
+          return jsonResponse({ error: "WhatsApp did not confirm delivery. Tap Resend in a moment." }, 502, req);
+        }
+        return jsonResponse({
+          sent: true,
+          challenge_id: challengeId,
+          expires_at: expiresAt,
+          delivered: gwBody && gwBody.delivered === true ? true : undefined,
+          tip: "Open WhatsApp on this phone. Code usually arrives within 30 seconds.",
+        }, 200, req);
       } catch (e) {
         console.error("send_otp fetch error:", e);
         await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
-        return jsonResponse({ error: "Failed to reach WhatsApp gateway." }, 502, req);
+        const aborted = e instanceof Error && (e.name === "AbortError" || /abort/i.test(e.message));
+        return jsonResponse({
+          error: aborted
+            ? "WhatsApp gateway timed out. Keep the gateway PC online and try Resend."
+            : "Failed to reach WhatsApp gateway.",
+        }, 502, req);
       }
     }
     // ─────────────────────────────────────────────────────────────────────────

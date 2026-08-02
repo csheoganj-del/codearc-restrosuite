@@ -73,6 +73,40 @@
     } catch (_) {}
   }
 
+  /** Kill blocking overlays so POS taps always work after first-run flows. */
+  function closeAllModals() {
+    try {
+      if (global.RSModal && typeof RSModal.closeAll === 'function') {
+        RSModal.closeAll();
+        return;
+      }
+    } catch (_) {}
+    try {
+      document
+        .querySelectorAll('#rs-modal-root .rs-overlay, .rs-overlay.show, #rs-pin-overlay')
+        .forEach(function (el) {
+          try {
+            el.classList.remove('show');
+            el.style.pointerEvents = 'none';
+            el.remove();
+          } catch (_) {}
+        });
+      var tour = document.getElementById('onboarding-overlay');
+      if (tour) {
+        tour.style.display = 'none';
+        tour.style.pointerEvents = 'none';
+        tour.classList.remove('is-visible', 'show');
+      }
+      var bd = document.getElementById('onboarding-backdrop');
+      if (bd) {
+        bd.style.pointerEvents = 'none';
+        bd.style.display = 'none';
+      }
+      var wel = document.getElementById('rs-fx-welcome');
+      if (wel) wel.remove();
+    } catch (_) {}
+  }
+
   function role() {
     try {
       var s = global.RS_API && RS_API.session && RS_API.session();
@@ -436,6 +470,8 @@
   async function loadStartSellingPack(opts) {
     opts = opts || {};
     var result = { menu: 0, tables: false, stock: 0 };
+    // Never leave welcome/onboarding covering POS after pack load
+    closeAllModals();
     try {
       var m = await ensureSampleMenu();
       result.menu = m.added || 0;
@@ -459,9 +495,13 @@
       } catch (_) {}
       paintPosEmptyCoach();
       paintActivationChecklist();
+      // Second pass: async toasts / delayed modals must not block menu taps
+      setTimeout(closeAllModals, 50);
+      setTimeout(closeAllModals, 400);
     } catch (e) {
       console.warn('[Frictionless] pack', e);
       toast('Could not load sample pack — add a dish in Menu Editor', 'fa-circle-exclamation');
+      closeAllModals();
     }
     return result;
   }
@@ -489,9 +529,52 @@
       st.firstBill = true;
       st.sample = true;
     }
-    // reports opened once
+    // Persist any session flag that reports were opened (sidebar / hash / checklist)
+    try {
+      if (sessionStorage.getItem(tenantKey(ACTIVATION_KEY) + ':reports') === '1') {
+        st.reports = true;
+      }
+    } catch (_) {}
+    // If reports tab is currently active, count as done
+    try {
+      var rt = document.getElementById('reports-tab');
+      if (rt && (rt.classList.contains('active') || rt.classList.contains('show'))) {
+        st.reports = true;
+      }
+      var hash = String(location.hash || '');
+      if (/reports-tab|reports/i.test(hash)) st.reports = true;
+    } catch (_) {}
     lsSet(tenantKey(ACTIVATION_KEY), st);
     return st;
+  }
+
+  function wireReportsActivation() {
+    function onReportsVisit() {
+      try {
+        sessionStorage.setItem(tenantKey(ACTIVATION_KEY) + ':reports', '1');
+      } catch (_) {}
+      markActivation('reports');
+    }
+    document.addEventListener('rs:tab-change', function (ev) {
+      var tab = (ev && ev.detail && ev.detail.tab) || '';
+      if (tab === 'reports-tab' || tab === 'analytics-tab') onReportsVisit();
+      if (tab === 'pos-tab') {
+        // Ensure no leftover modal steals POS clicks
+        setTimeout(closeAllModals, 0);
+      }
+    });
+    window.addEventListener('hashchange', function () {
+      if (/reports-tab|reports/i.test(String(location.hash || ''))) onReportsVisit();
+    });
+    // CA pack / day pack buttons also complete the step
+    document.addEventListener(
+      'click',
+      function (ev) {
+        var t = ev.target && ev.target.closest && ev.target.closest('#rs-fx-ca-pack, #btn-download-gstr, #rs-day-pack, [data-ca-pack]');
+        if (t) onReportsVisit();
+      },
+      true
+    );
   }
 
   function paintActivationChecklist() {
@@ -599,11 +682,19 @@
       try {
         localStorage.setItem(tenantKey(WELCOME_KEY), '1');
       } catch (_) {}
+      closeAllModals();
       var wrap = document.getElementById('rs-fx-welcome');
       if (wrap) wrap.remove();
       setMode('counter', { silent: true, skipSave: false });
       if (loadSample) {
-        loadStartSellingPack({ withStock: true });
+        // Close first, then pack — avoid stacked overlays
+        Promise.resolve()
+          .then(function () {
+            return loadStartSellingPack({ withStock: true });
+          })
+          .finally(function () {
+            closeAllModals();
+          });
       } else {
         paintActivationChecklist();
         paintPosEmptyCoach();
@@ -644,13 +735,19 @@
           var sample = modal.querySelector('[data-sample]');
           if (own) {
             own.onclick = function () {
-              close();
+              try {
+                close();
+              } catch (_) {}
+              closeAllModals();
               finishWelcome(false);
             };
           }
           if (sample) {
             sample.onclick = function () {
-              close();
+              try {
+                close();
+              } catch (_) {}
+              closeAllModals();
               finishWelcome(true);
             };
           }
@@ -1194,6 +1291,7 @@
     installGatewayHealthChip();
     installReportsAnalyticsBridge();
     wireBillHooks();
+    wireReportsActivation();
     maybeSoftOpenShift();
     // Welcome after hydrate settles
     setTimeout(function () {
@@ -1203,6 +1301,8 @@
       paintModeSwitcher();
       maybeProgressiveUnlock();
       maybeSoftOpenShift();
+      // Re-paint checklist in case bills/reports already done this session
+      paintActivationChecklist();
     }, 900);
   }
 
@@ -1215,6 +1315,7 @@
     downloadCaPack: downloadCaPack,
     openLearnChecklist: openLearnChecklist,
     applyModeNav: applyModeNav,
+    closeAllModals: closeAllModals,
   };
   global.RS_exportDayPack =
     global.RS_exportDayPack ||

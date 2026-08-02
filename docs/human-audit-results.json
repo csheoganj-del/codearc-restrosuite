@@ -1,0 +1,119 @@
+{
+  "SLUG": "humanaudit56676669",
+  "EMAIL": "ha676669@codearc.test",
+  "PASS": "AuditTest99!",
+  "phone": "6377404756",
+  "pass": 18,
+  "fail": 0,
+  "results": [
+    {
+      "id": "1",
+      "title": "Login after register",
+      "status": "pass",
+      "detail": "https://restrosuite.codearc.co.in/dashboard?appv=v237#pos-tab"
+    },
+    {
+      "id": "2",
+      "title": "Mode switcher Counter/Tables/Full",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "id": "3",
+      "title": "RSFrictionless API present",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "4",
+      "title": "POS menu tiles",
+      "status": "pass",
+      "detail": "tiles=12"
+    },
+    {
+      "id": "5",
+      "title": "Cart has items after tap",
+      "status": "pass",
+      "detail": "lines=3 total="
+    },
+    {
+      "id": "6",
+      "title": "Checkout / bill settle attempt",
+      "status": "pass",
+      "detail": "settledUi=0"
+    },
+    {
+      "id": "7",
+      "title": "Bills tab opens",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "8",
+      "title": "Reports + CA pack",
+      "status": "pass",
+      "detail": "ca=1"
+    },
+    {
+      "id": "9",
+      "title": "WhatsApp badge (Hub/On preferred)",
+      "status": "pass",
+      "detail": "label=+1179 class=tb-pill tb-wa-pill js-wa-status-pill wa-platform"
+    },
+    {
+      "id": "10",
+      "title": "Switch to Tables mode",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "11",
+      "title": "Floor tab",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "12",
+      "title": "QR Orders tab",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "13",
+      "title": "Kitchen tab",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "14",
+      "title": "Menu Editor",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "15",
+      "title": "Inventory",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "16",
+      "title": "Employees",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "17",
+      "title": "Customers",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "18",
+      "title": "Growth Hub cards",
+      "status": "pass",
+      "detail": "n=9"
+    }
+  ],
+  "at": "2026-08-02T08:01:50.066Z"
+}

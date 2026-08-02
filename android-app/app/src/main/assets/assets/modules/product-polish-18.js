@@ -141,14 +141,26 @@
       if (txt) {txt.textContent = 'Online · synced';}
       pill.title = 'Connected — cloud sync OK';
     }
-    // Enhance version pill with content stamp
+    // Version pill is support-only (hidden for restaurant users in CSS/JS)
     const ver = document.getElementById('app-version-pill');
-    if (ver) {
-      const full = ver.dataset.fullVersion || ver.textContent || '';
-      const tip = 'RestroSuite ' + full + ' · click to copy · content polish-18';
-      ver.title = tip;
-      ver.setAttribute('data-tooltip', tip);
+    if (ver && !isSupportUiAllowed()) {
+      ver.style.display = 'none';
     }
+  }
+
+  /** Dev / support UI: superadmin, explicit demo tools, or localhost only */
+  function isSupportUiAllowed() {
+    try {
+      if (role() === 'superadmin') return true;
+      if (global.RS_API && RS_API.enableDemoTools) return true;
+      const h = String(location.hostname || '');
+      if (h === 'localhost' || h === '127.0.0.1') return true;
+      if (sessionStorage.getItem('rs_debug_ui') === '1' &&
+          new URLSearchParams(location.search).get('debug') === '1') {
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   /* ---------- #4 Live access banner ---------- */
@@ -284,40 +296,154 @@
     });
   }
 
-  /* ---------- #9 Density modes ---------- */
+  /* ---------- #9 Density modes (this device only) ---------- */
+  function currentDensity() {
+    let m = 'comfortable';
+    try { m = localStorage.getItem(DENSITY_KEY) || 'comfortable'; } catch (_) {}
+    if (['compact', 'comfortable', 'large'].indexOf(m) === -1) m = 'comfortable';
+    return m;
+  }
+
   function applyDensity(mode) {
-    let m = mode || localStorage.getItem(DENSITY_KEY) || 'comfortable';
+    let m = mode || currentDensity();
     if (['compact', 'comfortable', 'large'].indexOf(m) === -1) {m = 'comfortable';}
     document.documentElement.setAttribute('data-rs-density', m);
     try { localStorage.setItem(DENSITY_KEY, m); } catch (_) {}
-    document.querySelectorAll('#rs-density-row button').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-density') === m);
+    document.querySelectorAll('[data-density]').forEach(function (b) {
+      if (!b || !b.classList) return;
+      if (b.getAttribute('data-density')) {
+        b.classList.toggle('active', b.getAttribute('data-density') === m);
+        b.setAttribute('aria-pressed', b.getAttribute('data-density') === m ? 'true' : 'false');
+      }
+    });
+    // Sync compact chip label
+    document.querySelectorAll('[data-rs-density-label]').forEach(function (el) {
+      el.textContent = m === 'compact' ? 'Compact' : (m === 'large' ? 'Large' : 'Comfortable');
     });
   }
 
-  function injectDensityControl() {
-    const host =
-      document.querySelector('#settings-tab [data-sec="display"]') ||
-      document.querySelector('#settings-tab .set-section') ||
-      document.getElementById('settings-tab');
-    if (!host || document.getElementById('rs-density-row')) {return;}
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'margin:14px 0;padding:12px;border:1px solid var(--stroke-2);border-radius:12px';
-    wrap.innerHTML =
-      '<div style="font-weight:800;font-size:13px;margin-bottom:4px">Display density</div>' +
-      '<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px">Compact counter · Comfortable default · Large kitchen</div>' +
-      '<div id="rs-density-row">' +
-      '<button type="button" data-density="compact">Compact</button>' +
-      '<button type="button" data-density="comfortable">Comfortable</button>' +
-      '<button type="button" data-density="large">Large</button></div>';
-    host.insertBefore(wrap, host.firstChild);
-    wrap.querySelectorAll('button').forEach(function (b) {
+  function densityPickerHtml(idPrefix) {
+    const cur = currentDensity();
+    const opts = [
+      { id: 'compact', title: 'Compact', sub: 'Small counter / phone — more items on screen' },
+      { id: 'comfortable', title: 'Comfortable', sub: 'Default size for day-to-day billing' },
+      { id: 'large', title: 'Large', sub: 'Kitchen display — easier to read from far' },
+    ];
+    return (
+      '<div class="rs-density-sheet" id="' + (idPrefix || 'rs-density-sheet') + '">' +
+      '<p class="rs-density-sheet-lead">This device only. Does not change other staff or outlets.</p>' +
+      '<div class="rs-density-options" role="group" aria-label="Display density">' +
+      opts.map(function (o) {
+        return (
+          '<button type="button" class="rs-density-opt' + (cur === o.id ? ' active' : '') + '" data-density="' + o.id + '" aria-pressed="' + (cur === o.id ? 'true' : 'false') + '">' +
+          '<span class="rs-density-opt-title">' + o.title + '</span>' +
+          '<span class="rs-density-opt-sub">' + o.sub + '</span></button>'
+        );
+      }).join('') +
+      '</div></div>'
+    );
+  }
+
+  function wireDensityButtons(root, onPicked) {
+    if (!root) return;
+    root.querySelectorAll('[data-density]').forEach(function (b) {
       b.onclick = function () {
-        applyDensity(b.getAttribute('data-density'));
-        toast('Display density: ' + b.getAttribute('data-density'), 'fa-text-height');
-        auditLog('settings.density', b.getAttribute('data-density'));
+        const mode = b.getAttribute('data-density');
+        applyDensity(mode);
+        toast('This device: ' + mode + ' display', 'fa-text-height');
+        auditLog('device.density', mode);
+        if (typeof onPicked === 'function') onPicked(mode);
       };
     });
+  }
+
+  /** Modal: preferred entry for every role */
+  function openDensityPrefs() {
+    applyDensity();
+    const body = densityPickerHtml('rs-density-modal');
+    if (global.RSModal && typeof RSModal.open === 'function') {
+      RSModal.open({
+        title: 'This device · Display',
+        icon: 'fa-text-height',
+        size: 'sm',
+        body: body,
+        onMount: function (modal, close) {
+          wireDensityButtons(modal, function () {
+            // Keep modal open so they can compare; optional auto-close:
+            // setTimeout(close, 280);
+          });
+        },
+      });
+      return;
+    }
+    // Fallback if RSModal missing
+    const mode = window.prompt('Display density: compact | comfortable | large', currentDensity());
+    if (mode) applyDensity(String(mode).toLowerCase().trim());
+  }
+
+  function stripSettingsDensity() {
+    // Remove legacy block that was injected at the top of Settings
+    document.querySelectorAll('#settings-tab #rs-density-row').forEach(function (row) {
+      const wrap = row.closest('div[style], .rs-density-legacy, section');
+      if (wrap && wrap.querySelector && wrap.querySelector('#rs-density-row')) {
+        try { wrap.remove(); } catch (_) {
+          try { row.parentElement && row.parentElement.remove(); } catch (__) {}
+        }
+      } else {
+        try { row.parentElement && row.parentElement.remove(); } catch (_) {}
+      }
+    });
+    // Also match our older inject markup (title "Display density" right under settings)
+    document.querySelectorAll('#settings-tab').forEach(function (tab) {
+      tab.querySelectorAll('div').forEach(function (div) {
+        if (div.id === 'rs-density-row') return;
+        const t = (div.textContent || '').trim();
+        if (t.indexOf('Display density') === 0 && div.querySelector('#rs-density-row')) {
+          try { div.remove(); } catch (_) {}
+        }
+      });
+    });
+  }
+
+  function injectSidebarDensityEntry() {
+    const foot = document.querySelector('.sb-foot');
+    if (!foot || document.getElementById('open-device-display')) return;
+    const help = document.getElementById('open-product-guide-btn');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sb-foot-btn';
+    btn.id = 'open-device-display';
+    btn.title = 'This device · Display size';
+    btn.innerHTML = '<i class="fa-solid fa-text-height"></i><span>Display</span>';
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      openDensityPrefs();
+    });
+    // Between Help and Sign out when possible
+    const logout = foot.querySelector('.sb-foot-btn.logout');
+    if (help && help.parentNode === foot) {
+      if (logout) foot.insertBefore(btn, logout);
+      else foot.insertBefore(btn, help.nextSibling);
+    } else if (logout) {
+      foot.insertBefore(btn, logout);
+    } else {
+      foot.appendChild(btn);
+    }
+  }
+
+  function removeTopbarDensityChip() {
+    // Top-bar chip sat next to search and looked like "Compact bbb" — remove it.
+    // Prefer sidebar "Display" + mobile More → Display only.
+    try {
+      const chip = document.getElementById('rs-density-chip');
+      if (chip) chip.remove();
+    } catch (_) {}
+  }
+
+  function injectDensityControl() {
+    stripSettingsDensity();
+    removeTopbarDensityChip();
+    injectSidebarDensityEntry();
     applyDensity();
   }
 
@@ -481,8 +607,14 @@
       .replace(/"/g, '&quot;');
   }
 
-  /* ---------- #14 Super-admin shell badge ---------- */
+  /* ---------- #14 Super-admin shell badge (platform owner only) ---------- */
   function platformBadge() {
+    // Never show on restaurant outlets — confuses customers
+    if (role() !== 'superadmin') {
+      const stale = document.getElementById('rs-platform-shell-badge');
+      if (stale) try { stale.remove(); } catch (_) {}
+      return;
+    }
     const side = document.querySelector('.sidebar .brand, .sidebar .sb-brand, #sidebar');
     if (!side || document.getElementById('rs-platform-shell-badge')) {return;}
     const b = document.createElement('div');
@@ -660,9 +792,18 @@
   window.addEventListener('rs:sync-queue-changed', paintSyncPill);
   window.addEventListener('rs:sync-queue-drained', paintSyncPill);
   window.addEventListener('rs:wa-queue-changed', paintWaChip);
-  document.addEventListener('rs:tab', function () {
+  document.addEventListener('rs:tab', function (ev) {
     applyKdsFocus();
     markSoldOutTiles();
+    // Settings used to host density — strip if any stale inject reappears
+    try {
+      const tab = ev && ev.detail && ev.detail.tab;
+      if (tab === 'settings-tab' || document.getElementById('settings-tab')?.classList?.contains('active')) {
+        stripSettingsDensity();
+      }
+    } catch (_) {
+      stripSettingsDensity();
+    }
   });
   setInterval(paintSyncPill, 4000);
   setInterval(paintWaChip, 8000);
@@ -676,7 +817,9 @@
     paintSyncPill: paintSyncPill,
     showAccessBanner: showAccessBanner,
     applyDensity: applyDensity,
+    openDensityPrefs: openDensityPrefs,
     humanizeCloudError: humanizeCloudError,
     ACCESS_PRESETS: ACCESS_PRESETS,
   };
+  global.RS_openDeviceDisplay = openDensityPrefs;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -484,7 +484,7 @@
               <input type="tel" id="reg-whatsapp" class="form-input" placeholder="98765 43210" autocomplete="tel" minlength="7" maxlength="15" pattern="[0-9\s\-]{7,15}" required>
               <i class="fa-brands fa-whatsapp wa"></i>
             </div>
-            <p class="field-help">Receipts &amp; account alerts are sent here. We never share it.</p>
+            <p class="field-help">Use <b>your personal WhatsApp</b> (the phone in your pocket). Not a shared PC line. Receipts &amp; OTP arrive here — we never share it.</p>
           </div>
           <label class="remember" style="margin-bottom:18px"><input type="checkbox" id="reg-terms" required> I agree to the <a href="terms.html" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600">Terms</a> &amp; <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600">Privacy Policy</a></label>
           <div class="step-actions">
@@ -506,6 +506,10 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span>Demo mode — your OTP is <b id="reg-otp-demo-code"></b></span>
           </div>
+          <p id="reg-otp-tip" style="margin:0 0 14px;font-size:12.5px;line-height:1.45;color:var(--text-soft)">
+            <i class="fa-solid fa-clock" style="margin-right:4px;opacity:.75"></i>
+            Open WhatsApp on this phone. Code usually arrives in <b>5–30 seconds</b>. Check the chat from CodeArc / RestroSuite.
+          </p>
           <div class="otp-row" id="reg-otp-row">
             <input maxlength="1" inputmode="numeric" aria-label="digit 1">
             <input maxlength="1" inputmode="numeric" aria-label="digit 2">
@@ -521,6 +525,9 @@
             Didn't receive it? <button type="button" class="link-btn" id="reg-resend-otp">Resend</button>
             <span id="reg-resend-timer" style="display:none;color:var(--text-mute);font-size:12px"></span>
           </div>
+          <p style="margin:10px 0 0;font-size:12px;line-height:1.4;color:var(--text-mute);text-align:center">
+            Still nothing? Use <b>Change number</b> and try a different WhatsApp that is open on your phone.
+          </p>
           <button type="button" class="btn btn-ghost btn-block" id="reg-otp-back" style="margin-top:8px;font-size:13px">
             <i class="fa-solid fa-arrow-left"></i> Change number
           </button>
@@ -1547,6 +1554,15 @@
 
   function genOTP(){ return String(Math.floor(100000 + Math.random() * 900000)); }
 
+  /** Central gateway WhatsApp — cannot receive OTP as a normal chat */
+  const PLATFORM_WA_LAST10 = new Set(['9983721179']);
+
+  function isBlockedPlatformPhone(digits){
+    const d = String(digits || '').replace(/\D/g, '');
+    const last10 = d.length > 10 ? d.slice(-10) : d;
+    return PLATFORM_WA_LAST10.has(last10);
+  }
+
   function canUseDemoOtpFallback(){
     const host = location.hostname;
     const localHost = host === 'localhost' || host === '127.0.0.1' || host === '';
@@ -1555,6 +1571,9 @@
   }
 
   async function sendWhatsAppOTP(phone, code, purpose){
+    if(isBlockedPlatformPhone(phone)){
+      throw new Error('That number is the RestroSuite central WhatsApp line — it cannot receive codes. Enter your personal WhatsApp mobile number.');
+    }
     // Wait for runtime config to load (async fetch in config.js)
     try { await (window.__configReady || Promise.resolve()); } catch(e){}
     const endpoint = (window.CONFIG && window.CONFIG.functions && window.CONFIG.functions.tenantPublic) ||
@@ -1569,7 +1588,7 @@
           body: JSON.stringify({ action: 'send_otp', phone, purpose })
         });
         const data = await res.json().catch(() => ({}));
-        if(res.ok && data.sent && data.challenge_id) return { sent:true, demo:false, challengeId:data.challenge_id };
+        if(res.ok && data.sent && data.challenge_id) return { sent:true, demo:false, challengeId:data.challenge_id, tip:data.tip };
         if(res.ok && data.sent) failure = 'OTP challenge was not created. Please try again.';
         else failure = data.error || ('HTTP ' + res.status);
       } catch(e){ failure = e && e.message ? e.message : String(e); }
@@ -1578,9 +1597,9 @@
     throw new Error(failure || 'Could not send OTP. Check internet and try again.');
   }
 
-  function startRegResendCooldown(){
+  function startRegResendCountdown(){
     const btn=document.getElementById('reg-resend-otp'), timerEl=document.getElementById('reg-resend-timer');
-    let secs=30; btn.disabled=true; btn.style.opacity='0.45';
+    let secs=45; btn.disabled=true; btn.style.opacity='0.45';
     timerEl.style.display='inline'; timerEl.textContent='('+secs+'s)';
     clearInterval(_regResendTimer);
     _regResendTimer=setInterval(()=>{
@@ -1631,6 +1650,11 @@
     if(pass.length < 10){showErr('Password must be at least 10 characters.');document.getElementById('reg-password').focus();return;}
     const phoneDigits = document.getElementById('reg-whatsapp').value.replace(/\D/g,'');
     if(phoneDigits.length < 7 || phoneDigits.length > 15){showErr('Enter a valid WhatsApp number (7–15 digits).');document.getElementById('reg-whatsapp').focus();return;}
+    if(isBlockedPlatformPhone(phoneDigits)){
+      showErr('Use your personal WhatsApp number — not the RestroSuite central/gateway line (…1179). Codes will not arrive on that number.');
+      document.getElementById('reg-whatsapp').focus();
+      return;
+    }
     const btn=document.getElementById('reg-submit'); const orig=btn.innerHTML;
     btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Sending OTP…'; btn.disabled=true;
     const email=document.getElementById('reg-email').value.trim();

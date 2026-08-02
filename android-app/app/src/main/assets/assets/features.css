@@ -1601,6 +1601,13 @@ table.rcp-qr-wrap {
   z-index: 2;
 }
 .set-save-bar.is-muted .btn-primary { opacity: 0.72; }
+/* Plan & billing / danger: no form save chrome */
+.set-save-bar.is-hidden {
+  display: none !important;
+}
+.set-body:has(#rs-plan-container) {
+  padding-bottom: 8px;
+}
 .set-save-hint {
   font-size: 12.5px;
   color: var(--text-mute);

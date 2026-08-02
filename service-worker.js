@@ -1,7 +1,7 @@
 // CACHE_NAME bumped on every deploy by scripts/bump-sw-version.cjs.
 // Changing this causes the activate event to delete the old cache.
 // Format: restrosuite-shell-vYYYYMMDD-HHmm
-const CACHE_NAME = 'restrosuite-shell-v20260802-1117';
+const CACHE_NAME = 'restrosuite-shell-v20260802-1329';
 
 // Per-file content hashes for stale-check in fetch handler (auto-generated — do not edit).
 // Populated by scripts/bump-sw-version.cjs on every deploy. Maps URL pathname → 12-char SHA-256.
@@ -26,7 +26,7 @@ const CACHE_MANIFEST = {
   "/pwa.js": "5b2ecaedffa5",
   "/config.js": "951d30e1517c",
   "/assets/supabase-config.js": "a4b6cc99cce4",
-  "/assets/saas-core.js": "04fe6e1916a7",
+  "/assets/saas-core.js": "2c32e1dd6fee",
   "/assets/db.js": "286e86810405",
   "/assets/doppio-api.js": "2eef6ee4db5e",
   "/assets/country-currency-data.js": "e0e436e3615a",
@@ -41,9 +41,9 @@ const CACHE_MANIFEST = {
   "/assets/features-pos.js": "31bcf43c2653",
   "/assets/features-shell.js": "d29de96afe48",
   "/assets/features-editor.js": "2d19305fec42",
-  "/assets/features-manage.js": "f03e2cc35e19",
+  "/assets/features-manage.js": "bd6f00f924a1",
   "/assets/features-extra.js": "ef48f27ed0dc",
-  "/assets/features-growth.js": "1433dc1e1141",
+  "/assets/features-growth.js": "6aecf29c84fc",
   "/assets/competitive-ops.js": "2e4fbd312e2c",
   "/assets/receipt.js": "75ed342e9a2d",
   "/assets/print-bridge.js": "befd0b0c18cf",
@@ -55,11 +55,11 @@ const CACHE_MANIFEST = {
   "/assets/modules/inventory-batches.js": "b19b6ba44c35",
   "/assets/modules/kitchen-link-coach.js": "ad0e6b77ecbc",
   "/assets/modules/xlsx-lite.js": "95b5237028c2",
-  "/assets/modules/bills-history.js": "52acff0a6df1",
+  "/assets/modules/bills-history.js": "726cbccb18c8",
   "/assets/modules/inventory-ui.js": "3182bed5c053",
   "/assets/modules/reports-ui.js": "96db972306be",
   "/assets/modules/gateway-monitor.js": "015030d27b88",
-  "/assets/modules/super-admin.js": "542c776b6051",
+  "/assets/modules/super-admin.js": "711ba557d64c",
   "/assets/modules/kds-ui.js": "3f97cd7dcb43",
   "/assets/modules/qr-orders-ui.js": "e04ee9010133",
   "/assets/modules/staff-table-scanner.js": "cbda7375ee03",
