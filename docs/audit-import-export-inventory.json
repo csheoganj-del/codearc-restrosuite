@@ -1,0 +1,284 @@
+{
+  "slug": "humanaudit56676669",
+  "at": "2026-08-02T11:35:11.610Z",
+  "pass": 28,
+  "fail": 1,
+  "warn": 9,
+  "downloadsTotal": 0,
+  "lastDownloads": [],
+  "results": [
+    {
+      "area": "menu",
+      "id": "btn-export-menu",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "menu",
+      "id": "btn-download-menu-template",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "menu",
+      "id": "btn-import-menu",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-export-inventory",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-download-inventory-template",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-import-inventory",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-export-low-stock",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-export-low-stock-toolbar",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-bulk-recipe-import",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "bills",
+      "id": "btn-export-bills",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "bills",
+      "id": "btn-export-bills-csv",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "reports",
+      "id": "btn-download-gstr",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "reports",
+      "id": "rs-fx-ca-pack",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "recipes",
+      "id": "btn-export-recipes",
+      "title": "Button in DOM",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "catalog",
+      "id": "all",
+      "title": "Export/import-like controls found",
+      "status": "pass",
+      "detail": "[{\"id\":\"rs-day-pack\",\"text\":\"Day pack CSV\",\"tag\":\"BUTTON\"},{\"id\":\"btn-export-bills\",\"text\":\"Excel\",\"tag\":\"BUTTON\"},{\"id\":\"btn-export-bills-csv\",\"text\":\"CSV\",\"tag\":\"BUTTON\"},{\"id\":\"btn-export-low-stock\",\"text\":\"Low-stock CSV\",\"tag\":\"BUTTON\"},{\"id\":\"btn-export-inventory\",\"text\":\"Export\",\"tag\":\"BUTTON\"},{\"id\":\"btn-export-low-stock-toolbar\",\"text\":\"Low stock\",\"tag\":\"BUTTON\"},{\"id\":\"btn-download-inventory-template\",\"text\":\"Template\",\"tag\":\"BUTTON\"},{\"id\":\"btn-import-inventory\",\"text\":\"Import\",\"tag\":\""
+    },
+    {
+      "area": "api",
+      "id": "downloadFile",
+      "title": "RS.downloadFile",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "area": "api",
+      "id": "deduct",
+      "title": "RS.deductInventoryForBill",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "area": "api",
+      "id": "ledger",
+      "title": "RSInventoryLedger",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "area": "api",
+      "id": "parseCsv",
+      "title": "CSV parser",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "area": "api",
+      "id": "data",
+      "title": "Menu/inv/bills counts",
+      "status": "info",
+      "detail": "{\"downloadFile\":true,\"deduct\":true,\"ledger\":true,\"parseCsv\":true,\"menuN\":12,\"invN\":0,\"billsN\":5,\"withRecipe\":0}"
+    },
+    {
+      "area": "menu",
+      "id": "btn-export-menu",
+      "title": "Export menu CSV",
+      "status": "pass",
+      "detail": "menu-export-2026-08-02.csv(918)"
+    },
+    {
+      "area": "menu",
+      "id": "btn-download-menu-template",
+      "title": "Menu template CSV",
+      "status": "pass",
+      "detail": "menu-template-2026-08-02.csv(251)"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-export-inventory",
+      "title": "Export inventory CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-download-inventory-template",
+      "title": "Inventory template CSV",
+      "status": "pass",
+      "detail": "inventory-template-2026-08-02.csv(366)"
+    },
+    {
+      "area": "inventory",
+      "id": "btn-export-low-stock-toolbar",
+      "title": "Low-stock CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "recipes",
+      "id": "btn-export-recipes",
+      "title": "Export recipes CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "bills",
+      "id": "btn-export-bills-csv",
+      "title": "Bills CSV",
+      "status": "pass",
+      "detail": "Human-Audit-Cafe-Bills-Today-20260802.csv(1198)"
+    },
+    {
+      "area": "bills",
+      "id": "btn-export-bills",
+      "title": "Bills Excel",
+      "status": "pass",
+      "detail": "Human-Audit-Cafe-Bills-Today-20260802.xlsx(0), Human-Audit-Cafe-Bills-Today-20260802.xlsx(0)"
+    },
+    {
+      "area": "reports",
+      "id": "btn-download-gstr",
+      "title": "GSTR CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "reports",
+      "id": "rs-fx-ca-pack",
+      "title": "CA pack download",
+      "status": "warn",
+      "detail": "no file (may open multi-step)"
+    },
+    {
+      "area": "pos",
+      "id": "rs-day-pack",
+      "title": "Day pack CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "tax",
+      "id": "tax-csv",
+      "title": "Tax ledger CSV button",
+      "status": "pass",
+      "detail": "count=1"
+    },
+    {
+      "area": "tax",
+      "id": "tax-csv",
+      "title": "Tax ledger CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "tax",
+      "id": "tax-gstr1-csv",
+      "title": "GSTR-1 offline CSV",
+      "status": "warn",
+      "detail": "clicked but no download captured (may need data or confirm UI)"
+    },
+    {
+      "area": "import",
+      "id": "parseCsv",
+      "title": "Parse sample CSV",
+      "status": "pass",
+      "detail": "{\"parse\":true,\"menuImportFn\":false,\"invImportFn\":false,\"sampleParseRows\":1,\"menuImportBtn\":true,\"invImportBtn\":true,\"bulkRecipe\":true}"
+    },
+    {
+      "area": "import",
+      "id": "menu-row",
+      "title": "Live menu import 1 row",
+      "status": "pass",
+      "detail": "{\"ok\":true,\"before\":12,\"after\":13,\"name\":\"Audit Import Chai\",\"id\":\"audit_import_1785670501187\"}"
+    },
+    {
+      "area": "import",
+      "id": "inv-row",
+      "title": "Live inventory import 1 row",
+      "status": "pass",
+      "detail": "{\"ok\":true,\"before\":0,\"after\":0,\"name\":\"Audit Import Milk\",\"id\":\"audit_inv_1785670509533\",\"stock\":99}"
+    },
+    {
+      "area": "inventory",
+      "id": "recipe-link",
+      "title": "Link recipe for deduct test",
+      "status": "fail",
+      "detail": "{\"ok\":false,\"reason\":\"no inventory item\"}"
+    },
+    {
+      "area": "inventory",
+      "id": "recipe-coverage",
+      "title": "Menu items with recipes (needed for auto deduct)",
+      "status": "warn",
+      "detail": "{\"menu\":13,\"withRecipe\":0,\"sampleNames\":[],\"noRecipe\":13}"
+    }
+  ]
+}

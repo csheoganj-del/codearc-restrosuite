@@ -269,7 +269,10 @@
             );
           }
           if (document.querySelector('#inventory-tab.active') && global.RS && RS.render) {RS.render('inventory-tab');}
-          return;
+          // If server ok but deducted nothing while we still have lines, fall through to local
+          if (deductedCount > 0 || payload.duplicate) {return;}
+          if (!missing.length) {return;}
+          console.info('[Inventory] server missing ingredients — local fallback for', missing.join(', '));
         }
       }
     } catch (e) {

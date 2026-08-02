@@ -36,27 +36,128 @@
   ]);
   // full = no filter (show all role-allowed)
 
+  // Recipes link to SAMPLE_STOCK keys so first bills auto-deduct store-room stock.
   var SAMPLE_MENU = [
-    { name: 'Masala Chai', cat: 'Beverages', price: 20, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Filter Coffee', cat: 'Beverages', price: 40, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Cold Coffee', cat: 'Beverages', price: 80, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Veg Maggi', cat: 'Snacks', price: 50, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Samosa (2 pcs)', cat: 'Snacks', price: 30, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Veg Sandwich', cat: 'Snacks', price: 60, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Paneer Roll', cat: 'Snacks', price: 90, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Veg Thali', cat: 'Meals', price: 120, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Dal Fry + Rice', cat: 'Meals', price: 100, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Butter Chicken', cat: 'Meals', price: 220, veg: false, taxCategory: 'IN_REST_5' },
-    { name: 'Jeera Rice', cat: 'Meals', price: 70, veg: true, taxCategory: 'IN_REST_5' },
-    { name: 'Gulab Jamun (2)', cat: 'Dessert', price: 40, veg: true, taxCategory: 'IN_REST_5' },
+    {
+      name: 'Masala Chai',
+      cat: 'Beverages',
+      price: 20,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [
+        { name: 'Tea leaves', key: 'tea_leaves', qty: 0.005, unit: 'kg' },
+        { name: 'Milk', key: 'milk', qty: 0.15, unit: 'L' },
+        { name: 'Paper cups', key: 'paper_cups', qty: 1, unit: 'pcs' },
+      ],
+    },
+    {
+      name: 'Filter Coffee',
+      cat: 'Beverages',
+      price: 40,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [
+        { name: 'Milk', key: 'milk', qty: 0.12, unit: 'L' },
+        { name: 'Paper cups', key: 'paper_cups', qty: 1, unit: 'pcs' },
+      ],
+    },
+    {
+      name: 'Cold Coffee',
+      cat: 'Beverages',
+      price: 80,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [
+        { name: 'Milk', key: 'milk', qty: 0.2, unit: 'L' },
+        { name: 'Paper cups', key: 'paper_cups', qty: 1, unit: 'pcs' },
+      ],
+    },
+    {
+      name: 'Veg Maggi',
+      cat: 'Snacks',
+      price: 50,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Cooking oil', key: 'cooking_oil', qty: 0.01, unit: 'L' }],
+    },
+    {
+      name: 'Samosa (2 pcs)',
+      cat: 'Snacks',
+      price: 30,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Cooking oil', key: 'cooking_oil', qty: 0.02, unit: 'L' }],
+    },
+    {
+      name: 'Veg Sandwich',
+      cat: 'Snacks',
+      price: 60,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Carry bags', key: 'carry_bags', qty: 1, unit: 'pcs' }],
+    },
+    {
+      name: 'Paneer Roll',
+      cat: 'Snacks',
+      price: 90,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [
+        { name: 'Cooking oil', key: 'cooking_oil', qty: 0.015, unit: 'L' },
+        { name: 'Carry bags', key: 'carry_bags', qty: 1, unit: 'pcs' },
+      ],
+    },
+    {
+      name: 'Veg Thali',
+      cat: 'Meals',
+      price: 120,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Cooking oil', key: 'cooking_oil', qty: 0.02, unit: 'L' }],
+    },
+    {
+      name: 'Dal Fry + Rice',
+      cat: 'Meals',
+      price: 100,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Cooking oil', key: 'cooking_oil', qty: 0.015, unit: 'L' }],
+    },
+    {
+      name: 'Butter Chicken',
+      cat: 'Meals',
+      price: 220,
+      veg: false,
+      taxCategory: 'IN_REST_5',
+      ingredients: [
+        { name: 'Cooking oil', key: 'cooking_oil', qty: 0.02, unit: 'L' },
+        { name: 'Milk', key: 'milk', qty: 0.05, unit: 'L' },
+      ],
+    },
+    {
+      name: 'Jeera Rice',
+      cat: 'Meals',
+      price: 70,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Cooking oil', key: 'cooking_oil', qty: 0.01, unit: 'L' }],
+    },
+    {
+      name: 'Gulab Jamun (2)',
+      cat: 'Dessert',
+      price: 40,
+      veg: true,
+      taxCategory: 'IN_REST_5',
+      ingredients: [{ name: 'Milk', key: 'milk', qty: 0.05, unit: 'L' }],
+    },
   ];
 
   var SAMPLE_STOCK = [
-    { name: 'Tea leaves', unit: 'kg', stock: 2, min: 0.5, cost: 400, cat: 'food' },
-    { name: 'Milk', unit: 'L', stock: 10, min: 2, cost: 60, cat: 'food' },
-    { name: 'Cooking oil', unit: 'L', stock: 5, min: 1, cost: 150, cat: 'food' },
-    { name: 'Paper cups', unit: 'pcs', stock: 200, min: 40, cost: 2, cat: 'packaging' },
-    { name: 'Carry bags', unit: 'pcs', stock: 100, min: 20, cost: 3, cat: 'packaging' },
+    { name: 'Tea leaves', key: 'tea_leaves', unit: 'kg', stock: 2, min: 0.5, cost: 400, cat: 'food' },
+    { name: 'Milk', key: 'milk', unit: 'L', stock: 10, min: 2, cost: 60, cat: 'food' },
+    { name: 'Cooking oil', key: 'cooking_oil', unit: 'L', stock: 5, min: 1, cost: 150, cat: 'food' },
+    { name: 'Paper cups', key: 'paper_cups', unit: 'pcs', stock: 200, min: 40, cost: 2, cat: 'packaging' },
+    { name: 'Carry bags', key: 'carry_bags', unit: 'pcs', stock: 100, min: 20, cost: 3, cat: 'packaging' },
   ];
 
   var SAMPLE_TABLES = [
@@ -408,7 +509,16 @@
         stock: 'ok',
         taxCategory: item.taxCategory || 'IN_REST_5',
         gst: '5%',
-        ingredients: [],
+        ingredients: Array.isArray(item.ingredients)
+          ? item.ingredients.map(function (ing) {
+              return {
+                name: ing.name,
+                key: ing.key || String(ing.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+                qty: Number(ing.qty) || 0,
+                unit: ing.unit || 'unit',
+              };
+            })
+          : [],
         recipeServings: 1,
         serveUnit: 'plate',
         _sample: true,
@@ -445,6 +555,7 @@
         var rec = {
           id: base + i,
           name: s.name,
+          key: s.key || String(s.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_'),
           unit: s.unit,
           stock: s.stock,
           current: s.stock,
@@ -456,13 +567,57 @@
           _sample: true,
         };
         if (global.RS && Array.isArray(RS.INVENTORY)) RS.INVENTORY.push(rec);
-        if (global.RS && typeof RS.saveOne === 'function') await RS.saveOne('inventory', rec);
-        else if (global.RS_DB && RS_DB.put) await RS_DB.put('inventory', rec.id, rec);
+        try {
+          if (global.RS && typeof RS.saveOne === 'function') await RS.saveOne('inventory', rec);
+          else if (global.RS_DB && RS_DB.put) await RS_DB.put('inventory', rec.id, rec);
+        } catch (saveErr) {
+          // Keep local stock even if cloud write fails — still deduct on this device
+          console.warn('[Frictionless] stock seed save', s.name, saveErr);
+        }
         n++;
       }
+      try {
+        if (global.RS && typeof RS.render === 'function') RS.render('inventory-tab');
+      } catch (_) {}
       return n;
     } catch (e) {
       console.warn('[Frictionless] stock seed', e);
+      return 0;
+    }
+  }
+
+  /** If outlet already has menu but empty stock, still seed store-room + backfill missing recipes. */
+  async function ensureSampleRecipesIfMissing() {
+    try {
+      var menu = (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [];
+      if (!menu.length) return 0;
+      var n = 0;
+      for (var i = 0; i < SAMPLE_MENU.length; i++) {
+        var sample = SAMPLE_MENU[i];
+        if (!sample.ingredients || !sample.ingredients.length) continue;
+        var live = menu.find(function (m) {
+          return String(m.name || '').toLowerCase() === String(sample.name || '').toLowerCase();
+        });
+        if (!live) continue;
+        if (Array.isArray(live.ingredients) && live.ingredients.length) continue;
+        live.ingredients = sample.ingredients.map(function (ing) {
+          return {
+            name: ing.name,
+            key: ing.key,
+            qty: Number(ing.qty) || 0,
+            unit: ing.unit || 'unit',
+          };
+        });
+        live.recipeServings = 1;
+        n++;
+        try {
+          if (global.RS && typeof RS.saveOne === 'function') await RS.saveOne('menu', live);
+          else if (global.RS_DB && RS_DB.put) await RS_DB.put('menu', live.id, live);
+        } catch (_) {}
+      }
+      return n;
+    } catch (e) {
+      console.warn('[Frictionless] recipe backfill', e);
       return 0;
     }
   }
@@ -477,6 +632,11 @@
       result.menu = m.added || 0;
       result.tables = await ensureSampleTables();
       if (opts.withStock !== false) result.stock = await ensureSampleStock();
+      // Existing outlets: empty stock + menu without recipes → still make deduct work
+      result.recipesBackfilled = await ensureSampleRecipesIfMissing();
+      if (opts.withStock !== false && result.stock === 0) {
+        result.stock = await ensureSampleStock();
+      }
       try {
         localStorage.setItem(tenantKey(SAMPLE_KEY), '1');
       } catch (_) {}
