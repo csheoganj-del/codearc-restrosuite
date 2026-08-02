@@ -559,35 +559,69 @@
       toast('No low-stock items to export', 'fa-circle-check');
       return;
     }
-    const lines = [
-      ['name', 'category', 'stock', 'min', 'unit', 'unit_cost', 'reorder_qty', 'est_value', 'supplier'].join(','),
-    ];
-    low.forEach((i) => {
-      const qty = reorderQty(i);
-      const row = [
-        i.name,
-        i.cat || '',
-        i.stock,
-        i.min,
-        i.unit || '',
-        i.cost || 0,
-        qty,
-        lineValue(i, qty),
-        i.supplier || i.vendor || (i.cat ? i.cat + ' Supplier' : ''),
-      ].map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"');
-      lines.push(row.join(','));
-    });
-    const csv = lines.join('\n');
-    const name = 'low-stock-' + new Date().toISOString().slice(0, 10) + '.csv';
-    if (global.RS && typeof RS.downloadFile === 'function') {
-      RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
-    } else {
-      const a = document.createElement('a');
-      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-      a.download = name;
-      a.click();
+    const prog =
+      global.RSProgress &&
+      RSProgress.open({
+        title: 'Exporting low stock…',
+        sub: 'Building reorder CSV',
+        total: low.length,
+        unit: 'items',
+      });
+    try {
+      const lines = [
+        ['name', 'category', 'stock', 'min', 'unit', 'unit_cost', 'reorder_qty', 'est_value', 'supplier'].join(','),
+      ];
+      low.forEach((i, idx) => {
+        const qty = reorderQty(i);
+        const row = [
+          i.name,
+          i.cat || '',
+          i.stock,
+          i.min,
+          i.unit || '',
+          i.cost || 0,
+          qty,
+          lineValue(i, qty),
+          i.supplier || i.vendor || (i.cat ? i.cat + ' Supplier' : ''),
+        ].map((c) => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"');
+        lines.push(row.join(','));
+        if (prog) {
+          prog.update({
+            done: idx + 1,
+            current: i.name || 'Item',
+            sub:
+              'Writing ' +
+              (idx + 1) +
+              ' of ' +
+              low.length +
+              ' · ' +
+              Math.max(0, low.length - idx - 1) +
+              ' remaining',
+          });
+        }
+      });
+      const csv = '\uFEFF' + lines.join('\n');
+      const name = 'low-stock-' + new Date().toISOString().slice(0, 10) + '.csv';
+      if (global.RS && typeof RS.downloadFile === 'function') {
+        RS.downloadFile(csv, 'text/csv;charset=utf-8;', name);
+      } else {
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+        a.download = name;
+        a.click();
+      }
+      if (prog) {
+        prog.succeed('Low-stock CSV · ' + low.length + ' items');
+        prog.close(900);
+      }
+      toast('Low-stock CSV · ' + low.length + ' items', 'fa-file-csv');
+    } catch (e) {
+      if (prog) {
+        prog.fail(e.message || 'Export failed');
+        prog.close(2200);
+      }
+      toast('Low-stock export failed', 'fa-circle-exclamation');
     }
-    toast('Low-stock CSV · ' + low.length + ' items', 'fa-file-csv');
   }
   async function confirmAndDraftPos() {
     const lowItems = lowStockItems();
@@ -1371,16 +1405,48 @@
               title: 'Importing recipes…',
               sub: 'Linking ingredients to menu items',
               total: ids.length,
-              unit: 'items',
+              unit: 'dishes',
             });
           try {
             for (let i = 0; i < ids.length; i++) {
               const row = byItem[ids[i]];
+              const dishName = (row.m && row.m.name) || ids[i];
+              if (prog) {
+                prog.update({
+                  done: i,
+                  current: dishName,
+                  sub:
+                    'Saving ' +
+                    (i + 1) +
+                    ' of ' +
+                    ids.length +
+                    ' · ' +
+                    (ids.length - i) +
+                    ' remaining',
+                });
+              }
               if (global.RS && RS.saveOne) {await RS.saveOne('menu', row.m);}
-              if (prog) {prog.update({ done: i + 1 });}
+              if (prog) {
+                prog.update({
+                  done: i + 1,
+                  current: dishName,
+                  sub:
+                    i + 1 < ids.length
+                      ? 'Saved ' + (i + 1) + ' · ' + (ids.length - i - 1) + ' remaining'
+                      : 'All recipes linked',
+                });
+              }
+              if (i % 2 === 1) {
+                await new Promise(function (r) {
+                  setTimeout(r, 0);
+                });
+              }
             }
             if (global.RS && RS.save && !global.RS.saveOne) {await RS.save('menu');}
-            if (prog) {prog.close();}
+            if (prog) {
+              prog.succeed('Recipes imported: ' + ids.length + ' dishes · ' + links + ' links');
+              prog.close(1000);
+            }
             toast('Recipes imported: ' + ids.length + ' item(s), ' + links + ' ingredient links', 'fa-circle-check');
             if (errors.length) {
               out.innerHTML =
@@ -1395,7 +1461,10 @@
               renderInventory();
             }
           } catch (e) {
-            if (prog) {prog.close();}
+            if (prog) {
+              prog.fail(e.message || 'Save failed');
+              prog.close(2200);
+            }
             console.warn('Recipe import save failed', e);
             out.innerHTML = '<span style="color:var(--red)">Save failed -- recipes were not saved. Try again.</span>';
             toast('Recipe import failed to save -- try again', 'fa-circle-exclamation');

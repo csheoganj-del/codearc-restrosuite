@@ -1696,61 +1696,95 @@
     const stationOnly = getZScope() !== 'all';
     const rows = todayBills(stationOnly);
     if (!rows.length) return toast('No sales today to export', 'fa-circle-exclamation');
-    const headers = [
-      'Bill No',
-      'DateTime',
-      'Total',
-      'Payment',
-      'Station',
-      'Shift',
-      'Cashier',
-      'Customer',
-      'Phone',
-      'Status',
-    ];
-    const lines = [headers.join(',')];
-    rows.forEach((b) => {
-      lines.push(
-        [
-          b.no || b.orderId || '',
-          b.dateTime || b.time || '',
-          b.amount != null ? b.amount : b.total || 0,
-          b.pay || b.paymentMethod || '',
-          b.stationLabel || b.stationId || '',
-          b.shiftId || '',
-          b.cashier || '',
-          b.customerName || '',
-          b.customerPhone || '',
-          b.status || 'paid',
-        ]
-          .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
-          .join(',')
-      );
-    });
-    const shift = getOpenShift();
-    if (shift) {
-      const sum = summarizeShift(shift);
-      lines.push('');
-      lines.push('"Z summary (open shift)"');
-      lines.push('"Gross","' + sum.gross + '"');
-      lines.push('"Cash sales","' + sum.cashSales + '"');
-      lines.push('"Expected cash","' + sum.expectedCash + '"');
-      lines.push('"Bills","' + sum.bills + '"');
+    const prog =
+      global.RSProgress &&
+      RSProgress.open({
+        title: 'Exporting day pack…',
+        sub: 'Building today\'s sales CSV',
+        total: rows.length,
+        unit: 'bills',
+      });
+    try {
+      const headers = [
+        'Bill No',
+        'DateTime',
+        'Total',
+        'Payment',
+        'Station',
+        'Shift',
+        'Cashier',
+        'Customer',
+        'Phone',
+        'Status',
+      ];
+      const lines = [headers.join(',')];
+      rows.forEach((b, idx) => {
+        lines.push(
+          [
+            b.no || b.orderId || '',
+            b.dateTime || b.time || '',
+            b.amount != null ? b.amount : b.total || 0,
+            b.pay || b.paymentMethod || '',
+            b.stationLabel || b.stationId || '',
+            b.shiftId || '',
+            b.cashier || '',
+            b.customerName || '',
+            b.customerPhone || '',
+            b.status || 'paid',
+          ]
+            .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
+            .join(',')
+        );
+        if (prog && (idx % 10 === 0 || idx === rows.length - 1)) {
+          prog.update({
+            done: idx + 1,
+            current: b.no || b.orderId || 'Bill',
+            sub:
+              'Writing ' +
+              (idx + 1) +
+              ' of ' +
+              rows.length +
+              ' · ' +
+              Math.max(0, rows.length - idx - 1) +
+              ' remaining',
+          });
+        }
+      });
+      const shift = getOpenShift();
+      if (shift) {
+        const sum = summarizeShift(shift);
+        lines.push('');
+        lines.push('"Z summary (open shift)"');
+        lines.push('"Gross","' + sum.gross + '"');
+        lines.push('"Cash sales","' + sum.cashSales + '"');
+        lines.push('"Expected cash","' + sum.expectedCash + '"');
+        lines.push('"Bills","' + sum.bills + '"');
+      }
+      const name =
+        'day-pack-' +
+        new Date().toISOString().slice(0, 10) +
+        (stationOnly ? '-station' : '-all') +
+        '.csv';
+      if (global.RS && typeof RS.downloadFile === 'function') {
+        RS.downloadFile('\uFEFF' + lines.join('\n'), 'text/csv;charset=utf-8;', name);
+      } else {
+        const a = document.createElement('a');
+        a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
+        a.download = name;
+        a.click();
+      }
+      if (prog) {
+        prog.succeed('Day pack ready · ' + rows.length + ' bills');
+        prog.close(900);
+      }
+      toast('Day pack CSV · ' + rows.length + ' bills', 'fa-file-csv');
+    } catch (e) {
+      if (prog) {
+        prog.fail(e.message || 'Export failed');
+        prog.close(2200);
+      }
+      toast('Day pack export failed', 'fa-circle-exclamation');
     }
-    const name =
-      'day-pack-' +
-      new Date().toISOString().slice(0, 10) +
-      (stationOnly ? '-station' : '-all') +
-      '.csv';
-    if (global.RS && typeof RS.downloadFile === 'function') {
-      RS.downloadFile(lines.join('\n'), 'text/csv;charset=utf-8;', name);
-    } else {
-      const a = document.createElement('a');
-      a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(lines.join('\n'));
-      a.download = name;
-      a.click();
-    }
-    toast('Day pack CSV · ' + rows.length + ' bills', 'fa-file-csv');
   }
 
   /* ---------------- Owner strip — hidden; metrics only under More ---------------- */

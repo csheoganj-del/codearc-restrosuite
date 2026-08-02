@@ -1363,23 +1363,59 @@
                 ]);
               });
             });
-            const csv =
-              '\uFEFF' +
-              [headers.map(escCell).join(','), ...fullRows.map((r) => r.map(escCell).join(','))].join('\r\n');
-            const stamp = new Date().toISOString().slice(0, 10);
-            const fname = 'recipes-export-' + stamp + '.csv';
-            if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', fname);
-            else {
-              const a = document.createElement('a');
-              a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-              a.download = fname;
-              a.click();
+            const prog =
+              window.RSProgress &&
+              RSProgress.open({
+                title: 'Exporting recipes…',
+                sub: 'Building recipe CSV with ingredients',
+                total: menu.length,
+                unit: 'dishes',
+              });
+            try {
+              menu.forEach((m, idx) => {
+                if (prog && (idx % 5 === 0 || idx === menu.length - 1)) {
+                  prog.update({
+                    done: idx + 1,
+                    current: m.name || 'Dish',
+                    sub:
+                      'Writing ' +
+                      (idx + 1) +
+                      ' of ' +
+                      menu.length +
+                      ' · ' +
+                      Math.max(0, menu.length - idx - 1) +
+                      ' remaining',
+                  });
+                }
+              });
+              const csv =
+                '\uFEFF' +
+                [headers.map(escCell).join(','), ...fullRows.map((r) => r.map(escCell).join(','))].join('\r\n');
+              const stamp = new Date().toISOString().slice(0, 10);
+              const fname = 'recipes-export-' + stamp + '.csv';
+              if (RS.downloadFile) RS.downloadFile(csv, 'text/csv;charset=utf-8;', fname);
+              else {
+                const a = document.createElement('a');
+                a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+                a.download = fname;
+                a.click();
+              }
+              const linked = menu.filter((m) => Array.isArray(m.ingredients) && m.ingredients.length).length;
+              if (prog) {
+                prog.succeed('Recipes CSV · ' + linked + ' linked dishes');
+                prog.close(900);
+              }
+              RS.toast(
+                'Recipes CSV · ' + linked + ' linked dish' + (linked === 1 ? '' : 'es') + ' · servings + units',
+                'fa-file-export'
+              );
+            } catch (e) {
+              if (prog) {
+                prog.fail(e.message || 'Export failed');
+                prog.close(2200);
+              }
+              RS.toast('Recipe export failed', 'fa-circle-exclamation');
             }
-            const linked = menu.filter((m) => Array.isArray(m.ingredients) && m.ingredients.length).length;
-            RS.toast(
-              'Recipes CSV · ' + linked + ' linked dish' + (linked === 1 ? '' : 'es') + ' · servings + units',
-              'fa-file-export'
-            );
           };
         }
 

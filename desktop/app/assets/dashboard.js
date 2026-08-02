@@ -2908,24 +2908,146 @@
         });
       });
     }
-    async function saveImportedRecords(collection, records) {
+    /**
+     * Save import rows one-by-one with live progress (done / remaining / failed).
+     * Sequential so the UI can show which row is writing — not a silent Promise.all.
+     */
+    async function saveImportedRecords(collection, records, progressOpts) {
       const before = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
       const failed = [];
       let saved = 0;
-      const cloudWrites = records.map(async (record) => {
-        const newItem = record;
+      const list = Array.isArray(records) ? records : [];
+      const unit = (progressOpts && progressOpts.unit) || (collection === 'menu' ? 'dishes' : 'items');
+      const title = (progressOpts && progressOpts.title) || ('Importing ' + collection + '…');
+      const prog =
+        window.RSProgress &&
+        RSProgress.open({
+          title: title,
+          sub: 'Starting live import…',
+          total: list.length,
+          unit: unit,
+        });
+
+      for (let i = 0; i < list.length; i++) {
+        const record = list[i];
+        const label = record.name || record.no || record.id || 'Row ' + (i + 1);
+        if (prog) {
+          prog.update({
+            done: i,
+            failed: failed.length,
+            current: label,
+            sub:
+              'Writing ' +
+              (i + 1) +
+              ' of ' +
+              list.length +
+              ' · ' +
+              (list.length - i) +
+              ' remaining',
+          });
+        } else {
+          setOperationStatus(
+            'Importing ' + (i + 1) + '/' + list.length + ' · ' + (list.length - i) + ' left · ' + label
+          );
+        }
         try {
           await RS.saveOne(collection, record);
           saved++;
-        } catch(e) {
-          if (collection === 'menu') failed.push(`Recipe import failed for ${newItem.name}: ${e.message}`);
+        } catch (e) {
+          if (collection === 'menu') failed.push(`Recipe import failed for ${record.name}: ${e.message}`);
           else failed.push(`${record.name || record.no || record.id || 'Row'}: ${e.message}`);
         }
-      });
-      await Promise.all(cloudWrites);
+        if (prog) {
+          prog.update({
+            done: i + 1,
+            failed: failed.length,
+            current: label,
+            sub:
+              i + 1 < list.length
+                ? 'Saved ' +
+                  saved +
+                  ' · ' +
+                  (list.length - i - 1) +
+                  ' remaining' +
+                  (failed.length ? ' · ' + failed.length + ' failed' : '')
+                : failed.length
+                  ? 'Done · ' + saved + ' ok · ' + failed.length + ' failed'
+                  : 'All ' + list.length + ' saved',
+          });
+        }
+        // Let the browser paint progress between cloud writes
+        if (i % 2 === 1) {
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+
       const lastError = window.RS_LAST_CLOUD_ERROR;
       const cloudFallback = !!(lastError && lastError.time !== before && lastError.collection === collection);
+      if (prog) {
+        if (failed.length) {
+          prog.fail(saved + ' imported · ' + failed.length + ' failed');
+          prog.close(2200);
+        } else {
+          prog.succeed(
+            cloudFallback
+              ? saved + ' saved locally · cloud sync pending'
+              : 'All ' + saved + ' ' + unit + ' imported'
+          );
+          prog.close(1000);
+        }
+      }
       return { saved, failed, cloudFallback };
+    }
+
+    function exportWithProgress(opts, buildFn) {
+      const list = opts.list || [];
+      if (!list.length) {
+        toast(opts.emptyMsg || 'Nothing to export', 'fa-circle-info');
+        return false;
+      }
+      const prog =
+        window.RSProgress &&
+        RSProgress.open({
+          title: opts.title || 'Exporting…',
+          sub: opts.sub || 'Building file…',
+          total: list.length,
+          unit: opts.unit || 'rows',
+        });
+      try {
+        if (prog) {prog.update({ done: 0, current: 'Preparing…' });}
+        else {setOperationStatus(opts.title || 'Exporting…');}
+        const result = buildFn(function onRow(i, label) {
+          if (prog && (i % 10 === 0 || i === list.length - 1)) {
+            prog.update({
+              done: i + 1,
+              current: label || 'Row ' + (i + 1),
+              sub:
+                'Writing ' +
+                (i + 1) +
+                ' of ' +
+                list.length +
+                ' · ' +
+                Math.max(0, list.length - i - 1) +
+                ' remaining',
+            });
+          }
+        });
+        if (prog) {
+          prog.succeed(opts.successMsg || 'Export ready · ' + list.length + ' ' + (opts.unit || 'rows'));
+          prog.close(900);
+        } else {
+          finishOperationStatus(opts.successMsg || 'Exported');
+        }
+        return result;
+      } catch (e) {
+        if (prog) {
+          prog.fail(e.message || 'Export failed');
+          prog.close(2400);
+        } else {
+          finishOperationStatus(e.message || 'Export failed', 'error');
+        }
+        throw e;
+      }
     }
     function importResultToast(label, result) {
       if (result.failed.length) {
@@ -2953,36 +3075,45 @@
       btnExportMenu.dataset.rsExportBound = '1';
       btnExportMenu.onclick = () => {
         const list = Array.isArray(MENU) ? MENU : [];
-        if (!list.length) {
-          toast('No menu items to export', 'fa-circle-info');
-          return;
-        }
-        setOperationStatus('Exporting menu CSV...');
-        const headers = [
-          'Name',
-          'Category',
-          'Price',
-          'Description',
-          'Type',
-          'Available',
-          'Stock',
-          'GST',
-          'Id',
-        ];
-        const rows = list.map((m) => [
-          m.name || '',
-          m.cat || m.category || '',
-          m.price != null ? m.price : '',
-          m.description || m.desc || '',
-          m.veg === false || m.type === 'nonveg' ? 'Non-veg' : 'Veg',
-          m.stock === 'out' ? 'NO' : 'YES',
-          m.stock || 'ok',
-          m.gst || m.tax || m.taxSlab || '',
-          m.id || '',
-        ]);
-        RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `menu-export-${fileDate()}.csv`);
-        finishOperationStatus('Menu exported');
-        toast('Menu CSV | ' + list.length + ' items', 'fa-file-export');
+        exportWithProgress(
+          {
+            list,
+            title: 'Exporting menu…',
+            sub: 'Building CSV for all dishes',
+            unit: 'dishes',
+            emptyMsg: 'No menu items to export',
+            successMsg: 'Menu CSV ready · ' + list.length + ' dishes',
+          },
+          (onRow) => {
+            const headers = [
+              'Name',
+              'Category',
+              'Price',
+              'Description',
+              'Type',
+              'Available',
+              'Stock',
+              'GST',
+              'Id',
+            ];
+            const rows = list.map((m, i) => {
+              onRow(i, m.name || 'Item');
+              return [
+                m.name || '',
+                m.cat || m.category || '',
+                m.price != null ? m.price : '',
+                m.description || m.desc || '',
+                m.veg === false || m.type === 'nonveg' ? 'Non-veg' : 'Veg',
+                m.stock === 'out' ? 'NO' : 'YES',
+                m.stock || 'ok',
+                m.gst || m.tax || m.taxSlab || '',
+                m.id || '',
+              ];
+            });
+            RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `menu-export-${fileDate()}.csv`);
+            toast('Menu CSV | ' + list.length + ' items', 'fa-file-export');
+          }
+        );
       };
     }
 
@@ -3094,14 +3225,16 @@
                 records.push(item);
               });
               if(!records.length) throw new Error('No valid menu rows found');
-              const proceed = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available.', rows:records.length, skipped });
+              const proceed = await importPreview({ title:'Import menu CSV', summary:'Menu items will be saved to this outlet and synced to Supabase when cloud is available. You will see live progress (done / remaining).', rows:records.length, skipped });
               if(!proceed) {
                 finishOperationStatus('Menu import cancelled', 'error');
                 return;
               }
-              setOperationStatus(`Importing ${records.length} menu rows...`);
-              const result = await saveImportedRecords('menu', records);
-              finishOperationStatus(`${result.saved} menu items imported`);
+              const result = await saveImportedRecords('menu', records, {
+                title: 'Importing menu…',
+                unit: 'dishes',
+              });
+              finishOperationStatus(`${result.saved} menu items imported` + (result.failed.length ? ` · ${result.failed.length} failed` : ''));
               importResultToast('menu items', result);
               if(window.RS_DB) {
                 const items = await RS_DB.list('menu');
@@ -3135,39 +3268,48 @@
       btnExportInventory.dataset.rsExportBound = '1';
       btnExportInventory.onclick = () => {
         const list = Array.isArray(INVENTORY) ? INVENTORY : [];
-        if (!list.length) {
-          toast('No stock items to export', 'fa-circle-info');
-          return;
-        }
-        setOperationStatus('Exporting inventory CSV...');
-        const headers = [
-          'IngredientName',
-          'Category',
-          'CurrentStock',
-          'MinLevel',
-          'Unit',
-          'UnitCost',
-          'Supplier',
-          'IngredientKey',
-          'Id',
-        ];
-        const rows = list.map((i) => [
-          i.name || i.label || '',
-          i.cat || i.category || '',
-          i.stock != null ? i.stock : '',
-          i.min != null ? i.min : '',
-          i.unit || 'unit',
-          i.cost != null ? i.cost : '',
-          i.supplier || i.vendor || '',
-          i.key ||
-            String(i.name || '')
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '_'),
-          i.id || '',
-        ]);
-        RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `inventory-export-${fileDate()}.csv`);
-        finishOperationStatus('Inventory exported');
-        toast('Stock CSV | ' + list.length + ' items', 'fa-file-export');
+        exportWithProgress(
+          {
+            list,
+            title: 'Exporting inventory…',
+            sub: 'Building stock CSV',
+            unit: 'items',
+            emptyMsg: 'No stock items to export',
+            successMsg: 'Stock CSV ready · ' + list.length + ' items',
+          },
+          (onRow) => {
+            const headers = [
+              'IngredientName',
+              'Category',
+              'CurrentStock',
+              'MinLevel',
+              'Unit',
+              'UnitCost',
+              'Supplier',
+              'IngredientKey',
+              'Id',
+            ];
+            const rows = list.map((i, idx) => {
+              onRow(idx, i.name || i.label || 'Item');
+              return [
+                i.name || i.label || '',
+                i.cat || i.category || '',
+                i.stock != null ? i.stock : '',
+                i.min != null ? i.min : '',
+                i.unit || 'unit',
+                i.cost != null ? i.cost : '',
+                i.supplier || i.vendor || '',
+                i.key ||
+                  String(i.name || '')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '_'),
+                i.id || '',
+              ];
+            });
+            RS.downloadFile(buildCsv(headers, rows), 'text/csv;charset=utf-8;', `inventory-export-${fileDate()}.csv`);
+            toast('Stock CSV | ' + list.length + ' items', 'fa-file-export');
+          }
+        );
       };
     }
 
@@ -3319,14 +3461,16 @@
                 records.push(item);
               });
               if(!records.length) throw new Error('No valid inventory rows found');
-              const proceed = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels for this outlet and sync to Supabase when cloud is available.', rows:records.length, skipped });
+              const proceed = await importPreview({ title:'Import inventory CSV', summary:'Inventory rows will update stock levels and sync when cloud is available. Live progress shows done / remaining.', rows:records.length, skipped });
               if(!proceed) {
                 finishOperationStatus('Inventory import cancelled', 'error');
                 return;
               }
-              setOperationStatus(`Importing ${records.length} inventory rows...`);
-              const result = await saveImportedRecords('inventory', records);
-              finishOperationStatus(`${result.saved} inventory items imported`);
+              const result = await saveImportedRecords('inventory', records, {
+                title: 'Importing inventory…',
+                unit: 'items',
+              });
+              finishOperationStatus(`${result.saved} inventory items imported` + (result.failed.length ? ` · ${result.failed.length} failed` : ''));
               importResultToast('ingredients', result);
               if(window.RS_DB) {
                 const invs = await RS_DB.list('inventory');
