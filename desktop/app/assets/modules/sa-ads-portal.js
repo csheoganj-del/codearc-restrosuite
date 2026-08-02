@@ -13,7 +13,7 @@
 
   const STYLE_ID = 'rs-sa-ads-style';
   const STORE_KEY = 'rs_sa_ads_campaigns_v1';
-  const DRAFT_KEY = 'rs_sa_ads_draft_v1';
+  const DRAFT_KEY = 'rs_sa_ads_draft_v2';
   const DAILY_HINT = 180; // mirrors gateway default DAILY_LIMIT
 
   let contacts = []; // { name, phone, status, error, at }
@@ -221,12 +221,17 @@
   }
 
   function defaultMessage() {
+    // Psychology: name first → pain (Wi‑Fi / paper) → one clear fix → free + fast → soft CTA
+    // Short for WhatsApp; no ALL CAPS; one link; human tone (not spam blast)
     return (
       'Hi {{first}} 👋\n\n' +
-      'RestroSuite helps restaurants bill offline, send WhatsApp receipts, run kitchen display & QR table ordering — free during launch.\n\n' +
-      'Create your outlet (2 minutes):\n' +
+      'Quick one — does billing freeze when Wi‑Fi drops at your counter?\n\n' +
+      'We built *RestroSuite* for that: bill offline on phone/PC, kitchen display, QR table order, WhatsApp receipts — one app.\n\n' +
+      'Free during launch. No card. Live in minutes.\n\n' +
+      'Open your free outlet:\n' +
       'https://restrosuite.codearc.co.in/login?tab=register\n\n' +
-      '— CodeArc RestroSuite'
+      'If it helps, try a sample bill today. If not for you, ignore this — no pressure.\n\n' +
+      '— Team CodeArc'
     );
   }
 
