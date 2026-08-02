@@ -772,7 +772,14 @@ serve(async (req) => {
     }
     if (operation === "gateway_send") {
       // Receipts from POS need send; destructive gateway_reset above is admin-only.
+      // Super-admin / brand_admin: platform ads & ops via central WhatsApp line (system).
+      const isPlatformAdmin =
+        actorRole === "superadmin" ||
+        actorRole === "super_admin" ||
+        actorRole === "brand_admin" ||
+        actorRole === "brandadmin";
       const canSend =
+        isPlatformAdmin ||
         isOutletAdmin ||
         tabsForOps.includes("pos-tab") ||
         tabsForOps.includes("bills-tab") ||
@@ -789,7 +796,16 @@ serve(async (req) => {
       if (!phone || (!message && !pdfData && !caption)) {
         return jsonResponse({ error: "Missing phone or message/pdfData." }, 400, req);
       }
-      return await proxyGatewayRequest("/send", "POST", req, { phone, message, caption, orderId, pdfData, filename }, verified.tenantId);
+      // Ads / platform blasts always go through the central system WhatsApp line.
+      const forceSystem = payload.via_platform === true || payload.via_system === true || isPlatformAdmin;
+      const sendAsTenantId = forceSystem ? "system" : verified.tenantId;
+      return await proxyGatewayRequest(
+        "/send",
+        "POST",
+        req,
+        { phone, message, caption, orderId, pdfData, filename },
+        sendAsTenantId,
+      );
     }
 
     // Wave 7: server-side bill search (history beyond client cache cap)
