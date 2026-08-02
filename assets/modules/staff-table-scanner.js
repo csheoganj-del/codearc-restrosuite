@@ -246,9 +246,9 @@
       r + ' .rs-scan-vid-wrap.is-zooming video{transform:scale(1.35);}',
       r + ' .rs-scan-vid-wrap.is-found video{transform:scale(1.1);}',
       /* Bottom sheet body */
-      r + ' .rs-scan-body{flex:1;min-height:0;overflow-y:auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:10px;}',
+      r + ' .rs-scan-body{flex:1;min-height:0;overflow-y:auto;padding:10px 16px 14px;display:flex;flex-direction:column;gap:8px;}',
       r +
-        ' .rs-scan-status{font-size:13px;font-weight:700;color:rgba(255,255,255,.72);display:flex;align-items:center;gap:10px;min-height:28px;}',
+        ' .rs-scan-status{font-size:13.5px;font-weight:700;color:rgba(255,255,255,.78);display:flex;align-items:center;gap:10px;min-height:28px;}',
       r +
         ' .rs-scan-live{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:rgba(37,211,102,.14);color:#34d399;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;flex-shrink:0;}',
       r +
@@ -257,43 +257,60 @@
       r + ' .rs-scan-live span:nth-child(3){animation-delay:.3s;}',
       r + ' .rs-scan-status.is-found{color:#34d399;}',
       r + ' .rs-scan-status.is-error{color:#fbbf24;}',
+      /* Floating tools on camera (calm, not a control panel) */
       r +
-        ' .rs-scan-cam-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+        ' .rs-scan-float{position:absolute;left:10px;right:10px;bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;z-index:3;pointer-events:none;}',
       r +
-        ' .rs-scan-cam-row .btn-snap,' +
+        ' .rs-scan-float label,' +
         r +
-        ' .rs-scan-cam-row .btn-live{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;padding:12px 10px;border-radius:12px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;border:0;}',
+        ' .rs-scan-float button{pointer-events:auto;border:0;border-radius:999px;padding:10px 14px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 6px 20px rgba(0,0,0,.35);}',
       r +
-        ' .rs-scan-cam-row .btn-snap{background:#25D366;color:#062816;}',
-      r + ' .rs-scan-cam-row .btn-snap:hover{filter:brightness(1.05);}',
+        ' .rs-scan-float .btn-snap{background:rgba(37,211,102,.95);color:#062816;}',
       r +
-        ' .rs-scan-cam-row .btn-live{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12);}',
-      r + ' .rs-scan-cam-row .btn-live:hover{background:rgba(255,255,255,.12);}',
+        ' .rs-scan-float .btn-live{background:rgba(20,20,24,.72);color:#fff;border:1px solid rgba(255,255,255,.14);}',
+      r +
+        ' .rs-scan-hit{padding:12px 14px;border-radius:14px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.35);font-size:13.5px;font-weight:700;color:#d1fae5;display:none;}',
+      r + ' .rs-scan-hit.on{display:block;}',
+      r + ' .rs-scan-auto{font-size:12px;font-weight:700;color:#6ee7b7;margin-top:4px;}',
+      r +
+        ' .rs-scan-primary{display:none;width:100%;border:0;border-radius:14px;padding:14px 12px;font:inherit;font-weight:800;font-size:14.5px;cursor:pointer;background:#25D366;color:#062816;align-items:center;justify-content:center;gap:8px;}',
+      r + ' .rs-scan-primary.on{display:inline-flex;}',
+      r + ' .rs-scan-primary:hover{filter:brightness(1.05);}',
+      /* Quiet fallbacks — collapsed by default */
+      r +
+        ' .rs-scan-links{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;}',
+      r +
+        ' .rs-scan-links button{border:0;background:transparent;color:rgba(255,255,255,.55);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;padding:6px 8px;border-radius:8px;}',
+      r + ' .rs-scan-links button:hover{color:#fff;background:rgba(255,255,255,.06);}',
+      r + ' .rs-scan-links button[aria-expanded="true"]{color:#6ee7b7;}',
+      r + ' .rs-scan-links .dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.25);}',
+      r +
+        ' .rs-scan-panel{display:none;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);}',
+      r + ' .rs-scan-panel.on{display:flex;}',
       r + ' .rs-scan-manual{display:flex;gap:8px;}',
       r +
         ' .rs-scan-manual input{flex:1;min-width:0;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;border-radius:12px;padding:11px 12px;font:inherit;font-size:14px;}',
       r + ' .rs-scan-manual input::placeholder{color:rgba(255,255,255,.4);}',
       r +
-        ' .rs-scan-manual .btn-go{border:0;background:rgba(255,255,255,.12);color:#fff;border-radius:12px;padding:0 16px;font-weight:800;cursor:pointer;flex-shrink:0;}',
-      r + ' .rs-scan-manual .btn-go:hover{background:rgba(255,255,255,.18);}',
-      r + ' .rs-scan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+        ' .rs-scan-manual .btn-go{border:0;background:#25D366;color:#062816;border-radius:12px;padding:0 18px;font-weight:800;cursor:pointer;flex-shrink:0;}',
       r +
-        ' .rs-scan-actions button{width:100%;justify-content:center;border-radius:12px;padding:11px 8px;font-weight:700;font-size:12.5px;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#fff;display:inline-flex;align-items:center;gap:6px;}',
+        ' .rs-scan-more-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}',
       r +
-        ' .rs-scan-actions button[data-act="pos"]{background:#25D366;color:#062816;border-color:transparent;font-weight:800;}',
+        ' .rs-scan-more-grid button{width:100%;justify-content:center;border-radius:12px;padding:12px 6px;font-weight:700;font-size:11.5px;cursor:pointer;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#fff;display:inline-flex;flex-direction:column;align-items:center;gap:6px;}',
+      r + ' .rs-scan-more-grid button i{font-size:15px;opacity:.9;}',
+      r + ' .rs-scan-more-grid button:hover{background:rgba(255,255,255,.1);}',
       r +
-        ' .rs-scan-actions button:hover{filter:brightness(1.06);}',
-      r +
-        ' .rs-scan-hit{padding:12px;border-radius:14px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.35);font-size:13.5px;font-weight:700;color:#d1fae5;display:none;}',
-      r + ' .rs-scan-hit.on{display:block;}',
-      r + ' .rs-scan-auto{font-size:11.5px;font-weight:600;color:#6ee7b7;margin-top:4px;}',
-      r +
-        ' .rs-scan-foot{margin:0;font-size:11px;color:rgba(255,255,255,.38);line-height:1.4;text-align:center;}',
+        ' .rs-scan-foot{margin:2px 0 0;font-size:11px;color:rgba(255,255,255,.38);line-height:1.4;text-align:center;}',
       '@media (max-height:640px){' +
         r +
-        ' .rs-scan-vid-wrap{aspect-ratio:4/3;max-height:38dvh;}' +
+        ' .rs-scan-vid-wrap{aspect-ratio:4/3;max-height:42dvh;}' +
         r +
-        ' .rs-scan-cam-row{grid-template-columns:1fr;}}',
+        ' .rs-scan-more-grid{grid-template-columns:1fr 1fr;}}',
+      '@media (max-width:380px){' +
+        r +
+        ' .rs-scan-float label span.rs-scan-lbl,' +
+        r +
+        ' .rs-scan-float button span.rs-scan-lbl{display:none;}}',
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -426,9 +443,12 @@
       '<i class="fa-solid fa-circle-check" style="color:#0F9F6E;margin-right:6px"></i>' +
       'Table <strong>' +
       esc(parsed.table) +
-      '</strong> detected' +
-      '<div class="rs-scan-auto">Opening POS in a moment… or tap a button below</div>';
+      '</strong> locked' +
+      '<div class="rs-scan-auto">Opening POS…</div>';
     root._parsed = parsed;
+    try {
+      if (typeof root._showPrimaryPos === 'function') {root._showPrimaryPos(true);}
+    } catch (_) {}
   }
 
   async function handleDecoded(root, text) {
@@ -462,12 +482,12 @@
     }
 
     showHit(root, parsed);
-    setScanUiState(root, 'found', 'Table ' + parsed.table + ' locked — opening POS…');
+    setScanUiState(root, 'found', 'Table ' + parsed.table + ' · opening POS…');
     try {
       if (navigator.vibrate) {navigator.vibrate([40, 40, 40]);}
     } catch (_) {}
 
-    // Auto-open POS (Yono-style: detect → lock → act without extra taps)
+    // Auto-open POS (calm path: detect → lock → act)
     if (autoActTimer) {clearTimeout(autoActTimer);}
     autoActTimer = setTimeout(async function () {
       if (!document.getElementById(ROOT_ID) || !root._parsed) {return;}
@@ -477,9 +497,12 @@
         await openTableInPosFromScan(parsed, { seat: false });
       } catch (e) {
         console.warn('[StaffScan] auto open POS failed', e);
-        toast('Table detected — tap Open POS', 'fa-utensils');
+        toast('Table locked — tap Open POS now', 'fa-utensils');
+        try {
+          if (typeof root._showPrimaryPos === 'function') {root._showPrimaryPos(true);}
+        } catch (_) {}
       }
-    }, 450);
+    }, 420);
   }
 
   function isIOS() {
@@ -694,7 +717,7 @@
       setScanUiState(
         root,
         'scanning',
-        ios ? 'Hold the table QR inside the green corners' : 'Point at table QR — auto-zoom + lock'
+        'Point at table QR'
       );
     } catch (e) {
       console.warn('[StaffScan] video play', e);
@@ -712,7 +735,7 @@
       );
       // Keep camera on for preview; manual still works
     } else {
-      setScanUiState(root, 'scanning', 'Scanning… align QR in the green corners');
+      setScanUiState(root, 'scanning', 'Point at table QR');
     }
 
     // BarcodeDetector is NOT on iPhone Safari — don't rely on it
@@ -950,61 +973,93 @@
     root.innerHTML =
       '<div class="rs-scan-card">' +
       '<div class="rs-scan-head">' +
-      '<h3><i class="fa-solid fa-qrcode"></i> Scan table QR</h3>' +
+      '<h3><i class="fa-solid fa-qrcode"></i> Scan table</h3>' +
       '<button type="button" class="rs-scan-x" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>' +
       '</div>' +
-      // Always-visible square viewfinder (no ugly empty oval)
+      // Big viewfinder — primary UI
       '<div class="rs-scan-vid-wrap is-idle" data-vid-box>' +
       '<video playsinline webkit-playsinline muted autoplay></video>' +
       '<canvas aria-hidden="true"></canvas>' +
       '<div class="rs-scan-placeholder" data-placeholder>' +
       '<i class="fa-solid fa-camera"></i>' +
       '<div data-ph-text>' +
-      (ios ? 'Snap a photo of the table QR' : 'Starting camera…') +
+      (ios ? 'Point camera at table QR' : 'Point at table QR') +
       '</div>' +
       '</div>' +
       '<div class="rs-scan-mask" aria-hidden="true"></div>' +
       '<div class="rs-scan-frame" aria-hidden="true"><i></i></div>' +
       '<div class="rs-scan-laser" aria-hidden="true"></div>' +
+      '<div class="rs-scan-float">' +
+      '<label class="btn-snap" title="Snap photo of QR">' +
+      '<i class="fa-solid fa-camera"></i><span class="rs-scan-lbl">Snap</span>' +
+      '<input type="file" accept="image/*" capture="environment" data-snap style="display:none">' +
+      '</label>' +
+      '<button type="button" class="btn-live" data-live-cam title="Restart camera">' +
+      '<i class="fa-solid fa-rotate-right"></i><span class="rs-scan-lbl">' +
+      (ios ? 'Live' : 'Retry') +
+      '</span></button>' +
+      '</div>' +
       '</div>' +
       '<div class="rs-scan-body">' +
       '<div class="rs-scan-status" data-status>' +
       '<span class="rs-scan-live" data-live><span></span><span></span><span></span> Ready</span>' +
-      '<span data-status-text>' +
-      (ios ? 'Snap photo or type table #' : 'Starting camera…') +
-      '</span>' +
+      '<span data-status-text>Point at table QR</span>' +
       '</div>' +
       '<div class="rs-scan-hit" data-hit></div>' +
-      '<div class="rs-scan-cam-row">' +
-      '<label class="btn-snap">' +
-      '<i class="fa-solid fa-camera"></i> Snap photo' +
-      '<input type="file" accept="image/*" capture="environment" data-snap style="display:none">' +
-      '</label>' +
-      '<button type="button" class="btn-live" data-live-cam>' +
-      '<i class="fa-solid fa-video"></i> ' +
-      (ios ? 'Live scan' : 'Restart cam') +
+      '<button type="button" class="rs-scan-primary" data-act="pos">' +
+      '<i class="fa-solid fa-utensils"></i> Open POS now' +
       '</button>' +
+      '<div class="rs-scan-links">' +
+      '<button type="button" data-toggle-manual aria-expanded="false">Type table #</button>' +
+      '<span class="dot" aria-hidden="true"></span>' +
+      '<button type="button" data-toggle-more aria-expanded="false">More</button>' +
       '</div>' +
+      '<div class="rs-scan-panel" data-panel-manual>' +
       '<div class="rs-scan-manual">' +
-      '<input type="text" data-manual inputmode="numeric" autocomplete="off" placeholder="Type table # (e.g. 5)">' +
+      '<input type="text" data-manual inputmode="numeric" autocomplete="off" placeholder="e.g. 5 or T2" aria-label="Table number">' +
       '<button type="button" class="btn-go" data-manual-go>Go</button>' +
       '</div>' +
-      '<div class="rs-scan-actions">' +
-      '<button type="button" data-act="pos"><i class="fa-solid fa-utensils"></i> Open POS</button>' +
+      '</div>' +
+      '<div class="rs-scan-panel" data-panel-more>' +
+      '<div class="rs-scan-more-grid">' +
       '<button type="button" data-act="seat"><i class="fa-solid fa-chair"></i> Seat + QR</button>' +
       '<button type="button" data-act="kot"><i class="fa-solid fa-fire-burner"></i> Waiter KOT</button>' +
       '<button type="button" data-act="hub"><i class="fa-solid fa-eye"></i> Guest view</button>' +
       '</div>' +
-      '<p class="rs-scan-foot">Same QR guests scan. Type table # → Go always works.</p>' +
+      '</div>' +
+      '<p class="rs-scan-foot">Locks automatically → opens POS. Same QR guests use.</p>' +
       '</div></div>';
 
     document.body.appendChild(root);
-    setScanUiState(root, 'idle', ios ? 'Snap photo of table QR, or type #' : 'Starting camera…');
+    setScanUiState(root, 'idle', ios ? 'Point camera at table QR' : 'Point at table QR');
 
     root.querySelector('[data-close]').onclick = closeScanner;
     root.addEventListener('click', function (e) {
       if (e.target === root) {closeScanner();}
     });
+
+    root.querySelector('[data-toggle-manual]').onclick = function () {
+      const panel = root.querySelector('[data-panel-manual]');
+      const open = !panel.classList.contains('on');
+      root.querySelector('[data-panel-manual]').classList.toggle('on', open);
+      root.querySelector('[data-toggle-manual]').setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        root.querySelector('[data-panel-more]').classList.remove('on');
+        root.querySelector('[data-toggle-more]').setAttribute('aria-expanded', 'false');
+        const inp = root.querySelector('[data-manual]');
+        if (inp) {setTimeout(function () { try { inp.focus(); } catch (_) {} }, 40);}
+      }
+    };
+    root.querySelector('[data-toggle-more]').onclick = function () {
+      const panel = root.querySelector('[data-panel-more]');
+      const open = !panel.classList.contains('on');
+      root.querySelector('[data-panel-more]').classList.toggle('on', open);
+      root.querySelector('[data-toggle-more]').setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        root.querySelector('[data-panel-manual]').classList.remove('on');
+        root.querySelector('[data-toggle-manual]').setAttribute('aria-expanded', 'false');
+      }
+    };
 
     // --- Photo capture (iOS-reliable) ---
     const snapInput = root.querySelector('[data-snap]');
@@ -1019,9 +1074,12 @@
           setScanUiState(
             root,
             'error',
-            'No QR in photo — move closer and retake, or type table #'
+            'No QR in photo — move closer, or type table #'
           );
           toast('No QR in photo — retake closer or type table #', 'fa-circle-exclamation');
+          // Open manual fallback automatically
+          root.querySelector('[data-panel-manual]').classList.add('on');
+          root.querySelector('[data-toggle-manual]').setAttribute('aria-expanded', 'true');
           return;
         }
         await handleDecoded(root, text);
@@ -1033,9 +1091,9 @@
     if (liveBtn) {
       liveBtn.onclick = function () {
         stopCamera();
-        setScanUiState(root, 'scanning', 'Starting live camera…');
+        setScanUiState(root, 'scanning', 'Starting camera…');
         const ph = root.querySelector('[data-ph-text]');
-        if (ph) {ph.textContent = 'Starting camera…';}
+        if (ph) {ph.textContent = 'Point at table QR';}
         startCamera(root);
       };
     }
@@ -1045,15 +1103,24 @@
       startCamera(root);
     }
 
+    function showPrimaryPos(show) {
+      const btn = root.querySelector('[data-act="pos"]');
+      if (btn) {btn.classList.toggle('on', !!show);}
+    }
+
     function requireParsed() {
       if (root._parsed) {return root._parsed;}
       const manual = (root.querySelector('[data-manual]').value || '').trim();
       const p = parseTableQrPayload(manual);
       if (p) {
         showHit(root, p);
+        showPrimaryPos(true);
         setScanUiState(root, 'found', 'Table ' + p.table + ' ready');
         return p;
       }
+      // Expand type-table if nothing scanned
+      root.querySelector('[data-panel-manual]').classList.add('on');
+      root.querySelector('[data-toggle-manual]').setAttribute('aria-expanded', 'true');
       toast('Scan a table QR or enter table number', 'fa-circle-exclamation');
       return null;
     }
@@ -1061,7 +1128,6 @@
     root.querySelector('[data-manual-go]').onclick = async function () {
       const p = requireParsed();
       if (!p) {return;}
-      // On manual entry, open POS immediately (staff already typed the number)
       if (autoActTimer) {
         clearTimeout(autoActTimer);
         autoActTimer = null;
@@ -1119,6 +1185,9 @@
         '&hub=1';
       window.open(url, '_blank', 'noopener');
     };
+
+    // Expose for showHit to reveal primary CTA
+    root._showPrimaryPos = showPrimaryPos;
 
     if (typeof opts.onOpen === 'function') {opts.onOpen();}
   }
