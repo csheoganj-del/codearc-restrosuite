@@ -293,6 +293,7 @@
     'employees-tab':['Employee Ledger','Team, roles, shifts & payroll'],
     'super-admin-tab':['SaaS Super-Admin','Platform-wide tenants & metrics'],
     'sa-reports-tab':['Platform Reports','Revenue, plans, trials & risk across all outlets'],
+    'sa-ads-tab':['WhatsApp Ads','Human-paced platform ads · contacts · sent / remaining'],
     'gateway-monitor-tab':['Gateway Monitor','WhatsApp gateway health & logs'],
     'chain-dashboard-tab':['Chain Dashboard','Consolidated reporting, catalog & logistics']
   };
@@ -321,7 +322,7 @@
     if (isSuper) {
       if (id === 'settings-tab' || id === 'open-settings') {
         id = 'gateway-monitor-tab';
-      } else if (id !== 'super-admin-tab' && id !== 'sa-reports-tab' && id !== 'gateway-monitor-tab') {
+      } else if (id !== 'super-admin-tab' && id !== 'sa-reports-tab' && id !== 'sa-ads-tab' && id !== 'gateway-monitor-tab') {
         id = 'super-admin-tab';
       }
     } else if (isBrandAdmin) {
@@ -329,7 +330,7 @@
         id = 'chain-dashboard-tab';
       }
     } else {
-      if (id === 'super-admin-tab' || id === 'sa-reports-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
+      if (id === 'super-admin-tab' || id === 'sa-reports-tab' || id === 'sa-ads-tab' || id === 'gateway-monitor-tab' || id === 'chain-dashboard-tab') {
         id = 'pos-tab';
       }
       // Route-level role enforcement: hiding sidebar links is cosmetic --
@@ -2003,7 +2004,7 @@
       }
     },
     'inventory-tab':renderInventory,'editor-tab':renderEditor,'reports-tab':renderReports,'kds-tab':renderKDS,
-    'growth-hub-tab':renderGrowthHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'sa-reports-tab':renderSaReports,'gateway-monitor-tab':renderGateway,
+    'growth-hub-tab':renderGrowthHub,'employees-tab':renderEmployees,'super-admin-tab':renderSuper,'sa-reports-tab':renderSaReports,'sa-ads-tab':function(){ if(window.RSSaAdsPortal&&RSSaAdsPortal.render) RSSaAdsPortal.render(); },'gateway-monitor-tab':renderGateway,
     'chain-dashboard-tab':() => { if(window.RestroSuite && RestroSuite.chain) RestroSuite.chain.init(window.RS_API); }
   };
 
@@ -2541,7 +2542,7 @@
     // 2. Hide all regular sidebar links (keep only superadmin ones)
     $$('.sidebar-link').forEach(link => {
       const tabId = link.dataset.tab || '';
-      if (tabId !== 'super-admin-tab' && tabId !== 'sa-reports-tab' && tabId !== 'gateway-monitor-tab') {
+      if (tabId !== 'super-admin-tab' && tabId !== 'sa-reports-tab' && tabId !== 'sa-ads-tab' && tabId !== 'gateway-monitor-tab') {
         link.style.display = 'none';
       }
     });

@@ -88,7 +88,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v236-20260802-frictionless';
+    var builtin = 'v240-20260802-frictionless';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -351,8 +351,8 @@
   body.rs-role-superadmin #app-version-pill {
     display: none !important;
   }
-  html.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#sa-reports-tab):not(#gateway-monitor-tab),
-  body.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#sa-reports-tab):not(#gateway-monitor-tab) {
+  html.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#sa-reports-tab):not(#sa-ads-tab):not(#gateway-monitor-tab),
+  body.rs-role-superadmin .tab-content:not(#super-admin-tab):not(#sa-reports-tab):not(#sa-ads-tab):not(#gateway-monitor-tab) {
     display: none !important;
   }
   html.rs-role-superadmin .user-pill .ur::before {
@@ -450,6 +450,7 @@
       <div class="sb-section superadmin-only" style="display:none">Platform</div>
       <a class="sidebar-link superadmin-only" data-tab="super-admin-tab" style="display:none" title="Super-Admin"><i class="fa-solid fa-user-shield"></i><span>Super-Admin</span></a>
       <a class="sidebar-link superadmin-only" data-tab="sa-reports-tab" style="display:none" title="Platform reports"><i class="fa-solid fa-chart-column"></i><span>SA Reports</span></a>
+      <a class="sidebar-link superadmin-only" data-tab="sa-ads-tab" style="display:none" title="WhatsApp Ads Portal"><i class="fa-brands fa-whatsapp"></i><span>WA Ads</span></a>
       <a class="sidebar-link superadmin-only" data-tab="gateway-monitor-tab" style="display:none" title="Gateway monitor"><i class="fa-solid fa-server"></i><span>Gateway</span></a>
     </nav>
 
@@ -1258,6 +1259,14 @@
         </div>
       </section>
 
+      <!-- ============ SUPER-ADMIN WHATSAPP ADS PORTAL ============ -->
+      <section class="tab-content" id="sa-ads-tab" data-screen-label="WhatsApp Ads">
+        <div class="panel panel-pad" style="text-align:center;padding:28px;color:var(--text-mute)">
+          <i class="fa-brands fa-whatsapp" style="font-size:28px;color:#25D366"></i>
+          <p style="margin:10px 0 0">Loading ads portal…</p>
+        </div>
+      </section>
+
       <!-- ============ SUPER-ADMIN PLATFORM REPORTS ============ -->
       <section class="tab-content" id="sa-reports-tab" data-screen-label="Platform Reports">
         <div class="panel panel-pad" style="margin-bottom:14px">
@@ -1782,6 +1791,7 @@
 <script src="assets/modules/kitchen-link-coach.js"></script>
 <script src="assets/modules/xlsx-lite.js"></script>
 <script src="assets/modules/super-admin.js"></script>
+<script src="assets/modules/sa-ads-portal.js"></script>
 <script src="assets/lib/jsQR.min.js"></script>
 <script src="assets/modules/staff-table-scanner.js"></script>
 <script src="assets/modules/employees-ui.js"></script>

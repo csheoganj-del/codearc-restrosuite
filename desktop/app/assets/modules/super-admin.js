@@ -1688,6 +1688,26 @@ function renderInlinePlatformReports(tenants) {
       }
     };
   }
+  // Inject Ads Portal shortcut once next to reports
+  try {
+    const head = document.querySelector('#super-admin-tab .panel-head');
+    if (head && !document.getElementById('sa-open-ads-btn')) {
+      const adsBtn = document.createElement('button');
+      adsBtn.type = 'button';
+      adsBtn.className = 'btn btn-primary btn-sm';
+      adsBtn.id = 'sa-open-ads-btn';
+      adsBtn.title = 'WhatsApp ads portal';
+      adsBtn.innerHTML = '<i class="fa-brands fa-whatsapp"></i> WA Ads';
+      adsBtn.onclick = () => {
+        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('sa-ads-tab');
+        else {
+          const link = document.querySelector('[data-tab="sa-ads-tab"]');
+          if (link) link.click();
+        }
+      };
+      head.appendChild(adsBtn);
+    }
+  } catch (_) {}
 }
 
 function renderPlatformReports() {
