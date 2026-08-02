@@ -14,7 +14,7 @@
   <!-- FIX: matched to manifest theme_color -->
   <meta name="theme-color" content="#FF4F00">
   <!-- SEO -->
-  <meta name="description" content="RestroSuite by CodeArc — offline-first restaurant POS, kitchen display, WhatsApp receipts, and QR ordering. Free to start. Built for Indian food businesses.">
+  <meta name="description" content="RestroSuite by CodeArc — offline-first POS, kitchen KDS, QR ordering, floor, WhatsApp bills, reports, inventory, staff roles & Growth Hub. Free to start for Indian restaurants.">
   <meta name="robots" content="index, follow">
   <meta name="author" content="CodeArc Tech Labs">
   <!-- Open Graph / WhatsApp / Facebook / LinkedIn (optimized for link unfurl) -->
@@ -898,6 +898,42 @@
     }
     .feature-card:hover .learn { opacity: 1; transform: none; }
 
+    /* All modules catalogue */
+    .modules-section { border-top: 1px solid var(--border); }
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .mod-card {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 16px 16px 15px;
+      border-radius: 16px;
+      background: var(--panel-solid, var(--surface-solid));
+      border: 1px solid var(--stroke-2, var(--border));
+      transition: border-color .2s, box-shadow .2s, transform .2s;
+    }
+    .mod-card:hover {
+      border-color: var(--accent-line, rgba(255,79,0,.35));
+      box-shadow: var(--shadow-md, 0 8px 28px rgba(0,0,0,.06));
+      transform: translateY(-2px);
+    }
+    .mod-ic {
+      width: 40px; height: 40px; border-radius: 12px; flex: none;
+      display: grid; place-items: center; font-size: 15px;
+      background: var(--accent-soft); color: var(--accent);
+      border: 1px solid var(--accent-line, transparent);
+    }
+    .mod-card.t2 .mod-ic { background: var(--teal-soft, rgba(15,159,110,.1)); color: var(--teal, #0F9F6E); border-color: transparent; }
+    .mod-card h3 { font-size: 14.5px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; color: var(--text); }
+    .mod-card p { font-size: 12.5px; line-height: 1.45; margin: 0; color: var(--text-dim, var(--text-soft)); }
+    .modules-foot {
+      margin: 22px auto 0; max-width: 640px; text-align: center;
+      font-size: 13px; color: var(--text-mute); line-height: 1.5;
+    }
+    .modules-foot a { color: var(--accent); font-weight: 700; text-decoration: none; }
+    .modules-foot a:hover { text-decoration: underline; }
+
     /* Empathy split */
     .empathy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
     .empathy-col { padding: 36px 32px; }
@@ -1466,6 +1502,7 @@
       .hero-visual { max-width: 560px; margin: 0 auto; width: 100%; min-height: 0; }
       .hero-constellation.live { border-radius: 18px; }
       .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .modules-grid { grid-template-columns: repeat(2, 1fr); }
       .empathy-grid, .demo-grid, .pricing-grid { grid-template-columns: 1fr; }
       .pricing-card.featured { order: -1; }
       .footer-grid { grid-template-columns: 1fr 1fr; gap: 30px; }
@@ -1514,6 +1551,8 @@
 
       /* Features */
       .features-grid { grid-template-columns: 1fr; gap: 14px; }
+      .modules-grid { grid-template-columns: 1fr; gap: 10px; }
+      .mod-card { padding: 14px; }
       .feature-card { padding: 22px 20px; }
       .feature-ic { width: 44px; height: 44px; font-size: 18px; margin-bottom: 14px; }
       .feature-card h3 { font-size: 17px; }
@@ -1594,6 +1633,7 @@
       <nav class="nav-links" aria-label="Main navigation">
         <a href="install">Install</a>
         <a href="#features">Features</a>
+        <a href="#modules">All modules</a>
         <a href="#demo">Try a bill</a>
         <a href="#pricing">Pricing</a>
         <a href="login">Sign in</a>
@@ -1618,6 +1658,7 @@
   <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation" hidden>
     <a href="install"   onclick="closeMobileNav()"><i class="fa-solid fa-download fa-fw" aria-hidden="true"></i>Install</a>
     <a href="#features" onclick="closeMobileNav()"><i class="fa-solid fa-list fa-fw" aria-hidden="true"></i>Features</a>
+    <a href="#modules"  onclick="closeMobileNav()"><i class="fa-solid fa-layer-group fa-fw" aria-hidden="true"></i>All modules</a>
     <a href="#demo"     onclick="closeMobileNav()"><i class="fa-solid fa-receipt fa-fw" aria-hidden="true"></i>Try a bill</a>
     <a href="#pricing"  onclick="closeMobileNav()"><i class="fa-solid fa-tag fa-fw" aria-hidden="true"></i>Pricing</a>
     <a href="login"     onclick="closeMobileNav()"><i class="fa-solid fa-right-to-bracket fa-fw" aria-hidden="true"></i>Sign in</a>
@@ -1957,6 +1998,154 @@
             <a href="login" class="learn">Sign in to the console <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </div>
         </div>
+        <p style="text-align:center;margin:22px 0 0;font-size:13.5px;color:var(--text-mute)">
+          Full catalogue below · <a href="#modules" style="color:var(--accent);font-weight:700;text-decoration:none">See all modules</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== ALL MODULES ===== -->
+    <section class="section modules-section" id="modules" aria-labelledby="modules-title">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Full system</span>
+          <h2 id="modules-title">Every module in one workspace</h2>
+          <p>Day-one billing through growth tools — same outlet, same login. Start with Counter mode; unlock tables &amp; kitchen when ready.</p>
+        </div>
+        <div class="modules-grid" role="list">
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-cash-register" aria-hidden="true"></i></div>
+            <div>
+              <h3>POS &amp; billing</h3>
+              <p>Cash · UPI · card · split · hold · Print &amp; Pay · bill settled receipt.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-fire-burner" aria-hidden="true"></i></div>
+            <div>
+              <h3>Kitchen display (KDS)</h3>
+              <p>Live KOTs from POS &amp; QR. Timers, ready mark, station routing.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-qrcode" aria-hidden="true"></i></div>
+            <div>
+              <h3>QR table ordering</h3>
+              <p>Guest phone menu · no app. Orders hit QR board + kitchen live.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-chair" aria-hidden="true"></i></div>
+            <div>
+              <h3>Floor &amp; tables</h3>
+              <p>Occupancy map, seat sessions, staff scan table QR → open POS.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></div>
+            <div>
+              <h3>WhatsApp bills</h3>
+              <p>Send PDF/receipt from settle. Central Hub or your linked number.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-file-invoice" aria-hidden="true"></i></div>
+            <div>
+              <h3>Bills history</h3>
+              <p>Today’s sales, rebill, thermal reprint, filters, Excel/CSV export.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i></div>
+            <div>
+              <h3>Reports &amp; CA pack</h3>
+              <p>Day / week / month sales, tax totals, GSTR CSV, accountant pack.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-utensils" aria-hidden="true"></i></div>
+            <div>
+              <h3>Menu editor</h3>
+              <p>Categories, prices, tax, bestsellers, sample café pack on day one.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></div>
+            <div>
+              <h3>Inventory &amp; recipes</h3>
+              <p>Stock, min levels, recipe costing links so sales reduce store-room.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-user-group" aria-hidden="true"></i></div>
+            <div>
+              <h3>Staff &amp; roles</h3>
+              <p>Owner, cashier, kitchen, waiter — tab access &amp; PINs per person.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-address-book" aria-hidden="true"></i></div>
+            <div>
+              <h3>Customers &amp; CRM</h3>
+              <p>Guest phones, dues, loyalty-ready profiles from every bill.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-unlock" aria-hidden="true"></i></div>
+            <div>
+              <h3>Shifts &amp; Z-report</h3>
+              <p>Open float, track counter cash, Z-close with print/CSV when required.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-wifi" aria-hidden="true"></i></div>
+            <div>
+              <h3>Offline-first sync</h3>
+              <p>Bill when the line dies; cloud catch-up when online again.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></div>
+            <div>
+              <h3>Counter · Tables · Full modes</h3>
+              <p>Start simple (POS + bills + reports); unlock floor/QR/KDS later.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-rocket" aria-hidden="true"></i></div>
+            <div>
+              <h3>Growth Hub</h3>
+              <p>Reservations, offers, loyalty, campaigns, POs, feedback, support tickets.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-truck" aria-hidden="true"></i></div>
+            <div>
+              <h3>Channels</h3>
+              <p>Dine-in, takeaway, delivery counter, aggregator-ready order board.</p>
+            </div>
+          </article>
+          <article class="mod-card" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i></div>
+            <div>
+              <h3>Web · Windows · Mac · Android</h3>
+              <p>Same outlet on counter PC, kitchen tablet, or phone browser.</p>
+            </div>
+          </article>
+          <article class="mod-card t2" role="listitem">
+            <div class="mod-ic"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
+            <div>
+              <h3>Security &amp; trial</h3>
+              <p>Encrypted cloud, role lock, 30-day Serve trial — no card to start.</p>
+            </div>
+          </article>
+        </div>
+        <p class="modules-foot">
+          Brochure PDF:
+          <a href="downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener">Product features guide</a>
+          · Ready to run?
+          <a href="login.html?tab=register">Create free outlet</a>
+        </p>
       </div>
     </section>
 

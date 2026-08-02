@@ -105,6 +105,42 @@
   .story-feat { display: flex; align-items: center; gap: 11px; color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500; line-height: 1.35; }
   .story-feat i { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 13px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); color: #fff; flex: none; }
 
+  /* Full modules strip on login marketing panel */
+  .story-modules {
+    margin-top: 18px; padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .story-modules-label {
+    font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: rgba(255,255,255,0.5); margin-bottom: 10px;
+  }
+  .story-mod-chips {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .story-mod-chips span {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+    color: rgba(255,255,255,0.92);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    line-height: 1.2;
+  }
+  .story-mod-chips span i { font-size: 10px; opacity: .85; }
+  .story-modules-more {
+    margin: 10px 0 0; font-size: 12px; color: rgba(255,255,255,0.55);
+  }
+  .story-modules-more a {
+    color: #FFB38A; font-weight: 700; text-decoration: none;
+  }
+  .story-modules-more a:hover { text-decoration: underline; }
+  [data-theme="light"] .story-modules { border-top-color: var(--stroke-2); }
+  [data-theme="light"] .story-modules-label { color: var(--text-mute); }
+  [data-theme="light"] .story-mod-chips span {
+    color: var(--text); background: var(--glass, rgba(20,16,12,0.04)); border-color: var(--stroke-2);
+  }
+  [data-theme="light"] .story-modules-more { color: var(--text-mute); }
+  [data-theme="light"] .story-modules-more a { color: var(--orange); }
+
   /* ===== marketing panel — LIGHT MODE adaptation ===== */
   [data-theme="light"] .access-story { background: #FFFFFF; border-color: var(--stroke-2); }
   [data-theme="light"] .access-story::after { background: linear-gradient(160deg, rgba(255,79,0,0.08) 0%, transparent 50%); }
@@ -317,6 +353,33 @@
         <div class="story-feat"><i class="fa-solid fa-chart-line"></i> Live sales reports &amp; automatic daily close-out</div>
         <div class="story-feat"><i class="fa-solid fa-credit-card"></i> UPI · card · cash · wallet — every payment mode</div>
         <div class="story-feat"><i class="fa-solid fa-lock"></i> Bank-grade encryption · your data stays yours</div>
+      </div>
+
+      <div class="story-modules" aria-label="All modules in RestroSuite">
+        <div class="story-modules-label">Full system · all modules</div>
+        <div class="story-mod-chips">
+          <span><i class="fa-solid fa-cash-register"></i> POS &amp; bills</span>
+          <span><i class="fa-solid fa-fire-burner"></i> Kitchen KDS</span>
+          <span><i class="fa-solid fa-qrcode"></i> QR ordering</span>
+          <span><i class="fa-solid fa-chair"></i> Floor tables</span>
+          <span><i class="fa-brands fa-whatsapp"></i> WhatsApp bills</span>
+          <span><i class="fa-solid fa-file-invoice"></i> Reports · CA pack</span>
+          <span><i class="fa-solid fa-utensils"></i> Menu editor</span>
+          <span><i class="fa-solid fa-boxes-stacked"></i> Inventory</span>
+          <span><i class="fa-solid fa-user-group"></i> Staff roles</span>
+          <span><i class="fa-solid fa-address-book"></i> Customers</span>
+          <span><i class="fa-solid fa-unlock"></i> Shifts · Z</span>
+          <span><i class="fa-solid fa-wifi"></i> Offline sync</span>
+          <span><i class="fa-solid fa-rocket"></i> Growth Hub</span>
+          <span><i class="fa-solid fa-truck"></i> Takeaway · delivery</span>
+          <span><i class="fa-solid fa-mobile-screen"></i> Web · Win · Mac · Android</span>
+        </div>
+        <p class="story-modules-more">
+          Details on the site:
+          <a href="index.html#modules">See all modules</a>
+          ·
+          <a href="downloads/RestroSuite-Product-Features-Guide.pdf" target="_blank" rel="noopener">PDF brochure</a>
+        </p>
       </div>
     </div>
   </section>
