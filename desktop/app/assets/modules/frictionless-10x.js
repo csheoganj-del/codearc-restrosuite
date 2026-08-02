@@ -682,6 +682,18 @@
       try {
         localStorage.setItem(tenantKey(WELCOME_KEY), '1');
       } catch (_) {}
+      // Discard legacy Getting Started tour for this outlet — frictionless is the system
+      try {
+        var slug = 'local';
+        var user = 'owner';
+        try {
+          var sess = global.RS_API && RS_API.session && RS_API.session();
+          slug = String((sess && (sess.tenant_slug || sess.slug)) || sessionStorage.getItem('tenant_slug') || 'local');
+          user = String((sess && (sess.email || sess.username || sess.user_id)) || sessionStorage.getItem('username') || 'owner');
+        } catch (_) {}
+        localStorage.setItem('restrosuite_tour_done:' + slug + ':' + user, '1');
+        sessionStorage.setItem('restrosuite_tour_skip_session:' + slug + ':' + user, '1');
+      } catch (_) {}
       closeAllModals();
       var wrap = document.getElementById('rs-fx-welcome');
       if (wrap) wrap.remove();

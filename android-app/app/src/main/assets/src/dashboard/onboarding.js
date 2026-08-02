@@ -415,12 +415,21 @@
     try {
       if (sessionStorage.getItem(tourSessionSkipKey()) === '1') {return false;}
     } catch (_) {}
-    // Frictionless 10x welcome + start-selling checklist replaces the long tour on day 1
+    // CURRENT SYSTEM ONLY: frictionless welcome + Start selling checklist owns first-run.
+    // Never auto-pop the old multi-module "Getting Started" tour for outlet owners.
+    // Product Guide / Help can still open the tour on demand (startOnboardingTour).
     try {
-      if (window.RSFrictionless && !window.__rsForceFullOnboardingTour) {
-        const menuN = (window.RS && Array.isArray(RS.MENU)) ? RS.MENU.length : 0;
-        const billsN = (window.RS && Array.isArray(RS.BILLS)) ? RS.BILLS.length : 0;
-        if (menuN < 8 && billsN < 5) {return false;}
+      if (!window.__rsForceFullOnboardingTour) {
+        if (window.RSFrictionless) {return false;}
+        // Frictionless script pending load — still skip auto tour for real outlets
+        const role = String(
+          (window.RS_API && RS_API.session && RS_API.session() && RS_API.session().role) ||
+            sessionStorage.getItem('logged_in_role') ||
+            ''
+        ).toLowerCase();
+        if (role === 'owner' || role === 'admin' || role === 'manager' || !role) {
+          return false;
+        }
       }
     } catch (_) {}
     return true;
