@@ -313,23 +313,77 @@ function isPaidPlanCode(planCode: unknown): boolean {
   return c === "express" || c === "serve" || c === "command";
 }
 
-function isActiveBillingStatus(subStatus: unknown): boolean {
-  return String(subStatus || "").toLowerCase() === "active";
+/**
+ * Billing kind for Super-Admin metrics.
+ * "active" alone is NOT paid — many legacy / SA-created workspaces were stored as
+ * active while still on free trial. Paid requires conversion evidence.
+ */
+function tenantBillingKind(t: {
+  subscription_status?: unknown;
+  subscription_id?: unknown;
+  subscription_activated_at?: unknown;
+  trial_started_at?: unknown;
+}): "trial" | "paid" | "risk" | "other" {
+  const sub = String(t.subscription_status || "").toLowerCase();
+  if (sub === "trialing" || sub === "trial") return "trial";
+  if (sub === "past_due" || sub === "canceled" || sub === "cancelled" || sub === "expired") {
+    return "risk";
+  }
+  const hasPaidEvidence = !!(
+    (t.subscription_id && String(t.subscription_id).trim()) ||
+    t.subscription_activated_at
+  );
+  if (sub === "active") {
+    if (hasPaidEvidence) return "paid";
+    // active without payment → trial / complimentary (do not count in MRR)
+    return "trial";
+  }
+  if (!sub && t.trial_started_at) return "trial";
+  return "other";
 }
 
-/** Monthly recurring revenue for one tenant (yearly → /12). */
+function isPaidActiveTenant(t: {
+  plan_code?: unknown;
+  subscription_status?: unknown;
+  subscription_id?: unknown;
+  subscription_activated_at?: unknown;
+  trial_started_at?: unknown;
+}): boolean {
+  return tenantBillingKind(t) === "paid" && isPaidPlanCode(t.plan_code);
+}
+
+/** Monthly recurring revenue for one tenant (yearly → /12). Only real paid. */
 function tenantMrrRupees(
   map: Record<string, number>,
-  planCode: unknown,
-  subStatus: unknown,
+  tenantOrPlan: unknown,
+  subStatus?: unknown,
   billingInterval?: unknown,
+  paidEvidence?: { subscription_id?: unknown; subscription_activated_at?: unknown; trial_started_at?: unknown },
 ): number {
-  if (!isActiveBillingStatus(subStatus)) return 0;
+  // Support call shapes:
+  //  (map, tenantRow)
+  //  (map, planCode, subStatus, interval, evidence?)
+  let planCode: unknown;
+  let interval: unknown = billingInterval;
+  let evidence = paidEvidence || {};
+  if (tenantOrPlan && typeof tenantOrPlan === "object" && !Array.isArray(tenantOrPlan)) {
+    const t = tenantOrPlan as Record<string, unknown>;
+    if (!isPaidActiveTenant(t as any)) return 0;
+    planCode = t.plan_code;
+    interval = t.billing_interval;
+  } else {
+    planCode = tenantOrPlan;
+    const fake = {
+      plan_code: planCode,
+      subscription_status: subStatus,
+      ...evidence,
+    };
+    if (!isPaidActiveTenant(fake)) return 0;
+  }
   const monthly = priceFrom(map, planCode);
   if (!monthly) return 0;
-  const interval = String(billingInterval || "monthly").toLowerCase();
-  if (interval === "yearly") {
-    // Prefer catalogue yearly when known (499→4999, 999→9999, 2499→24999), else monthly*10 / 12
+  const iv = String(interval || "monthly").toLowerCase();
+  if (iv === "yearly") {
     const yr =
       monthly === 499 ? 4999
         : monthly === 999 ? 9999
@@ -448,7 +502,7 @@ async function listTenants(req: Request) {
     const full = await supabaseAdmin
       .from("saas_tenants")
       .select(
-        "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, billing_interval, admin_notes, created_at",
+        "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, billing_interval, admin_notes, trial_started_at, subscription_id, subscription_activated_at, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(500);
@@ -458,7 +512,7 @@ async function listTenants(req: Request) {
       const soft = await supabaseAdmin
         .from("saas_tenants")
         .select(
-          "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, billing_interval, created_at",
+          "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, billing_interval, trial_started_at, subscription_id, created_at",
         )
         .order("created_at", { ascending: false })
         .limit(500);
@@ -506,17 +560,16 @@ async function listTenants(req: Request) {
   }
 
   const tenants = rows.map((t: any) => {
-    const mrr = tenantMrrRupees(
-      priceMap,
-      t.plan_code,
-      t.subscription_status,
-      t.billing_interval,
-    );
+    const billing_kind = tenantBillingKind(t);
+    const mrr = tenantMrrRupees(priceMap, t);
     const oid = String(t.id);
     return {
       ...t,
       billing_interval: t.billing_interval || "monthly",
       admin_notes: t.admin_notes != null ? String(t.admin_notes) : "",
+      billing_kind,
+      is_trial: billing_kind === "trial",
+      is_paid: billing_kind === "paid",
       mrr,
       plan_name: planFor(t.plan_code).name,
       outlet_count: outletCountByTenant.get(oid) || 1,
@@ -529,7 +582,9 @@ async function listTenants(req: Request) {
 async function getPlatformStats(req: Request) {
   const { data: tenants, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, status, plan_code, subscription_status, billing_interval");
+    .select(
+      "id, status, plan_code, subscription_status, billing_interval, trial_started_at, subscription_id, subscription_activated_at",
+    );
   if (error) {
     console.error("get_platform_stats tenants failed:", error);
     return jsonResponse({ error: "Failed to load platform stats." }, 500, req);
@@ -541,22 +596,16 @@ async function getPlatformStats(req: Request) {
 
   const rows = tenants || [];
   const priceMap = await fetchPlanPriceMap();
-  const atRiskStatuses = new Set(["past_due", "canceled", "cancelled", "expired"]);
   const stats = {
     tenants_total: rows.length,
     tenants_active: rows.filter((t: any) => ["approved", "active"].includes(String(t.status))).length,
     tenants_pending: rows.filter((t: any) => String(t.status) === "pending").length,
-    tenants_at_risk: rows.filter((t: any) => atRiskStatuses.has(String(t.subscription_status || "").toLowerCase())).length,
-    // Paid = active subscription on Express / Serve / Command (or legacy aliases)
-    paid_tenants: rows.filter((t: any) =>
-      isActiveBillingStatus(t.subscription_status) && isPaidPlanCode(t.plan_code)
-    ).length,
-    // MRR only from active paid (not trials)
-    platform_mrr: rows.reduce(
-      (sum: number, t: any) =>
-        sum + tenantMrrRupees(priceMap, t.plan_code, t.subscription_status, t.billing_interval),
-      0,
-    ),
+    tenants_at_risk: rows.filter((t: any) => tenantBillingKind(t) === "risk").length,
+    tenants_trial: rows.filter((t: any) => tenantBillingKind(t) === "trial").length,
+    // Paid = converted Express/Serve/Command with payment evidence
+    paid_tenants: rows.filter((t: any) => isPaidActiveTenant(t)).length,
+    // MRR only from truly paid (never trials)
+    platform_mrr: rows.reduce((sum: number, t: any) => sum + tenantMrrRupees(priceMap, t), 0),
     users_total: userCount || 0,
   };
   return jsonResponse({ stats }, 200, req);
@@ -586,7 +635,9 @@ async function listUsers(req: Request) {
 async function getBilling(req: Request) {
   const { data: tenants, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, plan_code, subscription_status, subscription_current_period_end, billing_interval, created_at")
+    .select(
+      "id, name, slug, plan_code, subscription_status, subscription_current_period_end, billing_interval, trial_started_at, subscription_id, subscription_activated_at, created_at",
+    )
     .order("created_at", { ascending: false })
     .limit(500);
   if (error) {
@@ -602,21 +653,22 @@ async function getBilling(req: Request) {
   if (invoiceError) console.warn("get_billing invoices unavailable:", invoiceError.message);
 
   const priceMap = await fetchPlanPriceMap();
-  const billing = (tenants || []).map((tenant: any) => ({
-    tenant_id: tenant.id,
-    tenant_name: tenant.name,
-    tenant_slug: tenant.slug,
-    plan_code: tenant.plan_code || "express",
-    subscription_status: tenant.subscription_status || "active",
-    subscription_current_period_end: tenant.subscription_current_period_end || null,
-    billing_interval: tenant.billing_interval || "monthly",
-    mrr: tenantMrrRupees(
-      priceMap,
-      tenant.plan_code,
-      tenant.subscription_status,
-      tenant.billing_interval,
-    ),
-  }));
+  const billing = (tenants || []).map((tenant: any) => {
+    const kind = tenantBillingKind(tenant);
+    return {
+      tenant_id: tenant.id,
+      tenant_name: tenant.name,
+      tenant_slug: tenant.slug,
+      plan_code: tenant.plan_code || "express",
+      subscription_status: tenant.subscription_status || "active",
+      subscription_current_period_end: tenant.subscription_current_period_end || null,
+      billing_interval: tenant.billing_interval || "monthly",
+      billing_kind: kind,
+      is_trial: kind === "trial",
+      is_paid: kind === "paid",
+      mrr: tenantMrrRupees(priceMap, tenant),
+    };
+  });
   return jsonResponse({ billing, invoices: invoiceError ? [] : (invoices || []) }, 200, req);
 }
 
@@ -819,7 +871,7 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
   if (!tenantId) return jsonResponse({ error: "Tenant ID is required." }, 400, req);
   const { data: currentTenant, error: currentTenantError } = await supabaseAdmin
     .from("saas_tenants")
-    .select("username, auth_version")
+    .select("username, auth_version, trial_started_at, subscription_activated_at, subscription_id")
     .eq("id", tenantId)
     .maybeSingle();
   if (currentTenantError || !currentTenant) {
@@ -860,9 +912,32 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
     typeof payload.subscription_status === "string"
     && ["trialing", "active", "past_due", "canceled", "cancelled", "expired"].includes(payload.subscription_status)
   ) {
-    updates.subscription_status = payload.subscription_status === "cancelled"
+    const nextSub = payload.subscription_status === "cancelled"
       ? "canceled"
       : payload.subscription_status;
+    updates.subscription_status = nextSub;
+    // Stamp trial vs paid conversion for honest Super-Admin metrics
+    const prevSub = String((currentTenant as any)?.subscription_status || "").toLowerCase();
+    if (nextSub === "trialing") {
+      if (!(currentTenant as any)?.trial_started_at) {
+        updates.trial_started_at = new Date().toISOString();
+      }
+    }
+    // Paid conversion only when explicitly marked or status moves trialing → active
+    if (
+      nextSub === "active" &&
+      (payload.mark_paid === true ||
+        payload.activate_paid === true ||
+        prevSub === "trialing" ||
+        prevSub === "trial")
+    ) {
+      updates.subscription_activated_at = new Date().toISOString();
+    }
+  }
+  // Explicit Super-Admin "Activate paid" always stamps conversion
+  if (payload.mark_paid === true || payload.activate_paid === true) {
+    updates.subscription_status = "active";
+    updates.subscription_activated_at = new Date().toISOString();
   }
   if (typeof payload.subscription_current_period_end === "string") {
     const periodEnd = payload.subscription_current_period_end.trim();

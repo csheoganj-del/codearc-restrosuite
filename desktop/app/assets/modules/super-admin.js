@@ -83,12 +83,43 @@
     if (c === 'command' || c === 'enterprise' || c === 'scale') return 2499;
     return 0;
   }
-  /** Per-tenant MRR: prefer server-computed t.mrr, else derive from plan + status + interval. */
+  /**
+   * Trial vs paid (must match tenant-admin).
+   * "active" alone is NOT paid — needs subscription_id or subscription_activated_at.
+   * Mis-marked active workspaces with no payment evidence count as trial.
+   */
+  function isTrialTenant(t) {
+    if (!t) return false;
+    if (t.is_trial === true || t.billing_kind === 'trial') return true;
+    if (t.is_paid === true || t.billing_kind === 'paid') return false;
+    const sub = String(t.subscription_status || '').toLowerCase();
+    if (sub === 'trialing' || sub === 'trial') return true;
+    if (sub === 'past_due' || sub === 'canceled' || sub === 'cancelled' || sub === 'expired') return false;
+    const hasPaidEvidence = !!(
+      (t.subscription_id && String(t.subscription_id).trim()) ||
+      t.subscription_activated_at
+    );
+    if (sub === 'active' || !sub) return !hasPaidEvidence;
+    return !!t.trial_started_at && !hasPaidEvidence;
+  }
+  function isPaidTenant(t) {
+    if (!t) return false;
+    if (t.is_paid === true || t.billing_kind === 'paid') return true;
+    if (isTrialTenant(t)) return false;
+    const sub = String(t.subscription_status || '').toLowerCase();
+    if (sub !== 'active') return false;
+    const plan = canonPlanCode(t.plan_code);
+    if (!['express', 'serve', 'command'].includes(plan)) return false;
+    return !!(
+      (t.subscription_id && String(t.subscription_id).trim()) ||
+      t.subscription_activated_at
+    );
+  }
+  /** Per-tenant MRR: only real paid (never trials). */
   function tenantMrr(t) {
     if (!t) return 0;
+    if (!isPaidTenant(t)) return 0;
     if (Number(t.mrr) > 0) return Number(t.mrr);
-    const sub = String(t.subscription_status || '').toLowerCase();
-    if (sub !== 'active') return 0;
     const mo = planMonthlyPrice(t.plan_code);
     if (!mo) return 0;
     const interval = String(t.billing_interval || 'monthly').toLowerCase();
@@ -219,21 +250,22 @@ function renderPlatformSummary(tenants = []) {
   const total = tenants.length;
   const active = tenants.filter(t => t.status === 'approved' || t.status === 'active').length;
   const pending = tenants.filter(t => t.status === 'pending').length;
-  const paidTiers = tenants.filter(t => {
-    const sub = String(t.subscription_status || '').toLowerCase();
-    const plan = canonPlanCode(t.plan_code);
-    return sub === 'active' && ['express', 'serve', 'command'].includes(plan);
-  }).length;
-  const trials = tenants.filter(t => String(t.subscription_status || '').toLowerCase() === 'trialing').length;
-  const risk = tenants.filter(t => ['past_due', 'canceled', 'cancelled', 'expired'].includes(String(t.subscription_status || '').toLowerCase())).length;
+  const paidTiers = tenants.filter((t) => isPaidTenant(t)).length;
+  const trials = tenants.filter((t) => isTrialTenant(t)).length;
+  const risk = tenants.filter((t) =>
+    ['past_due', 'canceled', 'cancelled', 'expired'].includes(String(t.subscription_status || '').toLowerCase()) ||
+    t.billing_kind === 'risk'
+  ).length;
   const conversion = total ? Math.round((paidTiers / total) * 100) : 0;
   const totalMrrFixed = tenants.reduce((sum, t) => sum + tenantMrr(t), 0);
   const mrrDisplay = totalMrrFixed > 0 ? rs(totalMrrFixed) : '₹0';
-  const mrrSub = totalMrrFixed > 0 ? `${paidTiers} paid · ${trials} trial` : `${trials} on trial · no paid yet`;
+  const mrrSub = totalMrrFixed > 0
+    ? `${paidTiers} paid · ${trials} trial`
+    : (trials ? `${trials} on trial · ₹0 MRR` : 'no paid yet');
   target.innerHTML = [
     saasSnapshotCard('Workspaces', total, `${active} active · ${pending} pending`, 'fa-solid fa-store', 'all', superAdminFilter === 'all'),
     saasSnapshotCard('Pending', pending, pending ? 'Needs review' : 'Queue clear', 'fa-solid fa-user-clock', 'pending', superAdminFilter === 'pending'),
-    saasSnapshotCard('Paid plans', `${conversion}%`, `${paidTiers} of ${total} Express+`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
+    saasSnapshotCard('Paid plans', `${conversion}%`, `${paidTiers} of ${total} converted`, 'fa-solid fa-chart-pie', 'paid', superAdminFilter === 'paid'),
     saasSnapshotCard('At risk', risk, 'Past-due, expired or canceled', 'fa-solid fa-triangle-exclamation', 'risk', superAdminFilter === 'risk'),
     saasSnapshotCard('Platform MRR', mrrDisplay, mrrSub, 'fa-solid fa-indian-rupee-sign', 'mrr', superAdminFilter === 'mrr')
   ].join('');
@@ -295,14 +327,13 @@ function renderTenantTable() {
   // Status filter
   if (superAdminFilter === 'pending') {filtered = filtered.filter(t => t.status === 'pending');}
   else if (superAdminFilter === 'paid') {
-    filtered = filtered.filter(t => {
-      const sub = String(t.subscription_status || '').toLowerCase();
-      const plan = canonPlanCode(t.plan_code);
-      return sub === 'active' && ['express', 'serve', 'command'].includes(plan);
-    });
+    filtered = filtered.filter((t) => isPaidTenant(t));
   }
   else if (superAdminFilter === 'risk') {
-    filtered = filtered.filter(t => ['past_due', 'canceled', 'cancelled', 'expired'].includes(String(t.subscription_status || '').toLowerCase()));
+    filtered = filtered.filter(t =>
+      ['past_due', 'canceled', 'cancelled', 'expired'].includes(String(t.subscription_status || '').toLowerCase()) ||
+      t.billing_kind === 'risk'
+    );
   }
 
   // Text search
@@ -364,8 +395,9 @@ function renderTenantTable() {
     const isGrowth = planC === 'serve';
     const pillCls = isChain ? 'pill-violet' : isGrowth ? 'pill-orange' : '';
     const statusKey = (t.status || 'active').toLowerCase();
-    const statusCls = tStatus[statusKey] || 't-active';
-    const statusText = formatAccountStatus(t.status || 'active');
+    const onTrial = isTrialTenant(t);
+    const statusCls = onTrial ? 't-trial' : (tStatus[statusKey] || 't-active');
+    const statusText = onTrial ? 'Trial' : formatAccountStatus(t.status || 'active');
     const joined = formatDateIN(t.created_at);
     const mrr = tenantMrr(t);
     const rawName = t.name || t.tenant_name || t.slug || 'Unknown';
@@ -403,8 +435,10 @@ function renderTenantTable() {
       renewsCell = `<span style="color:${color};font-weight:600;white-space:nowrap">${_e(label)}</span>`;
     }
     const mrrCell = mrr > 0
-      ? `<span title="Monthly recurring from plan">${rs(mrr)}</span>`
-      : '<span style="color:var(--text-mute)" title="No active paid plan">₹0</span>';
+      ? `<span title="Monthly recurring from paid conversion">${rs(mrr)}</span>`
+      : (onTrial
+        ? '<span style="color:var(--text-mute)" title="On trial — not counted in MRR">₹0</span>'
+        : '<span style="color:var(--text-mute)" title="No active paid plan">₹0</span>');
     // Actions order: Manage · Open · Seed · Suspend (primary first)
     return `<tr class="tenant-row ${selected ? 'tenant-row-selected' : ''}" data-tid="${_e(tenantId)}" style="cursor:pointer">
       <td><div class="tenant-outlet-cell"><input type="checkbox" class="tenant-checkbox tenant-row-checkbox" data-tid="${_e(tenantId)}" aria-label="Select ${_e(name)}" ${selected ? 'checked' : ''}><div class="avatar-sm" style="background:${colorAt(rawName.length)}">${_e(initials(rawName))}</div><div><b>${_e(name)}</b><div style="font-size:11px;color:var(--text-mute)">${_e(slug)}</div></div></div></td>
@@ -882,11 +916,19 @@ function openCreateTenantModal() {
             const allTenants = (out && out.tenants) || [];
             const newTenant = allTenants.find(t => t.slug === slug || t.username === username);
             if (newTenant && newTenant.id) {
+              // New workspaces start on trial until Super-Admin activates paid (or Razorpay converts)
+              const trialEnd = new Date(Date.now() + 30 * 86400000).toISOString();
               await RS_API.admin({ action: 'update_tenant', tenant_id: newTenant.id, status: 'approved',
-                username, plan_code, subscription_status: 'active',
+                username, plan_code, subscription_status: 'trialing',
+                subscription_current_period_end: trialEnd,
                 allowed_tabs: newTenant.allowed_tabs || [], phone, email });
               newTenant.status = 'approved';
               newTenant.plan_code = plan_code;
+              newTenant.subscription_status = 'trialing';
+              newTenant.subscription_current_period_end = trialEnd;
+              newTenant.is_trial = true;
+              newTenant.billing_kind = 'trial';
+              newTenant.mrr = 0;
             }
             _cachedTenants = allTenants;
           } catch(e) { /* approval failed silently — tenant still created */ }
@@ -1662,6 +1704,9 @@ function initTenantManageModalEvents() {
         subscription_current_period_end,
         phone: t.phone || '',
         email: t.email || '',
+        // Marks paid conversion so metrics stop treating this as trial
+        mark_paid: kind === 'activate',
+        activate_paid: kind === 'activate',
       });
       Object.assign(t, {
         status: 'approved',
@@ -1669,7 +1714,16 @@ function initTenantManageModalEvents() {
         subscription_status,
         billing_interval: kind === 'trial' ? 'monthly' : billing_interval,
         subscription_current_period_end,
+        trial_started_at: kind === 'trial' ? (t.trial_started_at || new Date().toISOString()) : t.trial_started_at,
+        subscription_activated_at: kind === 'activate' ? new Date().toISOString() : t.subscription_activated_at,
+        is_trial: kind === 'trial',
+        is_paid: kind === 'activate',
+        billing_kind: kind === 'activate' ? 'paid' : (kind === 'trial' ? 'trial' : t.billing_kind),
+        mrr: 0,
       });
+      if (kind === 'activate') {
+        t.mrr = tenantMrr({ ...t, mrr: 0, is_paid: true, billing_kind: 'paid', subscription_status: 'active' });
+      }
       // Reflect in modal fields
       const pe = document.getElementById('manage-period-end');
       if (pe) pe.value = new Date(endMs).toISOString().slice(0, 10);
@@ -1708,14 +1762,18 @@ function renderInlinePlatformReports(tenants) {
   if (!box) return;
   const list = Array.isArray(tenants) ? tenants : _cachedTenants;
   const byPlan = { express: 0, serve: 0, command: 0, other: 0 };
-  const bySub = { trialing: 0, active: 0, expired: 0, past_due: 0, canceled: 0 };
+  let trialN = 0;
+  let paidN = 0;
+  let riskN = 0;
   list.forEach((t) => {
     const p = canonPlanCode(t.plan_code);
     if (byPlan[p] != null) byPlan[p]++; else byPlan.other++;
-    const s = String(t.subscription_status || 'active').toLowerCase();
-    if (s === 'cancelled') bySub.canceled++;
-    else if (bySub[s] != null) bySub[s]++;
-    else if (s === 'approved') bySub.active++;
+    if (isTrialTenant(t)) trialN++;
+    else if (isPaidTenant(t)) paidN++;
+    else if (
+      ['past_due', 'canceled', 'cancelled', 'expired'].includes(String(t.subscription_status || '').toLowerCase()) ||
+      t.billing_kind === 'risk'
+    ) riskN++;
   });
   const card = (label, val, sub) =>
     `<div style="border:1px solid var(--stroke);border-radius:10px;padding:10px 12px;background:var(--panel)">
@@ -1727,9 +1785,9 @@ function renderInlinePlatformReports(tenants) {
     card('Express', byPlan.express, 'counter plans'),
     card('Serve', byPlan.serve, 'floor plans'),
     card('Command', byPlan.command, 'full ops'),
-    card('Trials', bySub.trialing, 'free 30-day'),
-    card('Paid active', bySub.active, 'billing OK'),
-    card('Expired / risk', bySub.expired + bySub.past_due + bySub.canceled, 'need attention'),
+    card('Trials', trialN, 'free / not converted'),
+    card('Paid active', paidN, 'billing OK'),
+    card('Expired / risk', riskN, 'need attention'),
   ].join('');
   const openBtn = document.getElementById('sa-open-reports-btn');
   if (openBtn && !openBtn.dataset.bound) {
@@ -1781,9 +1839,14 @@ function renderPlatformReports() {
   tenants.forEach((t) => {
     const p = canonPlanCode(t.plan_code);
     if (byPlan[p] != null) byPlan[p]++;
-    const s = String(t.subscription_status || 'active').toLowerCase();
-    if (s === 'cancelled') bySub.canceled++;
-    else if (bySub[s] != null) bySub[s]++;
+    if (isTrialTenant(t)) bySub.trialing++;
+    else if (isPaidTenant(t)) bySub.active++;
+    else {
+      const s = String(t.subscription_status || '').toLowerCase();
+      if (s === 'cancelled' || s === 'canceled') bySub.canceled++;
+      else if (s === 'expired') bySub.expired++;
+      else if (s === 'past_due') bySub.past_due++;
+    }
     mrr += tenantMrr(t);
     if (t.subscription_current_period_end) {
       const end = new Date(t.subscription_current_period_end).getTime();
