@@ -549,7 +549,7 @@
     const allowVersionUi = (function () {
       try {
         const r = String((window.RS_API && RS_API.session && RS_API.session()?.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
-        if (r === 'superadmin') return true;
+        if (r === 'superadmin' || r === 'admin') return true;
         if (window.RS_API && RS_API.enableDemoTools) return true;
         const h = String(location.hostname || '');
         if (h === 'localhost' || h === '127.0.0.1') return true;
