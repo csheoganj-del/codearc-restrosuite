@@ -123,7 +123,7 @@
       const ev = String(log.event || '').toUpperCase();
       const t = log.created_at ? new Date(log.created_at) : null;
       if (!t || Number.isNaN(t.getTime()) || t < today) {return false;}
-      return /SEND|SENT|ALERT|APPROVAL_WHATSAPP|DISPATCH|MESSAGE/.test(ev);
+      return /SEND|SENT|ALERT|APPROVAL_WHATSAPP|DISPATCH|MESSAGE|SEND_AD|SEND_OTP/.test(ev);
     });
     const ok = sendLike.filter((l) => String(l.status || '').toLowerCase() === 'ok' || !l.status).length;
     const fail = sendLike.filter((l) => /err|fail|warn/i.test(String(l.status || ''))).length;
@@ -136,8 +136,29 @@
       }
     }
     if (latEl) {
-      const lat = statusData && (statusData.avgLatencyMs != null ? statusData.avgLatencyMs : statusData.latency_ms);
-      latEl.textContent = lat != null && Number(lat) >= 0 ? Math.round(Number(lat)) + ' ms' : 'n/a';
+      let lat = statusData && (statusData.avgLatencyMs != null ? statusData.avgLatencyMs : statusData.latency_ms);
+      // Derive rough latency from log detail ms= tags if gateway has no samples yet
+      if ((lat == null || lat < 0) && sendLike.length) {
+        const samples = [];
+        sendLike.forEach((l) => {
+          const d = l.details || l;
+          const raw = String((d && (d.latency_ms || d.duration_ms || d.message)) || l.message || '');
+          const m = raw.match(/(\d+)\s*ms\b/i) || raw.match(/latency[=:]\s*(\d+)/i);
+          if (m) samples.push(Number(m[1]));
+        });
+        if (samples.length) {
+          lat = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length);
+        }
+      }
+      if (lat != null && Number(lat) >= 0) {
+        latEl.textContent = Math.round(Number(lat)) + ' ms';
+        latEl.title = 'Average send latency (typing + WhatsApp handoff)';
+      } else {
+        latEl.textContent = sendLike.length ? '—' : 'n/a';
+        latEl.title = sendLike.length
+          ? 'Latency samples start after the next send (restart gateway for live KPI)'
+          : 'No sends today yet';
+      }
     }
     if (qEl) {
       const q = statusData && (statusData.queued != null ? statusData.queued : statusData.queue_length);

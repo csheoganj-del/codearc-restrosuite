@@ -338,6 +338,7 @@ async function _legacy_humanSend(client, chatId, msg, opts, tenantId) {
 
     const prev = _sendQueues.get(tenantId) || Promise.resolve();
     const next = prev.then(async () => {
+        const t0 = Date.now();
         try {
             await _paceIfBursting(tenantId);
 
@@ -365,6 +366,7 @@ async function _legacy_humanSend(client, chatId, msg, opts, tenantId) {
             }
 
             _lastSendAt.set(tenantId, Date.now());
+            try { recordSendLatency(Date.now() - t0); } catch (_) {}
             await _sleep(_betweenMessageDelay(tenantId));
             return result;
         } catch (err) {
@@ -647,6 +649,36 @@ const BAD_SESSION_RECOVER_MAX = 8;   // "Stream Errored (ack)" often recovers wi
 const totalMessagesSent = 0;
 const recentHealthEvents = []; // last 10 events for dashboard
 const lastAlertSentByType = new Map();
+// Rolling send latencies (ms) for Super-Admin Gateway KPI — last 40 successful sends
+const _sendLatencySamples = [];
+const SEND_LATENCY_MAX = 40;
+
+function recordSendLatency(ms) {
+    const n = Number(ms);
+    if (!Number.isFinite(n) || n < 0) return;
+    _sendLatencySamples.push(Math.round(n));
+    if (_sendLatencySamples.length > SEND_LATENCY_MAX) _sendLatencySamples.shift();
+}
+
+function avgSendLatencyMs() {
+    if (!_sendLatencySamples.length) return null;
+    const sum = _sendLatencySamples.reduce((a, b) => a + b, 0);
+    return Math.round(sum / _sendLatencySamples.length);
+}
+
+function queuedSendDepth() {
+    // Each tenant chain still resolving counts as work in flight
+    let n = 0;
+    try {
+        for (const p of _sendQueues.values()) {
+            // Promise always truthy; we cannot inspect settled state without tracking.
+            // Approximate: count maps that have been used recently via _lastSendAt.
+            if (p) n += 1;
+        }
+    } catch (_) {}
+    // Prefer explicit pending markers if present on queue promises
+    return Math.max(0, Math.min(n, 99));
+}
 
 /** Session folder for a tenant (Windows default under ~/.restrosuite/whatsapp-auth) */
 function tenantSessionFolder(tid) {
@@ -1352,8 +1384,16 @@ const {
     humanSend: _humanSend,
     humanCraftCaption: _humanCraftCaption,
     isSystemOrTransactionalMessage: _isSystemOrTransactionalMessage,
+    getSendStats: _getSendStats,
 } = createSendEngine(_gwCtx);
 _gwCtx.humanSend = _humanSend;
+function getSendStatsSafe() {
+    try {
+        return typeof _getSendStats === 'function' ? _getSendStats() : { avgLatencyMs: null, queued: 0 };
+    } catch (_) {
+        return { avgLatencyMs: null, queued: 0 };
+    }
+}
 
 // Session manager — Supabase Storage zip backup / restore
 const {
@@ -2730,11 +2770,24 @@ app.get('/status', (req, res) => {
                     : 'Scan QR once to link your restaurant WhatsApp'),
     };
 
+    const sendStats = getSendStatsSafe();
+    // Prefer real send-engine samples; fall back to inline ring if module unavailable
+    const avgLatencyMs = sendStats.avgLatencyMs != null
+        ? sendStats.avgLatencyMs
+        : (typeof avgSendLatencyMs === 'function' ? avgSendLatencyMs() : null);
+    const queued = sendStats.queued != null
+        ? sendStats.queued
+        : (typeof queuedSendDepth === 'function' ? queuedSendDepth() : 0);
+
     if (isAuthorized) {
         res.json({
             ...payload,
             totalMessagesSent,
-            recentHealthEvents
+            recentHealthEvents,
+            avgLatencyMs,
+            latency_ms: avgLatencyMs,
+            queued,
+            queue_length: queued,
         });
     } else {
         res.json({
@@ -2747,6 +2800,8 @@ app.get('/status', (req, res) => {
             canAutomate: payload.canAutomate,
             sendMode: payload.sendMode,
             lazyMode: true,
+            avgLatencyMs,
+            queued,
         });
     }
 });
@@ -2996,7 +3051,7 @@ app.post('/send', async (req, res) => {
         });
     }
 
-    let { orderId, phone, message, pdfData, filename, caption, outletName } = req.body;
+    let { orderId, phone, message, pdfData, filename, caption, outletName, kind, purpose, messageType } = req.body;
 
     if (!phone || (!message && !pdfData && !caption)) {
         return res.status(400).json({ status: 'error', error: 'Missing phone or message' });
@@ -3009,8 +3064,27 @@ app.post('/send', async (req, res) => {
     }
 
     try {
-        // Baileys modern JID
-        const chatId = `${phone}@s.whatsapp.net`;
+        // Resolve real WhatsApp JID (handles LID / international / not-on-WA)
+        async function resolveWhatsAppJid(client, phoneDigits) {
+            const digits = String(phoneDigits || '').replace(/\D/g, '');
+            const fallback = `${digits}@s.whatsapp.net`;
+            if (!client || typeof client.onWhatsApp !== 'function') return { jid: fallback, exists: null };
+            try {
+                let results = await client.onWhatsApp(digits);
+                let hit = Array.isArray(results) ? results.find((r) => r && r.exists) : null;
+                if (!hit) {
+                    results = await client.onWhatsApp('+' + digits);
+                    hit = Array.isArray(results) ? results.find((r) => r && r.exists) : null;
+                }
+                if (hit && hit.jid) {
+                    return { jid: String(hit.jid), exists: true };
+                }
+                return { jid: fallback, exists: false };
+            } catch (e) {
+                console.warn('[onWhatsApp] resolve failed for', digits, e.message);
+                return { jid: fallback, exists: null };
+            }
+        }
 
         const brandEarly = String(outletName || req.headers['x-outlet-name'] || '').trim().slice(0, 60);
         const isSystemMsgEarly =
@@ -3035,44 +3109,83 @@ app.post('/send', async (req, res) => {
             });
         }
 
-        // System OTP/security: wait for real delivery so callers never get false sent:true
-        if (isSystemMsgEarly && !pdfData) {
+        const resolved = await resolveWhatsAppJid(route.client, phone);
+        const chatId = resolved.jid;
+        if (resolved.exists === false) {
+            return res.status(400).json({
+                status: 'error',
+                error: `+${phone} is not registered on WhatsApp (or cannot be resolved). Check country code.`,
+                code: 'NOT_ON_WHATSAPP',
+                fromNumber: route.number || null,
+            });
+        }
+        console.log(`[Send] resolve jid phone=+${maskPhone(phone)} → ${chatId} exists=${resolved.exists}`);
+
+        // Purpose / marketing detection (ads must never get bill openers; wait for real delivery)
+        const purposeHintEarly = String(kind || purpose || messageType || '').toLowerCase().trim();
+        const isMarketingEarly =
+            /^(ad|ads|marketing|campaign|promo|blast|outreach)$/i.test(purposeHintEarly) ||
+            /\b(restrosuite\.codearc|tab=register|free during launch|month-to-month|no forced yearly)\b/i.test(
+                String(message || caption || '')
+            );
+        const wantSync =
+            isSystemMsgEarly ||
+            isMarketingEarly ||
+            req.body.sync === true ||
+            req.body.sync === 'true' ||
+            String(req.body.wait || '').toLowerCase() === 'true';
+
+        // System OTP/security + WA Ads: wait for real delivery so UI never shows false "1 sent"
+        if (wantSync && !pdfData) {
             try {
                 let textOut = String(message || caption || '').trim();
                 if (!textOut) {
-                    return res.status(400).json({ status: 'error', error: 'Missing OTP message body' });
+                    return res.status(400).json({ status: 'error', error: 'Missing message body' });
                 }
-                await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
+                // Never wrap ads/OTP with bill openers — send exact text
+                const sendResult = await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
+                const msgKey = sendResult && sendResult.key;
+                const msgId = msgKey && msgKey.id ? String(msgKey.id) : '';
+                if (!msgId) {
+                    throw new Error(
+                        'WhatsApp accepted the request but returned no message id. Relink platform Gateway QR and retry.'
+                    );
+                }
                 if (route.via === 'own') {touchTenantActivity(tenantId);}
+                const tag = isSystemMsgEarly ? 'OTP' : isMarketingEarly ? 'Ad' : 'Sync';
                 console.log(
-                    `[OTP Sent] WhatsApp system text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)}`
+                    `[${tag} Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} jid=${chatId} id=${msgId} [sync-exact]`
                 );
-                await logHealthEvent('send_otp', 'ok', {
+                await logHealthEvent(isSystemMsgEarly ? 'send_otp' : 'send_ad', 'ok', {
                     tenant_id: tenantId,
                     phone: maskPhone(phone),
                     via: route.via,
-                    message: `OTP/system message delivered via ${route.via} to +${maskPhone(phone)}`,
+                    message: `${tag} message delivered via ${route.via} to +${maskPhone(phone)} id=${msgId}`,
                 });
                 return res.json({
                     status: 'success',
-                    message: 'OTP delivered',
+                    message: isSystemMsgEarly ? 'OTP delivered' : 'Message delivered',
                     via: route.via,
                     fromNumber: route.number || null,
                     delivered: true,
                     sync: true,
+                    ok: true,
+                    sent: true,
+                    messageId: msgId,
+                    toJid: chatId,
                 });
-            } catch (otpErr) {
-                console.error(`[OTP Error] Failed system send to +${maskPhone(phone)}:`, otpErr.message);
-                await logHealthEvent('send_otp', 'error', {
+            } catch (syncErr) {
+                console.error(`[Sync Send Error] Failed to +${maskPhone(phone)}:`, syncErr.message);
+                await logHealthEvent(isSystemMsgEarly ? 'send_otp' : 'send_ad', 'error', {
                     tenant_id: tenantId,
                     phone: maskPhone(phone),
-                    error: otpErr.message,
-                    message: `Failed OTP/system send to +${maskPhone(phone)}: ${otpErr.message}`,
+                    error: syncErr.message,
+                    message: `Failed sync send to +${maskPhone(phone)}: ${syncErr.message}`,
                 });
                 return res.status(502).json({
                     status: 'error',
-                    error: otpErr.message || 'Failed to deliver WhatsApp OTP',
-                    code: 'OTP_DELIVERY_FAILED',
+                    error: syncErr.message || 'Failed to deliver WhatsApp message',
+                    code: isSystemMsgEarly ? 'OTP_DELIVERY_FAILED' : 'AD_DELIVERY_FAILED',
                     delivered: false,
                 });
             }
@@ -3109,7 +3222,21 @@ app.post('/send', async (req, res) => {
             const brand = brandEarly;
             // OTP / security messages: send exactly as written — never wrap with bill greetings
             const isSystemMsg = isSystemMsgEarly;
-            const craftBills = HUMAN_CRAFT_MODE && !isSystemMsg;
+            // Bill-style openers ("Here's your bill…") ONLY for real receipts.
+            // WA Ads / plain marketing text must never get bill phrasing prepended.
+            const purposeHint = purposeHintEarly;
+            const isMarketing = isMarketingEarly;
+            const isBillLike =
+                !isMarketing &&
+                !!(
+                    orderId ||
+                    hasPdf ||
+                    purposeHint === 'bill' ||
+                    purposeHint === 'receipt' ||
+                    purposeHint === 'invoice' ||
+                    purposeHint === 'order'
+                );
+            const craftBills = HUMAN_CRAFT_MODE && !isSystemMsg && isBillLike;
 
             // Human-crafted caption (staff phrasing) — PDF body stays exact preview; bills only
             const shortCaption = craftBills
@@ -3119,10 +3246,10 @@ app.post('/send', async (req, res) => {
                     isPlatform: route.via === 'platform',
                     baseCaption: caption,
                 })
-                : String(caption || message || (orderId ? `Bill ${orderId}` : 'Your bill')).trim().slice(0, 200);
+                : String(caption || message || (orderId ? `Bill ${orderId}` : '')).trim().slice(0, 200);
 
             if (message && typeof message === 'string' && craftBills && route.via === 'platform' && brand) {
-                // Soft intro only if message looks robotic (guest bills — not OTP)
+                // Soft intro only if message looks robotic (guest bills — not OTP / not ads)
                 if (/^bill\s/i.test(message.trim()) || message.length < 40) {
                     message = humanCraftCaption({
                         orderId,
@@ -3154,9 +3281,9 @@ app.post('/send', async (req, res) => {
                 await humanSend(route.client, chatId, media, {}, route.sendAsTenantId);
                 delivered = 'pdf';
                 if (route.via === 'own') {touchTenantActivity(tenantId);}
-                console.log(`[Background Sent] WhatsApp PDF via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} (${pdfBuffer.length} bytes) [${isSystemMsg ? 'system' : 'human-craft'}]`);
+                console.log(`[Background Sent] WhatsApp PDF via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} (${pdfBuffer.length} bytes) [${isSystemMsg ? 'system' : craftBills ? 'human-craft-bill' : 'exact-text'}]`);
             } else if (message) {
-                // Text: bills may get a natural opener; OTP/security always exact
+                // Text: only bills may get a natural bill opener; ads/OTP/plain text stay exact
                 let textOut = message;
                 if (craftBills && typeof textOut === 'string' && textOut.length > 20) {
                     // Keep full receipt text; prepend a short human line sometimes
@@ -3173,7 +3300,7 @@ app.post('/send', async (req, res) => {
                 await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
                 delivered = 'text';
                 if (route.via === 'own') {touchTenantActivity(tenantId);}
-                console.log(`[Background Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} [${isSystemMsg ? 'system-exact' : 'human-craft'}]`);
+                console.log(`[Background Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} [${isSystemMsg ? 'system-exact' : craftBills ? 'human-craft-bill' : isMarketing ? 'ad-exact' : 'exact-text'}]`);
             } else {
                 throw new Error('Nothing to send: empty message and no valid pdfData');
             }

@@ -88,7 +88,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v240-20260802-frictionless';
+    var builtin = 'v250-20260802-frictionless';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -1636,6 +1636,10 @@
           <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Takeaway POS</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Counter billing</div></div>
         </label>
         <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="floor-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Floor &amp; Tables</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Dine-in layout</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
           <input type="checkbox" value="qr-orders-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
           <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Live Table Orders</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">QR self-service</div></div>
         </label>
@@ -1656,16 +1660,32 @@
           <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Inventory Control</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Stock &amp; batches</div></div>
         </label>
         <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
-          <input type="checkbox" value="reports-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
-          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Sales Reports</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Analytics &amp; exports</div></div>
-        </label>
-        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
           <input type="checkbox" value="editor-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
           <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Menu Editor</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Item &amp; category manager</div></div>
         </label>
         <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="customers-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Customers CRM</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Guest directory</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
           <input type="checkbox" value="employees-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
           <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Employee Ledger</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Staff &amp; shifts</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="reports-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Sales Reports</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Analytics &amp; exports</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="analytics-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Trends</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Longer-range charts</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="tax-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Tax &amp; GST</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Rates &amp; profile</div></div>
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
+          <input type="checkbox" value="aggregator-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">
+          <div><div style="font-size:12px;font-weight:600;color:var(--text);line-height:1.2">Online Orders</div><div style="font-size:10px;color:var(--text-mute);margin-top:2px">Aggregator channel</div></div>
         </label>
         <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--stroke);cursor:pointer;background:var(--panel);user-select:none">
           <input type="checkbox" value="growth-hub-tab" style="accent-color:#FF4F00;width:15px;height:15px;flex-shrink:0;cursor:pointer">

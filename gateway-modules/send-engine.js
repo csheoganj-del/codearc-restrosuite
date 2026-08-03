@@ -81,6 +81,31 @@ function createSendEngine(ctx) {
     // ── Queues & timestamps ────────────────────────────────────────────────
     const _sendQueues = new Map();
     const _lastSendAt = new Map();
+    // Rolling send latencies (ms) for Super-Admin Gateway KPI
+    const _sendLatencySamples = [];
+    const SEND_LATENCY_MAX = 40;
+    const _inflightByTenant = new Map(); // tenantId → pending count
+
+    function recordSendLatency(ms) {
+        const n = Number(ms);
+        if (!Number.isFinite(n) || n < 0) return;
+        _sendLatencySamples.push(Math.round(n));
+        if (_sendLatencySamples.length > SEND_LATENCY_MAX) _sendLatencySamples.shift();
+    }
+
+    function getSendStats() {
+        const avgLatencyMs = _sendLatencySamples.length
+            ? Math.round(_sendLatencySamples.reduce((a, b) => a + b, 0) / _sendLatencySamples.length)
+            : null;
+        let queued = 0;
+        for (const n of _inflightByTenant.values()) queued += Math.max(0, Number(n) || 0);
+        return {
+            avgLatencyMs,
+            latencySamples: _sendLatencySamples.length,
+            queued,
+            queue_length: queued,
+        };
+    }
 
     // ── Utility helpers ────────────────────────────────────────────────────
     function _randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -226,7 +251,9 @@ function createSendEngine(ctx) {
         }
 
         const prev = _sendQueues.get(tenantId) || Promise.resolve();
+        _inflightByTenant.set(tenantId, (_inflightByTenant.get(tenantId) || 0) + 1);
         const next = prev.then(async () => {
+            const t0 = Date.now();
             try {
                 await _paceIfBursting(tenantId);
                 const msgText  = typeof msg === 'string' ? msg : (msg && (msg.text || msg.caption) || '');
@@ -250,11 +277,16 @@ function createSendEngine(ctx) {
                     try { await client.sendPresenceUpdate('available', jid); } catch (_) {}
                 }
                 _lastSendAt.set(tenantId, Date.now());
+                recordSendLatency(Date.now() - t0);
                 await _sleep(_betweenMessageDelay(tenantId));
                 return result;
             } catch (err) {
                 await _sleep(_betweenMessageDelay(tenantId));
                 throw err;
+            } finally {
+                const left = (_inflightByTenant.get(tenantId) || 1) - 1;
+                if (left <= 0) _inflightByTenant.delete(tenantId);
+                else _inflightByTenant.set(tenantId, left);
             }
         });
 
@@ -262,7 +294,7 @@ function createSendEngine(ctx) {
         return next;
     }
 
-    return { humanSend, humanCraftCaption, isSystemOrTransactionalMessage };
+    return { humanSend, humanCraftCaption, isSystemOrTransactionalMessage, getSendStats };
 }
 
 module.exports = { createSendEngine };

@@ -44,19 +44,31 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const PLAN_ENTITLEMENTS: Record<string, { name: string; allowedTabs: string[] }> = {
   free: {
     name: "Free / Demo",
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab"],
+    allowedTabs: ["pos-tab", "bills-tab", "editor-tab", "tokens-tab", "customers-tab"],
+  },
+  express: {
+    name: "Express",
+    allowedTabs: ["pos-tab", "bills-tab", "editor-tab", "tokens-tab", "customers-tab"],
+  },
+  serve: {
+    name: "Serve",
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "editor-tab", "tokens-tab", "customers-tab", "employees-tab", "aggregator-tab", "reports-tab", "tax-tab"],
+  },
+  command: {
+    name: "Command",
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "inventory-tab", "editor-tab", "customers-tab", "tax-tab", "aggregator-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "analytics-tab", "reports-tab"],
   },
   starter: {
-    name: "Starter",
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "editor-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+    name: "Express",
+    allowedTabs: ["pos-tab", "bills-tab", "editor-tab", "tokens-tab", "customers-tab"],
   },
   growth: {
-    name: "Growth",
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+    name: "Serve",
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "editor-tab", "tokens-tab", "customers-tab", "employees-tab", "aggregator-tab", "reports-tab", "tax-tab"],
   },
   enterprise: {
-    name: "Enterprise",
-    allowedTabs: ["pos-tab", "qr-orders-tab", "bills-tab", "inventory-tab", "reports-tab", "editor-tab", "crm-tab", "tax-tab", "online-tab", "kds-tab", "tokens-tab", "employees-tab", "growth-hub-tab"],
+    name: "Command",
+    allowedTabs: ["pos-tab", "floor-tab", "qr-orders-tab", "kds-tab", "bills-tab", "inventory-tab", "editor-tab", "customers-tab", "tax-tab", "aggregator-tab", "tokens-tab", "employees-tab", "growth-hub-tab", "analytics-tab", "reports-tab"],
   },
 };
 
@@ -278,11 +290,54 @@ function getGatewayUrlAndToken() {
   return { url, token: token.trim() };
 }
 
+/** Canonical + legacy plan monthly prices (₹). Used when saas_plans is unavailable. */
 function planMonthlyRupees(planCode: unknown) {
-  const code = String(planCode || "starter").toLowerCase();
-  if (code === "growth") return 1499;
-  if (code === "enterprise") return 4999;
+  const code = String(planCode || "express").toLowerCase();
+  if (code === "free") return 0;
+  if (code === "express" || code === "starter" || code === "basic") return 499;
+  if (code === "serve" || code === "growth" || code === "standard" || code === "pro") return 999;
+  if (code === "command" || code === "enterprise" || code === "scale") return 2499;
   return 0;
+}
+
+function normalizePlanCode(code: unknown): string {
+  const c = String(code || "express").trim().toLowerCase();
+  if (c === "starter" || c === "basic") return "express";
+  if (c === "growth" || c === "standard" || c === "pro") return "serve";
+  if (c === "enterprise" || c === "scale") return "command";
+  return c || "express";
+}
+
+function isPaidPlanCode(planCode: unknown): boolean {
+  const c = normalizePlanCode(planCode);
+  return c === "express" || c === "serve" || c === "command";
+}
+
+function isActiveBillingStatus(subStatus: unknown): boolean {
+  return String(subStatus || "").toLowerCase() === "active";
+}
+
+/** Monthly recurring revenue for one tenant (yearly → /12). */
+function tenantMrrRupees(
+  map: Record<string, number>,
+  planCode: unknown,
+  subStatus: unknown,
+  billingInterval?: unknown,
+): number {
+  if (!isActiveBillingStatus(subStatus)) return 0;
+  const monthly = priceFrom(map, planCode);
+  if (!monthly) return 0;
+  const interval = String(billingInterval || "monthly").toLowerCase();
+  if (interval === "yearly") {
+    // Prefer catalogue yearly when known (499→4999, 999→9999, 2499→24999), else monthly*10 / 12
+    const yr =
+      monthly === 499 ? 4999
+        : monthly === 999 ? 9999
+          : monthly === 2499 ? 24999
+            : monthly * 10;
+    return Math.round(yr / 12);
+  }
+  return monthly;
 }
 
 async function fetchPlanPriceMap(): Promise<Record<string, number>> {
@@ -290,19 +345,45 @@ async function fetchPlanPriceMap(): Promise<Record<string, number>> {
     const { data, error } = await supabaseAdmin.from("saas_plans").select("plan_code, price_monthly");
     if (error || !data) throw error || new Error("no plans");
     const map: Record<string, number> = {};
-    for (const p of data as Array<{ plan_code: string; price_monthly: number }>) map[String(p.plan_code)] = Number(p.price_monthly) || 0;
+    for (const p of data as Array<{ plan_code: string; price_monthly: number }>) {
+      map[String(p.plan_code)] = Number(p.price_monthly) || 0;
+    }
+    // Ensure aliases resolve even if only one side exists in DB
+    if (map.express == null && map.starter != null) map.express = map.starter;
+    if (map.serve == null && map.growth != null) map.serve = map.growth;
+    if (map.command == null && map.enterprise != null) map.command = map.enterprise;
+    if (map.starter == null && map.express != null) map.starter = map.express;
+    if (map.growth == null && map.serve != null) map.growth = map.serve;
+    if (map.enterprise == null && map.command != null) map.enterprise = map.command;
     return map;
   } catch (e) {
     console.warn("fetchPlanPriceMap fell back to constants:", (e as Error)?.message);
-    return { free: 0, starter: 0, growth: 1499, enterprise: 4999 };
+    return {
+      free: 0,
+      express: 499,
+      serve: 999,
+      command: 2499,
+      starter: 499,
+      growth: 999,
+      enterprise: 2499,
+    };
   }
 }
 function priceFrom(map: Record<string, number>, planCode: unknown) {
-  const code = String(planCode || "starter").toLowerCase();
-  return map[code] != null ? map[code] : planMonthlyRupees(code);
+  const code = String(planCode || "express").toLowerCase();
+  if (map[code] != null) return map[code];
+  const canon = normalizePlanCode(code);
+  if (map[canon] != null) return map[canon];
+  return planMonthlyRupees(code);
 }
 
-async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Request) {
+async function proxyGatewayRequest(
+  path: string,
+  method: "GET" | "POST",
+  req: Request,
+  bodyData?: Record<string, unknown>,
+  tenantId?: string,
+) {
   const { url, token } = getGatewayUrlAndToken();
   if (!url) {
     return jsonResponse({ error: "WhatsApp gateway URL is not configured." }, 503, req);
@@ -317,14 +398,21 @@ async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Re
   if (token) {
     headers["Authorization"] = token.toLowerCase().startsWith("bearer ") ? token : `Bearer ${token}`;
   }
+  // Platform ads / status use the central system WhatsApp line.
+  if (tenantId) {
+    headers["x-tenant-id"] = tenantId;
+  }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    // PDF / media sends need more headroom than status polls.
+    const timeoutMs = path.startsWith("/send") ? 45000 : 12000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const response = await fetch(targetUrl, {
       method,
       headers,
+      body: bodyData ? JSON.stringify(bodyData) : undefined,
       signal: controller.signal,
     });
 
@@ -353,24 +441,95 @@ async function proxyGatewayRequest(path: string, method: "GET" | "POST", req: Re
 }
 
 async function listTenants(req: Request) {
-  const { data, error } = await supabaseAdmin
-    .from("saas_tenants")
-    .select("id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, created_at")
-    .order("created_at", { ascending: false })
-    .limit(250);
+  // Prefer full select (billing_interval + admin_notes). Fall back if a column is missing pre-migration.
+  let data: any[] | null = null;
+  let error: { message?: string } | null = null;
+  {
+    const full = await supabaseAdmin
+      .from("saas_tenants")
+      .select(
+        "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, billing_interval, admin_notes, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(500);
+    data = full.data as any[] | null;
+    error = full.error;
+    if (error) {
+      const soft = await supabaseAdmin
+        .from("saas_tenants")
+        .select(
+          "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, billing_interval, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(500);
+      data = soft.data as any[] | null;
+      error = soft.error;
+    }
+    if (error) {
+      const minimal = await supabaseAdmin
+        .from("saas_tenants")
+        .select(
+          "id, name, slug, outlet_type, email, phone, username, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, created_at",
+        )
+        .order("created_at", { ascending: false })
+        .limit(500);
+      data = minimal.data as any[] | null;
+      error = minimal.error;
+    }
+  }
 
   if (error) {
     console.error("list_tenants failed:", error);
     return jsonResponse({ error: "Failed to load client workspaces." }, 500, req);
   }
 
-  return jsonResponse({ tenants: data || [] }, 200, req);
+  const rows = data || [];
+  const priceMap = await fetchPlanPriceMap();
+
+  // Outlet counts (multi-outlet Command). Soft-fail → 1 each.
+  const outletCountByTenant = new Map<string, number>();
+  try {
+    const tenantIds = rows.map((t: any) => String(t.id)).filter(Boolean);
+    if (tenantIds.length) {
+      const { data: outlets } = await supabaseAdmin
+        .from("doppio_outlets")
+        .select("tenant_id")
+        .in("tenant_id", tenantIds);
+      for (const o of outlets || []) {
+        const tid = String((o as any).tenant_id || "");
+        if (!tid) continue;
+        outletCountByTenant.set(tid, (outletCountByTenant.get(tid) || 0) + 1);
+      }
+    }
+  } catch (e) {
+    console.warn("list_tenants outlet count skipped:", (e as Error)?.message);
+  }
+
+  const tenants = rows.map((t: any) => {
+    const mrr = tenantMrrRupees(
+      priceMap,
+      t.plan_code,
+      t.subscription_status,
+      t.billing_interval,
+    );
+    const oid = String(t.id);
+    return {
+      ...t,
+      billing_interval: t.billing_interval || "monthly",
+      admin_notes: t.admin_notes != null ? String(t.admin_notes) : "",
+      mrr,
+      plan_name: planFor(t.plan_code).name,
+      outlet_count: outletCountByTenant.get(oid) || 1,
+    };
+  });
+
+  return jsonResponse({ tenants, plan_prices: priceMap }, 200, req);
 }
 
 async function getPlatformStats(req: Request) {
   const { data: tenants, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, status, plan_code, subscription_status");
+    .select("id, status, plan_code, subscription_status, billing_interval");
   if (error) {
     console.error("get_platform_stats tenants failed:", error);
     return jsonResponse({ error: "Failed to load platform stats." }, 500, req);
@@ -382,13 +541,22 @@ async function getPlatformStats(req: Request) {
 
   const rows = tenants || [];
   const priceMap = await fetchPlanPriceMap();
+  const atRiskStatuses = new Set(["past_due", "canceled", "cancelled", "expired"]);
   const stats = {
     tenants_total: rows.length,
     tenants_active: rows.filter((t: any) => ["approved", "active"].includes(String(t.status))).length,
     tenants_pending: rows.filter((t: any) => String(t.status) === "pending").length,
-    tenants_at_risk: rows.filter((t: any) => ["past_due", "canceled"].includes(String(t.subscription_status))).length,
-    paid_tenants: rows.filter((t: any) => ["growth", "enterprise"].includes(String(t.plan_code))).length,
-    platform_mrr: rows.reduce((sum: number, t: any) => sum + (["active", "trialing"].includes(String(t.subscription_status)) ? priceFrom(priceMap, t.plan_code) : 0), 0),
+    tenants_at_risk: rows.filter((t: any) => atRiskStatuses.has(String(t.subscription_status || "").toLowerCase())).length,
+    // Paid = active subscription on Express / Serve / Command (or legacy aliases)
+    paid_tenants: rows.filter((t: any) =>
+      isActiveBillingStatus(t.subscription_status) && isPaidPlanCode(t.plan_code)
+    ).length,
+    // MRR only from active paid (not trials)
+    platform_mrr: rows.reduce(
+      (sum: number, t: any) =>
+        sum + tenantMrrRupees(priceMap, t.plan_code, t.subscription_status, t.billing_interval),
+      0,
+    ),
     users_total: userCount || 0,
   };
   return jsonResponse({ stats }, 200, req);
@@ -418,7 +586,7 @@ async function listUsers(req: Request) {
 async function getBilling(req: Request) {
   const { data: tenants, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, slug, plan_code, subscription_status, subscription_current_period_end, created_at")
+    .select("id, name, slug, plan_code, subscription_status, subscription_current_period_end, billing_interval, created_at")
     .order("created_at", { ascending: false })
     .limit(500);
   if (error) {
@@ -438,12 +606,59 @@ async function getBilling(req: Request) {
     tenant_id: tenant.id,
     tenant_name: tenant.name,
     tenant_slug: tenant.slug,
-    plan_code: tenant.plan_code || "starter",
+    plan_code: tenant.plan_code || "express",
     subscription_status: tenant.subscription_status || "active",
     subscription_current_period_end: tenant.subscription_current_period_end || null,
-    mrr: priceFrom(priceMap, tenant.plan_code),
+    billing_interval: tenant.billing_interval || "monthly",
+    mrr: tenantMrrRupees(
+      priceMap,
+      tenant.plan_code,
+      tenant.subscription_status,
+      tenant.billing_interval,
+    ),
   }));
   return jsonResponse({ billing, invoices: invoiceError ? [] : (invoices || []) }, 200, req);
+}
+
+async function listBillingEvents(payload: Record<string, unknown>, req: Request) {
+  const limit = Math.min(Math.max(Number(payload.limit) || 25, 1), 100);
+  const tenantId = String(payload.tenant_id || "").trim();
+  let query = supabaseAdmin
+    .from("saas_billing_events")
+    .select("id, tenant_id, event_type, channel, payload, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (tenantId) query = query.eq("tenant_id", tenantId);
+  const { data, error } = await query;
+  if (error) {
+    console.error("list_billing_events failed:", error);
+    return jsonResponse({ error: "Failed to load billing events.", events: [] }, 200, req);
+  }
+  // Enrich with tenant name/slug for SA Reports
+  const rows = data || [];
+  const ids = [...new Set(rows.map((r: any) => String(r.tenant_id)).filter(Boolean))];
+  const nameById = new Map<string, { name: string; slug: string }>();
+  if (ids.length) {
+    const { data: tenants } = await supabaseAdmin
+      .from("saas_tenants")
+      .select("id, name, slug")
+      .in("id", ids);
+    for (const t of tenants || []) {
+      nameById.set(String((t as any).id), {
+        name: String((t as any).name || ""),
+        slug: String((t as any).slug || ""),
+      });
+    }
+  }
+  const events = rows.map((ev: any) => {
+    const meta = nameById.get(String(ev.tenant_id)) || { name: "", slug: "" };
+    return {
+      ...ev,
+      tenant_name: meta.name,
+      tenant_slug: meta.slug,
+    };
+  });
+  return jsonResponse({ events }, 200, req);
 }
 // ── Plan pricing management (superadmin) ───────────────────────────────────
 async function listPlans(req: Request) {
@@ -460,7 +675,17 @@ async function listPlans(req: Request) {
 
 async function updatePlan(payload: Record<string, unknown>, req: Request) {
   const planCode = String(payload.plan_code || "").trim().toLowerCase();
-  if (!["free", "starter", "growth", "enterprise"].includes(planCode)) {
+  // Canonical Express/Serve/Command + legacy aliases + free
+  const ALLOWED_PLAN_CODES = new Set([
+    "free",
+    "express",
+    "serve",
+    "command",
+    "starter",
+    "growth",
+    "enterprise",
+  ]);
+  if (!ALLOWED_PLAN_CODES.has(planCode)) {
     return jsonResponse({ error: "Unknown plan." }, 400, req);
   }
   const updates: Record<string, unknown> = {};
@@ -605,21 +830,56 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
   if (typeof payload.username === "string") updates.username = payload.username.trim();
   if (typeof payload.status === "string") updates.status = payload.status.trim();
   if (Array.isArray(payload.allowed_tabs)) updates.allowed_tabs = payload.allowed_tabs.map(String);
-  if (typeof payload.plan_code === "string" && ["free", "starter", "growth", "enterprise"].includes(payload.plan_code)) {
-    updates.plan_code = payload.plan_code;
+  // Canonical plans + legacy aliases
+  const PLAN_ALIASES: Record<string, string> = {
+    free: "free",
+    express: "express",
+    serve: "serve",
+    command: "command",
+    starter: "express",
+    growth: "serve",
+    enterprise: "command",
+    basic: "express",
+    standard: "serve",
+    pro: "serve",
+    scale: "command",
+  };
+  if (typeof payload.plan_code === "string") {
+    const raw = payload.plan_code.trim().toLowerCase();
+    const code = PLAN_ALIASES[raw] || raw;
+    if (["free", "express", "serve", "command", "starter", "growth", "enterprise"].includes(code)) {
+      updates.plan_code = code;
+      // Super-admin plan change always grants full tabs for that plan
+      try {
+        const plan = planFor(code);
+        if (plan?.allowedTabs?.length) updates.allowed_tabs = plan.allowedTabs;
+      } catch (_) { /* planFor may not be in this file's scope with that shape */ }
+    }
   }
   if (
     typeof payload.subscription_status === "string"
-    && ["trialing", "active", "past_due", "canceled"].includes(payload.subscription_status)
+    && ["trialing", "active", "past_due", "canceled", "cancelled", "expired"].includes(payload.subscription_status)
   ) {
-    updates.subscription_status = payload.subscription_status;
+    updates.subscription_status = payload.subscription_status === "cancelled"
+      ? "canceled"
+      : payload.subscription_status;
   }
   if (typeof payload.subscription_current_period_end === "string") {
     const periodEnd = payload.subscription_current_period_end.trim();
     updates.subscription_current_period_end = periodEnd ? periodEnd : null;
   }
+  if (typeof payload.billing_interval === "string"
+    && ["monthly", "yearly", "trial"].includes(payload.billing_interval)) {
+    updates.billing_interval = payload.billing_interval === "trial" ? "monthly" : payload.billing_interval;
+  }
   if (typeof payload.phone === "string") updates.phone = payload.phone.trim();
   if (typeof payload.email === "string") updates.email = payload.email.trim().toLowerCase();
+  // Super-admin internal notes (column added by 20260803 migration; soft if missing)
+  if (typeof payload.admin_notes === "string") {
+    updates.admin_notes = payload.admin_notes.slice(0, 4000);
+  } else if (typeof payload.notes === "string") {
+    updates.admin_notes = payload.notes.slice(0, 4000);
+  }
 
   if (typeof payload.password === "string" && payload.password.trim() !== "") {
     if (payload.password.length < 10) {
@@ -644,7 +904,13 @@ async function updateTenant(payload: Record<string, unknown>, req: Request) {
     migratedOwner = data;
   }
 
-  const { error } = await supabaseAdmin.from("saas_tenants").update(updates).eq("id", tenantId);
+  let { error } = await supabaseAdmin.from("saas_tenants").update(updates).eq("id", tenantId);
+  // If admin_notes column is not migrated yet, retry without it so other fields still save.
+  if (error && ("admin_notes" in updates) && /admin_notes|column/i.test(String(error.message || ""))) {
+    delete updates.admin_notes;
+    const retry = await supabaseAdmin.from("saas_tenants").update(updates).eq("id", tenantId);
+    error = retry.error;
+  }
   if (error) {
     console.error("update_tenant failed:", error);
     return jsonResponse({ error: "Failed to save settings." }, 500, req);
@@ -1171,6 +1437,7 @@ serve(async (req) => {
     if (action === "get_platform_stats") return await getPlatformStats(req);
     if (action === "list_users") return await listUsers(req);
     if (action === "get_billing") return await getBilling(req);
+    if (action === "list_billing_events") return await listBillingEvents(payload, req);
     if (action === "list_plans") return await listPlans(req);
     if (action === "update_plan") return await updatePlan(payload, req);
     if (action === "list_devices") return await listDevices(payload, req);
@@ -1185,9 +1452,37 @@ serve(async (req) => {
     if (action === "reset_tenant_data") return await resetTenantData(payload, req);
     if (action === "seed_tenant_data") return await seedTenantData(payload, req);
     if (action === "purge_demo_data") return await purgeTenantDemoData(payload, req);
-    if (action === "gateway_status") return await proxyGatewayRequest("/status", "GET", req);
-    if (action === "gateway_logs") return await proxyGatewayRequest("/debug-logs", "GET", req);
-    if (action === "gateway_reset") return await proxyGatewayRequest("/reset", "POST", req);
+    if (action === "gateway_status") {
+      return await proxyGatewayRequest("/status", "GET", req, undefined, "system");
+    }
+    if (action === "gateway_logs") {
+      return await proxyGatewayRequest("/debug-logs", "GET", req, undefined, "system");
+    }
+    if (action === "gateway_reset") {
+      return await proxyGatewayRequest("/reset", "POST", req, undefined, "system");
+    }
+    // Super-admin WA Ads: send via central platform WhatsApp line.
+    if (action === "gateway_send") {
+      const phone = String(payload.phone || "");
+      const message = String(payload.message || "");
+      const caption = payload.caption != null ? String(payload.caption) : undefined;
+      const orderId = String(payload.orderId || "");
+      const pdfData = payload.pdfData ? String(payload.pdfData) : undefined;
+      const filename = payload.filename ? String(payload.filename) : undefined;
+      // ad | marketing | bill | receipt — gateway uses this to skip bill openers on ads
+      const kind = payload.kind != null ? String(payload.kind) : undefined;
+      const purpose = payload.purpose != null ? String(payload.purpose) : undefined;
+      if (!phone || (!message && !pdfData && !caption)) {
+        return jsonResponse({ error: "Missing phone or message/pdfData." }, 400, req);
+      }
+      return await proxyGatewayRequest(
+        "/send",
+        "POST",
+        req,
+        { phone, message, caption, orderId, pdfData, filename, kind, purpose },
+        "system",
+      );
+    }
 
     return jsonResponse({ error: "Unsupported action." }, 400, req);
   } catch (error) {
