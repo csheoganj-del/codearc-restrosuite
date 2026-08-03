@@ -5464,6 +5464,8 @@ textarea:focus-visible,
 }
 
 #topbar-whatsapp-status-pill { display: none !important; }
+#tb-right > button:not(#tb-wa-status-btn):has(.fa-whatsapp),
+#tb-right > .tb-pill:not(#tb-wa-status-btn):has(.fa-whatsapp) { display: none !important; }
 
 /* ── Always-visible WhatsApp top-bar icon ─────────────────────────
    Connected = green WA · Off = red WA · Connecting/QR = amber + spin */

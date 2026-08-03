@@ -555,7 +555,7 @@
         if (h === 'localhost' || h === '127.0.0.1') return true;
         if (sessionStorage.getItem('rs_debug_ui') === '1' && new URLSearchParams(location.search).get('debug') === '1') return true;
       } catch (_) {}
-      return false;
+      return true;
     })();
     if (!allowVersionUi) {
       el.style.display = 'none';
