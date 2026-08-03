@@ -482,6 +482,7 @@
       settings.custom_tables = SAMPLE_TABLES.map(function (t) {
         return { n: t.n, name: t.name, cap: t.cap, state: 'free' };
       });
+      settings.rs_sample_tables = true;
       global.RS_SETTINGS = Object.assign({}, global.RS_SETTINGS || {}, settings);
       if (global.RS_DB && RS_DB.setSettings) await RS_DB.setSettings(settings);
       try {
@@ -737,12 +738,90 @@
     );
   }
 
+  function sampleRecordsPresent() {
+    try {
+      var menu = (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [];
+      var stock = (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [];
+      return menu.some(function (item) { return item && item._sample === true; }) ||
+        stock.some(function (item) { return item && item._sample === true; }) ||
+        !!(global.RS_SETTINGS && global.RS_SETTINGS.rs_sample_tables === true);
+    } catch (_) { return false; }
+  }
+
+  async function removeStarterSampleData() {
+    var jobs = [
+      { collection: 'menu', rows: (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [] },
+      { collection: 'inventory', rows: (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [] },
+    ];
+    for (var i = 0; i < jobs.length; i++) {
+      var job = jobs[i];
+      var samples = job.rows.filter(function (row) { return row && row._sample === true; });
+      for (var j = 0; j < samples.length; j++) {
+        var row = samples[j];
+        if (global.RS && typeof RS.removeOne === 'function') await RS.removeOne(job.collection, row.id);
+        else if (global.RS_DB && RS_DB.del) await RS_DB.del(job.collection, row.id);
+      }
+      var remaining = job.rows.filter(function (row) { return !row || row._sample !== true; });
+      if (global.RS) {
+        if (job.collection === 'menu') RS.MENU = remaining;
+        if (job.collection === 'inventory') RS.INVENTORY = remaining;
+      }
+    }
+    var settings = (global.RS && typeof RS.getSettings === 'function') ? await RS.getSettings() : (global.RS_SETTINGS || {});
+    if (settings && settings.rs_sample_tables === true) {
+      settings = Object.assign({}, settings, { custom_tables: [] });
+      delete settings.rs_sample_tables;
+      global.RS_SETTINGS = settings;
+      if (global.RS && typeof RS.saveSettings === 'function') await RS.saveSettings(settings);
+      else if (global.RS_DB && RS_DB.setSettings) await RS_DB.setSettings(settings);
+      try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (_) {}
+    }
+    try { localStorage.removeItem(tenantKey(SAMPLE_KEY)); } catch (_) {}
+    try {
+      if (global.RS && typeof RS.renderPOS === 'function') RS.renderPOS();
+      if (global.RS && typeof RS.render === 'function') RS.render('inventory-tab');
+    } catch (_) {}
+  }
+
+  function maybePromptSampleCleanup() {
+    var promptKey = tenantKey('rs_sample_cleanup_prompted_session');
+    try { if (sessionStorage.getItem(promptKey) === '1') return; } catch (_) {}
+    if (!sampleRecordsPresent()) return;
+    try { sessionStorage.setItem(promptKey, '1'); } catch (_) {}
+    if (!global.RSModal || typeof RSModal.open !== 'function') return;
+    RSModal.open({
+      title: 'Practice complete — ready for real orders',
+      sub: 'Your menu, first bill, and reports check are complete.',
+      icon: 'fa-circle-check',
+      size: 'sm',
+      body: '<p style="margin:0;line-height:1.55;color:var(--text-soft)">Remove the starter sample menu, stock, and tables now? Your first completed bill and every record you created yourself will stay.</p>',
+      foot: '<button type="button" class="btn btn-ghost" data-keep-samples>Keep samples for now</button><button type="button" class="btn btn-primary" data-remove-samples><i class="fa-solid fa-trash-can"></i> Remove samples</button>',
+      onMount: function (modal, close) {
+        modal.querySelector('[data-keep-samples]').onclick = close;
+        modal.querySelector('[data-remove-samples]').onclick = async function () {
+          var button = this;
+          button.disabled = true;
+          button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removing…';
+          try {
+            await removeStarterSampleData();
+            close();
+            toast('Starter samples removed. Your first bill is kept.', 'fa-circle-check');
+          } catch (error) {
+            button.disabled = false;
+            button.innerHTML = '<i class="fa-solid fa-trash-can"></i> Remove samples';
+            toast((error && error.message) || 'Could not remove all sample data.', 'fa-circle-exclamation');
+          }
+        };
+      },
+    });
+  }
   function paintActivationChecklist() {
     if (isPlatform() || !isOwnerLike()) return;
     injectStyles();
     var st = autoDetectActivation();
     var allDone = st.sample && st.firstBill && st.reports;
     if (allDone) {
+      maybePromptSampleCleanup();
       var old = document.getElementById('rs-fx-check');
       if (old) old.classList.add('hidden');
       return;
