@@ -13,7 +13,7 @@
 
   const STYLE_ID = 'rs-sa-ads-style';
   const STORE_KEY = 'rs_sa_ads_campaigns_v1';
-  const DRAFT_KEY = 'rs_sa_ads_draft_v2';
+  const DRAFT_KEY = 'rs_sa_ads_draft_v8_nagpur_monthly';
   const DAILY_HINT = 180; // mirrors gateway default DAILY_LIMIT
 
   let contacts = []; // { name, phone, status, error, at }
@@ -92,7 +92,10 @@
     document.head.appendChild(s);
   }
 
-  function loadCampaigns() {
+  /** In-memory cache of server (+ local fallback) campaign history */
+  let _campaignCache = null;
+
+  function loadCampaignsLocal() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       const arr = raw ? JSON.parse(raw) : [];
@@ -102,10 +105,63 @@
     }
   }
 
-  function saveCampaigns(list) {
+  function saveCampaignsLocal(list) {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify((list || []).slice(0, 40)));
     } catch (_) {}
+  }
+
+  function loadCampaigns() {
+    if (Array.isArray(_campaignCache) && _campaignCache.length) return _campaignCache;
+    return loadCampaignsLocal();
+  }
+
+  function saveCampaigns(list) {
+    _campaignCache = (list || []).slice(0, 40);
+    saveCampaignsLocal(_campaignCache);
+  }
+
+  /** Pull platform-wide history from Supabase (falls back to localStorage). */
+  async function refreshCampaignsFromServer() {
+    try {
+      if (!isSuper() || !global.RS_API || typeof RS_API.admin !== 'function') {
+        _campaignCache = loadCampaignsLocal();
+        return _campaignCache;
+      }
+      const out = await RS_API.admin({ action: 'list_ads_campaigns', limit: 30 });
+      const remote = (out && out.campaigns) || [];
+      if (Array.isArray(remote) && remote.length) {
+        _campaignCache = remote;
+        saveCampaignsLocal(remote);
+        return remote;
+      }
+      // Merge: keep local if server empty (pre-migration or first use)
+      _campaignCache = loadCampaignsLocal();
+      return _campaignCache;
+    } catch (_) {
+      _campaignCache = loadCampaignsLocal();
+      return _campaignCache;
+    }
+  }
+
+  async function persistCampaignToServer(camp) {
+    try {
+      if (!isSuper() || !global.RS_API || typeof RS_API.admin !== 'function') return;
+      await RS_API.admin({
+        action: 'save_ads_campaign',
+        id: camp.id,
+        label: camp.label,
+        messagePreview: camp.messagePreview || '',
+        total: camp.total || 0,
+        sent: camp.sent || 0,
+        failed: camp.failed || 0,
+        skipped: camp.skipped || 0,
+        pace: (document.getElementById('sa-ads-pace') || {}).value || 'safe',
+        testOnly: /test/i.test(String(camp.label || '')),
+      });
+    } catch (e) {
+      console.warn('WA Ads campaign server save failed (kept locally):', e && e.message);
+    }
   }
 
   function normalizePhone(raw) {
@@ -221,17 +277,21 @@
   }
 
   function defaultMessage() {
-    // Psychology: name first → pain (Wi‑Fi / paper) → one clear fix → free + fast → soft CTA
-    // Short for WhatsApp; no ALL CAPS; one link; human tone (not spam blast)
+    // Nagpur campaign — Man Singh (local salesperson)
+    // 10/10 cold WA: pain → stakes → local + offline → free/monthly money → CTA → permission
+    // Money line: free launch + month-to-month (no forced yearly) — never competitor-bash.
+    // Optional VIP image: assets/wa-ads-nagpur-brochure.jpg
     return (
       'Hi {{first}} 👋\n\n' +
-      'Quick one — does billing freeze when Wi‑Fi drops at your counter?\n\n' +
-      'We built *RestroSuite* for that: bill offline on phone/PC, kitchen display, QR table order, WhatsApp receipts — one app.\n\n' +
-      'Free during launch. No card. Live in minutes.\n\n' +
-      'Open your free outlet:\n' +
+      'Quick one — when Wi‑Fi drops at *your* counter, does billing freeze?\n\n' +
+      'That\'s the moment customers wait… and sometimes walk out.\n\n' +
+      'I\'m *Man Singh Gurjar* from CodeArc (Nagpur). We built *RestroSuite* so local cafés can *keep billing offline* on phone or PC — even with no internet.\n\n' +
+      '*Free during launch.* No card. After that, *month-to-month* — no forced yearly lock-in like most POS.\n\n' +
+      'Open your free outlet → try *one sample bill* today:\n' +
       'https://restrosuite.codearc.co.in/login?tab=register\n\n' +
-      'If it helps, try a sample bill today. If not for you, ignore this — no pressure.\n\n' +
-      '— Team CodeArc'
+      'If it\'s not useful, ignore this — no pressure.\n\n' +
+      '— Man Singh Gurjar · Nagpur\n' +
+      '+91 73002 00949'
     );
   }
 
@@ -323,6 +383,7 @@
     paintTable();
     paintPreview();
     paintHistory();
+    try { paintHistoryAsync(); } catch (_) {}
   }
 
   function paintKpis() {
@@ -396,7 +457,7 @@
     if (!el) {return;}
     const list = loadCampaigns();
     if (!list.length) {
-      el.innerHTML = '<div style="color:var(--text-mute);padding:8px 0">No campaigns yet</div>';
+      el.innerHTML = '<div style="color:var(--text-mute);padding:8px 0">No campaigns yet · history syncs across browsers after first send</div>';
       return;
     }
     el.innerHTML = list
@@ -407,7 +468,7 @@
           '<div><b>' +
           esc(c.label || 'Campaign') +
           '</b><div style="color:var(--text-mute);font-size:11.5px">' +
-          esc(c.at || '') +
+          esc(c.at || c.created_at || '') +
           '</div></div>' +
           '<div style="text-align:right;font-weight:700">' +
           '<span style="color:#0F9F6E">' +
@@ -421,6 +482,11 @@
         );
       })
       .join('');
+  }
+
+  async function paintHistoryAsync() {
+    await refreshCampaignsFromServer();
+    paintHistory();
   }
 
   function setStatusLine(msg) {
@@ -542,8 +608,8 @@
     if (test) {test.onclick = () => startCampaign(true);}
     const hist = document.getElementById('sa-ads-refresh-hist');
     if (hist) {
-      hist.onclick = () => {
-        paintHistory();
+      hist.onclick = async () => {
+        await paintHistoryAsync();
         toast('History refreshed', 'fa-rotate');
       };
     }
@@ -575,27 +641,86 @@
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  function last10(digits) {
+    const d = String(digits || '').replace(/\D/g, '');
+    return d.length > 10 ? d.slice(-10) : d;
+  }
+
+  /** Platform line status (system tenant). Returns { ready, number, error } */
+  async function fetchPlatformStatus() {
+    try {
+      if (!global.RS_API) {
+        return { ready: false, number: null, error: 'API not configured' };
+      }
+      // Super-admin session is NOT a tenant session — use tenant-admin.
+      // Tenant staff (if ever allowed) use tenant-data with via_platform.
+      let res;
+      if (isSuper() && typeof RS_API.admin === 'function') {
+        res = await RS_API.admin({ action: 'gateway_status' });
+      } else if (typeof RS_API.data === 'function') {
+        res = await RS_API.data({
+          operation: 'gateway_status',
+          via_platform: true,
+        });
+      } else {
+        return { ready: false, number: null, error: 'API not configured' };
+      }
+      const d = res && (res.status || res.platformReady != null ? res : res.data) || res || {};
+      const number = d.platformNumber || d.number || d.phone || d.wa_number || null;
+      const ready =
+        d.platformReady === true ||
+        d.canAutomate === true ||
+        d.status === 'ready' ||
+        d.live === true ||
+        d.authenticated === true;
+      return { ready: !!ready, number: number ? String(number).replace(/\D/g, '') : null, raw: d };
+    } catch (e) {
+      return { ready: false, number: null, error: (e && e.message) || 'Gateway status failed' };
+    }
+  }
+
   async function sendOne(phone, message) {
-    if (!global.RS_API || typeof RS_API.data !== 'function') {
+    if (!global.RS_API) {
       throw new Error('API not configured');
     }
-    const res = await RS_API.data({
-      operation: 'gateway_send',
-      via_platform: true,
-      phone: phone,
-      message: message,
-    });
-    // Accept common success shapes
+    let res;
+    // Super-admin WA Ads must go through tenant-admin (superadmin token).
+    // tenant-data requires a tenant staff session and returns "Tenant session required."
+    if (isSuper() && typeof RS_API.admin === 'function') {
+      res = await RS_API.admin({
+        action: 'gateway_send',
+        phone: phone,
+        message: message,
+        // Prevent gateway bill-wrapper ("Here's your bill…") on marketing blasts
+        kind: 'ad',
+        purpose: 'marketing',
+      });
+    } else if (typeof RS_API.data === 'function') {
+      res = await RS_API.data({
+        operation: 'gateway_send',
+        via_platform: true,
+        phone: phone,
+        message: message,
+        kind: 'ad',
+        purpose: 'marketing',
+      });
+    } else {
+      throw new Error('API not configured');
+    }
+    // Accept common success shapes (edge wraps as { data: gatewayJson } or flat gatewayJson)
+    const g = res && res.data && (res.data.status || res.data.ok != null) ? res.data : res;
     const ok =
-      res &&
-      (res.status === 'success' ||
-        res.status === 'ok' ||
-        res.ok === true ||
-        res.sent === true ||
-        (res.data && (res.data.status === 'success' || res.data.ok)));
+      g &&
+      (g.status === 'success' ||
+        g.status === 'ok' ||
+        g.ok === true ||
+        g.sent === true ||
+        g.delivered === true ||
+        /initiat|queued|sent|deliver/i.test(String(g.message || '')));
     if (!ok) {
       const err =
-        (res && (res.error || res.message || (res.data && res.data.error))) ||
+        (g && (g.error || g.message)) ||
+        (res && (res.error || res.message)) ||
         'Gateway did not accept send';
       throw new Error(String(err));
     }
@@ -618,11 +743,48 @@
     }
 
     let list;
+    // Pre-flight: platform gateway must be Ready
+    setStatusLine('Checking platform WhatsApp…');
+    const plat = await fetchPlatformStatus();
+    if (plat.error && !plat.ready) {
+      toast('Gateway check: ' + plat.error, 'fa-circle-exclamation');
+    }
+    if (!plat.ready) {
+      const why =
+        plat.error ||
+        'Platform WhatsApp is not Ready. Open Super-Admin → Gateway, scan QR on the PC tray, wait until Ready.';
+      toast(why, 'fa-circle-exclamation');
+      setStatusLine('Blocked · platform line not ready');
+      window.alert('Cannot send ads yet.\n\n' + why);
+      return;
+    }
+    const platformLast10 = plat.number ? last10(plat.number) : '';
+    setStatusLine(
+      'Platform Ready' +
+        (plat.number ? ' · +' + plat.number : '') +
+        ' · human-send'
+    );
+
     if (testOnly) {
-      const phone = window.prompt('Send one test message to this WhatsApp number (with country code, e.g. 9198…):');
+      const phone = window.prompt(
+        'Send ONE test to YOUR personal WhatsApp (with country code).\n\n' +
+          'Do NOT use the gateway/platform number' +
+          (platformLast10 ? ' (…' + platformLast10 + ')' : '') +
+          ' — self-chat is blocked.\n\nExample: 9198XXXXXXXX'
+      );
       const p = normalizePhone(phone);
       if (!p) {
         toast('Invalid test number', 'fa-circle-exclamation');
+        return;
+      }
+      if (platformLast10 && last10(p) === platformLast10) {
+        const msg =
+          'That number is the same as the platform WhatsApp line (…' +
+          platformLast10 +
+          ').\n\nWhatsApp cannot deliver a message to itself.\n\nEnter your personal mobile instead.';
+        toast('Self-chat blocked — use your personal number', 'fa-circle-exclamation');
+        window.alert(msg);
+        setStatusLine('Blocked · cannot test to platform line itself');
         return;
       }
       list = [{ name: 'Test', phone: p, status: 'pending', error: '', at: null }];
@@ -704,6 +866,14 @@
         });
       }
       try {
+        // Skip self-chat mid-campaign (platform line)
+        if (platformLast10 && last10(row.phone) === platformLast10) {
+          throw new Error(
+            'Skipped: same as platform WhatsApp line (…' +
+              platformLast10 +
+              '). Cannot send to the gateway number itself.'
+          );
+        }
         await sendOne(row.phone, body);
         row.status = 'sent';
         row.error = '';
@@ -721,8 +891,15 @@
           cancelFlag = true;
         } else {
           row.status = 'failed';
-          row.error = msg.slice(0, 120);
+          row.error = msg.slice(0, 200);
           failed++;
+          if (testOnly) {
+            setStatusLine('Test failed: ' + msg.slice(0, 140));
+            if (prog) {prog.fail(msg.slice(0, 160));}
+            try {
+              window.alert('Test send failed:\n\n' + msg);
+            } catch (_) { /* ignore */ }
+          }
         }
       }
       paintTable();
@@ -772,6 +949,8 @@
     hist.unshift(camp);
     saveCampaigns(hist);
     paintHistory();
+    // Platform-wide history (Supabase) — non-blocking
+    try { persistCampaignToServer(camp); } catch (_) {}
 
     if (prog) {
       if (failed && !sent) {

@@ -1486,6 +1486,73 @@ async function purgeTenantDemoData(payload: Record<string, unknown>, req: Reques
   return jsonResponse({ success: true }, 200, req);
 }
 
+/** Super-Admin WA Ads campaign history (platform-wide, multi-browser). */
+async function listAdsCampaigns(payload: Record<string, unknown>, req: Request) {
+  const limit = Math.min(Math.max(Number(payload.limit) || 25, 1), 80);
+  const { data, error } = await supabaseAdmin
+    .from("saas_platform_ads_campaigns")
+    .select(
+      "id, label, message_preview, total, sent, failed, skipped, pace, test_only, created_by, metadata, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    // Table may not be migrated yet — return empty so UI falls back to localStorage
+    console.warn("list_ads_campaigns:", error.message);
+    return jsonResponse({ campaigns: [], error: error.message }, 200, req);
+  }
+  const campaigns = (data || []).map((row: any) => ({
+    id: row.id,
+    label: row.label || "Campaign",
+    at: row.created_at
+      ? new Date(row.created_at).toLocaleString("en-IN")
+      : "",
+    created_at: row.created_at,
+    total: Number(row.total) || 0,
+    sent: Number(row.sent) || 0,
+    failed: Number(row.failed) || 0,
+    skipped: Number(row.skipped) || 0,
+    messagePreview: row.message_preview || "",
+    pace: row.pace || "safe",
+    testOnly: !!row.test_only,
+    createdBy: row.created_by || "superadmin",
+  }));
+  return jsonResponse({ campaigns }, 200, req);
+}
+
+async function saveAdsCampaign(
+  payload: Record<string, unknown>,
+  req: Request,
+  verifiedPayload: Record<string, unknown>,
+) {
+  const id = String(payload.id || `camp_${Date.now()}`).slice(0, 80);
+  const row = {
+    id,
+    label: String(payload.label || "Campaign").slice(0, 120),
+    message_preview: String(payload.messagePreview || payload.message_preview || "").slice(0, 240),
+    total: Math.max(0, Number(payload.total) || 0),
+    sent: Math.max(0, Number(payload.sent) || 0),
+    failed: Math.max(0, Number(payload.failed) || 0),
+    skipped: Math.max(0, Number(payload.skipped) || 0),
+    pace: String(payload.pace || "safe").slice(0, 32),
+    test_only: !!(payload.testOnly || payload.test_only),
+    created_by: String(verifiedPayload.username || "superadmin").slice(0, 120),
+    metadata: typeof payload.metadata === "object" && payload.metadata
+      ? payload.metadata
+      : {},
+  };
+  const { data, error } = await supabaseAdmin
+    .from("saas_platform_ads_campaigns")
+    .upsert(row, { onConflict: "id" })
+    .select("id, created_at")
+    .maybeSingle();
+  if (error) {
+    console.error("save_ads_campaign failed:", error);
+    return jsonResponse({ error: "Failed to save campaign history.", detail: error.message }, 500, req);
+  }
+  return jsonResponse({ success: true, campaign: data }, 200, req);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: getCorsHeaders(req) });
@@ -1513,6 +1580,10 @@ serve(async (req) => {
     if (action === "list_users") return await listUsers(req);
     if (action === "get_billing") return await getBilling(req);
     if (action === "list_billing_events") return await listBillingEvents(payload, req);
+    if (action === "list_ads_campaigns") return await listAdsCampaigns(payload, req);
+    if (action === "save_ads_campaign") {
+      return await saveAdsCampaign(payload, req, verified.payload as Record<string, unknown>);
+    }
     if (action === "list_plans") return await listPlans(req);
     if (action === "update_plan") return await updatePlan(payload, req);
     if (action === "list_devices") return await listDevices(payload, req);
