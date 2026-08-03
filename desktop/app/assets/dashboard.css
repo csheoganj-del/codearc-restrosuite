@@ -717,7 +717,15 @@ body.rs-role-superadmin #rs-install-banner,
 html.rs-role-superadmin .rs-install-prompt,
 body.rs-role-superadmin .rs-install-prompt,
 html.rs-role-superadmin #pwa-install-btn,
-body.rs-role-superadmin #pwa-install-btn {
+body.rs-role-superadmin #pwa-install-btn,
+html.rs-role-superadmin #tb-qr-scan,
+body.rs-role-superadmin #tb-qr-scan,
+html.rs-role-superadmin .tb-qr-scan,
+body.rs-role-superadmin .tb-qr-scan,
+html.rs-role-superadmin #rs-platform-shell-badge,
+body.rs-role-superadmin #rs-platform-shell-badge,
+html.rs-role-superadmin .rs-platform-shell-badge,
+body.rs-role-superadmin .rs-platform-shell-badge {
   display: none !important;
 }
 @media (max-width: 1100px) {

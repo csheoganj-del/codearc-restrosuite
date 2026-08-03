@@ -607,22 +607,17 @@
       .replace(/"/g, '&quot;');
   }
 
-  /* ---------- #14 Super-admin shell badge (platform owner only) ---------- */
+  /* ---------- #14 Super-admin shell badge (removed — cluttered SA UI) ---------- */
   function platformBadge() {
-    // Never show on restaurant outlets — confuses customers
-    if (role() !== 'superadmin') {
+    // Drop legacy "Platform console · not an outlet" chip everywhere.
+    // Super-Admin already has its own sidebar identity (Codearc Superadmin).
+    try {
       const stale = document.getElementById('rs-platform-shell-badge');
-      if (stale) try { stale.remove(); } catch (_) {}
-      return;
-    }
-    const side = document.querySelector('.sidebar .brand, .sidebar .sb-brand, #sidebar');
-    if (!side || document.getElementById('rs-platform-shell-badge')) {return;}
-    const b = document.createElement('div');
-    b.id = 'rs-platform-shell-badge';
-    b.textContent = 'Platform console · not an outlet';
-    const brand = document.querySelector('.sidebar .brand') || side.firstChild;
-    if (brand && brand.parentNode) {brand.parentNode.insertBefore(b, brand.nextSibling);}
-    else {side.insertBefore(b, side.firstChild);}
+      if (stale) stale.remove();
+      document.querySelectorAll('.rs-platform-shell-badge').forEach((el) => {
+        try { el.remove(); } catch (_) {}
+      });
+    } catch (_) {}
   }
 
   /* ---------- #16 Human offline errors (wrap toast if cloud language leaks) ---------- */

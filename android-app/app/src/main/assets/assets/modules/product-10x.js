@@ -329,27 +329,42 @@
       });
     }
 
-    // Staff QR scanner — always visible in top bar (phone, tablet, desktop webcam)
-    let scan = document.getElementById('tb-qr-scan');
-    if (!scan) {
-      scan = document.createElement('button');
-      scan.type = 'button';
-      scan.id = 'tb-qr-scan';
-      scan.className = 'tb-icon-btn tb-qr-scan';
-      scan.setAttribute('aria-label', t('scan_table') || 'Scan table QR');
-      scan.setAttribute(
-        'title',
-        'Scan table QR (camera) · or type table number — same session as guest'
-      );
-      scan.setAttribute('data-i18n-title', 'scan_table');
-      scan.innerHTML = '<i class="fa-solid fa-qrcode" aria-hidden="true"></i>';
-      // Prefer next to WhatsApp / support cluster so it is not lost in overflow
-      const wa = document.getElementById('tb-wa-status-btn');
-      const support = document.getElementById('tb-support-wrap');
-      if (wa && wa.parentNode) {wa.parentNode.insertBefore(scan, wa);}
-      else if (support && support.parentNode) {support.parentNode.insertBefore(scan, support);}
-      else {right.insertBefore(scan, right.firstChild);}
-      scan.onclick = () => openStaffQrScanner();
+    // Staff QR scanner — outlet floor only (never Super-Admin platform console)
+    const saRole = String(
+      (session() && session().role) || sessionStorage.getItem('logged_in_role') || ''
+    ).toLowerCase();
+    const isSa =
+      saRole === 'superadmin' ||
+      saRole === 'super_admin' ||
+      saRole === 'brand_admin' ||
+      document.documentElement.classList.contains('rs-role-superadmin');
+    if (!isSa) {
+      let scan = document.getElementById('tb-qr-scan');
+      if (!scan) {
+        scan = document.createElement('button');
+        scan.type = 'button';
+        scan.id = 'tb-qr-scan';
+        scan.className = 'tb-icon-btn tb-qr-scan';
+        scan.setAttribute('aria-label', t('scan_table') || 'Scan table QR');
+        scan.setAttribute(
+          'title',
+          'Scan table QR (camera) · or type table number — same session as guest'
+        );
+        scan.setAttribute('data-i18n-title', 'scan_table');
+        scan.innerHTML = '<i class="fa-solid fa-qrcode" aria-hidden="true"></i>';
+        // Prefer next to WhatsApp / support cluster so it is not lost in overflow
+        const wa = document.getElementById('tb-wa-status-btn');
+        const support = document.getElementById('tb-support-wrap');
+        if (wa && wa.parentNode) {wa.parentNode.insertBefore(scan, wa);}
+        else if (support && support.parentNode) {support.parentNode.insertBefore(scan, support);}
+        else {right.insertBefore(scan, right.firstChild);}
+        scan.onclick = () => openStaffQrScanner();
+      }
+    } else {
+      const staleScan = document.getElementById('tb-qr-scan');
+      if (staleScan) {
+        try { staleScan.remove(); } catch (_) {}
+      }
     }
     updateScanVisibility();
     window.addEventListener('resize', updateScanVisibility);
@@ -358,11 +373,13 @@
   function updateScanVisibility() {
     const scan = document.getElementById('tb-qr-scan');
     if (!scan) {return;}
-    // Kitchen / inventory / token display do not need floor QR scan chrome
+    // Kitchen / inventory / token display / Super-Admin do not need floor QR scan chrome
     const role = String(
       (session() && session().role) || sessionStorage.getItem('logged_in_role') || ''
     ).toLowerCase();
-    const hideFor = /^(kitchen|inventory|customer_display)$/.test(role);
+    const hideFor =
+      /^(kitchen|inventory|customer_display|superadmin|super_admin|brand_admin)$/.test(role) ||
+      document.documentElement.classList.contains('rs-role-superadmin');
     let hideByTabs = false;
     try {
       const tabs = window.RS_ROLE && window.RS_ROLE.allowedTabs;
@@ -371,14 +388,25 @@
       }
     } catch (_) {}
     const show = !hideFor && !hideByTabs;
-    scan.style.display = show ? '' : 'none';
-    scan.hidden = !show;
+    if (!show) {
+      scan.style.display = 'none';
+      scan.hidden = true;
+      try { scan.remove(); } catch (_) {}
+      return;
+    }
+    scan.style.display = '';
+    scan.hidden = false;
   }
 
   function openStaffQrScanner() {
-    // Role gate: waiter, admin, manager, owner, captain, cashier
+    // Role gate: waiter, admin, manager, owner, captain, cashier (not Super-Admin)
     const role = String(session().role || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
-    const allowed = /owner|admin|manager|waiter|captain|cashier|superadmin/.test(role) || !role;
+    if (/superadmin|super_admin|brand_admin/.test(role) ||
+        document.documentElement.classList.contains('rs-role-superadmin')) {
+      toast('Table QR scan is for outlet staff, not the platform console', 'fa-lock');
+      return;
+    }
+    const allowed = /owner|admin|manager|waiter|captain|cashier/.test(role) || !role;
     if (!allowed) {
       toast('No permission to scan table QR', 'fa-lock');
       return;
