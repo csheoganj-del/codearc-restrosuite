@@ -709,6 +709,17 @@ html.rs-native-app .rs-station-group {
 .rs-cart-shift-hint:hover { background: rgba(234,179,8,.14); }
 .rs-cart-shift-hint i { color: #ca8a04; }
 html.rs-role-superadmin .rs-topbar-shift { display: none !important; }
+/* Super-Admin is platform console — not an outlet POS */
+html.rs-role-superadmin #rs-ops-mode-chip,
+body.rs-role-superadmin #rs-ops-mode-chip,
+html.rs-role-superadmin #rs-install-banner,
+body.rs-role-superadmin #rs-install-banner,
+html.rs-role-superadmin .rs-install-prompt,
+body.rs-role-superadmin .rs-install-prompt,
+html.rs-role-superadmin #pwa-install-btn,
+body.rs-role-superadmin #pwa-install-btn {
+  display: none !important;
+}
 @media (max-width: 1100px) {
   .rs-shift-open-lbl { display: none; }
   .rs-shift-text { max-width: 72px; }

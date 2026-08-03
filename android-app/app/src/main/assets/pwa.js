@@ -244,10 +244,27 @@
   }
 
   // ── Install prompt (Add to Home Screen) ──────────────────────────────
+  // Super-Admin platform console is not an outlet POS — skip install nag there.
+  function isSuperAdminPage() {
+    try {
+      if (document.documentElement.classList.contains("rs-role-superadmin")) return true;
+      if (document.body && document.body.classList.contains("rs-role-superadmin")) return true;
+      var role =
+        (window.RS_API && RS_API.session && RS_API.session() && RS_API.session().role) ||
+        sessionStorage.getItem("logged_in_role") ||
+        "";
+      role = String(role).toLowerCase();
+      return role === "superadmin" || role === "super_admin" || role === "brand_admin";
+    } catch (_) {
+      return false;
+    }
+  }
+
   var deferredInstall = null;
   window.addEventListener("beforeinstallprompt", function (e) {
     e.preventDefault();
     deferredInstall = e;
+    if (isSuperAdminPage()) return;
     if (document.getElementById("rs-install-banner")) return;
     var bar = document.createElement("div");
     bar.id = "rs-install-banner";

@@ -452,7 +452,28 @@
     }
   }
 
+  function isSuperAdminShell() {
+    try {
+      if (document.documentElement.classList.contains('rs-role-superadmin')) return true;
+      if (document.body && document.body.classList.contains('rs-role-superadmin')) return true;
+      const sess = global.RS_API && typeof RS_API.session === 'function' ? RS_API.session() : null;
+      const role = String((sess && sess.role) || '').toLowerCase();
+      return role === 'superadmin' || role === 'super_admin' || role === 'brand_admin';
+    } catch (_) {
+      return false;
+    }
+  }
+
   function paintModeChip(mode) {
+    // Platform Super-Admin is not an outlet — never show outlet ops chips.
+    if (isSuperAdminShell()) {
+      const oldSa = document.getElementById('rs-ops-mode-chip');
+      if (oldSa) {
+        oldSa.style.display = 'none';
+        try { oldSa.remove(); } catch (_) {}
+      }
+      return;
+    }
     if (mode === 'full') {
       const old = document.getElementById('rs-ops-mode-chip');
       if (old) {old.style.display = 'none';}
