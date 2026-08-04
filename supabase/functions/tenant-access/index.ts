@@ -837,7 +837,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   const usernameNormalized = username.toLowerCase();
   const { data: staffUser, error: staffError } = await supabaseAdmin
     .from("tenant_users")
-    .select("id, username, display_name, password_hash, role, allowed_tabs, status, session_version")
+    .select("id, username, display_name, password_hash, role, allowed_tabs, status, session_version, must_change_password")
     .eq("tenant_id", tenant.id)
     .eq("username_normalized", usernameNormalized)
     .maybeSingle();
@@ -901,6 +901,7 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
         tenant_slug: tenant.slug,
         tenant_name: tenant.name,
         allowed_tabs: allowedTabs,
+        must_change_password: staffUser.must_change_password === true,
         data_reset_at: tenant.data_reset_at || null,
         plan_code: tenant.plan_code || "starter",
         plan_name: plan.name,

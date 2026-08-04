@@ -326,6 +326,7 @@ serve(async (req) => {
         password_hash: await hashPassword(password),
         role,
         allowed_tabs: normalizedTabs(role, payload.allowed_tabs, admin.tenantTabs),
+        must_change_password: true,
       }).select("id, employee_id, username, display_name, role, allowed_tabs, status, created_at").single();
       if (error?.code === "23505") return jsonResponse({ error: "That username already exists in this workspace." }, 409, req);
       if (error) throw error;

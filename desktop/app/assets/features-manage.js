@@ -2590,7 +2590,7 @@
         bodyHost.innerHTML = `
           <div style="display:flex;flex-direction:column;gap:14px">
             <div style="padding:12px 14px;border-radius:12px;background:rgba(31,138,91,.08);border:1px solid rgba(31,138,91,.22);font-size:13.5px;line-height:1.45;color:var(--text)">
-              <b>${safe(creds.name)}</b> can sign in now. Share these details once — then they should change the password.
+              <b>${safe(creds.name)}</b> can sign in now. Share these login credentials with your staff member.
             </div>
             <div style="display:grid;gap:10px;padding:14px;border-radius:12px;border:1px solid var(--stroke-2);background:var(--glass,#fafafa)">
               ${outlet ? `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">Outlet ID</span><code style="font-size:13px;font-weight:700">${safe(outlet)}</code></div>` : ''}
