@@ -57,6 +57,7 @@ try {
 contextBridge.exposeInMainWorld('rsDesktop', {
   storeLease: (leaseToken, serverTimeMs) => ipcRenderer.invoke('rs-license-store', leaseToken, serverTimeMs),
   recheckLicense: () => ipcRenderer.invoke('rs-license-recheck'),
+  beginLicenseRecovery: () => ipcRenderer.invoke('rs-license-recover'),
   listPrinters: () => ipcRenderer.invoke('rs-list-printers'),
   printHtml: (html, opts) => ipcRenderer.invoke('rs-print-html', { html, ...(opts || {}) }),
 });

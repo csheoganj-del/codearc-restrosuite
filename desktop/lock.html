@@ -46,8 +46,8 @@
     <div class="support">Need help? Contact RestroSuite support.</div>
   </div>
   <script>
-    // Restarting the app re-runs the main-process gate; once the plan is
-    // renewed and the device is online, the next launch loads the dashboard.
+    // First re-check the native lease. If it is missing or stale, open the
+    // local sign-in page so an active tenant can mint and persist a new one.
     var btn = document.getElementById('retry');
     var status = document.getElementById('status');
     btn.addEventListener('click', async function () {
@@ -56,16 +56,19 @@
         ? 'Checking your subscription…'
         : 'Still offline — connect to the internet, then retry.';
       try {
-        // Only the main process can unlock: it re-runs the gate and, if the
-        // subscription is valid again, loads the dashboard itself. Retry can
-        // never bypass the lock from inside the page.
         var res = (window.rsDesktop && window.rsDesktop.recheckLicense)
           ? await window.rsDesktop.recheckLicense()
           : { locked: true };
         if (res && res.locked) {
-          status.textContent = navigator.onLine
-            ? 'Subscription still inactive. Please renew, then retry.'
-            : 'Still offline. Connect to the internet, then retry.';
+          if (navigator.onLine && window.rsDesktop && window.rsDesktop.beginLicenseRecovery) {
+            status.textContent = 'Opening secure sign-in to refresh this deviceâ€¦';
+            var recovery = await window.rsDesktop.beginLicenseRecovery();
+            if (!recovery || !recovery.ok) {
+              status.textContent = 'Could not open sign-in. Please restart RestroSuite.';
+            }
+            return;
+          }
+          status.textContent = 'Still offline. Connect to the internet, then retry.';
         }
       } catch (e) {
         status.textContent = 'Could not verify right now. Please try again.';
