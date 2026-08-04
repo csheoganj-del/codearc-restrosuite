@@ -2,17 +2,29 @@
 :root {
   --rs-density-scale: 1;
 }
-html[data-rs-density="compact"] { --rs-density-scale: 0.9; }
-html[data-rs-density="comfortable"] { --rs-density-scale: 1; }
-html[data-rs-density="large"] { --rs-density-scale: 1.12; }
 
+/* ── Density: drive root font-size so ALL rem-based UI scales together ── */
+html[data-rs-density="compact"]     { font-size: 14px; --rs-density-scale: 0.875; }
+html[data-rs-density="comfortable"] { font-size: 16px; --rs-density-scale: 1; }
+html[data-rs-density="large"]       { font-size: 18px; --rs-density-scale: 1.125; }
+
+/* Compact — tighter cards so more items fit on small screens */
+html[data-rs-density="compact"] .menu-item-card { padding: 6px 8px; }
+html[data-rs-density="compact"] .sidebar        { font-size: 0.82rem; }
+html[data-rs-density="compact"] .sidebar .nav-link,
+html[data-rs-density="compact"] .sidebar .tab-link { padding: 6px 10px; }
+
+/* Large — bigger touch targets and text for wall-mount / kitchen screens */
 html[data-rs-density="large"] .menu-item-card,
 html[data-rs-density="large"] .kds-ticket,
 html[data-rs-density="large"] .floor-table-card {
-  font-size: calc(1em * var(--rs-density-scale));
+  font-size: 1rem; /* inherits the larger root already */
+  padding: 14px 16px;
+  min-height: 72px;
 }
-html[data-rs-density="large"] #page-title { font-size: 1.35rem; }
-html[data-rs-density="compact"] .menu-item-card { padding: 8px 10px; }
+html[data-rs-density="large"] #page-title { font-size: 1.4rem; }
+html[data-rs-density="large"] .btn,
+html[data-rs-density="large"] button { min-height: 44px; }
 
 /* #2 Sync status chip (topbar) */
 #rs-sync-status-pill {

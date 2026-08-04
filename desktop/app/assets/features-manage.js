@@ -3141,18 +3141,36 @@
               const btn = el.querySelector('#sle-save');
               if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving…'; }
               try {
-                await RS_API.staffUsers({
+                const result = await RS_API.staffUsers({
                   action: 'update_user',
                   user_id: u.id,
                   role,
                   display_name: dname,
                   allowed_tabs,
                 });
+                // Detect silent plan-ceiling stripping: server saved fewer tabs than we sent.
+                const savedTabs = (result && result.user && Array.isArray(result.user.allowed_tabs))
+                  ? result.user.allowed_tabs : null;
+                const strippedTabs = savedTabs
+                  ? allowed_tabs.filter((t) => !savedTabs.includes(t)) : [];
                 try {
                   if (window.RS_ownerAudit) RS_ownerAudit('staff.access_update', (u.username || '') + ' → ' + allowed_tabs.join(','));
                 } catch (_) {}
                 closeModal();
-                RS.toast('Access updated — live on their open app within ~10s', 'fa-user-shield');
+                if (strippedTabs.length) {
+                  const names = strippedTabs.map((t) => t.replace('-tab', '')).join(', ');
+                  RS.toast(
+                    'Access saved — but "' + names + '" was removed by your current plan. ' +
+                    'Upgrade your plan to grant this module.',
+                    'fa-triangle-exclamation'
+                  );
+                  console.warn(
+                    '[RestroSuite] Plan ceiling stripped tabs for', u.username,
+                    '— submitted:', allowed_tabs, '— saved by server:', savedTabs
+                  );
+                } else {
+                  RS.toast('Access updated — live on their open app within ~10s', 'fa-user-shield');
+                }
                 loadStaffUsers();
               } catch (e) {
                 errEl.textContent = e.message || String(e);

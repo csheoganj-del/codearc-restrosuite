@@ -85,59 +85,134 @@ export type PlanEntitlement = {
   maxStaff: number;
   monthlyOrderLimit: number;
   allowedTabs: string[];
+  priceMonthly?: number;
+  priceYearly?: number;
 };
+
+/** Front desk only — Express */
+const EXPRESS_TABS = [
+  "pos-tab",
+  "bills-tab",
+  "editor-tab",
+  "tokens-tab",
+  "customers-tab",
+  "reports-tab",
+];
+
+/** Front + kitchen / floor — Serve (default trial) */
+const SERVE_TABS = [
+  "pos-tab",
+  "floor-tab",
+  "qr-orders-tab",
+  "kds-tab",
+  "bills-tab",
+  "editor-tab",
+  "tokens-tab",
+  "customers-tab",
+  "employees-tab",
+  "aggregator-tab",
+  "reports-tab",
+  "tax-tab",
+];
+
+/** Full ops — Command */
+const COMMAND_TABS = [...ALL_MODULE_TABS];
 
 export const PLAN_ENTITLEMENTS: Record<string, PlanEntitlement> = {
   free: {
     name: "Free / Demo",
     maxStaff: 2,
     monthlyOrderLimit: 50,
-    allowedTabs: [
-      "pos-tab",
-      "floor-tab",
-      "qr-orders-tab",
-      "bills-tab",
-      "inventory-tab",
-      "editor-tab",
-      "kds-tab",
-      "tokens-tab",
-      "customers-tab",
-    ],
+    allowedTabs: EXPRESS_TABS.slice(),
+    priceMonthly: 0,
+    priceYearly: 0,
   },
+  // ── Current commercial plans ───────────────────────────────────────────
+  express: {
+    name: "Express",
+    maxStaff: 3,
+    monthlyOrderLimit: 6000,
+    allowedTabs: EXPRESS_TABS.slice(),
+    priceMonthly: 499,
+    priceYearly: 4999,
+  },
+  serve: {
+    name: "Serve",
+    maxStaff: 50,
+    monthlyOrderLimit: 100000,
+    allowedTabs: SERVE_TABS.slice(),
+    priceMonthly: 999,
+    priceYearly: 9999,
+  },
+  command: {
+    name: "Command",
+    maxStaff: 200,
+    monthlyOrderLimit: 1000000,
+    allowedTabs: COMMAND_TABS.slice(),
+    priceMonthly: 2499,
+    priceYearly: 24999,
+  },
+  // ── Legacy aliases (same entitlements) ─────────────────────────────────
   starter: {
-    name: "Starter",
-    maxStaff: 5,
-    monthlyOrderLimit: 300,
-    allowedTabs: [
-      "pos-tab",
-      "floor-tab",
-      "qr-orders-tab",
-      "bills-tab",
-      "inventory-tab",
-      "editor-tab",
-      "kds-tab",
-      "tokens-tab",
-      "employees-tab",
-      "growth-hub-tab",
-      "customers-tab",
-    ],
+    name: "Express",
+    maxStaff: 3,
+    monthlyOrderLimit: 6000,
+    allowedTabs: EXPRESS_TABS.slice(),
+    priceMonthly: 499,
+    priceYearly: 4999,
   },
   growth: {
-    name: "Growth",
-    maxStaff: 15,
-    monthlyOrderLimit: 8000,
-    allowedTabs: [...ALL_MODULE_TABS],
+    name: "Serve",
+    maxStaff: 50,
+    monthlyOrderLimit: 100000,
+    allowedTabs: SERVE_TABS.slice(),
+    priceMonthly: 999,
+    priceYearly: 9999,
   },
   enterprise: {
-    name: "Enterprise",
-    maxStaff: 75,
-    monthlyOrderLimit: 100000,
-    allowedTabs: [...ALL_MODULE_TABS],
+    name: "Command",
+    maxStaff: 200,
+    monthlyOrderLimit: 1000000,
+    allowedTabs: COMMAND_TABS.slice(),
+    priceMonthly: 2499,
+    priceYearly: 24999,
   },
 };
 
+/** Normalize plan codes (legacy → current). */
+export function normalizePlanCode(code: unknown): string {
+  const c = String(code || "serve").trim().toLowerCase();
+  if (c === "starter" || c === "basic") return "express";
+  if (c === "growth" || c === "standard" || c === "pro") return "serve";
+  if (c === "enterprise" || c === "scale") return "command";
+  if (PLAN_ENTITLEMENTS[c]) return c;
+  return "serve";
+}
+
 export function planFor(code: unknown): PlanEntitlement {
-  return PLAN_ENTITLEMENTS[String(code || "starter")] || PLAN_ENTITLEMENTS.starter;
+  const key = normalizePlanCode(code);
+  return PLAN_ENTITLEMENTS[key] || PLAN_ENTITLEMENTS.serve;
+}
+
+/** Prepaid renew: extend from existing expiry if still in future, else from now. */
+export function extendPeriodFromExpiry(
+  existingEndIso: string | null | undefined,
+  interval: "monthly" | "yearly" = "monthly",
+): string {
+  const now = Date.now();
+  const existingMs = existingEndIso ? new Date(existingEndIso).getTime() : 0;
+  const baseMs = Number.isFinite(existingMs) && existingMs > now ? existingMs : now;
+  const d = new Date(baseMs);
+  if (interval === "yearly") d.setUTCFullYear(d.getUTCFullYear() + 1);
+  else d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString();
+}
+
+export function daysUntilPeriodEnd(periodEndIso: string | null | undefined): number | null {
+  if (!periodEndIso) return null;
+  const end = new Date(periodEndIso).getTime();
+  if (!Number.isFinite(end)) return null;
+  return Math.ceil((end - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
 export function normalizeTabId(tab: string): string {

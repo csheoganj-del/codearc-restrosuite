@@ -130,12 +130,26 @@ function normalizeUsername(value: unknown) {
 
 /**
  * Resolve staff tab access via shared role-defaults (legacy ids normalized).
+ * Logs a warning if the plan ceiling strips any tabs the admin explicitly submitted,
+ * so the reason is visible in Supabase Edge Function logs instead of silently disappearing.
  */
 function normalizedTabs(role: string, requested: unknown, tenantTabs: unknown) {
-  if (requested === undefined || requested === null) {
-    return sharedEffectiveTabs(role, tabsForRole(role), tenantTabs);
+  const requestedNorm = (requested === undefined || requested === null)
+    ? tabsForRole(role)
+    : normalizeTabs(requested);
+  const result = sharedEffectiveTabs(role, requestedNorm, tenantTabs);
+  // Detect plan-ceiling stripping: any tab explicitly requested that didn't survive.
+  const stripped = requestedNorm.filter((t) => !result.includes(t));
+  if (stripped.length) {
+    console.warn(
+      `[tenant-users] plan ceiling stripped tabs for role="${role}": ` +
+      `submitted=[${requestedNorm.join(",")}] ` +
+      `saved=[${result.join(",")}] ` +
+      `stripped=[${stripped.join(",")}] ` +
+      `— either upgrade the tenant plan or add the tab to the plan entitlement in role-defaults.ts`
+    );
   }
-  return sharedEffectiveTabs(role, normalizeTabs(requested), tenantTabs);
+  return result;
 }
 
 async function verifyAdminSession(req: Request) {

@@ -2499,9 +2499,20 @@
         fromSession.includes('reports-tab') || fromSession.includes('analytics-tab')
       ));
       if (lockReports && role !== 'manager' && !explicitReports) {
+        const stripped = tabs.filter((t) => t === 'reports-tab' || t === 'analytics-tab');
+        if (stripped.length) {
+          console.warn(
+            '[RestroSuite] "Lock reports for staff" (Settings \u2192 Team) is ON \u2014 ' +
+            'stripping ' + stripped.join(', ') + ' from ' + role + ' session. ' +
+            'To allow this role to see Reports, either turn off the setting or ' +
+            'explicitly grant reports-tab in Employees \u2192 Logins \u2192 Save access.'
+          );
+        }
         tabs = tabs.filter((t) => t !== 'reports-tab' && t !== 'analytics-tab');
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error('[RestroSuite] resolveAllowedTabs failed unexpectedly:', err);
+    }
     return tabs;
   }
   const allowedTabs = resolveAllowedTabs(staffRole, sess && sess.allowed_tabs);
@@ -2869,8 +2880,11 @@
         if (sess && sess.role && sess.role !== 'superadmin') {
           applyLiveRoleUpdate(sess.role, sess.allowed_tabs, { silent: true });
         }
-      } catch (_) {
+      } catch (err) {
         /* offline / network — keep local tabs */
+        if (navigator.onLine) {
+          console.warn('[RestroSuite] validate_session poll failed (online):', err && err.message);
+        }
       }
     };
     window.__rsRolePollTimer = setInterval(pollRole, 8000);
