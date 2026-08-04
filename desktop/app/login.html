@@ -1386,6 +1386,12 @@
               try {
                 if (!localStorage.getItem(firstKey)) localStorage.setItem(firstKey, String(Date.now()));
               } catch (_) {}
+              // Electron's next cold start is gated by a separate encrypted
+              // main-process copy. Persist it before leaving login; relying on
+              // dashboard startup created a lock -> login -> lock loop.
+              if (window.rsDesktop && typeof window.rsDesktop.storeLease === 'function') {
+                await window.rsDesktop.storeLease(leaseRes.lease, Number(leaseRes.server_time || Date.now()));
+              }
             }
           }
         } catch (leaseErr) {

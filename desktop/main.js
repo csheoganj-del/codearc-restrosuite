@@ -763,6 +763,22 @@ app.whenReady().then(async () => {
       if (!decision.locked && appEntryUrl && mainWindow) mainWindow.loadURL(appEntryUrl).catch(() => {});
       return { locked: !!decision.locked, reason: decision.reason };
     });
+    // A locked device cannot refresh a missing/expired lease until it has a
+    // tenant session, but the native gate used to block the login page itself.
+    // Open only the local login route here; login mints and persists a signed
+    // lease before dashboard navigation, so this is recovery rather than a
+    // licence bypass.
+    ipcMain.handle('rs-license-recover', () => {
+      if (!appEntryUrl || !mainWindow || mainWindow.isDestroyed()) {
+        return { ok: false, error: 'window_unavailable' };
+      }
+      const separator = appEntryUrl.includes('?') ? '&' : '?';
+      const recoveryUrl = `${appEntryUrl}${separator}license_recovery=1`;
+      mainWindow.loadURL(recoveryUrl).catch((e) => {
+        console.warn('[main] license recovery login failed:', e && e.message);
+      });
+      return { ok: true };
+    });
 
     // Wave 4 — print bridge (silent HTML thermal + printer list)
     const preferredPrinterPath = () => path.join(app.getPath('userData'), 'preferred-printer.json');
