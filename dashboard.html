@@ -576,12 +576,15 @@
             <div class="pos-grid" id="pos-grid"></div>
             <!-- Interactive Seating Layout Selections Grid -->
             <div class="pos-table-grid-view" id="pos-table-grid-view" style="display: none; padding: 0 12px 20px 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
                 <h3 style="font-size: 14px; font-weight: 700; color: var(--text);">POS Seating Layout - Select Table</h3>
-                <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-soft); font-weight: 600;">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--text-soft); font-weight: 600;">
                   <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--green);"></span> Free</span>
                   <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--orange);"></span> Occupied</span>
                   <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--violet-soft);"></span> Billed</span>
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-pos-counter-exit" title="Open takeaway counter POS" aria-label="Open takeaway counter POS" style="min-height: 40px; padding: 8px 12px; white-space: nowrap;">
+                    <i class="fa-solid fa-cash-register" aria-hidden="true"></i> Counter POS
+                  </button>
                 </div>
               </div>
               <div class="pos-tables-grid" id="pos-tables-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px;">
