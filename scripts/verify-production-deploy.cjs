@@ -16,7 +16,9 @@ if (!expectedBuildId) {
   process.exit(2);
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
 
 async function main() {
   const deadline = Date.now() + timeoutMs;
