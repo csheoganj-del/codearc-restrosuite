@@ -1,29 +1,29 @@
 {
-  "generatedAt": "2026-07-26T14:22:25.515Z",
+  "generatedAt": "2026-08-05T08:37:46.415Z",
   "repo": "csheoganj-del/restrosuite-downloads",
-  "tag": "v2.0.8",
-  "version": "2.0.8",
-  "baseUrl": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8",
+  "tag": "v2.0.13",
+  "version": "2.0.13",
+  "baseUrl": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13",
   "assets": {
     "setup": {
       "name": "RestroSuite-Windows-Setup.exe",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Setup.exe",
-      "size": 85474287
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-Windows-Setup.exe",
+      "size": 106810328
+    },
+    "nsis": {
+      "name": "RestroSuite-2.0.13-x64.exe",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-2.0.13-x64.exe",
+      "size": 106810328
+    },
+    "blockmap": {
+      "name": "RestroSuite-2.0.13-x64.exe.blockmap",
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-2.0.13-x64.exe.blockmap",
+      "size": 111766
     },
     "portable": {
       "name": "RestroSuite-Windows-Portable.exe",
       "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Portable.exe",
       "size": 85202290
-    },
-    "nsis": {
-      "name": "RestroSuite-2.0.8-x64.exe",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe",
-      "size": 85474287
-    },
-    "blockmap": {
-      "name": "RestroSuite-2.0.8-x64.exe.blockmap",
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe.blockmap",
-      "size": 88894
     },
     "apk": {
       "name": "RestroSuite-Android.apk",
@@ -41,10 +41,10 @@
       "size": 109104017
     }
   },
-  "windowsSetup": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Setup.exe",
+  "windowsSetup": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-Windows-Setup.exe",
+  "windowsNsis": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-2.0.13-x64.exe",
+  "windowsBlockmap": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-2.0.13-x64.exe.blockmap",
   "windowsPortable": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Portable.exe",
-  "windowsNsis": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe",
-  "windowsBlockmap": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe.blockmap",
   "androidApk": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Android.apk",
   "macAppleSilicon": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Mac-AppleSilicon.dmg",
   "macIntel": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Mac-Intel.dmg"

@@ -1,8 +1,8 @@
-version: 2.0.12
+version: 2.0.13
 files:
-  - url: https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.12/RestroSuite-2.0.12-x64.exe
-    sha512: 4OnLlAXXMb9jIYX0Psxj3P2P/WBkIS9i+evILium8qT5qXwps7cumLbA9dMA6cU4aworl1+TebYRQYMKrOlb3A==
-    size: 109079603
-path: https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.12/RestroSuite-2.0.12-x64.exe
-sha512: 4OnLlAXXMb9jIYX0Psxj3P2P/WBkIS9i+evILium8qT5qXwps7cumLbA9dMA6cU4aworl1+TebYRQYMKrOlb3A==
-releaseDate: '2026-08-04T05:19:09.641Z'
+  - url: https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-2.0.13-x64.exe
+    sha512: Y4o65i1j+CNGhQhZeDZ7FHwKb+8BZe5Xf4WTmqmMvHbjx9LYfGcS+Ao9KqcgGx+xMoZ/RGKq+Tn59i2TTBajpg==
+    size: 106810328
+path: https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.13/RestroSuite-2.0.13-x64.exe
+sha512: Y4o65i1j+CNGhQhZeDZ7FHwKb+8BZe5Xf4WTmqmMvHbjx9LYfGcS+Ao9KqcgGx+xMoZ/RGKq+Tn59i2TTBajpg==
+releaseDate: '2026-08-05T08:17:28.994Z'
