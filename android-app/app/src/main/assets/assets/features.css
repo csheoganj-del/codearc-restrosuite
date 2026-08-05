@@ -368,6 +368,30 @@
 }
 .rc-icon-btn i { pointer-events: none; } /* clicks always hit the button */
 .rc-foot-actions { pointer-events: auto; position: relative; z-index: 3; }
+.rc-print-status {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(360px, calc(100vw - 56px));
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .18);
+  z-index: 8;
+  pointer-events: none;
+}
+.rc-print-status[hidden] { display: none !important; }
+.rc-print-status.success { background: #ecfdf5; border-color: #86efac; color: #166534; }
+.rc-print-status.error { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+.rc-icon-btn[aria-busy="true"] { cursor: wait; opacity: .72; }
 .rs-mfoot:has(.rc-foot-actions) { pointer-events: auto; position: relative; z-index: 3; }
 .rc-icon-btn:hover {
   color: var(--text);

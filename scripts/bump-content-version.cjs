@@ -92,7 +92,10 @@ function main() {
     now.getFullYear() +
     pad2(now.getMonth() + 1) +
     pad2(now.getDate());
-  const version = 'v' + nextMajor + '-' + ymd + '-' + slug;
+  const deployRef = isCi
+    ? String(process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '').slice(0, 8)
+    : '';
+  const version = 'v' + nextMajor + '-' + ymd + '-' + slug + (deployRef ? '-' + deployRef : '');
   const contentStamp = stampHash();
   const date = now.toISOString().slice(0, 10);
 

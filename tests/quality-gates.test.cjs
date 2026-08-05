@@ -146,3 +146,24 @@ test('Kitchen Setup has one guarded permission state during live role refresh', 
     /html\.rs-kitchen-setup-denied #klc-sidebar-setup[\s\S]*display: none !important/
   );
 });
+
+test('settled receipt print reports progress and the final printer result inline', () => {
+  const pos = read('assets/features-pos.js');
+  const css = read('assets/features.css');
+  assert.match(pos, /id="rc-print-status"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(pos, /printBtn\.onclick = async/);
+  assert.match(pos, /setPrintStatus\('Sending receipt to printer\.\.\.'/);
+  assert.match(pos, /result && result\.deviceName/);
+  assert.match(pos, /setPrintStatus\('Print job sent'/);
+  assert.match(pos, /setPrintStatus\('Print failed'/);
+  assert.match(css, /\.rc-print-status\.success/);
+  assert.match(css, /\.rc-print-status\.error/);
+});
+
+test('automatic content versions include the deployment commit', () => {
+  const bump = read('scripts/bump-content-version.cjs');
+  assert.match(bump, /process\.env\.VERCEL_GIT_COMMIT_SHA/);
+  assert.match(bump, /process\.env\.GITHUB_SHA/);
+  assert.match(bump, /\.slice\(0, 8\)/);
+  assert.match(bump, /deployRef \? '-' \+ deployRef/);
+});

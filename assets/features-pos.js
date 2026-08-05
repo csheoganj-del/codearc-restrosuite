@@ -1634,14 +1634,43 @@
         };
 
         const printBtn = modal.querySelector('#rc-print');
+        const printStatus = modal.querySelector('#rc-print-status');
+        const setPrintStatus = (message, state) => {
+          if (!printStatus) return;
+          printStatus.hidden = !message;
+          printStatus.textContent = message || '';
+          printStatus.className = 'rc-print-status ' + (state || 'working');
+        };
         if (printBtn) {
-          printBtn.onclick = (e) => {
+          printBtn.onclick = async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
-              RSOps.printBillThermal(bill);
-            } else {
-              RSPrint(printHtml, 'Receipt ' + bill.no);
+            if (printBtn.getAttribute('aria-busy') === 'true') return;
+            const icon = printBtn.querySelector('i');
+            printBtn.setAttribute('aria-busy', 'true');
+            printBtn.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+            setPrintStatus('Sending receipt to printer...', 'working');
+            try {
+              let result;
+              if (window.RSOps && typeof RSOps.printBillThermal === 'function') {
+                result = await RSOps.printBillThermal(bill);
+              } else {
+                result = await RSPrint(printHtml, 'Receipt ' + bill.no);
+              }
+              if (!result || result.ok !== false) {
+                const printer = result && result.deviceName ? ' to ' + result.deviceName : '';
+                setPrintStatus('Print job sent' + printer, 'success');
+              } else {
+                const detail = result.error ? ': ' + String(result.error) : '';
+                setPrintStatus('Print failed' + detail, 'error');
+              }
+            } catch (err) {
+              setPrintStatus('Print failed: ' + ((err && err.message) || 'printer unavailable'), 'error');
+            } finally {
+              printBtn.removeAttribute('aria-busy');
+              printBtn.disabled = false;
+              if (icon) icon.className = 'fa-solid fa-print';
             }
           };
         }
@@ -1740,6 +1769,7 @@
       const bodyHtml = connectBanner + '<div class="receipt-paper" id="rc-paper">' + receiptHTML(bill, null) + '</div>';
       const footHtml =
         '<div class="rc-foot-actions" role="toolbar" aria-label="Bill actions">' +
+        '<span class="rc-print-status working" id="rc-print-status" role="status" aria-live="polite" hidden></span>' +
         '<button type="button" class="rc-icon-btn rc-wa" id="rc-wa" title="WhatsApp - send bill manually" aria-label="WhatsApp">' +
         '<i class="fa-brands fa-whatsapp"></i></button>' +
         '<button type="button" class="rc-icon-btn rc-print" id="rc-print" title="Print receipt (thermal when available, otherwise browser)" aria-label="Print">' +
