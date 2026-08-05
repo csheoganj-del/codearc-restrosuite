@@ -5388,6 +5388,57 @@
         };
       }
       
+      function findOrderTypeButton(type) {
+        const want = String(type || '').toLowerCase();
+        return [...document.querySelectorAll('.order-type-btn')].find((btn) => {
+          const label = `${btn.textContent || ''} ${btn.getAttribute('aria-label') || ''} ${btn.title || ''}`.toLowerCase();
+          return label.includes(want);
+        }) || null;
+      }
+
+      function activateCounterPos() {
+        const takeawayBtn = findOrderTypeButton('takeaway');
+        const tableSelect = document.getElementById('cart-table');
+        if (tableSelect) tableSelect.value = 'Walk-in / Takeaway';
+        try { localStorage.setItem('rs_active_order_type', 'Takeaway'); } catch (_) {}
+
+        if (takeawayBtn) {
+          takeawayBtn.click();
+        } else {
+          document.querySelectorAll('.order-type-btn').forEach((btn) => btn.classList.remove('active'));
+          const posCats = document.getElementById('pos-cats');
+          const posGrid = document.getElementById('pos-grid');
+          const posTableView = document.getElementById('pos-table-grid-view');
+          const activeTableBanner = document.getElementById('pos-active-table-banner');
+          if (posTableView) posTableView.style.display = 'none';
+          if (posCats) posCats.style.display = 'flex';
+          if (posGrid) posGrid.style.display = 'grid';
+          if (activeTableBanner) activeTableBanner.style.display = 'none';
+          if (window.RS && typeof window.RS.renderPOS === 'function') window.RS.renderPOS();
+        }
+      }
+
+      // Tablet cart chrome is hidden until an item exists, so the table picker
+      // needs its own always-visible escape back to the takeaway counter menu.
+      const btnCounterExit = document.getElementById('btn-pos-counter-exit');
+      if (btnCounterExit) {
+        btnCounterExit.addEventListener('click', (event) => {
+          event.preventDefault();
+          activateCounterPos();
+        });
+      }
+
+      // A true Counter workspace must never restore a stale Dine-in/Delivery
+      // selection from this device. Tables/Full workspaces still restore it.
+      function isCounterWorkspace() {
+        try {
+          if (window.RSFrictionless && typeof RSFrictionless.getMode === 'function') {
+            return RSFrictionless.getMode() === 'counter';
+          }
+        } catch (_) {}
+        return String((window.RS_SETTINGS && RS_SETTINGS.set_workspace_mode) || '').toLowerCase() === 'counter';
+      }
+
       // Handle manual table select dropdown changes
       const tblSelectEl = document.getElementById('cart-table');
       if (tblSelectEl) {
@@ -5633,6 +5684,14 @@
           await renderPosTableGrid();
         }
       });
+
+      if (isCounterWorkspace()) {
+        const activeOrderType = document.querySelector('.order-type-btn.active');
+        const activeLabel = activeOrderType
+          ? `${activeOrderType.textContent || ''} ${activeOrderType.getAttribute('aria-label') || ''} ${activeOrderType.title || ''}`.toLowerCase()
+          : '';
+        if (!activeLabel.includes('takeaway')) activateCounterPos();
+      }
 
       document.querySelectorAll('.order-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {

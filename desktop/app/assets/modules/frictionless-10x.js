@@ -418,7 +418,11 @@
   }
 
   function paintModeSwitcher() {
-    if (isPlatform() || !isOwnerLike()) return;
+    if (isPlatform() || !isOwnerLike()) {
+      var stale = document.getElementById('rs-fx-mode');
+      if (stale) stale.remove();
+      return;
+    }
     var host =
       document.getElementById('tb-right') ||
       document.querySelector('.topbar-right') ||
@@ -1519,6 +1523,7 @@
       paintPosEmptyCoach();
       paintActivationChecklist();
       applyModeNav();
+      paintModeSwitcher();
       injectCaPackOnReports();
       ensureOwnerWaDefaults();
       maybeProgressiveUnlock();
@@ -1528,6 +1533,7 @@
   // Re-apply mode when role tabs change
   document.addEventListener('rs:role-updated', function () {
     applyModeNav();
+    paintModeSwitcher();
   });
   // When reports tab painted
   var mo;
