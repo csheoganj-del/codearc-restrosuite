@@ -5,6 +5,18 @@
 (function (global) {
   'use strict';
 
+  function notifyPrintStatus(message, icon) {
+    try {
+      if (global.RS && typeof global.RS.toast === 'function') return global.RS.toast(message, icon || 'fa-print');
+      if (typeof global.__toast === 'function') return global.__toast(message, icon || 'fa-print');
+    } catch (_) {}
+  }
+
+  function friendlyPrintError(error) {
+    const raw = String(error || 'Printer did not accept the job').replace(/[_-]+/g, ' ').trim();
+    return raw.length > 96 ? raw.slice(0, 95) + '…' : raw;
+  }
+
   function paperMaxW() {
     const paperSize = (global.RS_SETTINGS && global.RS_SETTINGS.set_paper_size) || '80 mm';
     return paperSize === '58 mm' ? '200px' : '300px';
@@ -213,30 +225,47 @@
 
   async function printHtml(innerHTML, title, opts) {
     const options = opts || {};
+    const feedback = options.feedback !== false;
     const fullHtml = wrapHtml(innerHTML, title);
 
     // Android WebView — system Print dialog covers USB, Bluetooth & Wi‑Fi printers
     if (global.AndroidInterface && typeof global.AndroidInterface.printReceipt === 'function') {
+      if (feedback) notifyPrintStatus('Opening printer service…', 'fa-spinner fa-spin');
       try {
         global.AndroidInterface.printReceipt(fullHtml);
+        if (feedback) notifyPrintStatus('Printer service opened', 'fa-print');
         return { ok: true, mode: 'android-print-service' };
       } catch (e) {
         console.warn('[Print] Android failed', e);
+        if (feedback) notifyPrintStatus('Print failed — ' + friendlyPrintError(e && e.message), 'fa-circle-exclamation');
+        return { ok: false, mode: 'android-print-service', error: (e && e.message) || 'android_print_failed' };
       }
     }
 
-    // Electron desktop silent print
+    // Electron desktop silent print. A successful callback means Windows accepted
+    // the job; it cannot confirm that paper physically left the printer.
     const desk = global.RS_DESKTOP || global.rsDesktop;
     if (desk && typeof desk.printHtml === 'function') {
+      if (feedback) notifyPrintStatus('Sending print job…', 'fa-spinner fa-spin');
       try {
         const res = await desk.printHtml(fullHtml, {
           silent: options.silent !== false,
           deviceName: options.deviceName || null,
         });
-        if (res && res.ok) return { ok: true, mode: 'desktop', ...res };
-        console.warn('[Print] desktop print failed', res && res.error);
+        if (res && res.ok) {
+          const printer = res.deviceName || options.deviceName || '';
+          if (feedback) notifyPrintStatus(printer ? 'Print job sent to ' + printer : 'Print job sent to Windows', 'fa-print');
+          return { ok: true, mode: 'desktop', ...res };
+        }
+        const error = (res && res.error) || 'Printer did not accept the job';
+        console.warn('[Print] desktop print failed', error);
+        if (feedback) notifyPrintStatus('Print failed — ' + friendlyPrintError(error), 'fa-circle-exclamation');
+        return { ok: false, mode: 'desktop', error };
       } catch (e) {
+        const error = (e && e.message) || 'Desktop print bridge failed';
         console.warn('[Print] desktop bridge error', e);
+        if (feedback) notifyPrintStatus('Print failed — ' + friendlyPrintError(error), 'fa-circle-exclamation');
+        return { ok: false, mode: 'desktop', error };
       }
     }
 
@@ -246,12 +275,21 @@
         const tmp = document.createElement('div');
         tmp.innerHTML = innerHTML;
         await navigator.share({ title: title || 'Receipt', text: tmp.innerText || '' });
+        if (feedback) notifyPrintStatus('Share sheet opened', 'fa-share-nodes');
         return { ok: true, mode: 'web-share' };
       } catch (_) {}
     }
 
     // Browser fallback (USB/Wi‑Fi if OS has printer drivers)
-    return iframePrint(fullHtml);
+    if (feedback) notifyPrintStatus('Opening print dialog…', 'fa-spinner fa-spin');
+    const result = await iframePrint(fullHtml);
+    if (feedback) {
+      notifyPrintStatus(
+        result && result.ok ? 'Print dialog opened' : 'Could not open print dialog',
+        result && result.ok ? 'fa-print' : 'fa-circle-exclamation'
+      );
+    }
+    return result;
   }
 
   async function printEscPosText(text, opts) {
