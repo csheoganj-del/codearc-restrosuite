@@ -29,12 +29,12 @@
       <style>
         @page { margin: 0; size: auto; }
         *{margin:0;padding:0;box-sizing:border-box;}
-        html,body{background:#fff;color:#16151c;}
+        html,body{background:#fff !important;color:#16151c;}
         body{
           padding:6px 4px 10px;
           font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
+          -webkit-print-color-adjust: economy;
+          print-color-adjust: economy;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -43,8 +43,11 @@
           max-width: ${maxW} !important; width: 100% !important; margin: 0 auto !important;
         }
         .receipt-paper {
-          background: #fbfaf7; color: #16151c; border-radius: 0;
+          background: #fff !important; color: #16151c; border-radius: 0;
           padding: 10px 8px 14px; box-shadow: none; position: relative;
+        }
+        @media print {
+          html, body, body > div, .receipt-paper { background: #fff !important; box-shadow: none !important; }
         }
         .rcp-center { text-align: center; }
         .rcp-logo {

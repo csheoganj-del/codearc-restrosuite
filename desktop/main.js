@@ -823,7 +823,8 @@ app.whenReady().then(async () => {
       }
       const printWin = new BrowserWindow({
         show: false,
-        webPreferences: { offscreen: true, sandbox: true },
+        backgroundColor: '#ffffff',
+        webPreferences: { sandbox: true },
       });
       try {
         const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
@@ -833,7 +834,10 @@ app.whenReady().then(async () => {
           printWin.webContents.print(
             {
               silent: !!silent,
-              printBackground: true,
+              // Thermal drivers dither CSS backgrounds into a dense black/noisy
+              // block. Browser printing suppresses them by default, so keep the
+              // desktop path consistent and print only receipt foregrounds.
+              printBackground: false,
               deviceName: deviceName || undefined,
               margins: { marginType: 'none' },
             },
@@ -933,7 +937,8 @@ app.whenReady().then(async () => {
           .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`;
         const printWin = new BrowserWindow({
           show: false,
-          webPreferences: { offscreen: true, sandbox: true },
+          backgroundColor: '#ffffff',
+          webPreferences: { sandbox: true },
         });
         try {
           await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));

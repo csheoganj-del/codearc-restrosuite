@@ -42,6 +42,15 @@ test('desktop main registers print IPC handlers', () => {
   assert.match(src, /rs-print-escpos/);
 });
 
+test('desktop receipt printing does not rasterize page backgrounds', () => {
+  const main = fs.readFileSync(path.join(root, 'desktop/main.js'), 'utf8');
+  const bridge = fs.readFileSync(path.join(root, 'assets/print-bridge.js'), 'utf8');
+  assert.match(main, /printBackground:\s*false/);
+  assert.doesNotMatch(main, /webPreferences:\s*\{\s*offscreen:\s*true,\s*sandbox:\s*true\s*\}/);
+  assert.match(bridge, /print-color-adjust:\s*economy/);
+  assert.match(bridge, /\.receipt-paper\s*\{[\s\S]*?background:\s*#fff\s*!important/);
+});
+
 test('db.js uses IndexedDB for sync queue', () => {
   const src = fs.readFileSync(path.join(root, 'assets/db.js'), 'utf8');
   assert.match(src, /indexedDB|SYNC_IDB_NAME|idbReplaceAll/);
