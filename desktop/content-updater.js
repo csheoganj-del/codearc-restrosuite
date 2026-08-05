@@ -114,7 +114,12 @@ function openProgressWindow() {
   return new Promise((resolve) => {
     try {
       if (_progressWin && !_progressWin.isDestroyed()) {
-        try { _progressWin.focus(); } catch (_) {}
+        try {
+          if (_progressWin.isMinimized()) _progressWin.restore();
+          if (!_progressWin.isVisible()) _progressWin.show();
+          _progressWin.moveTop();
+          _progressWin.focus();
+        } catch (_) {}
         resolve(_progressWin);
         return;
       }
@@ -154,10 +159,23 @@ function openProgressWindow() {
       _progressWin.once('ready-to-show', () => {
         try { _progressWin.show(); } catch (_) {}
       });
-      _progressWin.loadFile(progressHtmlPath()).then(() => {
-        resolve(_progressWin);
+      const progressWin = _progressWin;
+      progressWin.loadFile(progressHtmlPath()).then(() => {
+        try {
+          if (!progressWin.isDestroyed() && !progressWin.isVisible()) progressWin.show();
+          if (!progressWin.isDestroyed()) {
+            progressWin.moveTop();
+            progressWin.focus();
+          }
+        } catch (_) {}
+        resolve(progressWin);
       }).catch((e) => {
         console.warn('[content-updater] progress window load failed', e && e.message);
+        try {
+          if (!progressWin.isDestroyed()) progressWin.destroy();
+        } catch (_) {}
+        if (_progressWin === progressWin) _progressWin = null;
+        _progressReady = false;
         resolve(null);
       });
     } catch (e) {
@@ -664,10 +682,27 @@ async function loadRemoteManifest(origin) {
  */
 async function checkContentUpdate(opts) {
   const options = opts || {};
-  if (_busy) return { status: 'busy' };
+  if (_busy) {
+    // A startup/background check may already own the updater. A manual Help
+    // click must surface that work instead of returning silently.
+    if (!options.silent) {
+      const existing = await openProgressWindow();
+      if (existing) {
+        sendProgressState(Object.assign({ phase: 'checking' }, _lastStatus));
+      } else {
+        await dialog.showMessageBox(parentWindow() || undefined, {
+          type: 'info',
+          title: 'RestroSuite update',
+          message: 'An update check is already running',
+          detail: 'Please wait a moment, then choose Help → Check for Updates again.',
+        });
+      }
+    }
+    return Object.assign({ status: 'busy' }, _lastStatus);
+  }
   _busy = true;
   _lastStatus = { status: 'checking' };
-  const useUi = !options.silent;
+  let useUi = !options.silent;
   let uiOpen = false;
 
   const showUi = async (state) => {
@@ -792,6 +827,10 @@ async function checkContentUpdate(opts) {
       '\n\nYou have: ' + localVer +
       '\nThis downloads only the updated screens (not the whole installer). Your bills and login stay safe.';
 
+    // Stay quiet while a startup check connects, but show the action window
+    // once an update is found. The old path waited forever for an invisible
+    // button and left every later Help click stuck at `busy`.
+    useUi = true;
     // Silent background prompt: open progress UI for available + install
     // (same polished bar whether Help → Check or auto-check)
     await showUi({

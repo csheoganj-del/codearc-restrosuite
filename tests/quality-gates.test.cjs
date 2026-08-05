@@ -40,6 +40,17 @@ test('native asset sync keeps migrations and legal styling', () => {
   assert.ok(read('desktop/sync-app.mjs').includes("'legal.css'"));
 });
 
+test('desktop content updater never waits on an invisible silent prompt', () => {
+  const source = read('desktop/content-updater.js');
+  const available = source.slice(
+    source.indexOf('const promptDetail'),
+    source.indexOf('// Download + apply with live progress bar')
+  );
+  assert.match(available, /useUi\s*=\s*true;[\s\S]*await showUi\(\{/);
+  assert.match(source, /if \(_busy\)[\s\S]*if \(!options\.silent\)[\s\S]*openProgressWindow\(\)/);
+  assert.match(source, /if \(!_progressWin\.isVisible\(\)\) _progressWin\.show\(\)/);
+});
+
 test('public order cart close control has an accessible name', () => {
   assert.match(read('order.html'), /class="close-btn"[^>]*aria-label="Close order cart"/);
 });
