@@ -478,6 +478,7 @@
   function openPrinterPicker() {
     const bridge = global.RSPrintBridge;
     if (bridge && typeof bridge.choosePreferredPrinter === 'function') {
+      if (global.RS && RS.toast) RS.toast('Loading Windows printers…', 'fa-spinner fa-spin');
       Promise.resolve(bridge.choosePreferredPrinter()).catch((err) => {
         console.warn('[printer chip]', err);
         if (global.RS && RS.toast) RS.toast('Could not open printer list', 'fa-print');
@@ -2100,12 +2101,18 @@
     let last = { ok: false };
     let anyOk = false;
 
+    toast(
+      copies > 1 ? `Sending ${copies} kitchen tickets…` : 'Sending kitchen ticket…',
+      'fa-spinner fa-spin'
+    );
+
     for (let c = 0; c < copies; c++) {
       try {
         if (global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
           last = await RSPrintBridge.printHtml(html, title, {
             silent: true,
             deviceName: deviceName || undefined,
+            feedback: false,
           });
         } else if (global.RSPrint) {
           const ret = global.RSPrint(html, title, { deviceName: deviceName || undefined });
@@ -2124,6 +2131,11 @@
       toast(
         'Kitchen printer offline — order saved, ticket not printed. Check printer cable / name in Settings.',
         'fa-triangle-exclamation'
+      );
+    } else {
+      toast(
+        deviceName ? `Kitchen ticket sent to ${deviceName}` : 'Kitchen ticket sent to printer',
+        'fa-print'
       );
     }
     return anyOk ? Object.assign({ ok: true, copies }, last || {}) : last;
@@ -2236,12 +2248,13 @@
       return { ok: false };
     }
     const outlet = outletForPrint();
+    toast('Sending receipt to printer…', 'fa-spinner fa-spin');
 
     // Optional: pure raw ESC/POS (plain text) only when settings force it
     if (preferRawEscPosThermal()) {
       try {
         if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-          const res = await RSPrintBridge.printBillEscPos(bill, outlet, { raw: true });
+          const res = await RSPrintBridge.printBillEscPos(bill, outlet, { raw: true, feedback: false });
           if (res && res.ok) {
             toast('Thermal receipt sent (raw)', 'fa-print');
             return res;
@@ -2258,20 +2271,24 @@
       const html = billReceiptPreviewHtml(bill, outlet, qr);
       const title = 'Receipt ' + (bill.no || bill.orderId || '');
       if (global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
-        const res = await RSPrintBridge.printHtml(html, title, { silent: true });
+        const res = await RSPrintBridge.printHtml(html, title, { silent: true, feedback: false });
         if (res && res.ok) {
           toast('Thermal print — same as preview', 'fa-receipt');
           return { ok: true, mode: res.mode || 'html-thermal', ...res };
         }
       }
-      if (global.RSPrint) {
-        RSPrint(html, title);
-        toast('Print opened — same format as preview', 'fa-print');
-        return { ok: true, mode: 'html' };
+      const hasPrintBridge = global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function';
+      if (!hasPrintBridge && global.RSPrint) {
+        const fallback = RSPrint(html, title);
+        const fallbackResult = fallback && typeof fallback.then === 'function' ? await fallback : fallback;
+        if (!fallbackResult || fallbackResult.ok !== false) {
+          toast('Print dialog opened — same format as preview', 'fa-print');
+          return { ok: true, mode: 'html' };
+        }
       }
-      if (global.RSReceipt && typeof RSReceipt.print === 'function') {
+      if (!hasPrintBridge && global.RSReceipt && typeof RSReceipt.print === 'function') {
         await RSReceipt.print(bill);
-        toast('Print opened — same format as preview', 'fa-print');
+        toast('Print dialog opened — same format as preview', 'fa-print');
         return { ok: true, mode: 'html' };
       }
     } catch (e) {
@@ -2281,7 +2298,7 @@
     // Last resort: raw ESC/POS text (unformatted) if HTML path unavailable
     try {
       if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-        const res = await RSPrintBridge.printBillEscPos(bill, outlet, {});
+        const res = await RSPrintBridge.printBillEscPos(bill, outlet, { feedback: false });
         if (res && res.ok) {
           toast('Thermal sent as plain text (fallback)', 'fa-print');
           return res;
