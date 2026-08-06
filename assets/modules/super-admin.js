@@ -74,13 +74,13 @@
         : c === 'enterprise' || c === 'scale' ? 'command'
           : c;
     if (_planPriceMap) {
-      if (_planPriceMap[c] != null && Number.isFinite(Number(_planPriceMap[c]))) return Number(_planPriceMap[c]);
-      if (_planPriceMap[canon] != null && Number.isFinite(Number(_planPriceMap[canon]))) return Number(_planPriceMap[canon]);
+      if (_planPriceMap[c] != null && Number.isFinite(Number(_planPriceMap[c]))) {return Number(_planPriceMap[c]);}
+      if (_planPriceMap[canon] != null && Number.isFinite(Number(_planPriceMap[canon]))) {return Number(_planPriceMap[canon]);}
     }
-    if (c === 'free') return 0;
-    if (c === 'express' || c === 'starter' || c === 'basic') return 499;
-    if (c === 'serve' || c === 'growth' || c === 'standard' || c === 'pro') return 999;
-    if (c === 'command' || c === 'enterprise' || c === 'scale') return 2499;
+    if (c === 'free') {return 0;}
+    if (c === 'express' || c === 'starter' || c === 'basic') {return 499;}
+    if (c === 'serve' || c === 'growth' || c === 'standard' || c === 'pro') {return 999;}
+    if (c === 'command' || c === 'enterprise' || c === 'scale') {return 2499;}
     return 0;
   }
   /**
@@ -89,27 +89,27 @@
    * Mis-marked active workspaces with no payment evidence count as trial.
    */
   function isTrialTenant(t) {
-    if (!t) return false;
-    if (t.is_trial === true || t.billing_kind === 'trial') return true;
-    if (t.is_paid === true || t.billing_kind === 'paid') return false;
+    if (!t) {return false;}
+    if (t.is_trial === true || t.billing_kind === 'trial') {return true;}
+    if (t.is_paid === true || t.billing_kind === 'paid') {return false;}
     const sub = String(t.subscription_status || '').toLowerCase();
-    if (sub === 'trialing' || sub === 'trial') return true;
-    if (sub === 'past_due' || sub === 'canceled' || sub === 'cancelled' || sub === 'expired') return false;
+    if (sub === 'trialing' || sub === 'trial') {return true;}
+    if (sub === 'past_due' || sub === 'canceled' || sub === 'cancelled' || sub === 'expired') {return false;}
     const hasPaidEvidence = !!(
       (t.subscription_id && String(t.subscription_id).trim()) ||
       t.subscription_activated_at
     );
-    if (sub === 'active' || !sub) return !hasPaidEvidence;
+    if (sub === 'active' || !sub) {return !hasPaidEvidence;}
     return !!t.trial_started_at && !hasPaidEvidence;
   }
   function isPaidTenant(t) {
-    if (!t) return false;
-    if (t.is_paid === true || t.billing_kind === 'paid') return true;
-    if (isTrialTenant(t)) return false;
+    if (!t) {return false;}
+    if (t.is_paid === true || t.billing_kind === 'paid') {return true;}
+    if (isTrialTenant(t)) {return false;}
     const sub = String(t.subscription_status || '').toLowerCase();
-    if (sub !== 'active') return false;
+    if (sub !== 'active') {return false;}
     const plan = canonPlanCode(t.plan_code);
-    if (!['express', 'serve', 'command'].includes(plan)) return false;
+    if (!['express', 'serve', 'command'].includes(plan)) {return false;}
     return !!(
       (t.subscription_id && String(t.subscription_id).trim()) ||
       t.subscription_activated_at
@@ -117,11 +117,11 @@
   }
   /** Per-tenant MRR: only real paid (never trials). */
   function tenantMrr(t) {
-    if (!t) return 0;
-    if (!isPaidTenant(t)) return 0;
-    if (Number(t.mrr) > 0) return Number(t.mrr);
+    if (!t) {return 0;}
+    if (!isPaidTenant(t)) {return 0;}
+    if (Number(t.mrr) > 0) {return Number(t.mrr);}
     const mo = planMonthlyPrice(t.plan_code);
-    if (!mo) return 0;
+    if (!mo) {return 0;}
     const interval = String(t.billing_interval || 'monthly').toLowerCase();
     if (interval === 'yearly') {
       const yr = mo === 499 ? 4999 : mo === 999 ? 9999 : mo === 2499 ? 24999 : mo * 10;
@@ -131,9 +131,9 @@
   }
   function canonPlanCode(code) {
     const c = String(code || '').toLowerCase();
-    if (c === 'starter' || c === 'basic') return 'express';
-    if (c === 'growth' || c === 'standard' || c === 'pro') return 'serve';
-    if (c === 'enterprise' || c === 'scale') return 'command';
+    if (c === 'starter' || c === 'basic') {return 'express';}
+    if (c === 'growth' || c === 'standard' || c === 'pro') {return 'serve';}
+    if (c === 'enterprise' || c === 'scale') {return 'command';}
     return c || 'serve';
   }
   /** Account status for staff: approved ≡ Active (one vocabulary with modal). */
@@ -977,9 +977,9 @@ async function openPlanPricingEditor() {
     plans = (out && out.plans) || [];
     // Seed live price map so Platform MRR matches editable catalogue
     if (plans.length) {
-      if (!_planPriceMap) _planPriceMap = {};
+      if (!_planPriceMap) {_planPriceMap = {};}
       plans.forEach((p) => {
-        if (p && p.plan_code != null) _planPriceMap[String(p.plan_code)] = Number(p.price_monthly) || 0;
+        if (p && p.plan_code != null) {_planPriceMap[String(p.plan_code)] = Number(p.price_monthly) || 0;}
       });
     }
   }
@@ -1020,7 +1020,7 @@ async function openPlanPricingEditor() {
       try {
         await RS_API.admin(payload);
         // Keep in-memory MRR catalogue in sync with saved price
-        if (!_planPriceMap) _planPriceMap = {};
+        if (!_planPriceMap) {_planPriceMap = {};}
         _planPriceMap[payload.plan_code] = payload.price_monthly;
         const alias = payload.plan_code === 'express' ? 'starter'
           : payload.plan_code === 'serve' ? 'growth'
@@ -1028,7 +1028,7 @@ async function openPlanPricingEditor() {
               : payload.plan_code === 'starter' ? 'express'
                 : payload.plan_code === 'growth' ? 'serve'
                   : payload.plan_code === 'enterprise' ? 'command' : null;
-        if (alias) _planPriceMap[alias] = payload.price_monthly;
+        if (alias) {_planPriceMap[alias] = payload.price_monthly;}
         // Recompute row mrr from new catalogue when server mrr not yet refreshed
         _cachedTenants = _cachedTenants.map((t) => ({
           ...t,
@@ -1673,7 +1673,7 @@ function initTenantManageModalEvents() {
     let subscription_status = 'active';
     let endMs = now;
     const existingEnd = t.subscription_current_period_end ? new Date(t.subscription_current_period_end).getTime() : 0;
-    if (Number.isFinite(existingEnd) && existingEnd > now) endMs = existingEnd;
+    if (Number.isFinite(existingEnd) && existingEnd > now) {endMs = existingEnd;}
 
     if (kind === 'trial') {
       subscription_status = 'trialing';
@@ -1726,11 +1726,11 @@ function initTenantManageModalEvents() {
       }
       // Reflect in modal fields
       const pe = document.getElementById('manage-period-end');
-      if (pe) pe.value = new Date(endMs).toISOString().slice(0, 10);
+      if (pe) {pe.value = new Date(endMs).toISOString().slice(0, 10);}
       const ss = document.getElementById('manage-subscription-status');
-      if (ss) ss.value = subscription_status;
+      if (ss) {ss.value = subscription_status;}
       const pc = document.getElementById('manage-plan-code');
-      if (pc && kind === 'trial') pc.value = 'serve';
+      if (pc && kind === 'trial') {pc.value = 'serve';}
       renderPlatformSummary(_cachedTenants);
       renderTenantTable();
       toast(
@@ -1759,7 +1759,7 @@ function initTenantManageModalEvents() {
 
 function renderInlinePlatformReports(tenants) {
   const box = document.getElementById('sa-inline-reports');
-  if (!box) return;
+  if (!box) {return;}
   const list = Array.isArray(tenants) ? tenants : _cachedTenants;
   const byPlan = { express: 0, serve: 0, command: 0, other: 0 };
   let trialN = 0;
@@ -1767,13 +1767,13 @@ function renderInlinePlatformReports(tenants) {
   let riskN = 0;
   list.forEach((t) => {
     const p = canonPlanCode(t.plan_code);
-    if (byPlan[p] != null) byPlan[p]++; else byPlan.other++;
-    if (isTrialTenant(t)) trialN++;
-    else if (isPaidTenant(t)) paidN++;
+    if (byPlan[p] != null) {byPlan[p]++;} else {byPlan.other++;}
+    if (isTrialTenant(t)) {trialN++;}
+    else if (isPaidTenant(t)) {paidN++;}
     else if (
       ['past_due', 'canceled', 'cancelled', 'expired'].includes(String(t.subscription_status || '').toLowerCase()) ||
       t.billing_kind === 'risk'
-    ) riskN++;
+    ) {riskN++;}
   });
   const card = (label, val, sub) =>
     `<div style="border:1px solid var(--stroke);border-radius:10px;padding:10px 12px;background:var(--panel)">
@@ -1793,10 +1793,10 @@ function renderInlinePlatformReports(tenants) {
   if (openBtn && !openBtn.dataset.bound) {
     openBtn.dataset.bound = '1';
     openBtn.onclick = () => {
-      if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('sa-reports-tab');
+      if (global.RS && typeof RS.activateTab === 'function') {RS.activateTab('sa-reports-tab');}
       else {
         const link = document.querySelector('[data-tab="sa-reports-tab"]');
-        if (link) link.click();
+        if (link) {link.click();}
       }
     };
   }
@@ -1811,10 +1811,10 @@ function renderInlinePlatformReports(tenants) {
       adsBtn.title = 'WhatsApp ads portal';
       adsBtn.innerHTML = '<i class="fa-brands fa-whatsapp"></i> WA Ads';
       adsBtn.onclick = () => {
-        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('sa-ads-tab');
+        if (global.RS && typeof RS.activateTab === 'function') {RS.activateTab('sa-ads-tab');}
         else {
           const link = document.querySelector('[data-tab="sa-ads-tab"]');
-          if (link) link.click();
+          if (link) {link.click();}
         }
       };
       head.appendChild(adsBtn);
@@ -1829,7 +1829,7 @@ function renderPlatformReports() {
   const health = document.getElementById('sa-reports-billing-health');
   const expBody = document.getElementById('sa-reports-expiring-body');
   const eventsEl = document.getElementById('sa-reports-events');
-  if (!kpis) return;
+  if (!kpis) {return;}
 
   let mrr = 0;
   const byPlan = { express: 0, serve: 0, command: 0 };
@@ -1838,20 +1838,20 @@ function renderPlatformReports() {
   const now = Date.now();
   tenants.forEach((t) => {
     const p = canonPlanCode(t.plan_code);
-    if (byPlan[p] != null) byPlan[p]++;
-    if (isTrialTenant(t)) bySub.trialing++;
-    else if (isPaidTenant(t)) bySub.active++;
+    if (byPlan[p] != null) {byPlan[p]++;}
+    if (isTrialTenant(t)) {bySub.trialing++;}
+    else if (isPaidTenant(t)) {bySub.active++;}
     else {
       const s = String(t.subscription_status || '').toLowerCase();
-      if (s === 'cancelled' || s === 'canceled') bySub.canceled++;
-      else if (s === 'expired') bySub.expired++;
-      else if (s === 'past_due') bySub.past_due++;
+      if (s === 'cancelled' || s === 'canceled') {bySub.canceled++;}
+      else if (s === 'expired') {bySub.expired++;}
+      else if (s === 'past_due') {bySub.past_due++;}
     }
     mrr += tenantMrr(t);
     if (t.subscription_current_period_end) {
       const end = new Date(t.subscription_current_period_end).getTime();
       const days = Math.ceil((end - now) / 86400000);
-      if (days <= 14) expiring.push({ t, days, end });
+      if (days <= 14) {expiring.push({ t, days, end });}
     }
   });
   expiring.sort((a, b) => a.days - b.days);
@@ -1907,7 +1907,7 @@ function renderPlatformReports() {
       expBody.querySelectorAll('.sa-rep-manage').forEach((btn) => {
         btn.onclick = () => {
           const t = _cachedTenants.find(x => String(x.id) === String(btn.getAttribute('data-tid')));
-          if (t) openTenantManageModal(t);
+          if (t) {openTenantManageModal(t);}
         };
       });
     }
@@ -1915,13 +1915,13 @@ function renderPlatformReports() {
 
   // Recent billing events from saas_billing_events (live)
   if (eventsEl) {
-    eventsEl.innerHTML = `<div style="color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading billing events…</div>`;
+    eventsEl.innerHTML = '<div style="color:var(--text-mute)"><i class="fa-solid fa-spinner fa-spin"></i> Loading billing events…</div>';
     try {
       if (window.RS_API && typeof RS_API.admin === 'function') {
         RS_API.admin({ action: 'list_billing_events', limit: 20 }).then((out) => {
           const rows = (out && out.events) || [];
           if (!rows.length) {
-            eventsEl.innerHTML = `<div style="color:var(--text-mute);font-size:12.5px;line-height:1.5">No billing events yet. Payments, renewals, and reminders will appear here automatically.</div>`;
+            eventsEl.innerHTML = '<div style="color:var(--text-mute);font-size:12.5px;line-height:1.5">No billing events yet. Payments, renewals, and reminders will appear here automatically.</div>';
             return;
           }
           eventsEl.innerHTML = rows.map((ev) => {
@@ -1933,13 +1933,13 @@ function renderPlatformReports() {
             </div>`;
           }).join('');
         }).catch(() => {
-          eventsEl.innerHTML = `<div style="color:var(--text-mute)">Billing events unavailable right now. Expiring list above is still live.</div>`;
+          eventsEl.innerHTML = '<div style="color:var(--text-mute)">Billing events unavailable right now. Expiring list above is still live.</div>';
         });
       } else {
-        eventsEl.innerHTML = `<div style="color:var(--text-mute)">Sign in as Super-Admin to load billing events.</div>`;
+        eventsEl.innerHTML = '<div style="color:var(--text-mute)">Sign in as Super-Admin to load billing events.</div>';
       }
     } catch (_) {
-      eventsEl.innerHTML = `<div style="color:var(--text-mute)">Could not load billing events.</div>`;
+      eventsEl.innerHTML = '<div style="color:var(--text-mute)">Could not load billing events.</div>';
     }
   }
 
@@ -1948,8 +1948,8 @@ function renderPlatformReports() {
     refresh.dataset.bound = '1';
     refresh.onclick = async () => {
       try {
-        if (typeof pollSuperTenants === 'function') await pollSuperTenants();
-        else if (typeof renderSuper === 'function') await renderSuper();
+        if (typeof pollSuperTenants === 'function') {await pollSuperTenants();}
+        else if (typeof renderSuper === 'function') {await renderSuper();}
         renderPlatformReports();
         toast('Reports refreshed', 'fa-rotate');
       } catch (e) {

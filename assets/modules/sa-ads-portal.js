@@ -112,7 +112,7 @@
   }
 
   function loadCampaigns() {
-    if (Array.isArray(_campaignCache) && _campaignCache.length) return _campaignCache;
+    if (Array.isArray(_campaignCache) && _campaignCache.length) {return _campaignCache;}
     return loadCampaignsLocal();
   }
 
@@ -146,7 +146,7 @@
 
   async function persistCampaignToServer(camp) {
     try {
-      if (!isSuper() || !global.RS_API || typeof RS_API.admin !== 'function') return;
+      if (!isSuper() || !global.RS_API || typeof RS_API.admin !== 'function') {return;}
       await RS_API.admin({
         action: 'save_ads_campaign',
         id: camp.id,
@@ -207,9 +207,9 @@
   }
 
   function parseContactsFromCsv(text) {
-    if (global.RestroSuite && RestroSuite.imports && typeof RestroSuite.imports.parseCsv === 'function') {
+    if (global.RestroSuite && global.RestroSuite.imports && typeof global.RestroSuite.imports.parseCsv === 'function') {
       try {
-        const parsed = RestroSuite.imports.parseCsv(text);
+        const parsed = global.RestroSuite.imports.parseCsv(text);
         if (parsed && parsed.length) {
           const rows = [];
           parsed.forEach((row) => {
@@ -638,7 +638,7 @@
   }
 
   function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms));
+    return new Promise((r) => { setTimeout(r, ms); });
   }
 
   function last10(digits) {
