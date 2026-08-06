@@ -77,6 +77,9 @@ test('gateway runtime honors the durable port and fails fast on bind errors', ()
   assert.match(tray, /await run\(pm2, \['restart'/);
   assert.match(tray, /PORT: String\(HEALTH_PORT\)/);
   assert.match(tray, /Command timed out after/);
+  assert.ok(gateway.includes('sentMessageCache'));
+  assert.ok(gateway.includes('getMessage: async (key)'));
+  assert.ok(read('gateway-modules/send-engine.js').includes('__rsRememberSentMessage'));
   assert.match(tunnel, /localApi\('GET', '\/api\/tunnels'\)/);
   assert.match(tunnel, /localApi\('DELETE'/);
   assert.match(tunnel, /encodeURIComponent\(existing\.name\)/);

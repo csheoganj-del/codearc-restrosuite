@@ -954,6 +954,22 @@
       }, closeDelay + 500);
     }
 
+    // Publish the final state before local/cloud history work. History is useful
+    // but must not leave the primary send control looking active if it fails.
+    setStatusLine(
+      'Done · ' +
+        sent +
+        ' sent · ' +
+        failed +
+        ' failed · ' +
+        statsOf().remaining +
+        ' still pending'
+    );
+    toast(
+      'Ads: ' + sent + ' sent · ' + failed + ' failed (human-paced)',
+      failed ? 'fa-circle-exclamation' : 'fa-brands fa-whatsapp'
+    );
+
     const camp = {
       id: currentCampaignId,
       label: testOnly ? 'Test send' : 'Ads blast',
@@ -971,19 +987,6 @@
     // Platform-wide history (Supabase) — non-blocking
     try { persistCampaignToServer(camp); } catch (_) {}
 
-    setStatusLine(
-      'Done · ' +
-        sent +
-        ' sent · ' +
-        failed +
-        ' failed · ' +
-        statsOf().remaining +
-        ' still pending'
-    );
-    toast(
-      'Ads: ' + sent + ' sent · ' + failed + ' failed (human-paced)',
-      failed ? 'fa-circle-exclamation' : 'fa-brands fa-whatsapp'
-    );
   }
 
   function renderSaAds() {

@@ -271,6 +271,14 @@ function createSendEngine(ctx) {
                     result = await client.sendMessage(jid, msg, opts || {});
                 }
 
+                // Keep the original payload available when WhatsApp asks this
+                // companion device to retry after a Signal/session miss.
+                try {
+                    if (client && typeof client.__rsRememberSentMessage === 'function') {
+                        client.__rsRememberSentMessage(result);
+                    }
+                } catch (_) {}
+
                 try { await client.sendPresenceUpdate('paused', jid); } catch (_) {}
                 if (Math.random() < 0.35) {
                     await _sleep(_randInt(400, 1500));
