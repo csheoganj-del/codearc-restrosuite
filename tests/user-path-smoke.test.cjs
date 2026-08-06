@@ -160,6 +160,9 @@ test('WA Ads closes completed progress before campaign bookkeeping', () => {
   const history = ads.indexOf('const camp = {', finish);
   assert.ok(finish >= 0, 'missing completed-send progress close');
   assert.ok(history > finish, 'progress must close before campaign history work');
-  assert.ok(ads.includes('prog.close(closeDelay)'));
+  assert.match(ads, /typeof prog\.succeed/);
+  assert.match(ads, /typeof prog\.fail/);
+  assert.match(ads, /typeof prog\.close/);
+  assert.ok(ads.includes('prog.close();'));
   assert.ok(ads.includes('progressRoot && progressRoot.isConnected'));
 });
