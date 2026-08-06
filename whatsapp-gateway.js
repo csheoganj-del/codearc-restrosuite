@@ -2995,7 +2995,11 @@ app.post('/send', async (req, res) => {
             const brand = String(outletName || req.headers['x-outlet-name'] || '').trim().slice(0, 60);
             // OTP / security messages: send exactly as written — never wrap with bill greetings
             const isSystemMsg = isSystemOrTransactionalMessage(message) || isSystemOrTransactionalMessage(caption);
-            const craftBills = HUMAN_CRAFT_MODE && !isSystemMsg;
+            const isMarketingMsg =
+                /\b(restrosuite\.codearc|tab=register|free during launch|month-to-month|no forced yearly)\b/i.test(
+                    String(message || caption || '')
+                );
+            const craftBills = HUMAN_CRAFT_MODE && !isSystemMsg && !isMarketingMsg;
 
             // Human-crafted caption (staff phrasing) — PDF body stays exact preview; bills only
             const shortCaption = craftBills
@@ -3056,7 +3060,13 @@ app.post('/send', async (req, res) => {
                         textOut = intro + '\n\n' + textOut;
                     }
                 }
-                await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
+                await humanSend(
+                    route.client,
+                    chatId,
+                    textOut,
+                    { rsProactiveSessionRetry: isMarketingMsg },
+                    route.sendAsTenantId
+                );
                 delivered = 'text';
                 if (route.via === 'own') {touchTenantActivity(tenantId);}
                 console.log(`[Background Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} [${isSystemMsg ? 'system-exact' : 'human-craft'}]`);

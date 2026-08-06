@@ -212,6 +212,12 @@ function createSendEngine(ctx) {
     async function humanSend(client, chatId, msg, opts, tenantId) {
         tenantId = tenantId || chatId;
 
+        // Internal-only send option. Remove it before passing options into
+        // Baileys so it never becomes part of the WhatsApp message payload.
+        const sendOpts = { ...(opts || {}) };
+        const proactiveSessionRetry = sendOpts.rsProactiveSessionRetry === true;
+        delete sendOpts.rsProactiveSessionRetry;
+
         let jid = chatId;
         if (jid && jid.endsWith('@c.us')) {
             jid = jid.replace('@c.us', '@s.whatsapp.net');
@@ -235,13 +241,13 @@ function createSendEngine(ctx) {
 
                 let result;
                 if (typeof msg === 'string') {
-                    result = await client.sendMessage(jid, { text: _uniquifyText(msg) }, opts || {});
+                    result = await client.sendMessage(jid, { text: _uniquifyText(msg) }, sendOpts);
                 } else if (msg && typeof msg.text === 'string') {
-                    result = await client.sendMessage(jid, { ...msg, text: _uniquifyText(msg.text) }, opts || {});
+                    result = await client.sendMessage(jid, { ...msg, text: _uniquifyText(msg.text) }, sendOpts);
                 } else if (msg && typeof msg.caption === 'string') {
-                    result = await client.sendMessage(jid, { ...msg, caption: _uniquifyText(msg.caption) }, opts || {});
+                    result = await client.sendMessage(jid, { ...msg, caption: _uniquifyText(msg.caption) }, sendOpts);
                 } else {
-                    result = await client.sendMessage(jid, msg, opts || {});
+                    result = await client.sendMessage(jid, msg, sendOpts);
                 }
 
                 // Keep the original payload available when WhatsApp asks this
@@ -251,6 +257,33 @@ function createSendEngine(ctx) {
                         client.__rsRememberSentMessage(result);
                     }
                 } catch (_) {}
+
+                // Baileys 6.x can close a stale Signal session while sending,
+                // yet WhatsApp does not always issue the retry receipt that
+                // would invoke getMessage(). For WA Ads, proactively perform
+                // the same recovery used by Baileys's retry handler: refresh
+                // the session and relay the same payload with the SAME id.
+                // WhatsApp deduplicates that id, so no second ad is created.
+                if (
+                    proactiveSessionRetry &&
+                    result && result.key && result.key.id && result.message &&
+                    client && typeof client.assertSessions === 'function' &&
+                    typeof client.relayMessage === 'function'
+                ) {
+                    try {
+                        await _sleep(900);
+                        await client.assertSessions([jid], true);
+                        await client.relayMessage(jid, result.message, {
+                            messageId: result.key.id,
+                            useUserDevicesCache: false,
+                        });
+                        console.log(`[HumanSend] Session-healing retry id=${result.key.id}`);
+                    } catch (retryErr) {
+                        console.warn(
+                            `[HumanSend] Session-healing retry skipped: ${retryErr && retryErr.message ? retryErr.message : retryErr}`
+                        );
+                    }
+                }
 
                 try { await client.sendPresenceUpdate('paused', jid); } catch (_) {}
                 if (Math.random() < 0.35) {
