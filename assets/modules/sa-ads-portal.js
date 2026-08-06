@@ -831,6 +831,14 @@
         total: list.length,
         unit: 'messages',
       });
+    const updateProgressFailure = function (message) {
+      if (!prog) {return;}
+      if (typeof prog.fail === 'function') {
+        prog.fail(message);
+      } else if (typeof prog.update === 'function') {
+        prog.update({ sub: message });
+      }
+    };
 
     let sent = 0;
     let failed = 0;
@@ -887,7 +895,7 @@
           row.error = msg;
           failed++;
           setStatusLine('Stopped: ' + msg);
-          if (prog) {prog.fail(msg);}
+          updateProgressFailure(msg);
           cancelFlag = true;
         } else {
           row.status = 'failed';
@@ -895,7 +903,7 @@
           failed++;
           if (testOnly) {
             setStatusLine('Test failed: ' + msg.slice(0, 140));
-            if (prog) {prog.fail(msg.slice(0, 160));}
+            updateProgressFailure(msg.slice(0, 160));
             try {
               window.alert('Test send failed:\n\n' + msg);
             } catch (_) { /* ignore */ }
@@ -940,18 +948,29 @@
     if (prog) {
       const closeDelay = failed ? (sent ? 1400 : 1800) : (testOnly ? 650 : 1100);
       const progressRoot = document.getElementById('rs-progress-ops-root');
-      if (failed && !sent) {
-        prog.fail(failed + ' failed · 0 sent');
-      } else if (failed) {
-        prog.fail(sent + ' sent · ' + failed + ' failed');
-      } else {
-        prog.succeed(sent + (testOnly ? ' test message sent' : ' messages handed to human-send engine'));
-      }
-      prog.close(closeDelay);
-      // Defensive fallback for stale/cached progress implementations.
+      try {
+        if (failed) {
+          updateProgressFailure(sent + ' sent · ' + failed + ' failed');
+        } else if (typeof prog.succeed === 'function') {
+          prog.succeed(
+            sent + (testOnly ? ' test message sent' : ' messages handed to human-send engine')
+          );
+        } else if (typeof prog.update === 'function') {
+          prog.update({
+            done: list.length,
+            failed: 0,
+            sub: sent + (testOnly ? ' test message sent' : ' messages sent'),
+          });
+        }
+      } catch (_) { /* completion UI must never block cleanup */ }
+      // Schedule cleanup ourselves: legacy close() is immediate, while newer
+      // implementations accept a delay. This works with both cached versions.
       setTimeout(function () {
+        try {
+          if (typeof prog.close === 'function') {prog.close();}
+        } catch (_) { /* ignore stale progress implementation errors */ }
         if (progressRoot && progressRoot.isConnected) {progressRoot.remove();}
-      }, closeDelay + 500);
+      }, closeDelay);
     }
 
     // Publish the final state before local/cloud history work. History is useful
