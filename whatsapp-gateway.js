@@ -1429,6 +1429,22 @@ async function initializeBaileysClient(tid, tenantData) {
             console.warn(`[Version Fetch] Failed to fetch latest WA version for tenant ${tid}, using fallback [${waVersion.join('.')}]:`, err.message);
         }
 
+        // Baileys calls getMessage when WhatsApp requests a retry after a linked
+        // device cannot decrypt the first payload. Keep a bounded in-memory cache
+        // of messages sent during this gateway process so that retry can succeed.
+        const sentMessageCache = tenantData.sentMessageCache || new Map();
+        tenantData.sentMessageCache = sentMessageCache;
+        const rememberSentMessage = (waMessage) => {
+            const id = waMessage && waMessage.key && String(waMessage.key.id || '');
+            if (!id || !waMessage.message) {return;}
+            sentMessageCache.delete(id);
+            sentMessageCache.set(id, { message: waMessage.message, at: Date.now() });
+            while (sentMessageCache.size > 500) {
+                const oldest = sentMessageCache.keys().next().value;
+                sentMessageCache.delete(oldest);
+            }
+        };
+
         const sock = makeWASocket({
             auth: state,
             version: waVersion,
@@ -1443,8 +1459,12 @@ async function initializeBaileysClient(tid, tenantData) {
             markOnlineOnConnect: true,
             syncFullHistory: false,
             generateHighQualityLinkPreview: false,
-            getMessage: async () => undefined
+            getMessage: async (key) => {
+                const cached = key && sentMessageCache.get(String(key.id || ''));
+                return cached ? cached.message : undefined;
+            }
         });
+        sock.__rsRememberSentMessage = rememberSentMessage;
 
         // Set the client reference on tenantData
         // sockId guards against late events from a replaced socket firing reconnect storms
