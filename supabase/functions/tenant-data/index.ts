@@ -793,8 +793,11 @@ serve(async (req) => {
       const orderId = String(payload.orderId || "");
       const pdfData = payload.pdfData ? String(payload.pdfData) : undefined;
       const filename = payload.filename ? String(payload.filename) : undefined;
-      if (!phone || (!message && !pdfData && !caption)) {
-        return jsonResponse({ error: "Missing phone or message/pdfData." }, 400, req);
+      const imageData = payload.imageData ? String(payload.imageData) : undefined;
+      const imageMime = payload.imageMime ? String(payload.imageMime) : undefined;
+      const imageFilename = payload.imageFilename ? String(payload.imageFilename) : undefined;
+      if (!phone || (!message && !pdfData && !caption && !imageData)) {
+        return jsonResponse({ error: "Missing phone or message/media data." }, 400, req);
       }
       // Ads / platform blasts always go through the central system WhatsApp line.
       const forceSystem = payload.via_platform === true || payload.via_system === true || isPlatformAdmin;
@@ -803,7 +806,7 @@ serve(async (req) => {
         "/send",
         "POST",
         req,
-        { phone, message, caption, orderId, pdfData, filename },
+        { phone, message, caption, orderId, pdfData, filename, imageData, imageMime, imageFilename },
         sendAsTenantId,
       );
     }

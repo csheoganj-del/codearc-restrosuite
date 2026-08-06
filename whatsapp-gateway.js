@@ -3038,6 +3038,46 @@ app.post('/email', async (req, res) => {
     }
 });
 
+function decodeCampaignImage(imageData, requestedMime, requestedFilename) {
+    let base64 = String(imageData || '').trim();
+    if (!base64) {return null;}
+    if (base64.startsWith('data:')) {
+        const comma = base64.indexOf(',');
+        if (comma >= 0) {base64 = base64.slice(comma + 1);}
+    }
+    base64 = base64.replace(/\s+/g, '');
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+        throw new Error('Invalid image encoding');
+    }
+    const buffer = Buffer.from(base64, 'base64');
+    if (buffer.length < 100 || buffer.length > 2 * 1024 * 1024) {
+        throw new Error('Image must be a JPG or PNG smaller than 2 MB');
+    }
+    const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    const isPng =
+        buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a;
+    if (!isJpeg && !isPng) {
+        throw new Error('Only real JPG and PNG image files are supported');
+    }
+    const mime = isPng ? 'image/png' : 'image/jpeg';
+    const requested = String(requestedMime || '').toLowerCase();
+    if (requested && requested !== mime && !(isJpeg && requested === 'image/jpg')) {
+        throw new Error('Image type does not match its file content');
+    }
+    const defaultName = isPng ? 'campaign-image.png' : 'campaign-image.jpg';
+    const fileName = String(requestedFilename || defaultName)
+        .replace(/[^a-z0-9._-]+/gi, '_')
+        .slice(0, 100) || defaultName;
+    return { buffer, mime, fileName };
+}
+
 // HTTP API Endpoint to send receipts manually in the background
 app.post('/send', async (req, res) => {
     if (!verifyToken(req)) {
@@ -3071,10 +3111,24 @@ app.post('/send', async (req, res) => {
         });
     }
 
-    let { orderId, phone, message, pdfData, filename, caption, outletName, kind, purpose, messageType } = req.body;
+    let {
+        orderId,
+        phone,
+        message,
+        pdfData,
+        filename,
+        caption,
+        outletName,
+        kind,
+        purpose,
+        messageType,
+        imageData,
+        imageMime,
+        imageFilename,
+    } = req.body;
 
-    if (!phone || (!message && !pdfData && !caption)) {
-        return res.status(400).json({ status: 'error', error: 'Missing phone or message' });
+    if (!phone || (!message && !pdfData && !caption && !imageData)) {
+        return res.status(400).json({ status: 'error', error: 'Missing phone or message/media data' });
     }
 
     // Clean phone number format
@@ -3084,6 +3138,16 @@ app.post('/send', async (req, res) => {
     }
 
     try {
+        let imagePayload = null;
+        try {
+            imagePayload = decodeCampaignImage(imageData, imageMime, imageFilename);
+        } catch (imageError) {
+            return res.status(400).json({
+                status: 'error',
+                error: imageError.message || 'Invalid campaign image',
+                code: 'INVALID_IMAGE',
+            });
+        }
         // Resolve real WhatsApp JID (handles LID / international / not-on-WA)
         async function resolveWhatsAppJid(client, phoneDigits) {
             const digits = String(phoneDigits || '').replace(/\D/g, '');
@@ -3159,14 +3223,29 @@ app.post('/send', async (req, res) => {
         if (wantSync && !pdfData) {
             try {
                 let textOut = String(message || caption || '').trim();
-                if (!textOut) {
+                if (!textOut && !imagePayload) {
                     return res.status(400).json({ status: 'error', error: 'Missing message body' });
                 }
+                if (imagePayload && textOut.length > 1024) {
+                    return res.status(400).json({
+                        status: 'error',
+                        error: 'Image caption must be 1,024 characters or fewer',
+                        code: 'IMAGE_CAPTION_TOO_LONG',
+                    });
+                }
                 // Never wrap ads/OTP with bill openers — send exact text
+                const outbound = imagePayload
+                    ? {
+                        image: imagePayload.buffer,
+                        mimetype: imagePayload.mime,
+                        fileName: imagePayload.fileName,
+                        caption: textOut || undefined,
+                    }
+                    : textOut;
                 const sendResult = await humanSend(
                     route.client,
                     chatId,
-                    textOut,
+                    outbound,
                     { rsProactiveSessionRetry: isMarketingEarly },
                     route.sendAsTenantId
                 );
@@ -3179,8 +3258,9 @@ app.post('/send', async (req, res) => {
                 }
                 if (route.via === 'own') {touchTenantActivity(tenantId);}
                 const tag = isSystemMsgEarly ? 'OTP' : isMarketingEarly ? 'Ad' : 'Sync';
+                const deliveredType = imagePayload ? 'image' : 'text';
                 console.log(
-                    `[${tag} Sent] WhatsApp text via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} jid=${chatId} id=${msgId} [sync-exact]`
+                    `[${tag} Sent] WhatsApp ${deliveredType} via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} jid=${chatId} id=${msgId} [sync-exact]`
                 );
                 await logHealthEvent(isSystemMsgEarly ? 'send_otp' : 'send_ad', 'ok', {
                     tenant_id: tenantId,
@@ -3197,6 +3277,7 @@ app.post('/send', async (req, res) => {
                     sync: true,
                     ok: true,
                     sent: true,
+                    deliveredType,
                     messageId: msgId,
                     toJid: chatId,
                 });
@@ -3286,7 +3367,22 @@ app.post('/send', async (req, res) => {
                 }
             }
 
-            if (hasPdf) {
+            if (imagePayload) {
+                const imageCaption = String(caption || message || '').trim();
+                if (imageCaption.length > 1024) {
+                    throw new Error('Image caption must be 1,024 characters or fewer');
+                }
+                const media = {
+                    image: imagePayload.buffer,
+                    mimetype: imagePayload.mime,
+                    fileName: imagePayload.fileName,
+                    caption: imageCaption || undefined,
+                };
+                await humanSend(route.client, chatId, media, {}, route.sendAsTenantId);
+                delivered = 'image';
+                if (route.via === 'own') {touchTenantActivity(tenantId);}
+                console.log(`[Background Sent] WhatsApp image via=${route.via} tenant=${tenantId} to +${maskPhone(phone)} (${imagePayload.buffer.length} bytes)`);
+            } else if (hasPdf) {
                 const pdfBuffer = Buffer.from(pdfBase64, 'base64');
                 if (pdfBuffer.length < 100 || pdfBuffer.slice(0, 4).toString() !== '%PDF') {
                     throw new Error(`Invalid PDF payload (${pdfBuffer.length} bytes, header=${pdfBuffer.slice(0, 8).toString('hex')})`);

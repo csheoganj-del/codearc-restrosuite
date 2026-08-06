@@ -15,8 +15,11 @@
   const STORE_KEY = 'rs_sa_ads_campaigns_v1';
   const DRAFT_KEY = 'rs_sa_ads_draft_v8_nagpur_monthly';
   const DAILY_HINT = 180; // mirrors gateway default DAILY_LIMIT
+  const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+  const IMAGE_CAPTION_MAX = 1024;
 
   let contacts = []; // { name, phone, status, error, at }
+  let campaignImage = null; // { data, mime, name, size, previewUrl }
   let sending = false;
   let cancelFlag = false;
   let currentCampaignId = null;
@@ -78,6 +81,13 @@
       '#sa-ads-tab .st-pill.skipped{background:rgba(161,98,7,.12);color:#a16207}',
       '#sa-ads-tab .sa-ads-hint{font-size:12px;line-height:1.5;color:var(--text-soft);margin:0 0 12px}',
       '#sa-ads-tab .sa-ads-preview{padding:12px 14px;border-radius:14px;background:#0b141a;color:#e9edef;font-size:13px;line-height:1.5;white-space:pre-wrap;min-height:80px;border:1px solid rgba(255,255,255,.08)}',
+      '#sa-ads-tab .sa-ads-media{margin-top:12px;padding:10px;border:1px solid var(--stroke-2);border-radius:12px;background:var(--glass)}',
+      '#sa-ads-tab .sa-ads-media-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}',
+      '#sa-ads-tab .sa-ads-media-preview{display:none;margin-top:10px;align-items:center;gap:10px}',
+      '#sa-ads-tab .sa-ads-media-preview.is-visible{display:flex}',
+      '#sa-ads-tab .sa-ads-media-preview img{width:92px;height:92px;object-fit:cover;border-radius:10px;border:1px solid var(--stroke-2);background:#fff}',
+      '#sa-ads-tab .sa-ads-media-meta{min-width:0;flex:1;font-size:12px;color:var(--text-soft)}',
+      '#sa-ads-tab .sa-ads-media-meta b{display:block;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '#sa-ads-tab .sa-ads-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}',
       '#sa-ads-tab .sa-ads-safe{display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--text-mute);margin-top:10px}',
       '#sa-ads-tab .sa-ads-safe span{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:99px;background:var(--glass);border:1px solid var(--stroke-2)}',
@@ -378,10 +388,12 @@
       '</div>' +
       '</div>';
 
+    installImageControls();
     wire();
     paintKpis();
     paintTable();
     paintPreview();
+    paintImagePreview();
     paintHistory();
     try { paintHistoryAsync(); } catch (_) {}
   }
@@ -450,6 +462,121 @@
     if (!ta || !prev) {return;}
     const sample = contacts[0] || { name: 'Ravi Sharma', phone: '919876543210' };
     prev.textContent = personalize(ta.value, sample) || '(empty message)';
+  }
+
+  function installImageControls() {
+    const messageBox = document.getElementById('sa-ads-message');
+    if (!messageBox || document.getElementById('sa-ads-image-file')) {return;}
+    const media = document.createElement('div');
+    media.className = 'sa-ads-media';
+    const row = document.createElement('div');
+    row.className = 'sa-ads-media-row';
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.className = 'btn btn-ghost btn-sm';
+    pick.id = 'sa-ads-image-pick';
+    pick.textContent = 'Attach image';
+    const hint = document.createElement('span');
+    hint.className = 'sa-ads-hint';
+    hint.style.margin = '0';
+    hint.textContent = 'Real JPG/PNG attachment - max 2 MB - message becomes its caption';
+    const file = document.createElement('input');
+    file.type = 'file';
+    file.id = 'sa-ads-image-file';
+    file.accept = 'image/jpeg,image/png,.jpg,.jpeg,.png';
+    file.style.display = 'none';
+    row.appendChild(pick);
+    row.appendChild(hint);
+    row.appendChild(file);
+    const preview = document.createElement('div');
+    preview.className = 'sa-ads-media-preview';
+    preview.id = 'sa-ads-image-preview';
+    const thumb = document.createElement('img');
+    thumb.id = 'sa-ads-image-thumb';
+    thumb.alt = 'Campaign attachment preview';
+    const meta = document.createElement('div');
+    meta.className = 'sa-ads-media-meta';
+    const name = document.createElement('b');
+    name.id = 'sa-ads-image-name';
+    const size = document.createElement('span');
+    size.id = 'sa-ads-image-size';
+    meta.appendChild(name);
+    meta.appendChild(size);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn-ghost btn-sm';
+    remove.id = 'sa-ads-image-remove';
+    remove.textContent = 'Remove';
+    preview.appendChild(thumb);
+    preview.appendChild(meta);
+    preview.appendChild(remove);
+    media.appendChild(row);
+    media.appendChild(preview);
+    messageBox.insertAdjacentElement('afterend', media);
+  }
+
+  function paintImagePreview() {
+    const wrap = document.getElementById('sa-ads-image-preview');
+    const thumb = document.getElementById('sa-ads-image-thumb');
+    const name = document.getElementById('sa-ads-image-name');
+    const size = document.getElementById('sa-ads-image-size');
+    if (!wrap || !thumb || !name || !size) {return;}
+    if (!campaignImage) {
+      wrap.classList.remove('is-visible');
+      thumb.removeAttribute('src');
+      name.textContent = '';
+      size.textContent = '';
+      return;
+    }
+    wrap.classList.add('is-visible');
+    thumb.src = campaignImage.previewUrl;
+    name.textContent = campaignImage.name;
+    size.textContent = (campaignImage.size / 1024).toFixed(0) + ' KB - real WhatsApp image';
+  }
+
+  function clearCampaignImage() {
+    if (campaignImage && campaignImage.previewUrl) {
+      try { URL.revokeObjectURL(campaignImage.previewUrl); } catch (_) {}
+    }
+    campaignImage = null;
+    paintImagePreview();
+  }
+
+  function readCampaignImage(file) {
+    if (!file) {return;}
+    const mime = String(file.type || '').toLowerCase();
+    if (mime !== 'image/jpeg' && mime !== 'image/png') {
+      toast('Choose a JPG or PNG image', 'fa-circle-exclamation');
+      return;
+    }
+    if (!file.size || !(file.size <= IMAGE_MAX_BYTES)) {
+      toast('Image must be smaller than 2 MB', 'fa-circle-exclamation');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function () {
+      const result = String(reader.result || '');
+      const pieces = result.split(',');
+      const data = pieces.length === 2 ? pieces[1] : '';
+      if (!data) {
+        toast('Could not read image data', 'fa-circle-exclamation');
+        return;
+      }
+      clearCampaignImage();
+      campaignImage = {
+        data: data,
+        mime: mime,
+        name: String(file.name || 'campaign-image').replace(/[^a-z0-9._-]+/gi, '_').slice(0, 100),
+        size: file.size,
+        previewUrl: URL.createObjectURL(file),
+      };
+      paintImagePreview();
+      toast('Image attached - test before campaign send', 'fa-image');
+    };
+    reader.onerror = function () {
+      toast('Could not read image', 'fa-circle-exclamation');
+    };
+    reader.readAsDataURL(file);
   }
 
   function paintHistory() {
@@ -594,6 +721,19 @@
     if (pace) {
       pace.onchange = saveDraft;
     }
+    const imageFile = document.getElementById('sa-ads-image-file');
+    const imagePick = document.getElementById('sa-ads-image-pick');
+    const imageRemove = document.getElementById('sa-ads-image-remove');
+    if (imagePick && imageFile) {
+      imagePick.onclick = function () {
+        imageFile.click();
+      };
+      imageFile.onchange = function () {
+        if (imageFile.files && imageFile.files[0]) {readCampaignImage(imageFile.files[0]);}
+        imageFile.value = '';
+      };
+    }
+    if (imageRemove) {imageRemove.onclick = clearCampaignImage;}
     const send = document.getElementById('sa-ads-send');
     if (send) {send.onclick = () => startCampaign(false);}
     const pause = document.getElementById('sa-ads-pause');
@@ -679,7 +819,7 @@
     }
   }
 
-  async function sendOne(phone, message) {
+  async function sendOne(phone, message, image) {
     if (!global.RS_API) {
       throw new Error('API not configured');
     }
@@ -694,6 +834,9 @@
         // Prevent gateway bill-wrapper ("Here's your bill…") on marketing blasts
         kind: 'ad',
         purpose: 'marketing',
+        imageData: image && image.data,
+        imageMime: image && image.mime,
+        imageFilename: image && image.name,
       });
     } else if (typeof RS_API.data === 'function') {
       res = await RS_API.data({
@@ -703,6 +846,9 @@
         message: message,
         kind: 'ad',
         purpose: 'marketing',
+        imageData: image && image.data,
+        imageMime: image && image.mime,
+        imageFilename: image && image.name,
       });
     } else {
       throw new Error('API not configured');
@@ -741,6 +887,14 @@
       toast('Write a message first (min 10 characters)', 'fa-circle-exclamation');
       return;
     }
+    if (campaignImage && !(template.length <= IMAGE_CAPTION_MAX)) {
+      toast('Image captions must be 1,024 characters or fewer', 'fa-circle-exclamation');
+      setStatusLine('Blocked - shorten the image caption');
+      return;
+    }
+    const imagePayload = campaignImage
+      ? { data: campaignImage.data, mime: campaignImage.mime, name: campaignImage.name }
+      : null;
 
     let list;
     // Pre-flight: platform gateway must be Ready
@@ -805,7 +959,9 @@
         if (!ok) {return;}
       } else {
         const ok = window.confirm(
-          'Send WhatsApp ads to ' +
+          'Send WhatsApp ads' +
+            (imagePayload ? ' with an image' : '') +
+            ' to ' +
             list.length +
             ' contacts via central platform number?\n\nHuman pacing is ON (gateway typing + gaps). Extra client delay: ' +
             ((document.getElementById('sa-ads-pace') || {}).value || 'safe') +
@@ -882,7 +1038,7 @@
               '). Cannot send to the gateway number itself.'
           );
         }
-        await sendOne(row.phone, body);
+        await sendOne(row.phone, body, imagePayload);
         row.status = 'sent';
         row.error = '';
         row.at = new Date().toISOString();
@@ -998,6 +1154,7 @@
       failed: failed,
       skipped: skipped,
       messagePreview: template.slice(0, 120),
+      hasImage: !!imagePayload,
     };
     const hist = loadCampaigns();
     hist.unshift(camp);

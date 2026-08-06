@@ -1615,17 +1615,32 @@ serve(async (req) => {
       const orderId = String(payload.orderId || "");
       const pdfData = payload.pdfData ? String(payload.pdfData) : undefined;
       const filename = payload.filename ? String(payload.filename) : undefined;
+      const imageData = payload.imageData ? String(payload.imageData) : undefined;
+      const imageMime = payload.imageMime ? String(payload.imageMime) : undefined;
+      const imageFilename = payload.imageFilename ? String(payload.imageFilename) : undefined;
       // ad | marketing | bill | receipt — gateway uses this to skip bill openers on ads
       const kind = payload.kind != null ? String(payload.kind) : undefined;
       const purpose = payload.purpose != null ? String(payload.purpose) : undefined;
-      if (!phone || (!message && !pdfData && !caption)) {
-        return jsonResponse({ error: "Missing phone or message/pdfData." }, 400, req);
+      if (!phone || (!message && !pdfData && !caption && !imageData)) {
+        return jsonResponse({ error: "Missing phone or message/media data." }, 400, req);
       }
       return await proxyGatewayRequest(
         "/send",
         "POST",
         req,
-        { phone, message, caption, orderId, pdfData, filename, kind, purpose },
+        {
+          phone,
+          message,
+          caption,
+          orderId,
+          pdfData,
+          filename,
+          imageData,
+          imageMime,
+          imageFilename,
+          kind,
+          purpose,
+        },
         "system",
       );
     }
