@@ -80,6 +80,9 @@ test('gateway runtime honors the durable port and fails fast on bind errors', ()
   assert.ok(gateway.includes('sentMessageCache'));
   assert.ok(gateway.includes('getMessage: async (key)'));
   assert.ok(read('gateway-modules/send-engine.js').includes('__rsRememberSentMessage'));
+  assert.ok(read('gateway-modules/send-engine.js').includes('rsProactiveSessionRetry'));
+  assert.ok(read('gateway-modules/send-engine.js').includes('client.assertSessions([jid], true)'));
+  assert.ok(read('gateway-modules/send-engine.js').includes('useUserDevicesCache: false'));
   assert.match(tunnel, /localApi\('GET', '\/api\/tunnels'\)/);
   assert.match(tunnel, /localApi\('DELETE'/);
   assert.match(tunnel, /encodeURIComponent\(existing\.name\)/);

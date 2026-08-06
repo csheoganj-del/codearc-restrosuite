@@ -3163,7 +3163,13 @@ app.post('/send', async (req, res) => {
                     return res.status(400).json({ status: 'error', error: 'Missing message body' });
                 }
                 // Never wrap ads/OTP with bill openers — send exact text
-                const sendResult = await humanSend(route.client, chatId, textOut, {}, route.sendAsTenantId);
+                const sendResult = await humanSend(
+                    route.client,
+                    chatId,
+                    textOut,
+                    { rsProactiveSessionRetry: isMarketingEarly },
+                    route.sendAsTenantId
+                );
                 const msgKey = sendResult && sendResult.key;
                 const msgId = msgKey && msgKey.id ? String(msgKey.id) : '';
                 if (!msgId) {
