@@ -153,3 +153,13 @@ test('cloud map packs bill ops + shift cash + offer discount without new tables'
   assert.match(db, /waste_log:\s*\{/);
   assert.match(db, /Collections without a cloud table \(e\.g\. waste_log\)|waste_log/);
 });
+
+test('WA Ads closes completed progress before campaign bookkeeping', () => {
+  const ads = read('assets/modules/sa-ads-portal.js');
+  const finish = ads.indexOf('const closeDelay = failed ?');
+  const history = ads.indexOf('const camp = {', finish);
+  assert.ok(finish >= 0, 'missing completed-send progress close');
+  assert.ok(history > finish, 'progress must close before campaign history work');
+  assert.ok(ads.includes('prog.close(closeDelay)'));
+  assert.ok(ads.includes('progressRoot && progressRoot.isConnected'));
+});

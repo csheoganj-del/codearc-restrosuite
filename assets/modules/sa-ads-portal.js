@@ -935,6 +935,25 @@
     if (sendBtn) {sendBtn.disabled = false;}
     if (pauseBtn) {pauseBtn.disabled = true;}
 
+    // Finish the blocking overlay before campaign-history bookkeeping. A history
+    // render/storage error must never leave a completed send stuck at 100%.
+    if (prog) {
+      const closeDelay = failed ? (sent ? 1400 : 1800) : (testOnly ? 650 : 1100);
+      const progressRoot = document.getElementById('rs-progress-ops-root');
+      if (failed && !sent) {
+        prog.fail(failed + ' failed · 0 sent');
+      } else if (failed) {
+        prog.fail(sent + ' sent · ' + failed + ' failed');
+      } else {
+        prog.succeed(sent + (testOnly ? ' test message sent' : ' messages handed to human-send engine'));
+      }
+      prog.close(closeDelay);
+      // Defensive fallback for stale/cached progress implementations.
+      setTimeout(function () {
+        if (progressRoot && progressRoot.isConnected) {progressRoot.remove();}
+      }, closeDelay + 500);
+    }
+
     const camp = {
       id: currentCampaignId,
       label: testOnly ? 'Test send' : 'Ads blast',
@@ -951,19 +970,6 @@
     paintHistory();
     // Platform-wide history (Supabase) — non-blocking
     try { persistCampaignToServer(camp); } catch (_) {}
-
-    if (prog) {
-      if (failed && !sent) {
-        prog.fail(failed + ' failed · 0 sent');
-        prog.close(2400);
-      } else if (failed) {
-        prog.fail(sent + ' sent · ' + failed + ' failed');
-        prog.close(2000);
-      } else {
-        prog.succeed(sent + ' messages handed to human-send engine');
-        prog.close(1100);
-      }
-    }
 
     setStatusLine(
       'Done · ' +
