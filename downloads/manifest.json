@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-09T07:36:56.614Z",
-  "appVersion": "v293-20260808-ten-x-utility",
+  "generatedAt": "2026-08-10T11:34:38.376Z",
+  "appVersion": "v294-20260810-release",
   "desktopVersion": "2.0.26",
   "androidVersion": "2.0.5",
   "androidVersionCode": 6,
@@ -124,12 +124,12 @@
       "blurb": "Open the live web app — service worker + app-update.json auto-prompt reload after deploys.",
       "icon": "fa-globe",
       "brand": "solid",
-      "version": "v293-20260808-ten-x-utility",
+      "version": "v294-20260810-release",
       "filename": null,
       "url": "https://restrosuite.codearc.co.in/login.html",
       "size": 0,
       "sizeLabel": "Online",
-      "updatedAt": "2026-08-09T07:36:56.534Z",
+      "updatedAt": "2026-08-10T11:34:38.345Z",
       "available": true,
       "openInPlace": true
     },

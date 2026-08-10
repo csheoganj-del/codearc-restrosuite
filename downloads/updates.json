@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-08-09T07:36:56.610Z",
+  "generatedAt": "2026-08-10T11:34:38.373Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v293-20260808-ten-x-utility",
-    "title": "10x utility: version, checklist, WA plain language",
-    "summary": "Unified App+Features version chip, owner open checklist, safer print default restore, plain WhatsApp status, go-live smoke.",
+    "version": "v294-20260810-release",
+    "title": "Live update v294-20260810-release",
+    "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
@@ -42,6 +42,6 @@
     "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Android.apk",
     "size": 10727924,
     "sizeLabel": "10.2 MB",
-    "notes": "Unified App+Features version chip, owner open checklist, safer print default restore, plain WhatsApp status, go-live smoke."
+    "notes": "Automatic deploy update — installed desktop apps will download this UI content."
   }
 }
