@@ -28,6 +28,9 @@ async function installLocalAssetOverrides(page) {
     ['/assets/dist/critical.bundle.js', path.join(root, 'assets', 'dist', 'critical.bundle.js')],
     ['/assets/features-pos.js', path.join(root, 'assets', 'features-pos.js')],
     ['/assets/modules/pos-ui.js', path.join(root, 'assets', 'modules', 'pos-ui.js')],
+    // Local-first checkout + cloud timeout + putLocal
+    ['/assets/db.js', path.join(root, 'assets', 'db.js')],
+    ['/assets/modules/bill-identity.js', path.join(root, 'assets', 'modules', 'bill-identity.js')],
   ]);
   await page.route('**/*', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -45,9 +48,14 @@ async function installLocalAssetOverrides(page) {
 }
 
 async function performLogin(page) {
-  await page.goto('/login.html', { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await expect(page.locator('#login-form')).toBeVisible({ timeout: 30000 });
-  await page.locator('#tenant-id').fill(slug);
+  // Production serves /login (not only login.html); staff tab may be required
+  await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.locator('#tab-login-btn').click().catch(() => {});
+  await expect(page.locator('#login-form, #username').first()).toBeVisible({ timeout: 30000 });
+  const tenant = page.locator('#tenant-id');
+  if (await tenant.count()) {
+    await tenant.fill(slug);
+  }
   await page.locator('#username').fill(user);
   await page.locator('#password').fill(pass);
   await page.locator('#login-submit').click();
@@ -61,9 +69,9 @@ async function performLogin(page) {
   } catch (_) {
     let errText = '';
     try {
-      const cls = await page.locator('#error-box').getAttribute('class');
-      if (cls && cls.includes('show')) {
-        errText = (await page.locator('#error-box').innerText()).trim();
+      const err = page.locator('#error-box, .login-error, [role="alert"]').first();
+      if (await err.count()) {
+        errText = (await err.innerText().catch(() => '')).trim();
       }
     } catch (_) {}
     return { ok: false, url: page.url(), errText };

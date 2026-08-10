@@ -13,7 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFileSync, execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const DESKTOP_PKG = path.join(ROOT, 'desktop', 'package.json');

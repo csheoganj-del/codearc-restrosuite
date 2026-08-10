@@ -7,8 +7,7 @@ Stable files at `https://restrosuite.codearc.co.in/downloads/…`
 | `updates.json` | Android + Windows + macOS + web version feed |
 | `desktop/latest.yml` | electron-updater (Windows Setup) |
 | `desktop/latest-mac.yml` | electron-updater (macOS) |
-| `RestroSuite-Windows-Setup.exe` | Full installer (auto-updates) |
-| `RestroSuite-Windows-Portable.exe` | Portable (prompts download) |
+| `RestroSuite-Windows-Setup.exe` | Full installer (auto-updates) — Setup only |
 | `RestroSuite-Mac-AppleSilicon.dmg` | macOS Apple Silicon DMG |
 | `RestroSuite-Mac-Intel.dmg` | macOS Intel DMG |
 | `RestroSuite-Android.apk` | Android package (in-app update) |

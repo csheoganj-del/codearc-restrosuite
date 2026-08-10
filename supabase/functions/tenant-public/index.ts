@@ -125,7 +125,7 @@ const PLAN_LIMITS: Record<string, { monthlyOrderLimit: number }> = {
   serve: { monthlyOrderLimit: 100000 },
   command: { monthlyOrderLimit: 1000000 },
   free: { monthlyOrderLimit: 50 },
-  starter: { monthlyOrderLimit: 6000 },
+  starter: { monthlyOrderLimit: 300 },
   growth: { monthlyOrderLimit: 100000 },
   enterprise: { monthlyOrderLimit: 1000000 },
 };

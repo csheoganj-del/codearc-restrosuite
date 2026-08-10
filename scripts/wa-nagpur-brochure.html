@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>RestroSuite · Nagpur</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1080px;
+    height: 1440px;
+    overflow: hidden;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: #F3EFE8;
+    color: #1A1714;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    width: 1080px;
+    height: 1440px;
+    position: relative;
+    background:
+      radial-gradient(ellipse 80% 50% at 100% 0%, rgba(255,79,0,0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 40% at 0% 100%, rgba(255,79,0,0.06) 0%, transparent 50%),
+      linear-gradient(180deg, #FCFAF6 0%, #F3EFE8 55%, #EDE7DC 100%);
+    padding: 48px 52px 40px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(255,79,0,0.18), 0 2px 6px rgba(0,0,0,0.06);
+    background: #fff;
+    object-fit: cover;
+  }
+  .brand-text h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #1A1714;
+    line-height: 1.05;
+  }
+  .brand-text h1 span { color: #FF4F00; }
+  .brand-text p {
+    font-size: 14px;
+    font-weight: 600;
+    color: #5C564F;
+    margin-top: 4px;
+    letter-spacing: 0.01em;
+  }
+  .badge-city {
+    background: linear-gradient(135deg, #FF4F00 0%, #D94300 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(255,79,0,0.28);
+    letter-spacing: 0.02em;
+  }
+
+  /* Hero line */
+  .hero {
+    margin-bottom: 22px;
+  }
+  .hero h2 {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.12;
+    color: #1A1714;
+    max-width: 920px;
+  }
+  .hero h2 em {
+    font-style: normal;
+    color: #FF4F00;
+    border-bottom: 4px solid rgba(255,79,0,0.35);
+  }
+  .hero .sub {
+    margin-top: 12px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #3F3A35;
+    line-height: 1.4;
+    max-width: 900px;
+  }
+
+  /* Pill strip */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .pill {
+    background: #fff;
+    border: 1.5px solid rgba(26,23,20,0.08);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #3F3A35;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .pill b { color: #FF4F00; }
+
+  /* Section label */
+  .sec-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #FF4F00;
+    margin-bottom: 14px;
+  }
+
+  /* Feature grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    flex: 1;
+    align-content: start;
+  }
+  .card {
+    background: #FFFFFF;
+    border: 1.5px solid rgba(26,23,20,0.07);
+    border-radius: 16px;
+    padding: 16px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 4px 14px rgba(26,23,20,0.04);
+    min-height: 118px;
+  }
+  .card .ic {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(255,79,0,0.12);
+    color: #FF4F00;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .card h3 {
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #1A1714;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .card p {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #6E675F;
+    line-height: 1.35;
+  }
+
+  /* CTA band */
+  .cta {
+    margin-top: 22px;
+    background: linear-gradient(135deg, #1A1714 0%, #2A2520 100%);
+    border-radius: 20px;
+    padding: 22px 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    box-shadow: 0 12px 32px rgba(26,23,20,0.18);
+  }
+  .cta-left h3 {
+    color: #F5F1EA;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .cta-left p {
+    color: #D4CBC0;
+    font-size: 14.5px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .cta-left .url {
+    margin-top: 10px;
+    display: inline-block;
+    background: #FF4F00;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 18px;
+    border-radius: 10px;
+    letter-spacing: 0.01em;
+  }
+  .cta-right {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .cta-right .from {
+    font-size: 12px;
+    font-weight: 600;
+    color: #A89F93;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .cta-right .name {
+    font-size: 22px;
+    font-weight: 800;
+    color: #FF4F00;
+    letter-spacing: -0.02em;
+  }
+  .cta-right .city {
+    font-size: 15px;
+    font-weight: 600;
+    color: #F5F1EA;
+    margin-top: 2px;
+  }
+  .cta-right .team {
+    font-size: 13px;
+    color: #A89F93;
+    margin-top: 6px;
+    font-weight: 500;
+  }
+
+  .foot {
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #6E675F;
+  }
+  .foot .dot { color: #FF4F00; margin: 0 6px; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="top">
+      <div class="brand">
+        <img class="logo" src="../assets/restrosuite-mark-512.png" alt="RestroSuite" />
+        <div class="brand-text">
+          <h1>Restro<span>Suite</span></h1>
+          <p>Offline-first restaurant POS · by CodeArc</p>
+        </div>
+      </div>
+      <div class="badge-city">📍 Made for Nagpur outlets</div>
+    </div>
+
+    <div class="hero">
+      <h2>Bill even when <em>Wi‑Fi dies</em> — full restaurant system in one app</h2>
+      <p class="sub">Built for Nagpur cafés, dhabas, hotels &amp; cloud kitchens. Free during launch. No card. Live in minutes on phone, PC or Android.</p>
+    </div>
+
+    <div class="pills">
+      <div class="pill"><b>Free</b> at launch</div>
+      <div class="pill">No card needed</div>
+      <div class="pill">Offline billing</div>
+      <div class="pill">WhatsApp receipts</div>
+      <div class="pill">Web · Windows · Android</div>
+    </div>
+
+    <div class="sec-label">Everything included · one login</div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="ic">🧾</div>
+        <h3>POS &amp; billing</h3>
+        <p>Cash · UPI · card · split · hold · Print &amp; Pay</p>
+      </div>
+      <div class="card">
+        <div class="ic">🔥</div>
+        <h3>Kitchen display (KDS)</h3>
+        <p>Live KOTs, timers, ready mark, station routing</p>
+      </div>
+      <div class="card">
+        <div class="ic">📱</div>
+        <h3>QR table ordering</h3>
+        <p>Guest phone menu — no app download</p>
+      </div>
+      <div class="card">
+        <div class="ic">🪑</div>
+        <h3>Floor &amp; tables</h3>
+        <p>Occupancy map · staff scan → open POS</p>
+      </div>
+      <div class="card">
+        <div class="ic">💬</div>
+        <h3>WhatsApp bills</h3>
+        <p>PDF receipt from settle — auto send</p>
+      </div>
+      <div class="card">
+        <div class="ic">📊</div>
+        <h3>Reports · CA pack</h3>
+        <p>Day/week/month sales · tax · GSTR CSV</p>
+      </div>
+      <div class="card">
+        <div class="ic">🍽️</div>
+        <h3>Menu editor</h3>
+        <p>Categories, prices, tax, sample café pack</p>
+      </div>
+      <div class="card">
+        <div class="ic">📦</div>
+        <h3>Inventory &amp; recipes</h3>
+        <p>Stock, min levels, recipe costing links</p>
+      </div>
+      <div class="card">
+        <div class="ic">👥</div>
+        <h3>Staff &amp; roles</h3>
+        <p>Owner, cashier, kitchen, waiter + PINs</p>
+      </div>
+      <div class="card">
+        <div class="ic">📒</div>
+        <h3>Customers &amp; CRM</h3>
+        <p>Guest phones, dues, profiles from bills</p>
+      </div>
+      <div class="card">
+        <div class="ic">🔐</div>
+        <h3>Shifts &amp; Z-report</h3>
+        <p>Open float, cash track, Z-close print/CSV</p>
+      </div>
+      <div class="card">
+        <div class="ic">📶</div>
+        <h3>Offline-first sync</h3>
+        <p>Bill when line dies; cloud when back</p>
+      </div>
+      <div class="card">
+        <div class="ic">🚀</div>
+        <h3>Growth Hub</h3>
+        <p>Offers, loyalty, campaigns, feedback</p>
+      </div>
+      <div class="card">
+        <div class="ic">🛵</div>
+        <h3>Takeaway · delivery</h3>
+        <p>Dine-in, counter, aggregator-ready board</p>
+      </div>
+      <div class="card">
+        <div class="ic">💻</div>
+        <h3>All devices</h3>
+        <p>Web · Windows · Mac · Android</p>
+      </div>
+    </div>
+
+    <div class="cta">
+      <div class="cta-left">
+        <h3>Start free for your Nagpur outlet</h3>
+        <p>Register in minutes · try a sample bill today</p>
+        <div class="url">restrosuite.codearc.co.in/login?tab=register</div>
+      </div>
+      <div class="cta-right">
+        <div class="from">Your Nagpur contact</div>
+        <div class="name">Man Singh Gurjar</div>
+        <div class="city">Nagpur · CodeArc</div>
+        <div class="team">Call +91 73002 00949</div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>CodeArc Tech Labs · India</span>
+      <span>Free during launch <span class="dot">·</span> No card <span class="dot">·</span> Made for real counters</span>
+    </div>
+  </div>
+</body>
+</html>

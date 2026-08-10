@@ -687,6 +687,20 @@
     }, 3000);
   }
 
+  /**
+   * Push any already-banked browser lease into the Electron/Android native
+   * store. Desktop cold-start used to lock because login only wrote
+   * localStorage and main never received the lease until the user hit Retry.
+   */
+  function rehydrateNativeLeaseFromBrowser() {
+    try {
+      var st = readState();
+      if (st && st.lease) {
+        pushLeaseToNative(st.lease, st.hwm || Date.now());
+      }
+    } catch (e) {}
+  }
+
   async function enforce(opts) {
     opts = opts || {};
     if (!CFG || !CFG.RS_LICENSE_PUBLIC_KEY_SPKI_B64 ||
@@ -701,6 +715,9 @@
       var s0 = root.RS_API && RS_API.session ? RS_API.session() : null;
       if (s0 && s0.role === 'superadmin') return true;
     } catch (e0) {}
+
+    // Desktop: sync browser lease → main DPAPI so next cold start is clean.
+    rehydrateNativeLeaseFromBrowser();
 
     var online = !IS_BROWSER || (typeof navigator === 'undefined') || navigator.onLine !== false;
     ensureSessionHydrated();

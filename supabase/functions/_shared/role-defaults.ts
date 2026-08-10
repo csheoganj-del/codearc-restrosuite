@@ -153,10 +153,12 @@ export const PLAN_ENTITLEMENTS: Record<string, PlanEntitlement> = {
     priceYearly: 24999,
   },
   // ── Legacy aliases (same entitlements) ─────────────────────────────────
+  // starter is the zero-cost launch plan: capped at 300 online orders/mo —
+  // must stay in sync with PLAN_LIMITS in tenant-public/index.ts.
   starter: {
     name: "Express",
     maxStaff: 3,
-    monthlyOrderLimit: 6000,
+    monthlyOrderLimit: 300,
     allowedTabs: EXPRESS_TABS.slice(),
     priceMonthly: 499,
     priceYearly: 4999,

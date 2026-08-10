@@ -84,7 +84,10 @@ function main() {
 
   const auPath = path.join(ROOT, 'app-update.json');
   const prev = readJson(auPath) || {};
-  const prevMajor = parseMajor(prev.version) || 216;
+  // Floor so a stale git app-update.json (e.g. v253) cannot republish
+  // "v254" after devices already run v259+ and refuse the "older" feed.
+  const FLOOR_MAJOR = 280;
+  const prevMajor = Math.max(parseMajor(prev.version) || 216, FLOOR_MAJOR);
   const nextMajor = prevMajor + 1;
 
   const now = new Date();

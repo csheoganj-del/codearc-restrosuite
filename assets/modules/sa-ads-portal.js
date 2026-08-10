@@ -122,7 +122,7 @@
   }
 
   function loadCampaigns() {
-    if (Array.isArray(_campaignCache) && _campaignCache.length) return _campaignCache;
+    if (Array.isArray(_campaignCache) && _campaignCache.length) {return _campaignCache;}
     return loadCampaignsLocal();
   }
 
@@ -156,7 +156,7 @@
 
   async function persistCampaignToServer(camp) {
     try {
-      if (!isSuper() || !global.RS_API || typeof RS_API.admin !== 'function') return;
+      if (!isSuper() || !global.RS_API || typeof RS_API.admin !== 'function') {return;}
       await RS_API.admin({
         action: 'save_ads_campaign',
         id: camp.id,
@@ -778,7 +778,7 @@
   }
 
   function sleep(ms) {
-    return new Promise((r) => setTimeout(r, ms));
+    return new Promise((r) => { setTimeout(r, ms); });
   }
 
   function last10(digits) {
@@ -998,7 +998,7 @@
 
     let sent = 0;
     let failed = 0;
-    let skipped = 0;
+    const skipped = 0;
 
     setStatusLine('Sending… gateway human-send active');
 

@@ -1,44 +1,30 @@
 /* RestroSuite product polish pack (18 items) */
-:root {
-  --rs-density-scale: 1;
-}
+/* Display density / zoom feature removed — no zoom scaling. */
 
-/* ── Density: drive root font-size so ALL rem-based UI scales together ── */
-html[data-rs-density="compact"]     { font-size: 14px; --rs-density-scale: 0.875; }
-html[data-rs-density="comfortable"] { font-size: 16px; --rs-density-scale: 1; }
-html[data-rs-density="large"]       { font-size: 18px; --rs-density-scale: 1.125; }
-
-/* Compact — tighter cards so more items fit on small screens */
-html[data-rs-density="compact"] .menu-item-card { padding: 6px 8px; }
-html[data-rs-density="compact"] .sidebar        { font-size: 0.82rem; }
-html[data-rs-density="compact"] .sidebar .nav-link,
-html[data-rs-density="compact"] .sidebar .tab-link { padding: 6px 10px; }
-
-/* Large — bigger touch targets and text for wall-mount / kitchen screens */
-html[data-rs-density="large"] .menu-item-card,
-html[data-rs-density="large"] .kds-ticket,
-html[data-rs-density="large"] .floor-table-card {
-  font-size: 1rem; /* inherits the larger root already */
-  padding: 14px 16px;
-  min-height: 72px;
-}
-html[data-rs-density="large"] #page-title { font-size: 1.4rem; }
-html[data-rs-density="large"] .btn,
-html[data-rs-density="large"] button { min-height: 44px; }
-
-/* #2 Sync status chip (topbar) */
+/* #2 Sync status chip (topbar) — compact when healthy so the bar does not overflow */
 #rs-sync-status-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;
   border: 1px solid var(--stroke-2); background: var(--glass); color: var(--text-soft);
-  max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  cursor: default; user-select: none;
+  max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: default; user-select: none; flex-shrink: 0; height: 32px; box-sizing: border-box;
 }
 #rs-sync-status-pill.is-offline { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 #rs-sync-status-pill.is-syncing { background: #e0f2fe; color: #075985; border-color: #7dd3fc; }
-#rs-sync-status-pill.is-online { background: #ecfdf5; color: #065f46; border-color: #6ee7b7; }
+#rs-sync-status-pill.is-online {
+  background: #ecfdf5; color: #065f46; border-color: #6ee7b7;
+  /* Icon + short label when healthy — frees space for title + version */
+  max-width: 118px;
+}
 #rs-sync-status-pill.is-auth { background: #fee2e2; color: #991b1b; border-color: #fca5a5; cursor: pointer; }
-#rs-sync-status-pill i { font-size: 11px; }
+#rs-sync-status-pill i { font-size: 11px; flex-shrink: 0; }
+@media (max-width: 1280px) {
+  #rs-sync-status-pill.is-online .rs-sync-txt { display: none; }
+  #rs-sync-status-pill.is-online {
+    width: 32px; height: 32px; max-width: 32px; padding: 0;
+    justify-content: center; border-radius: 50%;
+  }
+}
 
 /* #4 Live access banner */
 #rs-access-live-banner {
@@ -91,14 +77,17 @@ html.rs-kds-focus .kds-ticket { font-size: 1.05rem; }
   transform: translate(-50%, -120%); white-space: nowrap;
 }
 
-/* #11 WA queue chip */
-#rs-wa-queue-chip {
-  display: none; align-items: center; gap: 5px;
-  padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
-  background: #ecfdf5; color: #047857; border: 1px solid #6ee7b7; cursor: pointer;
+/* #11 Legacy WA queue chip removed — badge lives on #tb-wa-status-btn */
+#rs-wa-queue-chip { display: none !important; }
+#tb-wa-status-btn { position: relative !important; }
+#tb-wa-status-btn .rs-wa-q-badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; font-size: 9px; font-weight: 800; line-height: 16px;
+  text-align: center; color: #fff; background: #16a34a;
+  border: 1.5px solid #fff; pointer-events: none; z-index: 2;
 }
-#rs-wa-queue-chip.has-items { display: inline-flex; }
-#rs-wa-queue-chip.has-failed { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+#tb-wa-status-btn .rs-wa-q-badge.is-failed { background: #dc2626; }
 
 /* #12 86'd menu tiles */
 .menu-item-card.rs-sold-out {
@@ -178,38 +167,3 @@ html.rs-kds-focus .kds-ticket { font-size: 1.05rem; }
   cursor: pointer; background: #fff; color: inherit; box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
 
-/* Density — this device (sidebar / modal / topbar chip; not Settings) */
-#rs-density-chip.rs-density-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  max-width: 140px;
-}
-#rs-density-chip .hide-sm { font-size: 11.5px; font-weight: 700; }
-@media (max-width: 900px) {
-  #rs-density-chip .hide-sm { display: none; }
-}
-.rs-density-sheet { padding: 2px 0 4px; }
-.rs-density-sheet-lead {
-  margin: 0 0 12px; font-size: 12.5px; color: var(--text-soft); line-height: 1.45; font-weight: 600;
-}
-.rs-density-options { display: flex; flex-direction: column; gap: 8px; }
-.rs-density-opt {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-  width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px;
-  border: 1.5px solid var(--stroke-2); background: var(--panel); cursor: pointer;
-  transition: border-color .15s, background .15s;
-}
-.rs-density-opt:hover { border-color: color-mix(in srgb, var(--orange) 45%, var(--stroke-2)); }
-.rs-density-opt.active {
-  border-color: var(--orange);
-  background: rgba(255, 79, 0, 0.08);
-}
-.rs-density-opt-title { font-weight: 800; font-size: 14px; color: var(--text); }
-.rs-density-opt.active .rs-density-opt-title { color: var(--orange); }
-.rs-density-opt-sub { font-size: 12px; color: var(--text-soft); font-weight: 600; line-height: 1.35; }
-/* legacy row (if any leftover markup) */
-#rs-density-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-#rs-density-row button {
-  flex: 1; min-width: 90px; padding: 10px; border-radius: 10px;
-  border: 1.5px solid var(--stroke-2); background: var(--glass); cursor: pointer; font-weight: 700; font-size: 12.5px;
-}
-#rs-density-row button.active { border-color: var(--orange); background: rgba(255,79,0,.08); color: var(--orange); }

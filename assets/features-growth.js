@@ -3694,10 +3694,18 @@
       const prepN = ONLINE.filter((o) => o.status === 'preparing').length;
       const readyN = ONLINE.filter((o) => o.status === 'ready').length;
       const openValue = ONLINE.reduce((a, o) => a + o.total, 0);
-      const showDemo =
-        !!(window.RS_API && RS_API.enableDemoTools) ||
-        localStorage.getItem('rs_demo_tools') === '1' ||
-        /owner|manager|admin|superadmin/i.test(sessionStorage.getItem('logged_in_role') || '');
+      // Demo seed buttons: explicit flag or superadmin only (not every owner on production)
+      const showDemo = (function () {
+        try {
+          if (window.RS_API && RS_API.enableDemoTools) return true;
+          if (localStorage.getItem('rs_demo_tools') === '1') return true;
+          const sess = window.RS_API && RS_API.session && RS_API.session();
+          if (sess && sess.role === 'superadmin') return true;
+          const role = String(sessionStorage.getItem('logged_in_role') || '');
+          if (/superadmin/i.test(role)) return true;
+        } catch (_) {}
+        return false;
+      })();
       const feedLive = navigator.onLine !== false;
       const filtered = ONLINE.filter((o) => {
         if (aggFilterPlat !== 'all' && o.plat !== aggFilterPlat) return false;
@@ -4849,7 +4857,8 @@
               const hhmmss = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0') + String(now.getSeconds()).padStart(2, '0');
               const billNo = `RS-SETTLE-${yyyymmdd}-${hhmmss}`;
               const billTime = now.toLocaleString('en-IN', {
-                day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true
+                // Year required: receipt engine re-parses this string (year-less → 2001 bug)
+                day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
               });
               const billRow = {
                 id: billNo,

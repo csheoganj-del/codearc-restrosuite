@@ -1454,13 +1454,28 @@
               const leaseKey = 'rs_license_lease_v1';
               const hwmKey = 'rs_license_hwm_v1';
               const firstKey = 'rs_license_firstseen_v1';
-              const serverTime = String(leaseRes.server_time || Date.now());
+              const serverTimeMs = Number(leaseRes.server_time || Date.now());
+              const serverTime = String(serverTimeMs);
               try { localStorage.setItem(leaseKey, leaseRes.lease); } catch (_) {}
               try { sessionStorage.setItem(leaseKey, leaseRes.lease); } catch (_) {}
               try { localStorage.setItem(hwmKey, serverTime); } catch (_) {}
               try { sessionStorage.setItem(hwmKey, serverTime); } catch (_) {}
               try {
                 if (!localStorage.getItem(firstKey)) localStorage.setItem(firstKey, String(Date.now()));
+              } catch (_) {}
+              // Desktop main process gate reads DPAPI state, not localStorage.
+              // Without this, every cold start shows "Reconnect" until Retry.
+              try {
+                if (window.rsDesktop && typeof window.rsDesktop.storeLease === 'function') {
+                  await window.rsDesktop.storeLease(leaseRes.lease, serverTimeMs);
+                }
+              } catch (nativeLeaseErr) {
+                console.warn('[login] native lease store failed:', nativeLeaseErr && nativeLeaseErr.message);
+              }
+              try {
+                if (window.RSLicense && RSLicense._internal && typeof RSLicense._internal.storeLease === 'function') {
+                  RSLicense._internal.storeLease(leaseRes.lease, serverTimeMs);
+                }
               } catch (_) {}
             }
           }

@@ -158,10 +158,8 @@
             return;
           }
           let v = cell;
-          let t = null;
           if (cell && typeof cell === 'object' && 'v' in cell) {
             v = cell.v;
-            t = cell.t || null;
           }
           if (typeof v === 'number' && Number.isFinite(v)) {
             xml += `<c r="${ref}"><v>${v}</v></c>`;
@@ -187,7 +185,7 @@
       '<sheets>';
     list.forEach((sheet, idx) => {
       const name = String(sheet.name || 'Sheet' + (idx + 1))
-        .replace(/[\\/*?:\[\]]/g, ' ')
+        .replace(/[\\/*?:[\]]/g, ' ')
         .slice(0, 31);
       workbook += `<sheet name="${xmlEsc(name)}" sheetId="${idx + 1}" r:id="rId${idx + 1}"/>`;
     });

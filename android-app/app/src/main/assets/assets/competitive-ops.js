@@ -1806,12 +1806,23 @@
   }
 
   function canShowDemoTools() {
-    // Never expose demo/dev checklist to restaurant customers on production.
+    // Never expose demo/dev checklist to restaurant staff on production.
+    // Desktop EXE runs on localhost — that is still production (not a dev browser).
     try {
       if (global.RS_API && RS_API.enableDemoTools) return true;
       const sess = global.RS_API && RS_API.session && RS_API.session();
       if (sess && sess.role === 'superadmin') return true;
       if (sess && String(sess.username || '').indexOf('superadmin:') === 0) return true;
+      const isDesktop = !!(
+        global.RS_DESKTOP ||
+        global.rsDesktop ||
+        global.RS_NATIVE_APP ||
+        (typeof document !== 'undefined' &&
+          document.documentElement &&
+          (document.documentElement.getAttribute('data-rs-desktop') === '1' ||
+            document.documentElement.classList.contains('rs-desktop-app')))
+      );
+      if (isDesktop) return false;
       const h = String(location.hostname || '');
       if (h === 'localhost' || h === '127.0.0.1') return true;
     } catch (_) {}
@@ -2190,12 +2201,23 @@
     return { ok: false };
   }
 
-  /** Thermal must match Bill settled preview (same HTML). Raw ESC/POS is opt-in only. */
+  /**
+   * Settings → Printers → Receipt print mode
+   * Thermal text = RAW ESC/POS. HTML + QR = formatted (default).
+   */
   function preferRawEscPosThermal() {
     try {
       const s = global.RS_SETTINGS || {};
-      const mode = String(s.set_thermal_mode || s.set_receipt_thermal_mode || '').toLowerCase();
-      return mode === 'raw' || mode === 'escpos' || s.set_thermal_raw === true || s.set_thermal_raw === 'true';
+      if (s.set_thermal_raw === true || s.set_thermal_raw === 'true') return true;
+      const mode = String(
+        s.set_receipt_print_mode ||
+        s.set_thermal_mode ||
+        s.set_receipt_thermal_mode ||
+        ''
+      ).toLowerCase();
+      if (/thermal text|text \(fast\)|text only|raw|escpos/.test(mode)) return true;
+      if (/html|browser|formatted|qr|recommended/.test(mode)) return false;
+      return false;
     } catch (_) {
       return false;
     }
@@ -2248,59 +2270,80 @@
       return { ok: false };
     }
     const outlet = outletForPrint();
-    toast('Sending receipt to printer…', 'fa-spinner fa-spin');
+    const isDesktop = !!(global.RS_DESKTOP || global.rsDesktop || global.RS_NATIVE_APP);
 
-    // Optional: pure raw ESC/POS (plain text) only when settings force it
+    // Settings → Receipt print mode = Thermal text (fast)
     if (preferRawEscPosThermal()) {
+      toast('Sending thermal text receipt…', 'fa-spinner fa-spin');
       try {
         if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
           const res = await RSPrintBridge.printBillEscPos(bill, outlet, { raw: true, feedback: false });
           if (res && res.ok) {
-            toast('Thermal receipt sent (raw)', 'fa-print');
+            toast('Thermal text receipt sent', 'fa-print');
             return res;
           }
         }
       } catch (e) {
         console.warn('[Thermal] raw escpos failed', e);
       }
+      toast('Thermal text print failed — check printer in top bar', 'fa-circle-exclamation');
+      return { ok: false, mode: 'raw-fail' };
     }
 
-    // Default: same formatted preview as Bill settled (includes QR when available)
+    // Default: SAME HTML + QR as web → silent Chrome/Edge print (no Ctrl+P).
+    toast(
+      isDesktop ? 'Printing receipt…' : 'Sending receipt to printer…',
+      'fa-print'
+    );
     try {
       const qr = await qrForThermalBill(bill);
       const html = billReceiptPreviewHtml(bill, outlet, qr);
       const title = 'Receipt ' + (bill.no || bill.orderId || '');
       if (global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function') {
-        const res = await RSPrintBridge.printHtml(html, title, { silent: true, feedback: false });
+        const res = await RSPrintBridge.printHtml(html, title, {
+          silent: true, // kiosk silent — professional one-click POS
+          browserStyle: true,
+          openInBrowser: true,
+          feedback: true,
+        });
         if (res && res.ok) {
-          toast('Thermal print — same as preview', 'fa-receipt');
+          const mode = String(res.mode || '');
+          toast(
+            mode.indexOf('silent') >= 0
+              ? (res.printer ? 'Receipt sent to ' + res.printer : 'Receipt sent to printer')
+              : mode.indexOf('system-browser') >= 0 || mode.indexOf('browser') >= 0
+                ? 'Print dialog opened — choose POS58'
+                : mode.indexOf('raw') >= 0 || mode.indexOf('escpos') >= 0 || mode.indexOf('winspool') >= 0
+                  ? 'Text receipt sent'
+                  : 'Receipt sent',
+            'fa-receipt'
+          );
           return { ok: true, mode: res.mode || 'html-thermal', ...res };
         }
       }
-      const hasPrintBridge = global.RSPrintBridge && typeof RSPrintBridge.printHtml === 'function';
-      if (!hasPrintBridge && global.RSPrint) {
+      if (global.RSPrint) {
         const fallback = RSPrint(html, title);
         const fallbackResult = fallback && typeof fallback.then === 'function' ? await fallback : fallback;
         if (!fallbackResult || fallbackResult.ok !== false) {
-          toast('Print dialog opened — same format as preview', 'fa-print');
+          toast('Print dialog opened — same format as web', 'fa-print');
           return { ok: true, mode: 'html' };
         }
       }
-      if (!hasPrintBridge && global.RSReceipt && typeof RSReceipt.print === 'function') {
+      if (global.RSReceipt && typeof RSReceipt.print === 'function') {
         await RSReceipt.print(bill);
-        toast('Print dialog opened — same format as preview', 'fa-print');
+        toast('Print dialog opened — same format as web', 'fa-print');
         return { ok: true, mode: 'html' };
       }
     } catch (e) {
-      console.warn('[Thermal] formatted html print failed', e);
+      console.warn('[Thermal] web-style HTML print failed', e);
     }
 
-    // Last resort: raw ESC/POS text (unformatted) if HTML path unavailable
+    // Fallback: RAW text if dialog path failed
     try {
       if (global.RSPrintBridge && typeof RSPrintBridge.printBillEscPos === 'function') {
-        const res = await RSPrintBridge.printBillEscPos(bill, outlet, { feedback: false });
+        const res = await RSPrintBridge.printBillEscPos(bill, outlet, { raw: true, feedback: false });
         if (res && res.ok) {
-          toast('Thermal sent as plain text (fallback)', 'fa-print');
+          toast('Sent as text receipt (fallback)', 'fa-print');
           return res;
         }
       }

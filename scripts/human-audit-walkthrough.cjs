@@ -155,7 +155,7 @@ const PASS = success.password || 'AuditTest99!';
   );
 
   const cash = page.locator('button[data-pay-method="Cash"], button:has-text("Cash")').first();
-  if (await cash.isVisible().catch(() => false)) await cash.click().catch(() => {});
+  if (await cash.isVisible().catch(() => false)) {await cash.click().catch(() => {});}
   await page.waitForTimeout(300);
   const exact = page.locator('button:has-text("Exact")').first();
   if (await exact.isVisible({ timeout: 500 }).catch(() => false)) {
@@ -237,7 +237,7 @@ const PASS = success.password || 'AuditTest99!';
   await tab('customers-tab', 'Customers', 17);
 
   const fullBtn = page.locator('#rs-fx-mode [data-m="full"]').first();
-  if (await fullBtn.isVisible().catch(() => false)) await fullBtn.click();
+  if (await fullBtn.isVisible().catch(() => false)) {await fullBtn.click();}
   await page.waitForTimeout(400);
   await page.evaluate(() => {
     try {

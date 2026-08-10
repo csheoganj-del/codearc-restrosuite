@@ -64,28 +64,6 @@ function _dailyCounterPath() {
     return path.join(authDataPath, 'daily-send-counts.json');
 }
 
-/** Load persisted counters from disk into memory (called once at startup). */
-function _loadDailyCounts() {
-    try {
-        const p = _dailyCounterPath();
-        if (fs.existsSync(p)) {
-            const raw = fs.readFileSync(p, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object') {
-                // Prune stale entries (any date that is not today) at load time.
-                const today = new Date().toISOString().slice(0, 10);
-                for (const tid of Object.keys(parsed)) {
-                    if (parsed[tid] && parsed[tid].date === today) {
-                        _dailySendCount[tid] = parsed[tid];
-                    }
-                }
-                console.log(`[DailyCounter] Loaded persisted send counts (${Object.keys(_dailySendCount).length} tenant(s) active today).`);
-            }
-        }
-    } catch (err) {
-        console.warn('[DailyCounter] Could not load persisted counts (non-fatal, starting fresh):', err.message);
-    }
-}
 
 /** Flush in-memory counters to disk atomically (temp file → rename). */
 function _flushDailyCounts() {
@@ -407,7 +385,6 @@ const supabaseService = hasServiceKey
 
 // Storage bucket name for WhatsApp session backup
 const SESSION_BUCKET = 'whatsapp-session';
-const SESSION_FILE_NAME = 'session.zip';
 
 // ============================================================
 // ADMIN ALERT CONFIGURATION
@@ -655,13 +632,13 @@ const SEND_LATENCY_MAX = 40;
 
 function recordSendLatency(ms) {
     const n = Number(ms);
-    if (!Number.isFinite(n) || n < 0) return;
+    if (!Number.isFinite(n) || n < 0) {return;}
     _sendLatencySamples.push(Math.round(n));
-    if (_sendLatencySamples.length > SEND_LATENCY_MAX) _sendLatencySamples.shift();
+    if (_sendLatencySamples.length > SEND_LATENCY_MAX) {_sendLatencySamples.shift();}
 }
 
 function avgSendLatencyMs() {
-    if (!_sendLatencySamples.length) return null;
+    if (!_sendLatencySamples.length) {return null;}
     const sum = _sendLatencySamples.reduce((a, b) => a + b, 0);
     return Math.round(sum / _sendLatencySamples.length);
 }
@@ -673,7 +650,7 @@ function queuedSendDepth() {
         for (const p of _sendQueues.values()) {
             // Promise always truthy; we cannot inspect settled state without tracking.
             // Approximate: count maps that have been used recently via _lastSendAt.
-            if (p) n += 1;
+            if (p) {n += 1;}
         }
     } catch (_) {}
     // Prefer explicit pending markers if present on queue promises
@@ -718,9 +695,6 @@ function isHardTerminalDisconnect(statusCode, err) {
 }
 
 /** @deprecated use isHardTerminalDisconnect */
-function isTerminalDisconnect(statusCode, err) {
-    return isHardTerminalDisconnect(statusCode, err);
-}
 
 /** Human-readable disconnect label for logs/alerts */
 function disconnectReasonLabel(statusCode, err) {
@@ -1372,7 +1346,7 @@ const _gwCtx = {
 };
 
 // Health logger — in-memory ring + Supabase write
-const { logHealthEvent: _logHealthEvent, getRecentEvents } = createHealthLogger(_gwCtx);
+const { logHealthEvent: _logHealthEvent } = createHealthLogger(_gwCtx);
 _gwCtx.logHealthEvent = _logHealthEvent;
 
 // Alert manager — email / Telegram / desktop fan-out
@@ -1842,7 +1816,7 @@ function getSystemClientData() {
 function isClientReady(data) {
     // Match /health "ready" labels so tray Online·Ready and dashboard platformReady agree.
     // Require a live client object so we don't report ready during a half-init.
-    if (!data || !data.client) return false;
+    if (!data || !data.client) {return false;}
     const st = String(data.status || '').toLowerCase();
     return st === 'ready' || st === 'connected' || st === 'online' || st === 'open';
 }
@@ -2069,27 +2043,6 @@ async function resolveSendRouteLazy(tenantId) {
     return null;
 }
 
-/** @deprecated sync helper — use resolveSendRouteLazy */
-function resolveSendRoute(tenantId) {
-    const tid = (tenantId && String(tenantId).trim()) ? String(tenantId).trim() : 'system';
-    if (tid === 'system') {
-        const sys = getSystemClientData();
-        if (isClientReady(sys)) {return { client: sys.client, via: 'system', sendAsTenantId: 'system', number: sys.number };}
-        return null;
-    }
-    const own = tenantClients.get(tid);
-    if (isClientReady(own)) {
-        touchTenantActivity(tid);
-        return { client: own.client, via: 'own', sendAsTenantId: tid, number: own.number };
-    }
-    if (PLATFORM_SEND_FALLBACK) {
-        const sys = getSystemClientData();
-        if (isClientReady(sys)) {
-            return { client: sys.client, via: 'platform', sendAsTenantId: tid, number: sys.number };
-        }
-    }
-    return null;
-}
 
 // GET Endpoint to serve visual Gateway Dashboard for CodeArc Administrators (Made by Antigravity)
 app.get('/', (req, res) => {
@@ -2926,7 +2879,7 @@ async function performReset(req, res, format = 'json') {
         if (supabaseService) {
             const fileName = `session-${tenantId}.zip`;
             console.log(`[Reset] Deleting ${fileName} from Supabase Storage...`);
-            const { data, error } = await supabaseService.storage
+            const { error } = await supabaseService.storage
                 .from(SESSION_BUCKET)
                 .remove([fileName]);
 
@@ -3152,7 +3105,7 @@ app.post('/send', async (req, res) => {
         async function resolveWhatsAppJid(client, phoneDigits) {
             const digits = String(phoneDigits || '').replace(/\D/g, '');
             const fallback = `${digits}@s.whatsapp.net`;
-            if (!client || typeof client.onWhatsApp !== 'function') return { jid: fallback, exists: null };
+            if (!client || typeof client.onWhatsApp !== 'function') {return { jid: fallback, exists: null };}
             try {
                 let results = await client.onWhatsApp(digits);
                 let hit = Array.isArray(results) ? results.find((r) => r && r.exists) : null;
@@ -3180,7 +3133,7 @@ app.post('/send', async (req, res) => {
         const toDigits = String(phone || '').replace(/\D/g, '');
         const norm = (d) => {
             const x = String(d || '').replace(/\D/g, '');
-            if (x.length > 10 && x.startsWith('91')) return x.slice(-10);
+            if (x.length > 10 && x.startsWith('91')) {return x.slice(-10);}
             return x.slice(-10);
         };
         if (fromDigits && toDigits && norm(fromDigits) === norm(toDigits)) {
@@ -3222,7 +3175,7 @@ app.post('/send', async (req, res) => {
         // System OTP/security + WA Ads: wait for real delivery so UI never shows false "1 sent"
         if (wantSync && !pdfData) {
             try {
-                let textOut = String(message || caption || '').trim();
+                const textOut = String(message || caption || '').trim();
                 if (!textOut && !imagePayload) {
                     return res.status(400).json({ status: 'error', error: 'Missing message body' });
                 }
@@ -3246,7 +3199,7 @@ app.post('/send', async (req, res) => {
                     route.client,
                     chatId,
                     outbound,
-                    { rsProactiveSessionRetry: isMarketingEarly },
+                    {},
                     route.sendAsTenantId
                 );
                 const msgKey = sendResult && sendResult.key;
@@ -3392,12 +3345,12 @@ app.post('/send', async (req, res) => {
                     `bill-${orderId || Date.now()}.pdf`,
                     'your-bill.pdf',
                     'receipt.pdf',
-                    String(filename || `receipt-${orderId || 'bill'}.pdf`).replace(/[^\w.\-]+/g, '_'),
+                    String(filename || `receipt-${orderId || 'bill'}.pdf`).replace(/[^\w.-]+/g, '_'),
                 ];
                 const media = {
                     document: pdfBuffer,
                     mimetype: 'application/pdf',
-                    fileName: (craftBills ? _pick(niceNames) : String(filename || `receipt-${orderId || 'bill'}.pdf`)).replace(/[^\w.\-]+/g, '_'),
+                    fileName: (craftBills ? _pick(niceNames) : String(filename || `receipt-${orderId || 'bill'}.pdf`)).replace(/[^\w.-]+/g, '_'),
                     caption: shortCaption || undefined,
                 };
                 await humanSend(route.client, chatId, media, {}, route.sendAsTenantId);
@@ -4356,74 +4309,6 @@ const businessProfile = {
     gstEnabled: true
 };
 
-function getFallbackCategoryIcon(term) {
-    const t = String(term).toLowerCase();
-    if (t.includes('sandwich') || t.includes('panini')) {return '🥪';}
-    if (t.includes('fries') || t.includes('peri')) {return '🍟';}
-    if (t.includes('shake') || t.includes('frappe') || t.includes('thickshake')) {return '🥤';}
-    if (t.includes('latte') || t.includes('matcha') || t.includes('milk')) {return '🥛';}
-    if (t.includes('croissant') || t.includes('pastry') || t.includes('bakery')) {return '🥐';}
-    return '☕';
-}
-
-function getRandomGoodVibeQuote(record) {
-    const orderId = record.orderId || '';
-    let hasFood = false;
-    let hasDrinks = false;
-    let items = [];
-    try {
-        items = typeof record.items === 'string' ? JSON.parse(record.items) : record.items;
-    } catch (e) {
-        items = [];
-    }
-    if (Array.isArray(items)) {
-        items.forEach(item => {
-            const name = String(item.name || '').toLowerCase();
-            const cat = String(item.category || '').toLowerCase();
-            if (name.includes('sandwich') || name.includes('fries') || name.includes('panini') || name.includes('burger') || name.includes('snack') || name.includes('munch') || cat.includes('food') || cat.includes('snack') || cat.includes('snacks')) {
-                hasFood = true;
-            }
-            if (name.includes('coffee') || name.includes('latte') || name.includes('matcha') || name.includes('frappe') || name.includes('shake') || name.includes('tea') || cat.includes('beverage') || cat.includes('coffee') || cat.includes('drinks')) {
-                hasDrinks = true;
-            }
-        });
-    }
-
-    let quotes = [];
-    if (hasFood && !hasDrinks) {
-        quotes = [
-            'Prepared with fresh, premium ingredients',
-            'Freshly prepared for your satisfaction',
-            'Quality dining, crafted with care',
-            'Thank you for choosing our kitchen'
-        ];
-    } else if (hasDrinks && !hasFood) {
-        quotes = [
-            'Freshly prepared for your satisfaction',
-            'Crafted to elevate your day',
-            'Quality beverage, freshly prepared',
-            'Thank you for choosing our service'
-        ];
-    } else {
-        quotes = [
-            'We appreciate your patronage',
-            'Thank you for your valued business',
-            'Committed to quality and service',
-            'We look forward to serving you again',
-            'Your satisfaction is our priority'
-        ];
-    }
-
-    let hash = 0;
-    if (orderId) {
-        for (let i = 0; i < orderId.length; i++) {
-            hash += orderId.charCodeAt(i);
-        }
-    } else {
-        hash = Math.floor(Math.random() * quotes.length);
-    }
-    return quotes[hash % quotes.length];
-}
 
 function centerText24(text) {
     const width = 24;

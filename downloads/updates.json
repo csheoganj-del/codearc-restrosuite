@@ -1,47 +1,47 @@
 {
-  "generatedAt": "2026-08-02T07:59:23.633Z",
+  "generatedAt": "2026-08-09T07:36:56.610Z",
   "site": "https://restrosuite.codearc.co.in",
   "support": "support@codearc.co.in",
   "web": {
-    "version": "v236-20260802-frictionless",
-    "title": "Live update v236-20260802-frictionless",
-    "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
+    "version": "v293-20260808-ten-x-utility",
+    "title": "10x utility: version, checklist, WA plain language",
+    "summary": "Unified App+Features version chip, owner open checklist, safer print default restore, plain WhatsApp status, go-live smoke.",
     "appUpdateJson": "https://restrosuite.codearc.co.in/app-update.json"
   },
   "desktop": {
-    "version": "2.0.8",
+    "version": "2.0.26",
     "feedUrl": "https://restrosuite.codearc.co.in/downloads/desktop",
     "latestYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest.yml",
     "latestMacYml": "https://restrosuite.codearc.co.in/downloads/desktop/latest-mac.yml",
     "host": "github-releases",
-    "githubRelease": "v2.0.8",
+    "githubRelease": "v2.0.25",
     "nsis": {
-      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Setup.exe",
-      "feedFile": "RestroSuite-2.0.8-x64.exe",
-      "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe",
-      "size": 106800927,
-      "sizeLabel": "101.9 MB"
+      "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Windows-Setup.exe",
+      "feedFile": "RestroSuite-2.0.20-x64.exe",
+      "nsisAsset": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-2.0.25-x64.exe",
+      "size": 109092301,
+      "sizeLabel": "104.0 MB"
     },
     "portable": null,
     "mac": {
       "appleSilicon": {
-        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Mac-AppleSilicon.dmg",
+        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Mac-AppleSilicon.dmg",
         "size": null,
         "sizeLabel": null
       },
       "intel": {
-        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Mac-Intel.dmg",
+        "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Mac-Intel.dmg",
         "size": null,
         "sizeLabel": null
       }
     }
   },
   "android": {
-    "versionName": "2.0.4",
-    "versionCode": 5,
-    "url": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Android.apk",
-    "size": 13523849,
-    "sizeLabel": "12.9 MB",
-    "notes": "Automatic deploy update — installed desktop apps will download this UI content."
+    "versionName": "2.0.5",
+    "versionCode": 6,
+    "url": "https://restrosuite.codearc.co.in/downloads/RestroSuite-Android.apk",
+    "size": 10727924,
+    "sizeLabel": "10.2 MB",
+    "notes": "Unified App+Features version chip, owner open checklist, safer print default restore, plain WhatsApp status, go-live smoke."
   }
 }

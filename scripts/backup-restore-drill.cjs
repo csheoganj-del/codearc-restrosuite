@@ -27,7 +27,7 @@ function loadEnv() {
     if (!fs.existsSync(filePath)) {continue;}
     for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
       if (!line.trim() || line.trim().startsWith('#')) {continue;}
-      const match = line.match(/^\s*([\w.\-]+)\s*=\s*(.*)?\s*$/);
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
       if (!match) {continue;}
       let val = match[2] || '';
       if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {

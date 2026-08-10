@@ -129,12 +129,10 @@ function createSessionManager(ctx) {
 
                 const zipPath = path.join(os.tmpdir(), `wa_session_restore_${tenantId}.zip`);
                 try {
-                    // eslint-disable-next-line no-await-in-loop
                     const { data, error: dlErr } = await supabaseService.storage
                         .from(SESSION_BUCKET).download(file.name);
                     if (dlErr || !data) { throw dlErr || new Error('No data'); }
 
-                    // eslint-disable-next-line no-await-in-loop
                     const buf = Buffer.from(await data.arrayBuffer());
                     fs.writeFileSync(zipPath, buf);
 
@@ -144,7 +142,6 @@ function createSessionManager(ctx) {
                     }
                     fs.mkdirSync(dest, { recursive: true });
 
-                    // eslint-disable-next-line no-await-in-loop
                     await fs.createReadStream(zipPath)
                         .pipe(unzipper.Extract({ path: dest }))
                         .promise();

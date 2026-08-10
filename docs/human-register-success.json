@@ -1,0 +1,18 @@
+{
+  "slug": "humanaudit56676669",
+  "email": "ha676669@codearc.test",
+  "challenge": "ea1e9a2d-6b17-4247-bb99-2579c105f8ac",
+  "otp": "576749",
+  "phone": "6377404756",
+  "password": "AuditTest99!",
+  "response": {
+    "success": true,
+    "trial": true,
+    "plan_code": "serve",
+    "plan_name": "Serve",
+    "subscription_status": "trialing",
+    "subscription_current_period_end": "2026-09-01T07:44:46.157Z",
+    "invoice_number": "TRS-RS-20260802-6674",
+    "message": "Welcome! Your 30-day Serve trial is active — sign in now (no approval). A confirmation PDF is on its way to your email and WhatsApp."
+  }
+}

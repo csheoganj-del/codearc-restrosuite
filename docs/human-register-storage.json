@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "https://restrosuite.codearc.co.in",
+      "localStorage": [
+        {
+          "name": "rs_t:local-demo:rs-theme",
+          "value": "light"
+        },
+        {
+          "name": "__rsWebVerSeen",
+          "value": "v236-20260802-auto"
+        },
+        {
+          "name": "__rsWebVerApplied",
+          "value": "v236-20260801-pay-now"
+        }
+      ]
+    }
+  ]
+}

@@ -9,15 +9,15 @@
 (function (global) {
   'use strict';
 
-  var STYLE_ID = 'rs-frictionless-style';
-  var MODE_KEY = 'rs_workspace_mode_v1';
-  var ACTIVATION_KEY = 'rs_activation_v1';
-  var SAMPLE_KEY = 'rs_sample_pack_v1';
-  var WELCOME_KEY = 'rs_frictionless_welcome_v1';
-  var UNLOCK_KEY = 'rs_tables_mode_unlocked_v1';
-  var SESSION_GUARD_KEY = 'rs_session_outlet_guard_v1';
+  const STYLE_ID = 'rs-frictionless-style';
+  const MODE_KEY = 'rs_workspace_mode_v1';
+  const ACTIVATION_KEY = 'rs_activation_v1';
+  const SAMPLE_KEY = 'rs_sample_pack_v1';
+  const WELCOME_KEY = 'rs_frictionless_welcome_v1';
+  const UNLOCK_KEY = 'rs_tables_mode_unlocked_v1';
+  const SESSION_GUARD_KEY = 'rs_session_outlet_guard_v1';
 
-  var COUNTER_TABS = [
+  const COUNTER_TABS = [
     'pos-tab',
     'bills-tab',
     'reports-tab',
@@ -26,7 +26,7 @@
     'tax-tab',
     'employees-tab',
   ];
-  var TABLES_TABS = COUNTER_TABS.concat([
+  const TABLES_TABS = COUNTER_TABS.concat([
     'floor-tab',
     'qr-orders-tab',
     'kds-tab',
@@ -37,7 +37,7 @@
   // full = no filter (show all role-allowed)
 
   // Recipes link to SAMPLE_STOCK keys so first bills auto-deduct store-room stock.
-  var SAMPLE_MENU = [
+  const SAMPLE_MENU = [
     {
       name: 'Masala Chai',
       cat: 'Beverages',
@@ -152,7 +152,7 @@
     },
   ];
 
-  var SAMPLE_STOCK = [
+  const SAMPLE_STOCK = [
     { name: 'Tea leaves', key: 'tea_leaves', unit: 'kg', stock: 2, min: 0.5, cost: 400, cat: 'food' },
     { name: 'Milk', key: 'milk', unit: 'L', stock: 10, min: 2, cost: 60, cat: 'food' },
     { name: 'Cooking oil', key: 'cooking_oil', unit: 'L', stock: 5, min: 1, cost: 150, cat: 'food' },
@@ -160,7 +160,7 @@
     { name: 'Carry bags', key: 'carry_bags', unit: 'pcs', stock: 100, min: 20, cost: 3, cat: 'packaging' },
   ];
 
-  var SAMPLE_TABLES = [
+  const SAMPLE_TABLES = [
     { n: '01', name: '01', cap: 2, state: 'free' },
     { n: '02', name: '02', cap: 4, state: 'free' },
     { n: '03', name: '03', cap: 4, state: 'free' },
@@ -169,8 +169,8 @@
 
   function toast(msg, icon) {
     try {
-      if (global.__toast) return global.__toast(msg, icon);
-      if (global.RS && RS.toast) return RS.toast(msg, icon);
+      if (global.__toast) {return global.__toast(msg, icon);}
+      if (global.RS && RS.toast) {return RS.toast(msg, icon);}
     } catch (_) {}
   }
 
@@ -192,25 +192,25 @@
             el.remove();
           } catch (_) {}
         });
-      var tour = document.getElementById('onboarding-overlay');
+      const tour = document.getElementById('onboarding-overlay');
       if (tour) {
         tour.style.display = 'none';
         tour.style.pointerEvents = 'none';
         tour.classList.remove('is-visible', 'show');
       }
-      var bd = document.getElementById('onboarding-backdrop');
+      const bd = document.getElementById('onboarding-backdrop');
       if (bd) {
         bd.style.pointerEvents = 'none';
         bd.style.display = 'none';
       }
-      var wel = document.getElementById('rs-fx-welcome');
-      if (wel) wel.remove();
+      const wel = document.getElementById('rs-fx-welcome');
+      if (wel) {wel.remove();}
     } catch (_) {}
   }
 
   function role() {
     try {
-      var s = global.RS_API && RS_API.session && RS_API.session();
+      const s = global.RS_API && RS_API.session && RS_API.session();
       return String((s && s.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
     } catch (_) {
       return '';
@@ -218,26 +218,26 @@
   }
 
   function isOwnerLike() {
-    var r = role();
+    const r = role();
     return !r || r === 'owner' || r === 'admin' || r === 'manager' || r === 'superadmin';
   }
 
   function isPlatform() {
-    var r = role();
-    if (r === 'superadmin' || r === 'brand_admin' || r === 'brandadmin') return true;
+    const r = role();
+    if (r === 'superadmin' || r === 'brand_admin' || r === 'brandadmin') {return true;}
     try {
       if (document.body && document.body.classList) {
-        if (document.body.classList.contains('rs-role-superadmin')) return true;
-        if (document.body.classList.contains('rs-role-brandadmin')) return true;
+        if (document.body.classList.contains('rs-role-superadmin')) {return true;}
+        if (document.body.classList.contains('rs-role-brandadmin')) {return true;}
       }
     } catch (_) {}
     return false;
   }
 
   function tenantKey(suffix) {
-    var slug = '';
+    let slug = '';
     try {
-      var s = global.RS_API && RS_API.session && RS_API.session();
+      const s = global.RS_API && RS_API.session && RS_API.session();
       slug = String((s && (s.tenant_slug || s.slug || s.tenant_id)) || sessionStorage.getItem('tenant_slug') || 'local');
     } catch (_) {
       slug = 'local';
@@ -247,8 +247,8 @@
 
   function lsGet(key, fallback) {
     try {
-      var v = localStorage.getItem(key);
-      if (v == null) return fallback;
+      const v = localStorage.getItem(key);
+      if (v == null) {return fallback;}
       return JSON.parse(v);
     } catch (_) {
       return fallback;
@@ -262,8 +262,8 @@
   }
 
   function injectStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
+    if (document.getElementById(STYLE_ID)) {return;}
+    const s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent =
       '#rs-fx-welcome{position:fixed;inset:0;z-index:2147483500;display:flex;align-items:center;justify-content:center;' +
@@ -311,24 +311,24 @@
   /* ---------- Workspace mode (progressive sidebar) ---------- */
   function getMode() {
     try {
-      var fromLs = localStorage.getItem(tenantKey(MODE_KEY));
-      if (fromLs === 'counter' || fromLs === 'tables' || fromLs === 'full') return fromLs;
+      const fromLs = localStorage.getItem(tenantKey(MODE_KEY));
+      if (fromLs === 'counter' || fromLs === 'tables' || fromLs === 'full') {return fromLs;}
     } catch (_) {}
     try {
-      var s = global.RS_SETTINGS || {};
-      var m = String(s.set_workspace_mode || '').toLowerCase();
-      if (m === 'counter' || m === 'tables' || m === 'full') return m;
+      const s = global.RS_SETTINGS || {};
+      const m = String(s.set_workspace_mode || '').toLowerCase();
+      if (m === 'counter' || m === 'tables' || m === 'full') {return m;}
       // Legacy pos-only → counter
-      if (s.set_pos_only_mode === true || s.set_pos_only_mode === 'true') return 'counter';
+      if (s.set_pos_only_mode === true || s.set_pos_only_mode === 'true') {return 'counter';}
     } catch (_) {}
     // New outlets default to counter for calm first day
-    if (!hasAnySales()) return 'counter';
+    if (!hasAnySales()) {return 'counter';}
     return 'tables';
   }
 
   function setMode(mode, opts) {
     opts = opts || {};
-    var m = mode === 'full' || mode === 'tables' ? mode : 'counter';
+    const m = mode === 'full' || mode === 'tables' ? mode : 'counter';
     try {
       localStorage.setItem(tenantKey(MODE_KEY), m);
     } catch (_) {}
@@ -367,8 +367,8 @@
   }
 
   function tabsForMode(mode) {
-    if (mode === 'full') return null;
-    if (mode === 'tables') return TABLES_TABS.slice();
+    if (mode === 'full') {return null;}
+    if (mode === 'tables') {return TABLES_TABS.slice();}
     return COUNTER_TABS.slice();
   }
 
@@ -379,21 +379,21 @@
       });
       return;
     }
-    var mode = getMode();
-    var allowed = tabsForMode(mode);
-    var links = document.querySelectorAll('.sidebar-link[data-tab], .mnav-link[data-tab]');
+    const mode = getMode();
+    const allowed = tabsForMode(mode);
+    const links = document.querySelectorAll('.sidebar-link[data-tab], .mnav-link[data-tab]');
     links.forEach(function (a) {
-      var id = a.getAttribute('data-tab') || '';
-      if (!id) return;
+      const id = a.getAttribute('data-tab') || '';
+      if (!id) {return;}
       // Super-admin only links stay as-is
-      if (a.classList.contains('superadmin-only') || a.classList.contains('brandadmin-only')) return;
+      if (a.classList.contains('superadmin-only') || a.classList.contains('brandadmin-only')) {return;}
       // Kitchen setup always available for owners when inventory/menu unlocked
       if (a.id === 'klc-sidebar-setup' || a.classList.contains('klc-setup-link')) {
-        var showKlc = mode !== 'counter' || isOwnerLike();
+        const showKlc = mode !== 'counter' || isOwnerLike();
         a.classList.toggle('rs-fx-hidden', !showKlc && mode === 'counter');
         // In counter mode hide kitchen setup to reduce noise
-        if (mode === 'counter') a.classList.add('rs-fx-hidden');
-        else a.classList.remove('rs-fx-hidden');
+        if (mode === 'counter') {a.classList.add('rs-fx-hidden');}
+        else {a.classList.remove('rs-fx-hidden');}
         return;
       }
       if (allowed == null) {
@@ -405,30 +405,30 @@
         a.classList.toggle('rs-fx-hidden', mode !== 'full');
         return;
       }
-      var ok = allowed.indexOf(id) !== -1;
+      const ok = allowed.indexOf(id) !== -1;
       a.classList.toggle('rs-fx-hidden', !ok);
     });
     // If active tab hidden, jump to POS
     try {
-      var active = document.querySelector('.tab-content.active');
+      const active = document.querySelector('.tab-content.active');
       if (active && allowed && allowed.indexOf(active.id) === -1) {
-        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('pos-tab');
+        if (global.RS && typeof RS.activateTab === 'function') {RS.activateTab('pos-tab');}
       }
     } catch (_) {}
   }
 
   function paintModeSwitcher() {
     if (isPlatform() || !isOwnerLike()) {
-      var stale = document.getElementById('rs-fx-mode');
-      if (stale) stale.remove();
+      const stale = document.getElementById('rs-fx-mode');
+      if (stale) {stale.remove();}
       return;
     }
-    var host =
+    const host =
       document.getElementById('tb-right') ||
       document.querySelector('.topbar-right') ||
       document.querySelector('.topbar-actions');
-    if (!host) return;
-    var el = document.getElementById('rs-fx-mode');
+    if (!host) {return;}
+    let el = document.getElementById('rs-fx-mode');
     if (!el) {
       el = document.createElement('div');
       el.id = 'rs-fx-mode';
@@ -437,7 +437,7 @@
       el.title = 'Simplify or expand modules for this outlet';
       host.insertBefore(el, host.firstChild);
     }
-    var cur = getMode();
+    const cur = getMode();
     el.innerHTML =
       '<button type="button" data-m="counter" class="' +
       (cur === 'counter' ? 'on' : '') +
@@ -478,17 +478,17 @@
 
   async function ensureSampleTables() {
     try {
-      var settings = null;
-      if (global.RS_DB && RS_DB.getSettings) settings = await RS_DB.getSettings();
+      let settings = null;
+      if (global.RS_DB && RS_DB.getSettings) {settings = await RS_DB.getSettings();}
       settings = settings || global.RS_SETTINGS || {};
-      var existing = settings.custom_tables;
-      if (Array.isArray(existing) && existing.length > 0) return false;
+      const existing = settings.custom_tables;
+      if (Array.isArray(existing) && existing.length > 0) {return false;}
       settings.custom_tables = SAMPLE_TABLES.map(function (t) {
         return { n: t.n, name: t.name, cap: t.cap, state: 'free' };
       });
       settings.rs_sample_tables = true;
       global.RS_SETTINGS = Object.assign({}, global.RS_SETTINGS || {}, settings);
-      if (global.RS_DB && RS_DB.setSettings) await RS_DB.setSettings(settings);
+      if (global.RS_DB && RS_DB.setSettings) {await RS_DB.setSettings(settings);}
       try {
         document.dispatchEvent(new Event('rs:tables-updated'));
       } catch (_) {}
@@ -500,12 +500,12 @@
   }
 
   async function ensureSampleMenu() {
-    if (menuCount() > 0) return { added: 0, skipped: true };
-    var added = 0;
-    var baseId = Date.now();
-    for (var i = 0; i < SAMPLE_MENU.length; i++) {
-      var item = SAMPLE_MENU[i];
-      var rec = {
+    if (menuCount() > 0) {return { added: 0, skipped: true };}
+    let added = 0;
+    const baseId = Date.now();
+    for (let i = 0; i < SAMPLE_MENU.length; i++) {
+      const item = SAMPLE_MENU[i];
+      const rec = {
         id: baseId + i,
         name: item.name,
         cat: item.cat,
@@ -529,10 +529,10 @@
         _sample: true,
       };
       try {
-        if (global.RS && Array.isArray(RS.MENU)) RS.MENU.push(rec);
+        if (global.RS && Array.isArray(RS.MENU)) {RS.MENU.push(rec);}
         if (global.RS && typeof RS.saveOne === 'function') {
-          var saved = await RS.saveOne('menu', rec);
-          if (saved && saved.id != null) Object.assign(rec, saved);
+          const saved = await RS.saveOne('menu', rec);
+          if (saved && saved.id != null) {Object.assign(rec, saved);}
         } else if (global.RS_DB && RS_DB.put) {
           await RS_DB.put('menu', rec.id, rec);
         }
@@ -543,21 +543,21 @@
       }
     }
     try {
-      if (global.RS && typeof RS.renderPOS === 'function') RS.renderPOS();
-      if (typeof global.refreshPosCats === 'function') global.refreshPosCats();
+      if (global.RS && typeof RS.renderPOS === 'function') {RS.renderPOS();}
+      if (typeof global.refreshPosCats === 'function') {global.refreshPosCats();}
     } catch (_) {}
     return { added: added, skipped: false };
   }
 
   async function ensureSampleStock() {
     try {
-      var inv = (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [];
-      if (inv.length > 0) return 0;
-      var n = 0;
-      var base = Date.now() + 5000;
-      for (var i = 0; i < SAMPLE_STOCK.length; i++) {
-        var s = SAMPLE_STOCK[i];
-        var rec = {
+      const inv = (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [];
+      if (inv.length > 0) {return 0;}
+      let n = 0;
+      const base = Date.now() + 5000;
+      for (let i = 0; i < SAMPLE_STOCK.length; i++) {
+        const s = SAMPLE_STOCK[i];
+        const rec = {
           id: base + i,
           name: s.name,
           key: s.key || String(s.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_'),
@@ -571,10 +571,10 @@
           category: s.cat,
           _sample: true,
         };
-        if (global.RS && Array.isArray(RS.INVENTORY)) RS.INVENTORY.push(rec);
+        if (global.RS && Array.isArray(RS.INVENTORY)) {RS.INVENTORY.push(rec);}
         try {
-          if (global.RS && typeof RS.saveOne === 'function') await RS.saveOne('inventory', rec);
-          else if (global.RS_DB && RS_DB.put) await RS_DB.put('inventory', rec.id, rec);
+          if (global.RS && typeof RS.saveOne === 'function') {await RS.saveOne('inventory', rec);}
+          else if (global.RS_DB && RS_DB.put) {await RS_DB.put('inventory', rec.id, rec);}
         } catch (saveErr) {
           // Keep local stock even if cloud write fails — still deduct on this device
           console.warn('[Frictionless] stock seed save', s.name, saveErr);
@@ -582,7 +582,7 @@
         n++;
       }
       try {
-        if (global.RS && typeof RS.render === 'function') RS.render('inventory-tab');
+        if (global.RS && typeof RS.render === 'function') {RS.render('inventory-tab');}
       } catch (_) {}
       return n;
     } catch (e) {
@@ -594,17 +594,17 @@
   /** If outlet already has menu but empty stock, still seed store-room + backfill missing recipes. */
   async function ensureSampleRecipesIfMissing() {
     try {
-      var menu = (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [];
-      if (!menu.length) return 0;
-      var n = 0;
-      for (var i = 0; i < SAMPLE_MENU.length; i++) {
-        var sample = SAMPLE_MENU[i];
-        if (!sample.ingredients || !sample.ingredients.length) continue;
-        var live = menu.find(function (m) {
+      const menu = (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [];
+      if (!menu.length) {return 0;}
+      let n = 0;
+      for (let i = 0; i < SAMPLE_MENU.length; i++) {
+        const sample = SAMPLE_MENU[i];
+        if (!sample.ingredients || !sample.ingredients.length) {continue;}
+        const live = menu.find(function (m) {
           return String(m.name || '').toLowerCase() === String(sample.name || '').toLowerCase();
         });
-        if (!live) continue;
-        if (Array.isArray(live.ingredients) && live.ingredients.length) continue;
+        if (!live) {continue;}
+        if (Array.isArray(live.ingredients) && live.ingredients.length) {continue;}
         live.ingredients = sample.ingredients.map(function (ing) {
           return {
             name: ing.name,
@@ -616,8 +616,8 @@
         live.recipeServings = 1;
         n++;
         try {
-          if (global.RS && typeof RS.saveOne === 'function') await RS.saveOne('menu', live);
-          else if (global.RS_DB && RS_DB.put) await RS_DB.put('menu', live.id, live);
+          if (global.RS && typeof RS.saveOne === 'function') {await RS.saveOne('menu', live);}
+          else if (global.RS_DB && RS_DB.put) {await RS_DB.put('menu', live.id, live);}
         } catch (_) {}
       }
       return n;
@@ -629,14 +629,14 @@
 
   async function loadStartSellingPack(opts) {
     opts = opts || {};
-    var result = { menu: 0, tables: false, stock: 0 };
+    const result = { menu: 0, tables: false, stock: 0 };
     // Never leave welcome/onboarding covering POS after pack load
     closeAllModals();
     try {
-      var m = await ensureSampleMenu();
+      const m = await ensureSampleMenu();
       result.menu = m.added || 0;
       result.tables = await ensureSampleTables();
-      if (opts.withStock !== false) result.stock = await ensureSampleStock();
+      if (opts.withStock !== false) {result.stock = await ensureSampleStock();}
       // Existing outlets: empty stock + menu without recipes → still make deduct work
       result.recipesBackfilled = await ensureSampleRecipesIfMissing();
       if (opts.withStock !== false && result.stock === 0) {
@@ -656,7 +656,7 @@
         'fa-mug-hot'
       );
       try {
-        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('pos-tab');
+        if (global.RS && typeof RS.activateTab === 'function') {RS.activateTab('pos-tab');}
       } catch (_) {}
       paintPosEmptyCoach();
       paintActivationChecklist();
@@ -677,7 +677,7 @@
   }
 
   function markActivation(step) {
-    var st = loadActivation();
+    const st = loadActivation();
     st[step] = true;
     st.updatedAt = Date.now();
     lsSet(tenantKey(ACTIVATION_KEY), st);
@@ -688,8 +688,8 @@
   }
 
   function autoDetectActivation() {
-    var st = loadActivation();
-    if (menuCount() > 0) st.sample = true;
+    const st = loadActivation();
+    if (menuCount() > 0) {st.sample = true;}
     if (billCount() > 0) {
       st.firstBill = true;
       st.sample = true;
@@ -702,12 +702,12 @@
     } catch (_) {}
     // If reports tab is currently active, count as done
     try {
-      var rt = document.getElementById('reports-tab');
+      const rt = document.getElementById('reports-tab');
       if (rt && (rt.classList.contains('active') || rt.classList.contains('show'))) {
         st.reports = true;
       }
-      var hash = String(location.hash || '');
-      if (/reports-tab|reports/i.test(hash)) st.reports = true;
+      const hash = String(location.hash || '');
+      if (/reports-tab|reports/i.test(hash)) {st.reports = true;}
     } catch (_) {}
     lsSet(tenantKey(ACTIVATION_KEY), st);
     return st;
@@ -721,22 +721,22 @@
       markActivation('reports');
     }
     document.addEventListener('rs:tab-change', function (ev) {
-      var tab = (ev && ev.detail && ev.detail.tab) || '';
-      if (tab === 'reports-tab' || tab === 'analytics-tab') onReportsVisit();
+      const tab = (ev && ev.detail && ev.detail.tab) || '';
+      if (tab === 'reports-tab' || tab === 'analytics-tab') {onReportsVisit();}
       if (tab === 'pos-tab') {
         // Ensure no leftover modal steals POS clicks
         setTimeout(closeAllModals, 0);
       }
     });
     window.addEventListener('hashchange', function () {
-      if (/reports-tab|reports/i.test(String(location.hash || ''))) onReportsVisit();
+      if (/reports-tab|reports/i.test(String(location.hash || ''))) {onReportsVisit();}
     });
     // CA pack / day pack buttons also complete the step
     document.addEventListener(
       'click',
       function (ev) {
-        var t = ev.target && ev.target.closest && ev.target.closest('#rs-fx-ca-pack, #btn-download-gstr, #rs-day-pack, [data-ca-pack]');
-        if (t) onReportsVisit();
+        const t = ev.target && ev.target.closest && ev.target.closest('#rs-fx-ca-pack, #btn-download-gstr, #rs-day-pack, [data-ca-pack]');
+        if (t) {onReportsVisit();}
       },
       true
     );
@@ -744,8 +744,8 @@
 
   function sampleRecordsPresent() {
     try {
-      var menu = (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [];
-      var stock = (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [];
+      const menu = (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [];
+      const stock = (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [];
       return menu.some(function (item) { return item && item._sample === true; }) ||
         stock.some(function (item) { return item && item._sample === true; }) ||
         !!(global.RS_SETTINGS && global.RS_SETTINGS.rs_sample_tables === true);
@@ -753,46 +753,46 @@
   }
 
   async function removeStarterSampleData() {
-    var jobs = [
+    const jobs = [
       { collection: 'menu', rows: (global.RS && Array.isArray(RS.MENU) && RS.MENU) || [] },
       { collection: 'inventory', rows: (global.RS && Array.isArray(RS.INVENTORY) && RS.INVENTORY) || [] },
     ];
-    for (var i = 0; i < jobs.length; i++) {
-      var job = jobs[i];
-      var samples = job.rows.filter(function (row) { return row && row._sample === true; });
-      for (var j = 0; j < samples.length; j++) {
-        var row = samples[j];
-        if (global.RS && typeof RS.removeOne === 'function') await RS.removeOne(job.collection, row.id);
-        else if (global.RS_DB && RS_DB.del) await RS_DB.del(job.collection, row.id);
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      const samples = job.rows.filter(function (row) { return row && row._sample === true; });
+      for (let j = 0; j < samples.length; j++) {
+        const row = samples[j];
+        if (global.RS && typeof RS.removeOne === 'function') {await RS.removeOne(job.collection, row.id);}
+        else if (global.RS_DB && RS_DB.del) {await RS_DB.del(job.collection, row.id);}
       }
-      var remaining = job.rows.filter(function (row) { return !row || row._sample !== true; });
+      const remaining = job.rows.filter(function (row) { return !row || row._sample !== true; });
       if (global.RS) {
-        if (job.collection === 'menu') RS.MENU = remaining;
-        if (job.collection === 'inventory') RS.INVENTORY = remaining;
+        if (job.collection === 'menu') {RS.MENU = remaining;}
+        if (job.collection === 'inventory') {RS.INVENTORY = remaining;}
       }
     }
-    var settings = (global.RS && typeof RS.getSettings === 'function') ? await RS.getSettings() : (global.RS_SETTINGS || {});
+    let settings = (global.RS && typeof RS.getSettings === 'function') ? await RS.getSettings() : (global.RS_SETTINGS || {});
     if (settings && settings.rs_sample_tables === true) {
       settings = Object.assign({}, settings, { custom_tables: [] });
       delete settings.rs_sample_tables;
       global.RS_SETTINGS = settings;
-      if (global.RS && typeof RS.saveSettings === 'function') await RS.saveSettings(settings);
-      else if (global.RS_DB && RS_DB.setSettings) await RS_DB.setSettings(settings);
+      if (global.RS && typeof RS.saveSettings === 'function') {await RS.saveSettings(settings);}
+      else if (global.RS_DB && RS_DB.setSettings) {await RS_DB.setSettings(settings);}
       try { document.dispatchEvent(new Event('rs:tables-updated')); } catch (_) {}
     }
     try { localStorage.removeItem(tenantKey(SAMPLE_KEY)); } catch (_) {}
     try {
-      if (global.RS && typeof RS.renderPOS === 'function') RS.renderPOS();
-      if (global.RS && typeof RS.render === 'function') RS.render('inventory-tab');
+      if (global.RS && typeof RS.renderPOS === 'function') {RS.renderPOS();}
+      if (global.RS && typeof RS.render === 'function') {RS.render('inventory-tab');}
     } catch (_) {}
   }
 
   function maybePromptSampleCleanup() {
-    var promptKey = tenantKey('rs_sample_cleanup_prompted_session');
-    try { if (sessionStorage.getItem(promptKey) === '1') return; } catch (_) {}
-    if (!sampleRecordsPresent()) return;
+    const promptKey = tenantKey('rs_sample_cleanup_prompted_session');
+    try { if (sessionStorage.getItem(promptKey) === '1') {return;} } catch (_) {}
+    if (!sampleRecordsPresent()) {return;}
     try { sessionStorage.setItem(promptKey, '1'); } catch (_) {}
-    if (!global.RSModal || typeof RSModal.open !== 'function') return;
+    if (!global.RSModal || typeof RSModal.open !== 'function') {return;}
     RSModal.open({
       title: 'Practice complete — ready for real orders',
       sub: 'Your menu, first bill, and reports check are complete.',
@@ -803,7 +803,7 @@
       onMount: function (modal, close) {
         modal.querySelector('[data-keep-samples]').onclick = close;
         modal.querySelector('[data-remove-samples]').onclick = async function () {
-          var button = this;
+          const button = this;
           button.disabled = true;
           button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Removing…';
           try {
@@ -820,34 +820,34 @@
     });
   }
   function paintActivationChecklist() {
-    if (isPlatform() || !isOwnerLike()) return;
+    if (isPlatform() || !isOwnerLike()) {return;}
     injectStyles();
-    var st = autoDetectActivation();
-    var allDone = st.sample && st.firstBill && st.reports;
+    const st = autoDetectActivation();
+    const allDone = st.sample && st.firstBill && st.reports;
     if (allDone) {
       maybePromptSampleCleanup();
-      var old = document.getElementById('rs-fx-check');
-      if (old) old.classList.add('hidden');
+      const old = document.getElementById('rs-fx-check');
+      if (old) {old.classList.add('hidden');}
       return;
     }
     // Hide if dismissed permanently
     try {
-      if (localStorage.getItem(tenantKey(ACTIVATION_KEY) + ':dismiss') === '1') return;
+      if (localStorage.getItem(tenantKey(ACTIVATION_KEY) + ':dismiss') === '1') {return;}
     } catch (_) {}
 
-    var el = document.getElementById('rs-fx-check');
+    let el = document.getElementById('rs-fx-check');
     if (!el) {
       el = document.createElement('div');
       el.id = 'rs-fx-check';
       document.body.appendChild(el);
     }
     el.classList.remove('hidden');
-    var steps = [
+    const steps = [
       { id: 'sample', label: 'Menu ready (sample or your dishes)', tab: 'editor-tab' },
       { id: 'firstBill', label: 'Complete first bill on POS', tab: 'pos-tab' },
       { id: 'reports', label: 'Open Reports / CA pack', tab: 'reports-tab' },
     ];
-    var doneN = steps.filter(function (s) {
+    const doneN = steps.filter(function (s) {
       return st[s.id];
     }).length;
     el.innerHTML =
@@ -878,7 +878,7 @@
         ? '<button type="button" class="btn btn-primary btn-sm" id="rs-fx-load-sample" style="width:100%;margin-top:8px"><i class="fa-solid fa-wand-magic-sparkles"></i> Load sample café menu</button>'
         : '');
 
-    var x = el.querySelector('#rs-fx-check-x');
+    const x = el.querySelector('#rs-fx-check-x');
     if (x) {
       x.onclick = function () {
         try {
@@ -889,12 +889,12 @@
     }
     el.querySelectorAll('.fx-row').forEach(function (row) {
       row.onclick = function () {
-        var tab = row.getAttribute('data-tab');
-        if (tab && global.RS && typeof RS.activateTab === 'function') RS.activateTab(tab);
-        if (row.getAttribute('data-step') === 'reports') markActivation('reports');
+        const tab = row.getAttribute('data-tab');
+        if (tab && global.RS && typeof RS.activateTab === 'function') {RS.activateTab(tab);}
+        if (row.getAttribute('data-step') === 'reports') {markActivation('reports');}
       };
     });
-    var loadBtn = el.querySelector('#rs-fx-load-sample');
+    const loadBtn = el.querySelector('#rs-fx-load-sample');
     if (loadBtn) {
       loadBtn.onclick = function () {
         loadBtn.disabled = true;
@@ -907,9 +907,9 @@
 
   /* ---------- Welcome modal ---------- */
   function showWelcomeIfNeeded() {
-    if (isPlatform() || !isOwnerLike()) return;
+    if (isPlatform() || !isOwnerLike()) {return;}
     try {
-      if (localStorage.getItem(tenantKey(WELCOME_KEY)) === '1') return;
+      if (localStorage.getItem(tenantKey(WELCOME_KEY)) === '1') {return;}
     } catch (_) {}
     // Only when empty / brand new
     if (menuCount() > 3 || billCount() > 0) {
@@ -918,7 +918,7 @@
       } catch (_) {}
       return;
     }
-    if (!global.RSModal && !document.body) return;
+    if (!global.RSModal && !document.body) {return;}
     injectStyles();
 
     function finishWelcome(loadSample) {
@@ -927,10 +927,10 @@
       } catch (_) {}
       // Discard legacy Getting Started tour for this outlet — frictionless is the system
       try {
-        var slug = 'local';
-        var user = 'owner';
+        let slug = 'local';
+        let user = 'owner';
         try {
-          var sess = global.RS_API && RS_API.session && RS_API.session();
+          const sess = global.RS_API && RS_API.session && RS_API.session();
           slug = String((sess && (sess.tenant_slug || sess.slug)) || sessionStorage.getItem('tenant_slug') || 'local');
           user = String((sess && (sess.email || sess.username || sess.user_id)) || sessionStorage.getItem('username') || 'owner');
         } catch (_) {}
@@ -938,8 +938,8 @@
         sessionStorage.setItem('restrosuite_tour_skip_session:' + slug + ':' + user, '1');
       } catch (_) {}
       closeAllModals();
-      var wrap = document.getElementById('rs-fx-welcome');
-      if (wrap) wrap.remove();
+      const wrap = document.getElementById('rs-fx-welcome');
+      if (wrap) {wrap.remove();}
       setMode('counter', { silent: true, skipSave: false });
       if (loadSample) {
         // Close first, then pack — avoid stacked overlays
@@ -954,13 +954,13 @@
         paintActivationChecklist();
         paintPosEmptyCoach();
         try {
-          if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('editor-tab');
+          if (global.RS && typeof RS.activateTab === 'function') {RS.activateTab('editor-tab');}
         } catch (_) {}
         toast('Add your first dish, then open POS', 'fa-utensils');
       }
     }
 
-    var welcomeBody =
+    const welcomeBody =
       '<p style="margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--text-soft)">' +
       'Your <b>30-day free trial</b> is live. Start simple: <b>Counter mode</b> = POS + bills + reports only.</p>' +
       '<p style="margin:0 0 12px;font-size:12.5px;line-height:1.5;color:var(--text-mute)">' +
@@ -986,8 +986,8 @@
           '<button type="button" class="btn btn-primary" style="flex:1.4" data-sample>' +
           '<i class="fa-solid fa-wand-magic-sparkles"></i> Load sample &amp; sell</button>',
         onMount: function (modal, close) {
-          var own = modal.querySelector('[data-own]');
-          var sample = modal.querySelector('[data-sample]');
+          const own = modal.querySelector('[data-own]');
+          const sample = modal.querySelector('[data-sample]');
           if (own) {
             own.onclick = function () {
               try {
@@ -1012,8 +1012,8 @@
     }
 
     // Fallback overlay
-    if (document.getElementById('rs-fx-welcome')) return;
-    var wrap = document.createElement('div');
+    if (document.getElementById('rs-fx-welcome')) {return;}
+    const wrap = document.createElement('div');
     wrap.id = 'rs-fx-welcome';
     wrap.innerHTML =
       '<div class="fx-card" role="dialog" aria-modal="true">' +
@@ -1036,60 +1036,60 @@
 
   /* ---------- Empty POS coach ---------- */
   function paintPosEmptyCoach() {
-    if (isPlatform()) return;
-    var pos = document.getElementById('pos-tab');
-    if (!pos) return;
-    var existing = document.getElementById('rs-fx-pos-empty');
+    if (isPlatform()) {return;}
+    const pos = document.getElementById('pos-tab');
+    if (!pos) {return;}
+    const existing = document.getElementById('rs-fx-pos-empty');
     if (menuCount() > 0) {
-      if (existing) existing.remove();
+      if (existing) {existing.remove();}
       return;
     }
-    if (existing) return;
+    if (existing) {return;}
     injectStyles();
-    var box = document.createElement('div');
+    const box = document.createElement('div');
     box.id = 'rs-fx-pos-empty';
     box.innerHTML =
       '<div style="flex:1;min-width:180px"><div class="t">No dishes yet</div>' +
       '<div class="s">Load a sample café menu or add one item in Menu Editor — then tap to bill.</div></div>' +
       '<button type="button" class="btn btn-primary btn-sm" id="rs-fx-pos-sample"><i class="fa-solid fa-wand-magic-sparkles"></i> Sample menu</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="rs-fx-pos-editor"><i class="fa-solid fa-utensils"></i> Menu Editor</button>';
-    var toolbar = pos.querySelector('.pos-toolbar, .pos-head, .toolbar-row') || pos.firstChild;
-    if (toolbar && toolbar.parentNode) toolbar.parentNode.insertBefore(box, toolbar.nextSibling);
-    else pos.insertBefore(box, pos.firstChild);
+    const toolbar = pos.querySelector('.pos-toolbar, .pos-head, .toolbar-row') || pos.firstChild;
+    if (toolbar && toolbar.parentNode) {toolbar.parentNode.insertBefore(box, toolbar.nextSibling);}
+    else {pos.insertBefore(box, pos.firstChild);}
     box.querySelector('#rs-fx-pos-sample').onclick = function () {
       loadStartSellingPack();
     };
     box.querySelector('#rs-fx-pos-editor').onclick = function () {
-      if (global.RS && RS.activateTab) RS.activateTab('editor-tab');
+      if (global.RS && RS.activateTab) {RS.activateTab('editor-tab');}
     };
   }
 
   /* ---------- Owner WA default-on ---------- */
   async function ensureOwnerWaDefaults() {
-    if (isPlatform() || !isOwnerLike()) return;
+    if (isPlatform() || !isOwnerLike()) {return;}
     try {
       if (!global.RSOwnerWa && !global.RSOwnerReports) {
         // owner-wa-reports exposes via different names — use local cfg
       }
-      var sess = (global.RS_API && RS_API.session && RS_API.session()) || {};
-      var phone =
+      const sess = (global.RS_API && RS_API.session && RS_API.session()) || {};
+      let phone =
         String(sess.phone || sess.whatsapp || sess.owner_phone || sess.mobile || '').replace(/\D/g, '') ||
         '';
       if (!phone && global.RS_SETTINGS) {
         phone = String(global.RS_SETTINGS.set_phone || global.RS_SETTINGS.set_whatsapp || '').replace(/\D/g, '');
       }
-      if (!phone || phone.length < 10) return;
+      if (!phone || phone.length < 10) {return;}
 
-      var key = 'rs_owner_wa_reports_v1';
-      var raw = null;
+      const key = 'rs_owner_wa_reports_v1';
+      let raw = null;
       try {
         raw = localStorage.getItem(key);
       } catch (_) {}
-      var cfg = raw ? JSON.parse(raw) : null;
-      if (cfg && cfg.ownerPhone && cfg._frictionlessDefault) return;
-      if (cfg && cfg.ownerPhone && cfg.enabled === false) return; // user opted out
+      const cfg = raw ? JSON.parse(raw) : null;
+      if (cfg && cfg.ownerPhone && cfg._frictionlessDefault) {return;}
+      if (cfg && cfg.ownerPhone && cfg.enabled === false) {return;} // user opted out
 
-      var next = Object.assign(
+      const next = Object.assign(
         {
           enabled: true,
           ownerPhone: phone,
@@ -1110,7 +1110,7 @@
       } catch (_) {}
       try {
         if (global.RS_DB && RS_DB.put) {
-          var tid = sess.tenant_id || sessionStorage.getItem('tenant_id') || 'local';
+          const tid = sess.tenant_id || sessionStorage.getItem('tenant_id') || 'local';
           await RS_DB.put('owner_report_prefs', tid, Object.assign({}, next, { id: tid, tenantId: tid }));
         }
       } catch (_) {}
@@ -1121,12 +1121,12 @@
 
   /* ---------- Progressive unlock ---------- */
   function maybeProgressiveUnlock() {
-    if (isPlatform()) return;
+    if (isPlatform()) {return;}
     try {
-      if (localStorage.getItem(tenantKey(UNLOCK_KEY)) === '1') return;
+      if (localStorage.getItem(tenantKey(UNLOCK_KEY)) === '1') {return;}
     } catch (_) {}
-    var n = billCount();
-    if (n < 10) return;
+    const n = billCount();
+    if (n < 10) {return;}
     if (getMode() !== 'counter') {
       try {
         localStorage.setItem(tenantKey(UNLOCK_KEY), '1');
@@ -1165,18 +1165,18 @@
   /* ---------- Soft first shift of day (delegates to RSOps one-tap modal) ---------- */
   function maybeSoftOpenShift() {
     try {
-      if (isPlatform()) return;
-      var required = false;
+      if (isPlatform()) {return;}
+      let required = false;
       if (global.RSOps && typeof RSOps.isShiftRequired === 'function') {
         required = !!RSOps.isShiftRequired();
       } else if (typeof global.RS_featureOn === 'function') {
         required = !!global.RS_featureOn('set_require_open_shift', global.RS_SETTINGS, false);
       } else {
-        var v = (global.RS_SETTINGS || {}).set_require_open_shift;
+        const v = (global.RS_SETTINGS || {}).set_require_open_shift;
         required = v === true || v === 'true' || v === 1 || v === '1';
       }
-      if (!required) return;
-      if (global.RSOps && typeof RSOps.getOpenShift === 'function' && RSOps.getOpenShift()) return;
+      if (!required) {return;}
+      if (global.RSOps && typeof RSOps.getOpenShift === 'function' && RSOps.getOpenShift()) {return;}
       // competitive-ops maybePromptOpenShift runs on refresh; also nudge after sample pack
       try {
         sessionStorage.removeItem('rs_shift_prompted');
@@ -1193,113 +1193,23 @@
 
   /* ---------- WhatsApp gateway health (plain language) ---------- */
   function installGatewayHealthChip() {
-    if (isPlatform()) return;
-    injectStyles();
-    var styleExtra = document.getElementById(STYLE_ID);
-    if (styleExtra && styleExtra.textContent.indexOf('rs-fx-wa-health') < 0) {
-      styleExtra.textContent +=
-        '#rs-fx-wa-health{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;' +
-        'padding:5px 10px;border-radius:999px;border:1px solid var(--stroke-2);background:var(--glass);' +
-        'color:var(--text-soft);cursor:pointer;margin-left:6px}' +
-        '#rs-fx-wa-health.is-ok{color:#15803d;border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.1)}' +
-        '#rs-fx-wa-health.is-bad{color:#b91c1c;border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.1)}' +
-        '#rs-fx-wa-health.is-unk{color:#a16207;border-color:rgba(234,179,8,.35);background:rgba(234,179,8,.1)}';
-    }
-
-    function ensureChip() {
-      var host =
-        document.getElementById('tb-right') ||
-        document.querySelector('.topbar-right') ||
-        document.querySelector('.topbar-actions');
-      if (!host || document.getElementById('rs-fx-wa-health')) return document.getElementById('rs-fx-wa-health');
-      var chip = document.createElement('button');
-      chip.type = 'button';
-      chip.id = 'rs-fx-wa-health';
-      chip.className = 'is-unk';
-      chip.title = 'WhatsApp receipt status';
-      chip.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span data-l>WA…</span>';
-      chip.onclick = function () {
-        var msg =
-          chip.getAttribute('data-msg') ||
-          'WhatsApp receipts need the gateway linked. Open Settings → WhatsApp.';
-        if (global.RSModal && typeof RSModal.open === 'function') {
-          RSModal.open({
-            title: 'WhatsApp receipts',
-            icon: 'fa-brands fa-whatsapp',
-            size: 'sm',
-            body:
-              '<p style="margin:0;font-size:13.5px;line-height:1.55;color:var(--text-soft)">' +
-              msg +
-              '</p>' +
-              '<p style="margin:12px 0 0;font-size:12.5px;color:var(--text-mute)">Simple words: if this is green, bills can go to customer WhatsApp. Red means link again or check internet.</p>',
-            foot: '<button type="button" class="btn btn-primary" data-ok style="flex:1">OK</button>',
-            onMount: function (m, close) {
-              m.querySelector('[data-ok]').onclick = close;
-            },
-          });
-        } else {
-          toast(msg, 'fa-brands fa-whatsapp');
-        }
-      };
-      host.appendChild(chip);
-      return chip;
-    }
-
-    async function paint() {
-      var chip = ensureChip();
-      if (!chip) return;
-      var label = chip.querySelector('[data-l]');
-      var state = 'unk';
-      var msg = 'Checking WhatsApp connection…';
+    // Never inject a second WhatsApp control — the shell already has
+    // #tb-wa-status-btn. A duplicate "WA OK" chip crowded the topbar.
+    if (isPlatform()) {return;}
+    try {
+      const legacy = document.getElementById('rs-fx-wa-health');
+      if (legacy) {legacy.remove();}
+    } catch (_) {}
+    // Optionally refresh the single topbar WA button if the shell exposes it.
+    function paint() {
       try {
-        // Prefer topbar badge state if shell already painted it
-        var tb = document.getElementById('tb-wa-status-btn');
-        if (tb) {
-          if (tb.classList.contains('wa-linked') || tb.classList.contains('wa-platform')) {
-            state = 'ok';
-            msg = 'WhatsApp is linked. Customer receipts can send.';
-          } else if (tb.classList.contains('wa-offline') || tb.classList.contains('wa-auth-failure')) {
-            state = 'bad';
-            msg = 'WhatsApp is not connected. Open Settings → WhatsApp and scan QR / reconnect.';
-          } else if (tb.classList.contains('wa-qr') || tb.classList.contains('wa-starting') || tb.classList.contains('wa-syncing')) {
-            state = 'unk';
-            msg = 'WhatsApp is connecting or waiting for QR scan.';
-          }
-        }
-        // Optional live poll (throttled)
-        if (state === 'unk' && global.RS_API && typeof RS_API.data === 'function' && navigator.onLine !== false) {
-          var last = Number(chip.getAttribute('data-poll') || 0);
-          if (Date.now() - last > 45000) {
-            chip.setAttribute('data-poll', String(Date.now()));
-            try {
-              var res = await RS_API.data({ operation: 'gateway_status' });
-              var st = String((res && (res.status || res.state || res.connected)) || '').toLowerCase();
-              if (st === 'true' || st === 'connected' || st === 'open' || st === 'ready' || res.connected === true) {
-                state = 'ok';
-                msg = 'WhatsApp gateway is online. Receipts can send.';
-              } else if (st === 'qr' || st === 'pairing') {
-                state = 'unk';
-                msg = 'Scan WhatsApp QR in Settings to finish linking.';
-              } else if (st) {
-                state = 'bad';
-                msg = 'WhatsApp offline (' + st + '). Reconnect in Settings → WhatsApp.';
-              }
-            } catch (_) {
-              /* keep unk */
-            }
-          }
+        if (typeof global.updateTopbarWhatsAppStatus === 'function') {
+          global.updateTopbarWhatsAppStatus();
         }
       } catch (_) {}
-      chip.className = state === 'ok' ? 'is-ok' : state === 'bad' ? 'is-bad' : 'is-unk';
-      chip.setAttribute('data-msg', msg);
-      if (label) {
-        label.textContent = state === 'ok' ? 'WA OK' : state === 'bad' ? 'WA off' : 'WA…';
-      }
-      chip.title = msg;
     }
-
     paint();
-    setInterval(paint, 20000);
+    setInterval(paint, 30000);
     document.addEventListener('rs:hydrated', function () {
       setTimeout(paint, 800);
     });
@@ -1311,12 +1221,12 @@
     document.addEventListener(
       'click',
       function (ev) {
-        var a = ev.target && ev.target.closest && ev.target.closest('[data-tab="analytics-tab"]');
-        if (!a) return;
+        const a = ev.target && ev.target.closest && ev.target.closest('[data-tab="analytics-tab"]');
+        if (!a) {return;}
         setTimeout(function () {
-          var tab = document.getElementById('analytics-tab');
-          if (!tab || tab.querySelector('#rs-fx-trends-hint')) return;
-          var hint = document.createElement('div');
+          const tab = document.getElementById('analytics-tab');
+          if (!tab || tab.querySelector('#rs-fx-trends-hint')) {return;}
+          const hint = document.createElement('div');
           hint.id = 'rs-fx-trends-hint';
           hint.style.cssText =
             'margin:10px 12px;padding:12px 14px;border-radius:12px;border:1px solid var(--stroke-2);' +
@@ -1325,10 +1235,10 @@
             '<div style="flex:1;min-width:200px"><b>Trends</b> = longer history. For today\'s sales, tax &amp; accountant file use <b>Reports → CA pack</b>.</div>' +
             '<button type="button" class="btn btn-primary btn-sm" id="rs-fx-goto-reports"><i class="fa-solid fa-file-invoice"></i> Open Reports</button>';
           tab.insertBefore(hint, tab.firstChild);
-          var b = hint.querySelector('#rs-fx-goto-reports');
+          const b = hint.querySelector('#rs-fx-goto-reports');
           if (b) {
             b.onclick = function () {
-              if (global.RS && RS.activateTab) RS.activateTab('reports-tab');
+              if (global.RS && RS.activateTab) {RS.activateTab('reports-tab');}
               markActivation('reports');
             };
           }
@@ -1340,11 +1250,11 @@
 
   /* ---------- Session outlet guard (multi-tab safety) ---------- */
   function installSessionGuard() {
-    if (isPlatform()) return;
+    if (isPlatform()) {return;}
     injectStyles();
     // Pin this tab's outlet so we detect remember-blob / other-tab drift
     try {
-      var s0 = global.RS_API && RS_API.session && RS_API.session();
+      const s0 = global.RS_API && RS_API.session && RS_API.session();
       if (s0 && s0.tenant_slug) {
         sessionStorage.setItem('rs_tab_outlet_pin', String(s0.tenant_slug));
         sessionStorage.setItem('rs_tab_token_pin', String(s0.tenant_session_token || s0.session_token || s0.token || '').slice(0, 24));
@@ -1352,9 +1262,9 @@
     } catch (_) {}
 
     function showGuard(tabSlug, blobSlug) {
-      if (sessionStorage.getItem(SESSION_GUARD_KEY) === '1') return;
-      if (document.getElementById('rs-fx-guard')) return;
-      var bar = document.createElement('div');
+      if (sessionStorage.getItem(SESSION_GUARD_KEY) === '1') {return;}
+      if (document.getElementById('rs-fx-guard')) {return;}
+      const bar = document.createElement('div');
       bar.id = 'rs-fx-guard';
       bar.innerHTML =
         '<span><i class="fa-solid fa-triangle-exclamation"></i> This tab is <b>' +
@@ -1378,29 +1288,29 @@
 
     function check() {
       try {
-        var sess = global.RS_API && RS_API.session && RS_API.session();
-        if (!sess || !sess.tenant_slug) return;
-        var tabSlug = String(sess.tenant_slug || sessionStorage.getItem('tenant_slug') || '');
-        var pin = sessionStorage.getItem('rs_tab_outlet_pin') || tabSlug;
+        const sess = global.RS_API && RS_API.session && RS_API.session();
+        if (!sess || !sess.tenant_slug) {return;}
+        const tabSlug = String(sess.tenant_slug || sessionStorage.getItem('tenant_slug') || '');
+        const pin = sessionStorage.getItem('rs_tab_outlet_pin') || tabSlug;
         // Session in this tab mutated unexpectedly (another script wrote sessionStorage)
         if (pin && tabSlug && pin !== tabSlug) {
           showGuard(tabSlug, pin + ' (was)');
           return;
         }
-        var blobRaw = null;
+        let blobRaw = null;
         try {
           blobRaw = localStorage.getItem('rs_remembered_session_v1');
         } catch (_) {}
         if (!blobRaw) {
-          var g0 = document.getElementById('rs-fx-guard');
-          if (g0 && !sessionStorage.getItem(SESSION_GUARD_KEY)) g0.remove();
+          const g0 = document.getElementById('rs-fx-guard');
+          if (g0 && !sessionStorage.getItem(SESSION_GUARD_KEY)) {g0.remove();}
           return;
         }
-        var blob = JSON.parse(blobRaw);
-        var blobSlug = String((blob && (blob.tenant_slug || blob.slug)) || '');
+        const blob = JSON.parse(blobRaw);
+        const blobSlug = String((blob && (blob.tenant_slug || blob.slug)) || '');
         if (!blobSlug || !tabSlug || blobSlug === tabSlug) {
-          var g = document.getElementById('rs-fx-guard');
-          if (g) g.remove();
+          const g = document.getElementById('rs-fx-guard');
+          if (g) {g.remove();}
           return;
         }
         showGuard(tabSlug, blobSlug);
@@ -1409,7 +1319,7 @@
     check();
     setInterval(check, 5000);
     window.addEventListener('storage', function (e) {
-      if (e && (e.key === 'rs_remembered_session_v1' || (e.key && e.key.indexOf('tenant') >= 0))) check();
+      if (e && (e.key === 'rs_remembered_session_v1' || (e.key && e.key.indexOf('tenant') >= 0))) {check();}
     });
   }
 
@@ -1417,15 +1327,15 @@
   function downloadCaPack() {
     try {
       // Trigger GSTR if present
-      var gstr = document.getElementById('btn-download-gstr');
-      if (gstr) gstr.click();
+      const gstr = document.getElementById('btn-download-gstr');
+      if (gstr) {gstr.click();}
       // Day pack if available
       setTimeout(function () {
         try {
-          if (typeof global.RS_exportDayPack === 'function') global.RS_exportDayPack();
+          if (typeof global.RS_exportDayPack === 'function') {global.RS_exportDayPack();}
           else {
-            var day = document.getElementById('rs-day-pack');
-            if (day) day.click();
+            const day = document.getElementById('rs-day-pack');
+            if (day) {day.click();}
           }
         } catch (_) {}
       }, 400);
@@ -1433,16 +1343,16 @@
       toast('CA pack: GSTR CSV + day sales export', 'fa-file-zipper');
     } catch (e) {
       toast('Open Reports, then use Download GSTR CSV', 'fa-circle-info');
-      if (global.RS && RS.activateTab) RS.activateTab('reports-tab');
+      if (global.RS && RS.activateTab) {RS.activateTab('reports-tab');}
     }
   }
 
   function injectCaPackOnReports() {
-    var tab = document.getElementById('reports-tab');
-    if (!tab || tab.querySelector('#rs-fx-ca-pack')) return;
-    var toolbar = tab.querySelector('.toolbar-row');
-    if (!toolbar) return;
-    var btn = document.createElement('button');
+    const tab = document.getElementById('reports-tab');
+    if (!tab || tab.querySelector('#rs-fx-ca-pack')) {return;}
+    const toolbar = tab.querySelector('.toolbar-row');
+    if (!toolbar) {return;}
+    const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'rs-fx-ca-pack';
     btn.className = 'btn btn-primary btn-sm';
@@ -1464,9 +1374,9 @@
       maybeProgressiveUnlock();
     });
     // Poll bills length lightly after hydrate
-    var last = billCount();
+    let last = billCount();
     setInterval(function () {
-      var n = billCount();
+      const n = billCount();
       if (n > last) {
         last = n;
         markActivation('firstBill');
@@ -1483,7 +1393,7 @@
         sessionStorage.setItem('rs_learn_mode', '1');
       } catch (_) {}
     }
-    var steps = [
+    const steps = [
       'Open POS and confirm dishes appear',
       'Add 1–2 items and complete a Cash or UPI bill',
       'Open Bills history and find that bill',
@@ -1505,7 +1415,7 @@
         onMount: function (modal, close) {
           modal.querySelector('[data-ok]').onclick = function () {
             close();
-            if (global.RS && RS.activateTab) RS.activateTab('pos-tab');
+            if (global.RS && RS.activateTab) {RS.activateTab('pos-tab');}
           };
         },
       });
@@ -1515,10 +1425,10 @@
   }
 
   function injectLearnEntry() {
-    if (isPlatform() || !isOwnerLike()) return;
-    var help = document.getElementById('open-product-guide-btn');
-    if (!help || document.getElementById('rs-fx-learn')) return;
-    var btn = document.createElement('button');
+    if (isPlatform() || !isOwnerLike()) {return;}
+    const help = document.getElementById('open-product-guide-btn');
+    if (!help || document.getElementById('rs-fx-learn')) {return;}
+    const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'sb-foot-btn';
     btn.id = 'rs-fx-learn';
@@ -1533,7 +1443,7 @@
 
   /* ---------- Boot ---------- */
   function boot() {
-    if (isPlatform()) return;
+    if (isPlatform()) {return;}
     injectStyles();
     applyModeNav();
     paintModeSwitcher();
@@ -1575,8 +1485,8 @@
   global.RS_exportDayPack =
     global.RS_exportDayPack ||
     function () {
-      var b = document.getElementById('rs-day-pack');
-      if (b) b.click();
+      const b = document.getElementById('rs-day-pack');
+      if (b) {b.click();}
     };
 
   function onReady() {
@@ -1615,7 +1525,7 @@
     paintModeSwitcher();
   });
   // When reports tab painted
-  var mo;
+  let mo;
   try {
     mo = new MutationObserver(function () {
       injectCaPackOnReports();

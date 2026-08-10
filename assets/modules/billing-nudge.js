@@ -8,9 +8,9 @@
 (function (root) {
   'use strict';
 
-  var STYLE_ID = 'rs-billing-nudge-style';
-  var MODAL_ID = 'rs-billing-nudge-modal';
-  var DAY_KEY = 'rs_billing_nudge_day';
+  const STYLE_ID = 'rs-billing-nudge-style';
+  const MODAL_ID = 'rs-billing-nudge-modal';
+  const DAY_KEY = 'rs_billing_nudge_day';
 
   function sess() {
     try {
@@ -21,17 +21,17 @@
   }
 
   function planLabel(code) {
-    var c = String(code || '').toLowerCase();
-    if (c === 'express' || c === 'starter') return 'Express';
-    if (c === 'serve' || c === 'growth') return 'Serve';
-    if (c === 'command' || c === 'enterprise') return 'Command';
+    const c = String(code || '').toLowerCase();
+    if (c === 'express' || c === 'starter') {return 'Express';}
+    if (c === 'serve' || c === 'growth') {return 'Serve';}
+    if (c === 'command' || c === 'enterprise') {return 'Command';}
     return code || 'plan';
   }
 
   function daysLeft(iso) {
-    if (!iso) return null;
-    var end = new Date(iso).getTime();
-    if (!Number.isFinite(end)) return null;
+    if (!iso) {return null;}
+    const end = new Date(iso).getTime();
+    if (!Number.isFinite(end)) {return null;}
     return Math.ceil((end - Date.now()) / 86400000);
   }
 
@@ -48,8 +48,8 @@
   }
 
   function injectStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    var s = document.createElement('style');
+    if (document.getElementById(STYLE_ID)) {return;}
+    const s = document.createElement('style');
     s.id = STYLE_ID;
     s.textContent =
       '#' + MODAL_ID + '{position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;' +
@@ -71,19 +71,19 @@
     try {
       location.hash = '#settings';
       setTimeout(function () {
-        var tab = document.querySelector('[data-settings-panel="plan"], #rs-plan-container, [data-panel="plan"]');
-        if (tab && tab.click) tab.click();
-        var btn = document.querySelector('[data-set-nav="plan"], button[data-panel="plan"]');
-        if (btn) btn.click();
+        const tab = document.querySelector('[data-settings-panel="plan"], #rs-plan-container, [data-panel="plan"]');
+        if (tab && tab.click) {tab.click();}
+        const btn = document.querySelector('[data-set-nav="plan"], button[data-panel="plan"]');
+        if (btn) {btn.click();}
         document.dispatchEvent(new CustomEvent('rs:open-plan-panel'));
       }, 200);
     } catch (_) {}
   }
 
   function closeModal(force) {
-    var el = document.getElementById(MODAL_ID);
-    if (!el) return;
-    if (el.getAttribute('data-blocking') === '1' && !force) return;
+    const el = document.getElementById(MODAL_ID);
+    if (!el) {return;}
+    if (el.getAttribute('data-blocking') === '1' && !force) {return;}
     try { el.remove(); } catch (_) {}
   }
 
@@ -91,13 +91,13 @@
     opts = opts || {};
     injectStyles();
     closeModal(true);
-    var blocking = !!opts.blocking;
-    var wrap = document.createElement('div');
+    const blocking = !!opts.blocking;
+    const wrap = document.createElement('div');
     wrap.id = MODAL_ID;
     wrap.setAttribute('role', 'dialog');
     wrap.setAttribute('aria-modal', 'true');
     wrap.setAttribute('data-blocking', blocking ? '1' : '0');
-    var chipClass = blocking ? 'rs-bn-chip danger' : 'rs-bn-chip';
+    const chipClass = blocking ? 'rs-bn-chip danger' : 'rs-bn-chip';
     wrap.innerHTML =
       '<div class="rs-bn-card">' +
       '<div class="' + chipClass + '"><i class="fa-solid fa-' + (blocking ? 'lock' : 'bell') + '"></i> ' +
@@ -122,7 +122,7 @@
       closeModal(true);
       goToPlans();
     };
-    var later = wrap.querySelector('#rs-bn-later');
+    const later = wrap.querySelector('#rs-bn-later');
     if (later) {
       later.onclick = function () {
         try {
@@ -153,8 +153,8 @@
 
   async function refreshFromServer() {
     try {
-      if (!root.RS_API || typeof RS_API.getPlans !== 'function') return null;
-      var data = await RS_API.getPlans();
+      if (!root.RS_API || typeof RS_API.getPlans !== 'function') {return null;}
+      const data = await RS_API.getPlans();
       return data && data.current ? data.current : null;
     } catch (_) {
       return null;
@@ -162,17 +162,17 @@
   }
 
   async function run() {
-    var s = sess();
-    if (!s || !s.session_token) return;
-    if (s.role === 'superadmin') return;
+    const s = sess();
+    if (!s || !s.session_token) {return;}
+    if (s.role === 'superadmin') {return;}
 
-    var current = {
+    const current = {
       plan_code: s.plan_code || 'serve',
       subscription_status: s.subscription_status || 'active',
       subscription_current_period_end: s.subscription_current_period_end || null,
     };
 
-    var remote = await refreshFromServer();
+    const remote = await refreshFromServer();
     if (remote) {
       current.plan_code = remote.plan_code || current.plan_code;
       current.subscription_status = remote.subscription_status || current.subscription_status;
@@ -188,10 +188,10 @@
       } catch (_) {}
     }
 
-    var status = String(current.subscription_status || '').toLowerCase();
-    var end = current.subscription_current_period_end;
-    var dLeft = daysLeft(end);
-    var expired =
+    const status = String(current.subscription_status || '').toLowerCase();
+    const end = current.subscription_current_period_end;
+    const dLeft = daysLeft(end);
+    const expired =
       status === 'expired' ||
       status === 'canceled' ||
       status === 'cancelled' ||
@@ -211,10 +211,10 @@
       return;
     }
 
-    if (dLeft === null || dLeft > 3) return;
-    if (alreadyNudgedToday()) return;
+    if (dLeft === null || dLeft > 3) {return;}
+    if (alreadyNudgedToday()) {return;}
 
-    var isTrial = status === 'trialing';
+    const isTrial = status === 'trialing';
     showModal({
       blocking: false,
       days: dLeft,

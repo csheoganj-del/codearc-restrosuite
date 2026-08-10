@@ -15,6 +15,14 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
   isDesktop: true,
   platform: process.platform,
   isNativeApp: true,
+  /** Desktop installer version (e.g. 2.0.26) — plain "App" version for owners */
+  appVersion: (() => {
+    try {
+      return String(require('./package.json').version || '');
+    } catch (_) {
+      return '';
+    }
+  })(),
   versions: {
     electron: process.versions.electron,
     chrome: process.versions.chrome,
@@ -25,6 +33,9 @@ contextBridge.exposeInMainWorld('RS_DESKTOP', {
   // Wave 4 — silent / thermal print bridge
   listPrinters: () => ipcRenderer.invoke('rs-list-printers'),
   printHtml: (html, opts) => ipcRenderer.invoke('rs-print-html', { html, ...(opts || {}) }),
+  /** Open receipt HTML in real Chrome/Edge (auto-print). Avoids black POS58 from Electron. */
+  openReceiptInBrowser: (html, opts) =>
+    ipcRenderer.invoke('rs-open-receipt-browser', { html, ...(opts || {}) }),
   printEscPos: (payload) => ipcRenderer.invoke('rs-print-escpos', payload || {}),
   getPreferredPrinter: () => ipcRenderer.invoke('rs-get-preferred-printer'),
   setPreferredPrinter: (name) => ipcRenderer.invoke('rs-set-preferred-printer', name),
@@ -59,4 +70,9 @@ contextBridge.exposeInMainWorld('rsDesktop', {
   recheckLicense: () => ipcRenderer.invoke('rs-license-recheck'),
   listPrinters: () => ipcRenderer.invoke('rs-list-printers'),
   printHtml: (html, opts) => ipcRenderer.invoke('rs-print-html', { html, ...(opts || {}) }),
+  openReceiptInBrowser: (html, opts) =>
+    ipcRenderer.invoke('rs-open-receipt-browser', { html, ...(opts || {}) }),
+  printEscPos: (payload) => ipcRenderer.invoke('rs-print-escpos', payload || {}),
+  getPreferredPrinter: () => ipcRenderer.invoke('rs-get-preferred-printer'),
+  setPreferredPrinter: (name) => ipcRenderer.invoke('rs-set-preferred-printer', name),
 });

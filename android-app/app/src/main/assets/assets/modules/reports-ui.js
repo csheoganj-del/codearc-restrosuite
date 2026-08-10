@@ -37,12 +37,12 @@
     let sum = 0;
     let maxT = 0;
     (bills || []).forEach((b) => {
-      if (!b || b.status !== 'paid') return;
+      if (!b || b.status !== 'paid') {return;}
       const t = b.dateTime ? new Date(b.dateTime).getTime() : (b.time ? new Date(b.time).getTime() : 0);
-      if (t < cutoff) return;
+      if (t < cutoff) {return;}
       count += 1;
       sum += Number(b.amount != null ? b.amount : b.total) || 0;
-      if (t > maxT) maxT = t;
+      if (t > maxT) {maxT = t;}
     });
     return period + '|' + count + '|' + Math.round(sum * 100) + '|' + maxT + '|' + (bills || []).length;
   }
@@ -58,7 +58,6 @@
   const days = period==='Today'?1:period==='This week'?7:period==='This month'?30:period==='Last 90 days'?90:30;
   const now = Date.now();
   const cutoff = now - days * 86400000;
-  const todayStart = (function(){ const d=new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
 
   const localFp = billsFingerprint(BILLS, period, days);
   const alreadyPainted = !!(tabEl && tabEl.querySelector('.stat-card, .report-grid, #chart-revenue'));
@@ -104,11 +103,11 @@
     // Silent fallback — do not beep on every background refresh
     console.warn('[Reports] sales_summary unavailable, using local bills', e && e.message);
   } finally {
-    if (_inFlight) _inFlight = null;
+    if (_inFlight) {_inFlight = null;}
   }
 
   // A newer render started while we awaited — drop this stale paint
-  if (seq !== _renderSeq) return;
+  if (seq !== _renderSeq) {return;}
 
   const paidBills = BILLS.filter(b => {
     if (b.status !== 'paid') {return false;}
@@ -201,7 +200,6 @@
   const payTotal = Object.values(payMap).reduce((a,v)=>a+v,0)||1;
   const payColors = {Cash:'var(--green)',UPI:'var(--violet)',Card:'var(--orange)',Due:'var(--red)',Stripe:'var(--blue-soft)',Online:'var(--violet-soft)'};
   const payEntries = Object.entries(payMap).sort((a,b)=>b[1]-a[1]);
-  const acc=0;
   const payMix = payEntries.map(([name,val])=>{
     const pct=Math.round(val/payTotal*100);
     return [name,pct,payColors[name]||'var(--amber)'];
@@ -382,9 +380,9 @@
         }
       } catch (_) {}
       const g = document.getElementById('btn-download-gstr');
-      if (g) g.click();
+      if (g) {g.click();}
       try {
-        if (window.RSFrictionless && RSFrictionless.markActivation) RSFrictionless.markActivation('reports');
+        if (window.RSFrictionless && RSFrictionless.markActivation) {RSFrictionless.markActivation('reports');}
       } catch (_) {}
     };
   }
@@ -392,7 +390,7 @@
   if (trendsBtn) {
     trendsBtn.onclick = () => {
       try {
-        if (global.RS && typeof RS.activateTab === 'function') RS.activateTab('analytics-tab');
+        if (global.RS && typeof RS.activateTab === 'function') {RS.activateTab('analytics-tab');}
       } catch (_) {}
     };
   }

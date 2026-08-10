@@ -1,0 +1,17 @@
+{
+  "BASE": "https://restrosuite.codearc.co.in",
+  "SLUG": "humanaudit56279364",
+  "NAME": "Human Audit Cafe",
+  "OWNER": "Audit Owner",
+  "EMAIL": "humanaudit279364@codearc.test",
+  "PASS": "AuditTest99!",
+  "PHONE": "6377404756",
+  "otpStep": true,
+  "phoneEcho": "+91 6377404756",
+  "err": null,
+  "otpHttp": {
+    "status": 200,
+    "body": "{\"sent\":true,\"challenge_id\":\"04b79bcd-dbeb-44f5-b1f9-c11d7d157a73\",\"expires_at\":\"2026-08-02T07:48:10.311Z\"}"
+  },
+  "at": "2026-08-02T07:38:44.496Z"
+}

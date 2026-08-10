@@ -10,12 +10,6 @@
   let _loaded = false;
   let _loadPromise = null;
 
-  function toast(msg, icon) {
-    if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
-  }
-  function getInventory() {
-    return (global.RS && RS.INVENTORY) || [];
-  }
   function startOfDay(d) {
     const x = new Date(d);
     x.setHours(0, 0, 0, 0);
@@ -172,7 +166,6 @@
     const need = Math.max(0, Number(qty) || 0);
     if (!item || !(need > 0)) {return { deducted: 0, remaining: need, batchesTouched: [] };}
     await loadBatches();
-    const today = startOfDay(new Date()).getTime();
     // Prefer batches with earliest expiry; undated batches last; expired still usable but first
     const mine = _batches
       .filter((b) => matchBatchToItem(b, item) && Number(b.qty) > 0)

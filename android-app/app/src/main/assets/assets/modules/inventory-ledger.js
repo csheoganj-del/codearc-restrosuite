@@ -173,7 +173,9 @@
       return;
     }
 
-    let { lines, noRecipeCount } = buildLines(items, MENU);
+    const built = buildLines(items, MENU);
+    let lines = built.lines;
+    const noRecipeCount = built.noRecipeCount;
     const packMerge = appendTakeawayPackLines(lines, billRow);
     lines = packMerge.lines;
     const packCount = packMerge.packCount || 0;

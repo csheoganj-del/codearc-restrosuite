@@ -38,12 +38,6 @@
 
   function isoDate(d) { return new Date(d).toISOString().slice(0, 10); }
 
-  function startOfDay(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-
   function daysAgo(n) {
     const d = new Date();
     d.setDate(d.getDate() - n);
@@ -317,8 +311,6 @@
         fetchEmployees(),
         fetchAttendance(targetMonth + '-01')
       ]);
-
-      const empMap = Object.fromEntries(employees.map((e) => [e.id, e]));
 
       const filtered = attendance.filter((a) => {
         return (a.date || '').startsWith(targetMonth);

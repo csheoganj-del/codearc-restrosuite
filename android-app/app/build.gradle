@@ -89,7 +89,11 @@ task forceCleanDexIntermediates {
             "${buildDir}/intermediates/merged_res",
             "${buildDir}/intermediates/merged_res_blame_folder",
             "${buildDir}/intermediates/incremental/debug/mergeDebugResources",
-            "${buildDir}/intermediates/incremental/packageDebugResources",
+            "${buildDir}/intermediates/incremental/release/mergeReleaseResources",
+            "${buildDir}/intermediates/merged-not-compiled-resources/debug",
+            "${buildDir}/intermediates/merged-not-compiled-resources/release",
+            "${buildDir}/intermediates/incremental/debug/packageDebugResources",
+            "${buildDir}/intermediates/incremental/release/packageReleaseResources",
         ]
         targets.each { path ->
             if (file(path).exists()) {

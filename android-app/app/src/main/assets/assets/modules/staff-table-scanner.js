@@ -548,7 +548,7 @@
         s.src = src;
         s.async = true;
         s.onload = function () {
-          console.log('[StaffScan] jsQR loaded from', src);
+          console.info('[StaffScan] jsQR loaded from', src);
           resolve(!!global.jsQR);
         };
         s.onerror = function () {
@@ -647,7 +647,7 @@
           });
         }
         opened = true;
-        console.log('[StaffScan] camera ok with constraints', attempts[i]);
+        console.info('[StaffScan] camera ok with constraints', attempts[i]);
         break;
       } catch (e) {
         lastErr = e;

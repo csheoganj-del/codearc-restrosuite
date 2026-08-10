@@ -731,15 +731,32 @@ async function checkContentUpdate(opts) {
     ).trim();
     const stForStamp = readState() || {};
     const localStamp = String(stForStamp.contentStamp || stForStamp.buildId || '').trim();
-    const stampNewer = !!(remoteStamp && remoteStamp !== localStamp && remoteRank >= localRank);
+    // Also parse YYYYMMDD from version string (v280-20260808-slug) so a
+    // same-or-higher calendar date can win even if major temporarily regressed
+    // on a bad deploy (user had v259 while production briefly published v254).
+    function dateRank(v) {
+      const m = String(v || '').match(/v\d+-(\d{8})/i);
+      return m ? Number(m[1]) : 0;
+    }
+    const localDate = dateRank(localVer);
+    const remoteDate = dateRank(remoteVer);
+    const dateAllows =
+      !localDate || !remoteDate || remoteDate >= localDate;
+    const stampNewer = !!(
+      remoteStamp &&
+      remoteStamp !== localStamp &&
+      (remoteRank >= localRank || (dateAllows && remoteRank + 50 >= localRank))
+    );
 
     // Need update when:
     //  - remote version string differs and is not older (by vNNN), OR
     //  - remote contentStamp/buildId differs (auto-deploy fingerprint)
-    // Never re-prompt for an *older* remote major after a reinstall.
+    // Never re-prompt for a clearly *older* remote major after a reinstall
+    // unless the calendar date is newer (handles major-number regressions).
     const needsUpdate =
       options.force ||
       (remoteVer !== localVer && remoteRank >= localRank) ||
+      (remoteVer !== localVer && remoteDate > localDate) ||
       stampNewer;
 
     if (!options.force && !needsUpdate) {

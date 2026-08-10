@@ -223,7 +223,7 @@
       }
       return;
     }
-    const modal = RSModal.open({
+    RSModal.open({
       title: `Set role -- ${emp.name}`,
       icon: 'fa-user-gear',
       body,
@@ -343,7 +343,6 @@
     const loginBtn = grid.querySelector('#emp-goto-logins');
     if (loginBtn) {
       loginBtn.onclick = () => {
-        const seg = document.querySelector('#employees-tab .seg button');
         const loginSeg = Array.from(document.querySelectorAll('#employees-tab .seg button'))
           .find(b => /login/i.test(b.textContent || ''));
         if (loginSeg) {loginSeg.click();}

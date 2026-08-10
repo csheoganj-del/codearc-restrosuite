@@ -174,7 +174,7 @@ async function seedTenantData(supabaseAdmin, tenantId) {
   }
 
   // 2. Clear existing operational data first
-  const resetRes = await resetTenantData(supabaseAdmin, tenantId);
+  await resetTenantData(supabaseAdmin, tenantId);
 
   // 3. Seed doppio_business_profile
   await supabaseAdmin.from('doppio_business_profile').insert({

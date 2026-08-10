@@ -10,13 +10,6 @@
   function toast(msg, icon) {
     if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
   }
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
   function rs(n) {
     if (global.RS && typeof RS.rs === 'function') {return RS.rs(n);}
     return '₹' + (Number(n) || 0).toLocaleString('en-IN');

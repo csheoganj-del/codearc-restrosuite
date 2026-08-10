@@ -38,6 +38,8 @@
     [data-rs-receipt-export] .rcp-qr-wrap img {
       width: 110px !important; height: 110px !important; display: block !important;
       margin: 0 auto !important; float: none !important;
+      /* Width-adaptive: stays 110px on normal paper, scales down on narrow strips */
+      max-width: 62% !important; max-height: 62% !important;
     }
     [data-rs-receipt-export] .rcp-qr-label {
       font-size: 10px !important; color: #6b6960 !important; margin-top: 6px !important;
@@ -55,7 +57,7 @@
         <tr>
           <td align="center" valign="middle" style="width:100%;text-align:center;padding:12px 0 0;margin:0;">
             <img src="${src}" width="110" height="110" alt="Digital bill QR" crossorigin="anonymous"
-              style="display:block;margin:0 auto;width:110px;height:110px;max-width:110px;border:0;float:none;" />
+              style="display:block;margin:0 auto;width:110px;height:auto;max-width:62%;border:0;float:none;" />
             <div class="rcp-qr-label" style="display:block;width:100%;text-align:center;font-size:10px;color:#6b6960;margin:6px 0 0;line-height:1.3;">
               Scan to view digital bill
             </div>
@@ -67,6 +69,35 @@
   function esc(v) {
     return String(v == null ? '' : v).replace(/[&<>"']/g, (ch) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  }
+
+  /**
+   * Parse a stored bill timestamp into a Date.
+   *
+   * Older bills stored time as a year-less locale string ("09 Aug, 2:14 pm").
+   * `new Date("09 Aug, 2:14 pm")` resolves to the year 2001 in V8, so every
+   * receipt printed "09 Aug, 2001". Detect the year-less pattern and patch the
+   * current year before parsing so legacy bills render the right year too.
+   */
+  function parseBillTime(str) {
+    let s = String(str == null ? '' : str).trim();
+    if (!s) return null;
+    // "09 Aug, 2:14 pm" / "09 Aug 2:14 pm" (no 4-digit year token)
+    if (!/\b\d{4}\b/.test(s) && /^\d{1,2} [A-Za-z]{3,9},? \d{1,2}:\d{2}(:\d{2})?( ?[AP]M)?$/i.test(s)) {
+      s = s + ', ' + new Date().getFullYear();
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  /** Human-friendly "09 Aug 2026, 2:14 pm" from any stored bill timestamp. */
+  function formatBillTime(str) {
+    const d = parseBillTime(str);
+    if (!d) return String(str == null ? '' : str);
+    return d.toLocaleString(undefined, {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
   }
 
   function money(n, rsFn) {
@@ -209,8 +240,8 @@
     // Human-readable time (avoid raw ISO flash / ugly Z timestamps)
     let timeDisp = m.time || '';
     try {
-      const d = new Date(m.time);
-      if (!isNaN(d.getTime())) {
+      const d = parseBillTime(m.time);
+      if (d) {
         timeDisp = d.toLocaleString(undefined, {
           day: '2-digit', month: 'short', year: 'numeric',
           hour: '2-digit', minute: '2-digit',
@@ -321,7 +352,7 @@
       outlet.phone ? `Phone: ${outlet.phone}` : '',
       (tax.tax_registration_no || outlet.gstin) ? `${tax.tax_system || 'GST'} No: ${tax.tax_registration_no || outlet.gstin}` : '',
       `Bill: ${m.no}`,
-      `${m.table} | ${m.time}`,
+      `${m.table} | ${formatBillTime(m.time)}`,
       m.covers ? `Covers: ${m.covers}` : '',
       m.customer && m.customer !== 'Walk-in' ? `Customer: ${m.customer}` : '',
       m.customerPhone ? `Phone: ${m.customerPhone}` : '',
@@ -413,9 +444,29 @@
   }
 
   /** Preload PDF libs after login so first WhatsApp send is fast. */
+  /**
+   * Skip the eager PDF-lib preload on slow connections / data-saver.
+   * jsPDF + html2canvas are ~650 KB combined; downloading and parsing them
+   * on every dashboard load hurts POS terminals on mobile data even though
+   * most sessions never export a PDF. They still lazy-load on demand at
+   * export time (ensureJsPDF / ensureHtml2Canvas), so nothing breaks.
+   */
+  function shouldPreloadPdfLibs() {
+    try {
+      const c = global.navigator && global.navigator.connection;
+      if (!c) return true;
+      if (c.saveData) return false;
+      const et = String(c.effectiveType || '');
+      return !/^(slow-2g|2g|3g)$/.test(et);
+    } catch (_) {
+      return true;
+    }
+  }
+
   function preload() {
     if (libsPreloaded || typeof document === 'undefined') return;
     libsPreloaded = true;
+    if (!shouldPreloadPdfLibs()) return;
     const run = () => {
       ensureJsPDF().catch(() => {});
       ensureHtml2Canvas().catch(() => {});
@@ -478,13 +529,13 @@
     });
   }
 
-  function cacheKey(bill) {
+  function cacheKey(bill, mode) {
     const m = normalizeBill(bill);
-    return String(m.no || '') + '|' + String(m.grand) + '|' + String((m.items || []).length);
+    return String(mode || '') + '|' + String(m.no || '') + '|' + String(m.grand) + '|' + String((m.items || []).length);
   }
 
-  function getCachedPdf(bill) {
-    const key = cacheKey(bill);
+  function getCachedPdf(bill, mode) {
+    const key = cacheKey(bill, mode);
     const hit = PDF_CACHE.get(key);
     if (!hit) return null;
     if (Date.now() - hit.at > PDF_CACHE_TTL_MS) {
@@ -494,8 +545,8 @@
     return hit.dataUri;
   }
 
-  function setCachedPdf(bill, dataUri) {
-    PDF_CACHE.set(cacheKey(bill), { dataUri, at: Date.now() });
+  function setCachedPdf(bill, dataUri, mode) {
+    PDF_CACHE.set(cacheKey(bill, mode), { dataUri, at: Date.now() });
     // Cap cache size
     if (PDF_CACHE.size > 30) {
       const first = PDF_CACHE.keys().next().value;
@@ -508,13 +559,25 @@
    */
   async function toPDF(bill, opts) {
     const options = opts || {};
-    const preferThermal = options.mode === 'thermal'
-      || (global.RS_SETTINGS && (global.RS_SETTINGS.set_wa_thermal_pdf === true || global.RS_SETTINGS.set_wa_thermal_pdf === 'true' || global.RS_SETTINGS.set_receipt_pdf_mode === 'thermal'));
+    // Lightweight 88mm thermal PDF (pure-vector jsPDF) is the DEFAULT: the
+    // html2canvas pixel capture produces ~2-3 MB per receipt, which makes
+    // WhatsApp bill sends slow and data-heavy. Opt back into the pixel-perfect
+    // preview PDF with mode 'preview'/'html' or settings set_wa_thermal_pdf=false
+    // / set_receipt_pdf_mode='preview'.
+    let preferThermal = true;
+    try {
+      const settings = global.RS_SETTINGS || {};
+      if (settings.set_wa_thermal_pdf === false || settings.set_wa_thermal_pdf === 'false') preferThermal = false;
+      const pdfMode = String(settings.set_receipt_pdf_mode || '').toLowerCase();
+      if (pdfMode === 'preview' || pdfMode === 'html') preferThermal = false;
+    } catch (_) {}
+    if (options.mode === 'preview' || options.mode === 'html') preferThermal = false;
+    if (options.mode === 'thermal') preferThermal = true;
     if (preferThermal && global.RS && typeof global.RS.compileThermalPDF === 'function') {
       try {
         const thermal = await global.RS.compileThermalPDF(bill);
         if (thermal) {
-          setCachedPdf(bill, thermal);
+          setCachedPdf(bill, thermal, 'thermal');
           return thermal;
         }
       } catch (e) {
@@ -522,7 +585,7 @@
       }
     }
     if (!options.skipCache) {
-      const cached = getCachedPdf(bill);
+      const cached = getCachedPdf(bill, preferThermal ? 'thermal' : 'preview');
       if (cached) return cached;
     }
     const { jsPDF } = await ensureJsPDF();
@@ -566,7 +629,7 @@
       doc.rect(0, 0, pageWmm, pageHmm, 'F');
       doc.addImage(img, 'PNG', 0, 0, pageWmm, pageHmm);
       const dataUri = doc.output('datauristring');
-      setCachedPdf(bill, dataUri);
+      setCachedPdf(bill, dataUri, preferThermal ? 'thermal' : 'preview');
       return dataUri;
     } finally {
       if (host.parentNode) host.parentNode.removeChild(host);

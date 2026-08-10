@@ -108,16 +108,16 @@ const success = JSON.parse(
 
   const pos = await page.evaluate(async () => {
     const tiles = document.querySelectorAll('.menu-item-card, .pos-item, [data-menu-id]');
-    if (tiles[0]) tiles[0].click();
-    await new Promise((res) => setTimeout(res, 400));
-    if (tiles[1]) tiles[1].click();
-    await new Promise((res) => setTimeout(res, 400));
+    if (tiles[0]) {tiles[0].click();}
+    await new Promise((res) => { setTimeout(res, 400); });
+    if (tiles[1]) {tiles[1].click();}
+    await new Promise((res) => { setTimeout(res, 400); });
     const exact = Array.from(document.querySelectorAll('button')).find((b) =>
       /exact/i.test(b.textContent || '')
     );
-    if (exact) exact.click();
+    if (exact) {exact.click();}
     const cash = document.querySelector('[data-pay-method="Cash"]');
-    if (cash) cash.click();
+    if (cash) {cash.click();}
     const cartText = (document.querySelector('#cart-items') || {}).innerText || '';
     const totalEl = document.querySelector(
       '#cart-total, .cart-total, .pos-total, #grand-total'

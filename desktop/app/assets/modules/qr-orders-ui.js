@@ -388,9 +388,9 @@
           document.getElementById('pos-menu-order-types');
         if (ot) {
           const dine = ot.querySelector('[data-type="dine-in"], [data-order-type="dine-in"], button[value="dine-in"]');
-          if (dine && dine.click) dine.click();
+          if (dine && dine.click) {dine.click();}
         }
-        if (window.RS && typeof RS.setOrderType === 'function') RS.setOrderType('dine-in');
+        if (window.RS && typeof RS.setOrderType === 'function') {RS.setOrderType('dine-in');}
       } catch (_) {}
     };
 
@@ -460,7 +460,7 @@
   }
 
   async function markTableOccupiedForBill(tableName, order) {
-    if (!tableName || !window.RS_DB || typeof RS_DB.getSettings !== 'function') return;
+    if (!tableName || !window.RS_DB || typeof RS_DB.getSettings !== 'function') {return;}
     try {
       const settings = (await RS_DB.getSettings()) || {};
       const tables = Array.isArray(settings.custom_tables) ? settings.custom_tables.slice() : null;
@@ -481,7 +481,6 @@
           (Number.isFinite(want) && dig(label) === want);
         if (match) {
           t.state = 'billed';
-          t.qrOpen = t.qrOpen;
           t.billingOrderId = order && (order.id || order.orderId) || null;
           changed = true;
         }
@@ -618,7 +617,6 @@
           </div>
           ${sortedIdx
             .map(({ o, i }) => {
-              const mins = ageMinutes(o);
               const itemSummary = (o.items || [])
                 .slice(0, 3)
                 .map((it) => qrItemLabel(it))
@@ -904,7 +902,7 @@
   window.addEventListener('rs:db-sync', (ev) => {
     try {
       const c = ev && ev.detail && ev.detail.collection;
-      if (c === 'pending_orders' || !c) renderQR();
+      if (c === 'pending_orders' || !c) {renderQR();}
     } catch (_) {}
   });
 })(typeof window !== 'undefined' ? window : globalThis);

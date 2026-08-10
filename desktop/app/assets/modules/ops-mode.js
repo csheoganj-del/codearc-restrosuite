@@ -323,7 +323,6 @@
         kotBtn.style.display = '';
         // Friendlier label when kitchen is printer-only
         if (printerOnly) {
-          const span = kotBtn.querySelector('span:not(.fa-solid):not(i)');
           const label = kotBtn.querySelector('.btn-label, .rs-btn-label');
           if (label) {label.textContent = 'Print KOT';}
           else if (!kotBtn.querySelector('i') || kotBtn.childNodes.length <= 2) {
@@ -454,8 +453,8 @@
 
   function isSuperAdminShell() {
     try {
-      if (document.documentElement.classList.contains('rs-role-superadmin')) return true;
-      if (document.body && document.body.classList.contains('rs-role-superadmin')) return true;
+      if (document.documentElement.classList.contains('rs-role-superadmin')) {return true;}
+      if (document.body && document.body.classList.contains('rs-role-superadmin')) {return true;}
       const sess = global.RS_API && typeof RS_API.session === 'function' ? RS_API.session() : null;
       const role = String((sess && sess.role) || '').toLowerCase();
       return role === 'superadmin' || role === 'super_admin' || role === 'brand_admin';

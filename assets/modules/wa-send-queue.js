@@ -373,7 +373,6 @@
   }
 
   // Hook status updates
-  const _origUpdate = () => {};
   function installStatusHook() {
     const wrap = () => {
       if (typeof global.updateTopbarWhatsAppStatus !== 'function') {return;}

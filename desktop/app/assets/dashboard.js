@@ -542,44 +542,43 @@
   })();
   const appVersionShort = String(appVersion).split('-')[0] || appVersion;
 
-  // Version chip: support / localhost only — restaurant owners don't need build tags
+  // Version chip: ONE plain story for owners — App (desktop) + Features (UI content)
   (function wireVersionPill() {
     const el = document.getElementById('app-version-pill');
     if (!el) return;
-    const allowVersionUi = (function () {
-      try {
-        const r = String((window.RS_API && RS_API.session && RS_API.session()?.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
-        if (r === 'superadmin' || r === 'admin') return true;
-        if (window.RS_API && RS_API.enableDemoTools) return true;
-        const h = String(location.hostname || '');
-        if (h === 'localhost' || h === '127.0.0.1') return true;
-        if (sessionStorage.getItem('rs_debug_ui') === '1' && new URLSearchParams(location.search).get('debug') === '1') return true;
-      } catch (_) {}
-      return true;
-    })();
-    if (!allowVersionUi) {
-      el.style.display = 'none';
-      el.setAttribute('hidden', '');
-      el.setAttribute('aria-hidden', 'true');
-      document.documentElement.classList.remove('rs-dev-ui');
-      return;
-    }
     document.documentElement.classList.add('rs-dev-ui');
     el.removeAttribute('hidden');
     el.removeAttribute('aria-hidden');
     el.style.display = '';
-    const tip = 'RestroSuite ' + appVersionShort + ' | full build ' + appVersion + ' | click to copy';
-    el.textContent = appVersionShort;
+    el.style.visibility = 'visible';
+
+    const desk = window.RS_DESKTOP || window.rsDesktop;
+    const shellVer = desk && desk.appVersion ? String(desk.appVersion).replace(/^v/i, '') : '';
+    // Owner-facing label: "App 2.0.26 · Features v293" on desktop, "v293" on web
+    const ownerLabel = shellVer
+      ? ('App ' + shellVer + ' · ' + appVersionShort)
+      : appVersionShort;
+    const tip = shellVer
+      ? ('App ' + shellVer + ' = desktop installer (print/tray). Features ' + appVersionShort + ' = screens & settings. Click to copy.')
+      : ('Features ' + appVersionShort + ' · click to copy full build id');
+
+    el.textContent = ownerLabel;
     el.classList.add('tb-version', 'tb-version-live');
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
-    el.setAttribute('aria-label', 'App version ' + appVersionShort + '. Click to copy full build id.');
+    el.setAttribute('aria-label', tip);
     el.setAttribute('data-tooltip', tip);
     el.title = tip;
-    el.dataset.fullVersion = appVersion;
+    el.dataset.fullVersion = shellVer
+      ? ('App ' + shellVer + ' | Features ' + appVersion)
+      : appVersion;
+    // Slightly wider for "App x · Features y"
+    if (shellVer) {
+      try { el.style.maxWidth = '220px'; el.style.fontSize = '11px'; } catch (_) {}
+    }
 
     const copyVersion = async () => {
-      const text = appVersion;
+      const text = el.dataset.fullVersion || appVersion;
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
@@ -594,9 +593,9 @@
           document.execCommand('copy');
           ta.remove();
         }
-        if (typeof toast === 'function') toast('Copied ' + appVersionShort, 'fa-copy');
+        if (typeof toast === 'function') toast('Copied version info', 'fa-copy');
       } catch (_) {
-        if (typeof toast === 'function') toast(appVersionShort, 'fa-circle-info');
+        if (typeof toast === 'function') toast(ownerLabel, 'fa-circle-info');
       }
     };
     el.addEventListener('click', (e) => {
@@ -1513,12 +1512,12 @@
     const tbLabel = document.getElementById('tb-wa-label');
     const friendly = (function (raw) {
       const s = String(raw || '').toLowerCase();
-      if (!s) return 'WhatsApp is not connected. Open Settings â†’ WhatsApp to link.';
-      if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings â†’ WhatsApp.';
+      if (!s) return 'WhatsApp is not connected. Open Settings → WhatsApp to link.';
+      if (s.includes('stream') || s.includes('conflict')) return 'WhatsApp connection dropped. Reconnect in Settings → WhatsApp.';
       if (s.includes('timeout')) return 'WhatsApp took too long to respond. Try again in a moment.';
-      if (s.includes('auth')) return 'Link expired. Scan the QR code again in Settings â†’ WhatsApp.';
+      if (s.includes('auth')) return 'Link expired. Scan the QR code again in Settings → WhatsApp.';
       if (s.length > 90 || /[{}\[\]<>]|error code|ECONN/i.test(String(raw))) {
-        return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings â†’ WhatsApp.';
+        return 'WhatsApp is temporarily unavailable. Try reconnecting in Settings → WhatsApp.';
       }
       return 'WhatsApp is offline.';
     })(reason);
@@ -2544,7 +2543,7 @@
     $$('.brandadmin-only').forEach(el => el.style.display = 'none');
   }
 
-  // â”€â”€ Super-admin platform shell (CSS already hides client chrome from first paint) â”€â”€
+  // ---- Super-admin platform shell (CSS already hides client chrome from first paint) ----
   if (isSuper) {
     // 1. Show superadmin-only elements (sidebar links, mobile nav, section labels)
     $$('.superadmin-only').forEach(el => {
@@ -2610,7 +2609,7 @@
       cloudPill.title = 'Click to check cloud sync status';
       cloudPill.addEventListener('click', () => {
         const mode = cloudPill.textContent.trim();
-        const detail = window.RS_LAST_CLOUD_ERROR ? `âš ï¸ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : 'âœ… No recent sync errors.';
+        const detail = window.RS_LAST_CLOUD_ERROR ? `⚠️ Last error: ${window.RS_LAST_CLOUD_ERROR.message || 'Unknown'} at ${window.RS_LAST_CLOUD_ERROR.time ? new Date(window.RS_LAST_CLOUD_ERROR.time).toLocaleTimeString() : '-'}` : '✅ No recent sync errors.';
         toast(`Cloud status: ${mode}  -  ${detail}`, 'fa-cloud');
       });
     }
@@ -3180,7 +3179,7 @@
                 if (val === undefined || val === null || val === '') return NaN;
                 if (typeof val === 'number') return val;
                 let str = String(val).trim();
-                str = str.replace(/[â‚¹$???\s]/g, '');
+                str = str.replace(/[₹$???\s]/g, '');
 
                 const hasComma = str.includes(',');
                 const hasDot = str.includes('.');
@@ -3389,7 +3388,7 @@
                 if (val === undefined || val === null || val === '') return NaN;
                 if (typeof val === 'number') return val;
                 let str = String(val).trim();
-                str = str.replace(/[â‚¹$???\s]/g, '');
+                str = str.replace(/[₹$???\s]/g, '');
 
                 const hasComma = str.includes(',');
                 const hasDot = str.includes('.');

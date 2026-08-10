@@ -32,9 +32,9 @@ export default function handler(req, res) {
     time: new Date().toISOString(),
     checks,
     downloads: {
-      windowsSetup: 'https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Windows-Setup.exe',
-      android: 'https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.7/RestroSuite-Android.apk',
-      releasePage: 'https://github.com/csheoganj-del/restrosuite-downloads/releases/tag/v2.0.7',
+      windowsSetup: 'https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Windows-Setup.exe',
+      android: 'https://restrosuite.codearc.co.in/downloads/RestroSuite-Android.apk',
+      releasePage: 'https://github.com/csheoganj-del/restrosuite-downloads/releases/tag/v2.0.25',
     },
     support: 'support@codearc.co.in',
     site: 'https://restrosuite.codearc.co.in',

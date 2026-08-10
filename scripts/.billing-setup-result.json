@@ -1,0 +1,23 @@
+{
+  "plans": {
+    "monthly": {
+      "express": "plan_TKRUkWABCaIJOG",
+      "serve": "plan_TKRUkjnhFh9jR2",
+      "command": "plan_TKRUkzu4rDH91Y"
+    },
+    "yearly": {
+      "express": "plan_TKRUlDCgPxD2WI",
+      "serve": "plan_TKRUlR4TdSlGzn",
+      "command": "plan_TKRUleQj0B1F0Y"
+    }
+  },
+  "webhook": {
+    "url": "https://htkauiibuejetimfiavs.supabase.co/functions/v1/razorpay-webhook",
+    "id": "TKRUnoDVNrCQPM",
+    "secret": null,
+    "note": "created"
+  },
+  "billingCronSecret": "de7c415d14ce4a7964b9446a80936b21853e98a8b62b2b96",
+  "webhookSecretSet": true,
+  "secretsFile": "C:\\Users\\MASTER PC\\Downloads\\restrosuite\\scripts\\.billing-secrets.env"
+}

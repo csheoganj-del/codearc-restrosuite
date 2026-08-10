@@ -9,6 +9,30 @@
   // Alias: some render paths (Employee Ledger "Logins" tab) call safe() --
   // it was never defined in this module, crashing with "safe is not defined".
   const safe = esc;
+  // Styled confirm (RSModal) for staff-login destructive actions — matches the
+  // rest of the app instead of the blocking browser-native confirm() dialog.
+  function slConfirm({ title, sub, icon, body, okLabel, okIcon, danger } = {}) {
+    if (window.RSModal && typeof RSModal.open === 'function') {
+      return new Promise((resolve) => {
+        let settled = false;
+        const done = (val) => { if (settled) return; settled = true; resolve(val); };
+        RSModal.open({
+          title: title || 'Are you sure?',
+          sub: sub || '',
+          icon: icon || 'fa-triangle-exclamation',
+          size: 'sm',
+          body: body || '',
+          foot: `<button type="button" class="btn btn-ghost" style="flex:1" data-x>Cancel</button>`
+            + `<button type="button" class="btn btn-primary" style="flex:1;${danger ? 'background:var(--red);border-color:var(--red);box-shadow:none' : ''}" data-ok>${okIcon ? `<i class="fa-solid ${okIcon}"></i> ` : ''}${okLabel || 'Confirm'}</button>`,
+          onMount: (modal, close) => {
+            modal.querySelector('[data-x]').onclick = () => { try { close(); } catch (_) {} done(false); };
+            modal.querySelector('[data-ok]').onclick = () => { try { close(); } catch (_) {} done(true); };
+          },
+        });
+      });
+    }
+    return Promise.resolve(window.confirm(title || 'Proceed?'));
+  }
   function boot(){
     const RS = window.RS, rs = RS.rs;
     const $ = (s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -2740,11 +2764,18 @@
         loginPane.querySelectorAll('.sl-toggle-btn').forEach(b => b.addEventListener('click', async () => {
           const u = staffUsers[+b.dataset.idx];
           const newStatus = b.dataset.status === 'active' ? 'suspended' : 'active';
-          if (!confirm(
-            newStatus === 'suspended'
-              ? `Suspend ${u.display_name || u.username}?\n\nThey cannot log in. Active sessions on other devices will be revoked within a minute.`
-              : `Reactivate ${u.display_name || u.username}?`
-          )) return;
+          const suspending = newStatus === 'suspended';
+          const uname = u.display_name || u.username || '';
+          const ok = await slConfirm({
+            title: suspending ? 'Suspend login?' : 'Reactivate login?',
+            sub: suspending ? 'They cannot log in. Active sessions on other devices will be revoked within a minute.' : '',
+            icon: suspending ? 'fa-ban' : 'fa-user-check',
+            body: `<p style="color:var(--text-soft);font-size:14.5px;margin:0">${suspending ? 'Suspend' : 'Reactivate'} <b style="color:var(--text)">${esc(uname)}</b>?${suspending ? ' They cannot log in until reactivated.' : ''}</p>`,
+            okLabel: suspending ? 'Suspend' : 'Reactivate',
+            okIcon: suspending ? 'fa-ban' : 'fa-user-check',
+            danger: suspending,
+          });
+          if (!ok) return;
           try {
             await RS_API.staffUsers({ action:'update_user', user_id:u.id, status:newStatus });
             try {
@@ -2763,7 +2794,17 @@
         // -- Delete account --
         loginPane.querySelectorAll('.sl-delete-btn').forEach(b => b.addEventListener('click', async () => {
           const u = staffUsers[+b.dataset.idx];
-          if (!confirm(`Delete login for ${u.display_name || u.username}? This cannot be undone.`)) return;
+          const uname = u.display_name || u.username || '';
+          const ok = await slConfirm({
+            title: 'Delete login?',
+            sub: 'This cannot be undone.',
+            icon: 'fa-user-minus',
+            body: `<p style="color:var(--text-soft);font-size:14.5px;margin:0">Delete login for <b style="color:var(--text)">${esc(uname)}</b>? This cannot be undone.</p>`,
+            okLabel: 'Delete',
+            okIcon: 'fa-trash-can',
+            danger: true,
+          });
+          if (!ok) return;
           try {
             await RS_API.staffUsers({ action:'delete_user', user_id:u.id });
             RS.toast(`${u.display_name || u.username} deleted`, 'fa-user-minus');

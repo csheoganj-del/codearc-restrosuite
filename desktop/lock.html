@@ -42,23 +42,25 @@
       confirmed. Your data is safe and nothing has been deleted.
     </p>
     <button id="retry">Retry now</button>
-    <div class="status" id="status"></div>
+    <div class="status" id="status">Checking automatically…</div>
     <div class="support">Need help? Contact RestroSuite support.</div>
   </div>
   <script>
-    // Restarting the app re-runs the main-process gate; once the plan is
-    // renewed and the device is online, the next launch loads the dashboard.
     var btn = document.getElementById('retry');
     var status = document.getElementById('status');
-    btn.addEventListener('click', async function () {
+    var busy = false;
+
+    async function doRetry(isAuto) {
+      if (busy) return;
+      busy = true;
       btn.disabled = true;
       status.textContent = navigator.onLine
-        ? 'Checking your subscription…'
+        ? (isAuto ? 'Opening app to verify subscription…' : 'Checking your subscription…')
         : 'Still offline — connect to the internet, then retry.';
       try {
-        // Only the main process can unlock: it re-runs the gate and, if the
-        // subscription is valid again, loads the dashboard itself. Retry can
-        // never bypass the lock from inside the page.
+        // Main process re-runs the gate. For recoverable locks it soft-opens the
+        // web app so license-guard can refresh the lease online (this page alone
+        // cannot call the lease API).
         var res = (window.rsDesktop && window.rsDesktop.recheckLicense)
           ? await window.rsDesktop.recheckLicense()
           : { locked: true };
@@ -66,12 +68,23 @@
           status.textContent = navigator.onLine
             ? 'Subscription still inactive. Please renew, then retry.'
             : 'Still offline. Connect to the internet, then retry.';
+        } else {
+          status.textContent = 'Connected — loading…';
         }
       } catch (e) {
         status.textContent = 'Could not verify right now. Please try again.';
       }
-      setTimeout(function () { btn.disabled = false; }, 1500);
-    });
+      setTimeout(function () {
+        busy = false;
+        btn.disabled = false;
+      }, 1500);
+    }
+
+    btn.addEventListener('click', function () { doRetry(false); });
+
+    // Cold start: Windows networking / DPAPI often needs a beat. Auto-retry once
+    // so staff do not have to click every morning.
+    setTimeout(function () { doRetry(true); }, 900);
   </script>
 </body>
 </html>

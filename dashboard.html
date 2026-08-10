@@ -10,6 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
+<!-- Warm the Supabase Edge Functions origin: cuts DNS+TLS (~110-160ms) off the first API call -->
+<link rel="preconnect" href="https://htkauiibuejetimfiavs.supabase.co" crossorigin>
+<link rel="dns-prefetch" href="https://htkauiibuejetimfiavs.supabase.co">
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"></noscript>
@@ -28,13 +31,17 @@
 <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 <link rel="stylesheet" href="assets/restrosuite.css?v=v34-20260628">
 <script>
-  // Production: log only. Visual banner only on localhost / ?debug=1 / superadmin flag.
+  // Production: log only. Visual JS error banner ONLY for real dev hosts or explicit debug.
+  // Desktop EXE also uses localhost — that is production for staff, NOT debug mode.
   window.__RS_DEBUG_UI__ = (function() {
     try {
+      if (window.RS_DESKTOP || window.RS_NATIVE_APP || window.rsDesktop) return false;
+      if (document.documentElement.getAttribute('data-rs-desktop') === '1') return false;
+      if (document.documentElement.classList.contains('rs-desktop-app')) return false;
       var h = location.hostname || '';
       if (h === 'localhost' || h === '127.0.0.1') return true;
-      if (new URLSearchParams(location.search).get('debug') === '1') return true;
-      if (sessionStorage.getItem('rs_debug_ui') === '1') return true;
+      if (new URLSearchParams(location.search).get('debug') === '1' &&
+          sessionStorage.getItem('rs_debug_ui') === '1') return true;
     } catch (e) {}
     return false;
   })();
@@ -88,7 +95,7 @@
   // ?appv= is only a cache-bust token  -  sticky old values like ?appv=v151 used
   // to pin the pill forever; we now rewrite them to the current short tag.
   window.__RESTROSUITE_ASSET_VERSION__ = (function () {
-    var builtin = 'v250-20260802-frictionless';
+    var builtin = 'v293-20260808-ten-x-utility';
     function isReal(v) {
       v = String(v || '').trim();
       if (!v) return false;
@@ -111,7 +118,7 @@
       if (!cur || !isReal(cur)) needRewrite = true;
       else if (majorNum(cur) < majorNum(shortBuiltin)) needRewrite = true; // v151 < v159
       else if (cur !== shortBuiltin && cur !== builtin) {
-        // Same major or newer short form â†’ normalize to shortBuiltin for clean URLs
+        // Same major or newer short form → normalize to shortBuiltin for clean URLs
         if (majorNum(cur) === majorNum(shortBuiltin)) needRewrite = true;
       }
       if (needRewrite) {
@@ -320,7 +327,7 @@
     display: flex !important;
   }
 
-  /* â”€â”€ Super-admin platform shell: hide entire client POS surface â”€â”€ */
+  /* ---- Super-admin platform shell: hide entire client POS surface ---- */
   html.rs-role-superadmin .sidebar-link:not(.superadmin-only),
   html.rs-role-superadmin .sb-section:not(.superadmin-only):not(.brandadmin-only),
   html.rs-role-superadmin .superadmin-hide,
@@ -331,9 +338,7 @@
   html.rs-role-superadmin .tb-search,
   html.rs-role-superadmin #rs-station-chip,
   html.rs-role-superadmin #rs-printer-chip,
-  /* Build tag is support-only — not for restaurant customers */
-  html:not(.rs-dev-ui) #app-version-pill,
-  body:not(.rs-dev-ui) #app-version-pill,
+  /* Version chip is always visible for tenants; only hide on pure super-admin shell */
   html.rs-role-superadmin #app-version-pill,
   html.rs-role-superadmin #cash-drawer,
   html.rs-role-superadmin #cpay-drawer-backdrop,
@@ -347,7 +352,9 @@
   body.rs-role-superadmin #open-product-guide-btn,
   body.rs-role-superadmin .tb-search,
   body.rs-role-superadmin #rs-station-chip,
-  body.rs-role-superadmin #rs-printer-chip,
+  body.rs-role-superadmin #rs-printer-chip {
+    display: none !important;
+  }
   body.rs-role-superadmin #app-version-pill {
     display: none !important;
   }
@@ -477,7 +484,7 @@
       </div>
       <div class="tb-spacer"></div>
       <!-- Center: shift host injected by competitive-ops (#rs-topbar-shift) -->
-      <!-- Right: search | call | bill WhatsApp | clock | bell | theme | version (no â‹¯ dump) -->
+      <!-- Right: search | call | bill WhatsApp | clock | bell | theme | version (no ⋯ dump) -->
       <div class="tb-right" id="tb-right">
         <div class="tb-search tb-search-compact tb-search-global" title="Search settings, menu, bills (Ctrl+K)">
           <i class="fa-solid fa-magnifying-glass"></i>
@@ -549,8 +556,8 @@
                         <option value="default">Default</option>
                         <option value="name-asc">A - Z</option>
                         <option value="name-desc">Z - A</option>
-                        <option value="price-asc">Price â†‘</option>
-                        <option value="price-desc">Price â†“</option>
+                        <option value="price-asc">Price ↑</option>
+                        <option value="price-desc">Price ↓</option>
                         <option value="veg-first">Veg first</option>
                         <option value="nonveg-first">Non-veg first</option>
                       </select>
@@ -650,8 +657,8 @@
                       <div class="cust-search-results" id="cust-search-results" style="display: none;"></div>
                       <div class="cust-insights-panel" id="cust-insights-panel" style="display: none;">
                         <div class="insight-item"><span class="insight-label">Visits</span><span class="insight-val" id="insight-visits">0</span></div>
-                        <div class="insight-item"><span class="insight-label">Spent</span><span class="insight-val" id="insight-spend">â‚¹0</span></div>
-                        <div class="insight-item"><span class="insight-label">Dues</span><span class="insight-val" id="insight-dues" style="color:var(--orange)">â‚¹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Spent</span><span class="insight-val" id="insight-spend">₹0</span></div>
+                        <div class="insight-item"><span class="insight-label">Dues</span><span class="insight-val" id="insight-dues" style="color:var(--orange)">₹0</span></div>
                         <div class="insight-item"><span class="insight-label">Favorite</span><span class="insight-val" id="insight-favorite">None</span></div>
                       </div>
                     </div>
@@ -685,7 +692,7 @@
                 </script>
                 <div class="totals-grand">
                   <span class="totals-grand-lbl">Total</span>
-                  <span class="amt" id="t-grand">â‚¹0</span>
+                  <span class="amt" id="t-grand">₹0</span>
                 </div>
               </div>
               <details class="cart-more-opts" id="cart-more-opts">
@@ -703,7 +710,7 @@
                 <div class="cart-promo-row" id="cart-promo-row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 10px">
                   <input type="text" id="promo-input" placeholder="Promo code" title="Offer / coupon code" class="form-input" style="flex:1;min-width:100px;height:36px;font-size:12px;padding:4px 8px;text-transform:uppercase" autocomplete="off">
                   <button type="button" class="btn btn-ghost btn-sm" id="promo-apply" style="min-height:36px;padding:0 12px;font-size:11px"><i class="fa-solid fa-tags"></i> Apply</button>
-                  <button type="button" class="btn btn-ghost btn-sm" id="promo-clear" style="min-height:36px;padding:0 10px;font-size:11px" title="Clear promo">Ã—</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="promo-clear" style="min-height:36px;padding:0 10px;font-size:11px" title="Clear promo">×</button>
                   <span id="promo-applied-badge" style="display:none;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(255,79,0,.12);color:var(--orange)"></span>
                 </div>
               </details>
@@ -743,16 +750,16 @@
                         <i class="fa-solid fa-hand-holding-dollar csd-ico" title="Received" aria-hidden="true"></i>
                         <input type="number" id="inline-cash-received" class="form-input csd-input" placeholder="0" inputmode="decimal" title="Cash received" aria-label="Cash received">
                         <i class="fa-solid fa-coins csd-ico" title="Change" aria-hidden="true"></i>
-                        <strong id="inline-cash-change" class="csd-change-amt" title="Change due">â‚¹0</strong>
+                        <strong id="inline-cash-change" class="csd-change-amt" title="Change due">₹0</strong>
                         <button type="button" class="btn-den csd-den-btn csd-den-exact" data-val="exact" title="Exact amount">=</button>
                         <button type="button" class="btn btn-ghost btn-sm cart-cash-more" id="cash-dens-toggle" title="Quick notes" aria-expanded="false" aria-label="Quick cash notes"><i class="fa-solid fa-ellipsis"></i></button>
                         <button type="button" id="cash-drawer-close" class="cart-tender-close" title="Hide cash pad" aria-label="Hide cash pad">&times;</button>
                       </div>
                       <div id="cash-denominations-grid" class="csd-den-grid cart-tender-dens" hidden aria-label="Quick cash amounts">
-                        <button type="button" class="btn-den csd-den-btn" data-val="100">â‚¹100</button>
-                        <button type="button" class="btn-den csd-den-btn" data-val="200">â‚¹200</button>
-                        <button type="button" class="btn-den csd-den-btn" data-val="500">â‚¹500</button>
-                        <button type="button" class="btn-den csd-den-btn" data-val="2000">â‚¹2k</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="100">₹100</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="200">₹200</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="500">₹500</button>
+                        <button type="button" class="btn-den csd-den-btn" data-val="2000">₹2k</button>
                         <button type="button" class="btn-den csd-den-btn csd-den-clear" data-val="clear">CLR</button>
                       </div>
                     </div>
@@ -781,12 +788,12 @@
                         </div>
                       </div>
                       <div id="split-quick-fill" class="cart-split-quick">
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Rest to cash">â†’â‚¹</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Rest to UPI">â†’UPI</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Rest to card">â†’Card</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Rest to due">â†’Due</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="cash" title="Rest to cash">→₹</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="upi" title="Rest to UPI">→UPI</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="card" title="Rest to card">→Card</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="due" title="Rest to due">→Due</button>
                         <button type="button" class="btn btn-ghost btn-sm" data-split-fill="half" title="Half cash half UPI">Â½</button>
-                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear">Ã—</button>
+                        <button type="button" class="btn btn-ghost btn-sm" data-split-fill="clear" title="Clear">×</button>
                       </div>
                       <div class="csd-split-status cart-split-status">
                         <span id="split-status-text" class="csd-split-remaining"> - </span>
@@ -844,9 +851,9 @@
       <!-- ============ BILLS ============ -->
       <section class="tab-content" id="bills-tab" data-screen-label="Bills">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">â‚¹0</div><div class="sl" id="bills-stat-sales-label">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="bills-stat-sales">₹0</div><div class="sl" id="bills-stat-sales-label">Today's sales</div><div class="sd" id="bills-stat-sales-trend" style="display:none"></div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="bills-stat-count">0</div><div class="sl" id="bills-stat-count-label">Bills in range</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">â‚¹0</div><div class="sl">Avg order value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv" id="bills-stat-aov">₹0</div><div class="sl">Avg order value</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-rotate-left"></i></div><div><div class="sv" id="bills-stat-refunds">0</div><div class="sl" id="bills-stat-refunds-label">Refunds in range</div></div></div>
         </div>
         <div class="panel panel-pad">
@@ -866,17 +873,12 @@
             </div>
             <div class="pos-search grow" style="max-width:300px;padding:9px 14px"><i class="fa-solid fa-magnifying-glass"></i><input id="bills-search" placeholder="Search bill, table, customer, phone..." autocomplete="off" aria-label="Search bills"></div>
             <span id="bills-result-meta" class="bills-result-meta" hidden></span>
-            <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Payment & status filters are in the table header"><i class="fa-solid fa-filter"></i> Filter</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-bills-filter" title="Jump to payment and status filters"><i class="fa-solid fa-filter"></i> Filter</button>
             <div class="bills-export-group" role="group" aria-label="Export bills">
-              <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills" title="Excel workbook: Summary + Bills + Line items (recommended)"><i class="fa-solid fa-file-excel"></i> Excel</button>
-              <button type="button" class="btn btn-ghost btn-sm bills-csv-btn" id="btn-export-bills-csv" title="Plain CSV for imports / scripts"><i class="fa-solid fa-file-csv"></i> CSV</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-export-bills" title="Export Excel workbook"><i class="fa-solid fa-file-excel"></i> Excel</button>
+              <button type="button" class="btn btn-ghost btn-sm bills-csv-btn" id="btn-export-bills-csv" title="Export CSV"><i class="fa-solid fa-file-csv"></i> CSV</button>
             </div>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report" title="A4 / PDF sales summary for the selected date range"><i class="fa-solid fa-print"></i> Print report</button>
-          </div>
-          <div id="bills-filter-hint" class="bills-filter-hint" hidden aria-hidden="true">
-            <i class="fa-solid fa-circle-info"></i>
-            <span>Date chips control stats + the table. Payment / Status filters are in the table header. Export respects the same filters.</span>
-            <button type="button" class="bills-hint-dismiss" id="bills-hint-dismiss" aria-label="Dismiss tip" title="Dismiss">Ã—</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-print-day-report" title="Print sales summary for selected dates"><i class="fa-solid fa-print"></i> Print report</button>
           </div>
           <div class="table-scroll"><table class="data-table bills-table">
             <thead>
@@ -992,9 +994,9 @@
             <div class="panel-head"><h3>Add / edit item</h3></div>
             <div style="display:flex;flex-direction:column;gap:14px">
               <div><label class="fl">Item name</label><input class="form-input" placeholder="e.g. Paneer Tikka"></div>
-              <div style="display:flex;gap:12px"><div style="flex:1"><label class="fl">Price (â‚¹)</label><input class="form-input" type="number" placeholder="199"></div><div style="flex:1"><label class="fl">Category</label><select class="form-input"><option>Starters</option><option>Mains</option><option>Breads</option><option>Beverages</option><option>Desserts</option></select></div></div>
+              <div style="display:flex;gap:12px"><div style="flex:1"><label class="fl">Price (₹)</label><input class="form-input" type="number" placeholder="199"></div><div style="flex:1"><label class="fl">Category</label><select class="form-input"><option>Starters</option><option>Mains</option><option>Breads</option><option>Beverages</option><option>Desserts</option></select></div></div>
               <div style="display:flex;gap:12px"><div style="flex:1"><label class="fl">Type</label><select class="form-input"><option>Veg</option><option>Non-veg</option></select></div><div style="flex:1"><label class="fl">GST slab</label><select class="form-input"><option>5%</option><option>12%</option><option>18%</option></select></div></div>
-              <div><label class="fl">Linked ingredients</label><div style="display:flex;flex-wrap:wrap;gap:7px"><span class="pill">Paneer 100g Ã—</span><span class="pill">Onion 30g Ã—</span><span class="pill" style="border-style:dashed;cursor:pointer"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span></div></div>
+              <div><label class="fl">Linked ingredients</label><div style="display:flex;flex-wrap:wrap;gap:7px"><span class="pill">Paneer 100g ×</span><span class="pill">Onion 30g ×</span><span class="pill" style="border-style:dashed;cursor:pointer"><i class="fa-solid fa-plus" style="font-size:10px"></i> Add</span></div></div>
               <div><label class="fl">Photo</label><div class="ph" style="height:90px"><span>Drop item photo</span></div></div>
               <button class="btn btn-primary btn-block"><i class="fa-solid fa-circle-check"></i> Save item</button>
             </div>
@@ -1053,10 +1055,10 @@
       <!-- ============ REPORTS ============ -->
       <section class="tab-content" id="reports-tab" data-screen-label="Reports">
         <div class="stat-row">
-          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">â‚¹0</div><div class="sl">Revenue this week</div><div class="sd" style="display:none"></div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹0</div><div class="sl">Revenue this week</div><div class="sd" style="display:none"></div></div></div>
           <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-receipt"></i></div><div><div class="sv">0</div><div class="sl">Orders this week</div><div class="sd" style="display:none"></div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">â‚¹0</div><div class="sl">Avg order value</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">â‚¹0</div><div class="sl">GST collected</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-money-bill-trend-up"></i></div><div><div class="sv">₹0</div><div class="sl">Avg order value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-percent"></i></div><div><div class="sv">₹0</div><div class="sl">GST collected</div></div></div>
         </div>
         <div class="report-grid">
           <div class="panel panel-pad">
@@ -1065,7 +1067,7 @@
           </div>
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Payment mix</h3></div>
-            <div class="donut-wrap"><div class="donut" id="donut-pay"><div class="donut-center"><div class="dc-v">â‚¹3.28L</div><div class="dc-l">collected</div></div></div><div class="legend" id="legend-pay"></div></div>
+            <div class="donut-wrap"><div class="donut" id="donut-pay"><div class="donut-center"><div class="dc-v">₹3.28L</div><div class="dc-l">collected</div></div></div><div class="legend" id="legend-pay"></div></div>
           </div>
         </div>
         <div class="report-grid" style="margin-top:16px">
@@ -1076,10 +1078,10 @@
           <div class="panel panel-pad">
             <div class="panel-head"><h3>Tax summary</h3></div>
             <table class="data-table"><tbody>
-              <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">â‚¹11,200</td></tr>
-              <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">â‚¹5,200</td></tr>
-              <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">â‚¹3,11,600</td></tr>
-              <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">â‚¹16,400</b></td></tr>
+              <tr><td>GST @ 5% (food)</td><td class="td-strong" style="text-align:right">₹11,200</td></tr>
+              <tr><td>GST @ 18% (packaged)</td><td class="td-strong" style="text-align:right">₹5,200</td></tr>
+              <tr><td>Net taxable sales</td><td class="td-strong" style="text-align:right">₹3,11,600</td></tr>
+              <tr><td><b style="color:var(--text)">Total tax payable</b></td><td style="text-align:right"><b style="color:var(--orange);font-size:15px">₹16,400</b></td></tr>
             </tbody></table>
             <button class="btn btn-ghost btn-block" id="btn-download-gstr" style="margin-top:14px"><i class="fa-solid fa-file-arrow-down"></i> Download GSTR-ready report</button>
           </div>
@@ -1117,7 +1119,7 @@
         <div class="stat-row">
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-users"></i></div><div><div class="sv">0</div><div class="sl">Team members</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-user-clock"></i></div><div><div class="sv">0</div><div class="sl">On shift now</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">â‚¹0</div><div class="sl">Payroll (month)</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv">₹0</div><div class="sl">Payroll (month)</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-a"><i class="fa-solid fa-calendar-day"></i></div><div><div class="sv">0%</div><div class="sl">Attendance</div></div></div>
         </div>
         <div class="toolbar-row">
@@ -1132,9 +1134,9 @@
       <!-- ============ CHAIN DASHBOARD ============ -->
       <section class="tab-content" id="chain-dashboard-tab" data-screen-label="Chain Dashboard">
         <div class="stat-row" id="chain-platform-summary">
-          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="chain-total-revenue">â‚¹0.00</div><div class="sl">Total Brand Revenue</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-g"><i class="fa-solid fa-indian-rupee-sign"></i></div><div><div class="sv" id="chain-total-revenue">₹0.00</div><div class="sl">Total Brand Revenue</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-o"><i class="fa-solid fa-receipt"></i></div><div><div class="sv" id="chain-total-orders">0</div><div class="sl">Total Order Count</div></div></div>
-          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-ticket"></i></div><div><div class="sv" id="chain-avg-ticket">â‚¹0.00</div><div class="sl">Avg Ticket Value</div></div></div>
+          <div class="stat-card"><div class="stat-ic bg-v"><i class="fa-solid fa-ticket"></i></div><div><div class="sv" id="chain-avg-ticket">₹0.00</div><div class="sl">Avg Ticket Value</div></div></div>
           <div class="stat-card"><div class="stat-ic bg-r"><i class="fa-solid fa-triangle-exclamation"></i></div><div><div class="sv" id="chain-alerting-stores">0</div><div class="sl">Alerting Outlets</div></div></div>
         </div>
 
@@ -1393,7 +1395,7 @@
     <span id="pos-m-cart-bar-count">0 items</span>
   </div>
   <div class="pmcb-right">
-    <span id="pos-m-cart-bar-total">â‚¹0</span>
+    <span id="pos-m-cart-bar-total">₹0</span>
     <span class="pmcb-cta">Checkout <i class="fa-solid fa-arrow-right"></i></span>
   </div>
 </div>
@@ -1443,13 +1445,13 @@
         <div>
           <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Outlet type *</label>
           <select id="ct-outlet-type" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);background:var(--panel);outline:none;cursor:pointer;box-sizing:border-box">
-            <option value="cafe">â˜• CafÃ©</option>
-            <option value="restaurant">ðŸ½ï¸ Restaurant</option>
-            <option value="qsr">ðŸ” QSR / Fast Food</option>
-            <option value="bakery">ðŸ¥ Bakery</option>
-            <option value="bar">ðŸº Bar & Lounge</option>
-            <option value="cloud_kitchen">ðŸ“¦ Cloud Kitchen</option>
-            <option value="retail">ðŸ›’ Retail</option>
+            <option value="cafe">☕ Café</option>
+            <option value="restaurant">🍽️ Restaurant</option>
+            <option value="qsr">🍔 QSR / Fast Food</option>
+            <option value="bakery">🥐 Bakery</option>
+            <option value="bar">🍺 Bar & Lounge</option>
+            <option value="cloud_kitchen">📦 Cloud Kitchen</option>
+            <option value="retail">🛒 Retail</option>
           </select>
         </div>
         <div>
@@ -1563,9 +1565,9 @@
           <div>
             <label style="font-size:10px;font-weight:600;color:var(--text-mute);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Account status</label>
             <select id="manage-status" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--stroke);font-size:13px;color:var(--text);outline:none;background:var(--panel);cursor:pointer;box-sizing:border-box">
-              <option value="pending">â³ Pending</option>
-              <option value="approved">âœ… Active</option>
-              <option value="suspended">ðŸš« Suspended</option>
+              <option value="pending">⏳ Pending</option>
+              <option value="approved">✅ Active</option>
+              <option value="suspended">🚫 Suspended</option>
             </select>
           </div>
           <div>
@@ -1803,6 +1805,7 @@
 <script src="assets/modules/rs-action-feedback.js"></script>
 <link rel="stylesheet" href="assets/modules/product-polish-18.css">
 <script src="assets/modules/product-polish-18.js"></script>
+<script src="assets/modules/owner-first-hour.js"></script>
 <script src="assets/modules/lan-sync.js"></script>
 <!-- Single-path boot: POS/print/bills/KDS/QR/inventory UI modules load ONCE via
      assets/dist/critical.bundle.js (see async boot below). Do not also tag them here. -->

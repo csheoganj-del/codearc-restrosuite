@@ -295,27 +295,35 @@ html.rs-starter-nav.app.collapsed .rs-starter-nav-expand span { display: none; }
   color: var(--text-soft);
   line-height: 1.3;
 }
-/* Quiet version chip (not a dropdown dump) — clickable, never "Systempatch" */
+/* Quiet version chip — always readable (never force into 34px icon circle) */
 .tb-version,
+#app-version-pill,
 #app-version-pill.tb-version {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 9px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: none !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em;
   font-variant-numeric: tabular-nums;
-  color: var(--text-mute);
-  background: transparent;
-  border: 1px solid transparent;
+  color: #065f46 !important;
+  background: #ecfdf5 !important;
+  border: 1px solid #6ee7b7 !important;
   user-select: none;
-  white-space: nowrap;
-  flex-shrink: 0;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
   cursor: pointer;
   font-family: inherit;
   line-height: 1;
+  box-sizing: border-box !important;
   transition: color .15s ease, border-color .15s ease, background .15s ease, transform .12s ease;
 }
 .tb-version:hover,
@@ -2688,9 +2696,19 @@ html.rs-kitchen-setup-denied #klc-mobile-setup {
   }
   .tb-search,
   .tb-search-compact { display: none !important; }
-  .clock-pill,
+  .clock-pill { display: none !important; }
+  /* Keep short version chip on tablet; hide only when very narrow */
   #app-version-pill,
-  .tb-version { display: none !important; }
+  .tb-version {
+    display: inline-flex !important;
+    font-size: 10px !important;
+    padding: 0 7px !important;
+    height: 26px !important;
+  }
+  @media (max-width: 720px) {
+    #app-version-pill,
+    .tb-version { display: none !important; }
+  }
   .topbar .tb-pill:not(.clock-pill),
   .topbar .support-dropdown {
     width: 38px !important;
@@ -5189,11 +5207,47 @@ textarea:focus-visible,
 /* Compact header — min-height (not fixed height) so icons never clip */
 .topbar {
   padding: 8px clamp(12px, 2vw, 20px) !important;
-  gap: 10px !important;
+  gap: 8px !important;
   height: auto !important;
   min-height: 54px !important;
   box-sizing: border-box;
   overflow: visible !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+}
+.topbar .tb-left {
+  flex: 1 1 160px !important;
+  min-width: 0 !important;
+  max-width: min(420px, 42vw) !important;
+  overflow: hidden !important;
+}
+.topbar .tb-right {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  overflow: visible !important;
+}
+/* Mode switcher should not shove title off-screen */
+#rs-fx-mode {
+  flex-shrink: 0 !important;
+  max-width: 100%;
+}
+.topbar .tb-title h1 {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+.topbar .tb-title .tb-sub,
+.topbar .tb-title p {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
 }
 
 /* Make title area more compact */
@@ -5254,8 +5308,8 @@ textarea:focus-visible,
   left: auto;
 }
 
-/* General design for circular icon status badges (except Clock) */
-.topbar .tb-pill:not(.clock-pill),
+/* General design for circular icon status badges (except Clock + version text chip) */
+.topbar .tb-pill:not(.clock-pill):not(.tb-version):not(#app-version-pill),
 .topbar .support-dropdown {
   height: 34px !important;
   width: 34px !important;
@@ -5464,8 +5518,15 @@ textarea:focus-visible,
 }
 
 #topbar-whatsapp-status-pill { display: none !important; }
+/* Only one WhatsApp control in the topbar (status button). Hide all other WA chips. */
+#rs-fx-wa-health,
+#rs-wa-queue-chip,
 #tb-right > button:not(#tb-wa-status-btn):has(.fa-whatsapp),
-#tb-right > .tb-pill:not(#tb-wa-status-btn):has(.fa-whatsapp) { display: none !important; }
+#tb-right > .tb-pill:not(#tb-wa-status-btn):has(.fa-whatsapp),
+.topbar button:not(#tb-wa-status-btn):has(> .fa-whatsapp),
+.topbar .tb-pill:not(#tb-wa-status-btn):has(.fa-whatsapp) {
+  display: none !important;
+}
 
 /* ── Always-visible WhatsApp top-bar icon ─────────────────────────
    Connected = green WA · Off = red WA · Connecting/QR = amber + spin */

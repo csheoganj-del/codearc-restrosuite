@@ -40,7 +40,7 @@ const rec = (area, id, title, status, detail) => {
   // Dismiss overlays
   await page.evaluate(() => {
     try {
-      if (window.RSModal && RSModal.closeAll) RSModal.closeAll();
+      if (window.RSModal && RSModal.closeAll) {RSModal.closeAll();}
       document.querySelectorAll('#rs-modal-root .rs-overlay, .rs-overlay.show').forEach((el) => el.remove());
     } catch (_) {}
   });
@@ -48,8 +48,8 @@ const rec = (area, id, title, status, detail) => {
   // Hook downloads
   await page.evaluate(() => {
     function wrap() {
-      if (!window.RS || typeof RS.downloadFile !== 'function') return false;
-      if (RS.downloadFile.__audited) return true;
+      if (!window.RS || typeof RS.downloadFile !== 'function') {return false;}
+      if (RS.downloadFile.__audited) {return true;}
       const orig = RS.downloadFile.bind(RS);
       RS.downloadFile = function (content, mime, filename) {
         try {
@@ -59,7 +59,7 @@ const rec = (area, id, title, status, detail) => {
               : content && content.byteLength
                 ? content.byteLength
                 : 0;
-          if (window.__rsAuditDownload) window.__rsAuditDownload(String(mime || ''), String(filename || ''), len);
+          if (window.__rsAuditDownload) {window.__rsAuditDownload(String(mime || ''), String(filename || ''), len);}
         } catch (_) {}
         return orig(content, mime, filename);
       };
@@ -147,7 +147,7 @@ const rec = (area, id, title, status, detail) => {
     downloads.length = 0;
     await page.evaluate(() => {
       try {
-        if (window.RSModal && RSModal.closeAll) RSModal.closeAll();
+        if (window.RSModal && RSModal.closeAll) {RSModal.closeAll();}
       } catch (_) {}
     });
     const btn = page.locator('#' + id).first();
@@ -247,8 +247,8 @@ const rec = (area, id, title, status, detail) => {
       downloads.length = 0;
       await page.evaluate(() => {
         try {
-          if (window.RS_exportDayPack) RS_exportDayPack();
-          else if (window.RSOps && RSOps.exportDayPackCsv) RSOps.exportDayPackCsv();
+          if (window.RS_exportDayPack) {RS_exportDayPack();}
+          else if (window.RSOps && RSOps.exportDayPackCsv) {RSOps.exportDayPackCsv();}
         } catch (_) {}
       });
       await page.waitForTimeout(800);
@@ -265,9 +265,9 @@ const rec = (area, id, title, status, detail) => {
   await page.waitForTimeout(1500);
   const taxCsv = await page.locator('#tax-csv').count();
   rec('tax', 'tax-csv', 'Tax ledger CSV button', taxCsv > 0 ? 'pass' : 'warn', 'count=' + taxCsv);
-  if (taxCsv) await tryExport('tax', 'tax-csv', 'Tax ledger CSV');
+  if (taxCsv) {await tryExport('tax', 'tax-csv', 'Tax ledger CSV');}
   const taxGstr = await page.locator('#tax-gstr1-csv').count();
-  if (taxGstr) await tryExport('tax', 'tax-gstr1-csv', 'GSTR-1 offline CSV');
+  if (taxGstr) {await tryExport('tax', 'tax-gstr1-csv', 'GSTR-1 offline CSV');}
 
   // ---------- Import: parse CSV + dry-run menu import ----------
   const importTest = await page.evaluate(async () => {
@@ -309,13 +309,13 @@ const rec = (area, id, title, status, detail) => {
         'Name,Category,Price,Description,Available,Bestseller\n' +
         'Audit Import Chai,Beverages,22,Auto import test,YES,NO\n';
       const rows = RestroSuite.imports.parseCsv(csv);
-      if (!rows || !rows.length) return { ok: false, reason: 'parse empty' };
+      if (!rows || !rows.length) {return { ok: false, reason: 'parse empty' };}
 
       // Minimal save like dashboard import does
       const name = String(rows[0].Name || rows[0].name || '').trim();
-      if (!name) return { ok: false, reason: 'no name' };
+      if (!name) {return { ok: false, reason: 'no name' };}
       const exists = (RS.MENU || []).find((m) => String(m.name).toLowerCase() === name.toLowerCase());
-      if (exists) return { ok: true, skipped: true, before, after: before, name };
+      if (exists) {return { ok: true, skipped: true, before, after: before, name };}
 
       const id = 'audit_import_' + Date.now();
       const item = {
@@ -362,7 +362,7 @@ const rec = (area, id, title, status, detail) => {
       const name = 'Audit Import Milk';
       const before = (window.RS && RS.INVENTORY && RS.INVENTORY.length) || 0;
       const exists = (RS.INVENTORY || []).find((i) => String(i.name).toLowerCase() === name.toLowerCase());
-      if (exists) return { ok: true, skipped: true, before, stock: exists.stock, name };
+      if (exists) {return { ok: true, skipped: true, before, stock: exists.stock, name };}
 
       const id = 'audit_inv_' + Date.now();
       const item = {
@@ -375,9 +375,9 @@ const rec = (area, id, title, status, detail) => {
         unit: 'L',
         cost: 60,
       };
-      if (!RS.INVENTORY) return { ok: false, reason: 'no INVENTORY' };
+      if (!RS.INVENTORY) {return { ok: false, reason: 'no INVENTORY' };}
       RS.INVENTORY.push(item);
-      if (window.RS_DB && RS_DB.put) await RS_DB.put('inventory', id, item);
+      if (window.RS_DB && RS_DB.put) {await RS_DB.put('inventory', id, item);}
       if (RS.save) {
         try {
           await RS.save('inventory');
@@ -401,16 +401,16 @@ const rec = (area, id, title, status, detail) => {
   const deductSetup = await page.evaluate(async () => {
     const MENU = (window.RS && RS.MENU) || [];
     const INV = (window.RS && RS.INVENTORY) || [];
-    let dish =
+    const dish =
       MENU.find((m) => /butter chicken/i.test(m.name || '')) ||
       MENU.find((m) => /masala chai|cold coffee|filter coffee/i.test(m.name || '')) ||
       MENU[0];
-    let milk =
+    const milk =
       INV.find((i) => /audit import milk/i.test(i.name || '')) ||
       INV.find((i) => /milk/i.test(i.name || '')) ||
       INV[0];
-    if (!dish) return { ok: false, reason: 'no menu item' };
-    if (!milk) return { ok: false, reason: 'no inventory item' };
+    if (!dish) {return { ok: false, reason: 'no menu item' };}
+    if (!milk) {return { ok: false, reason: 'no inventory item' };}
 
     dish.ingredients = [
       {
@@ -421,7 +421,7 @@ const rec = (area, id, title, status, detail) => {
       },
     ];
     dish.recipeServings = 1;
-    if (window.RS_DB && RS_DB.put) await RS_DB.put('menu', dish.id, dish);
+    if (window.RS_DB && RS_DB.put) {await RS_DB.put('menu', dish.id, dish);}
     if (RS.save) {
       try {
         await RS.save('menu');
@@ -459,7 +459,7 @@ const rec = (area, id, title, status, detail) => {
         };
         await RS.deductInventoryForBill(billRow);
         // allow async cloud path
-        await new Promise((r) => setTimeout(r, 2500));
+        await new Promise((r) => { setTimeout(r, 2500); });
         const milk2 = (RS.INVENTORY || []).find((i) => String(i.id) === String(setup.invId));
         const after = milk2 ? Number(milk2.stock) : null;
         return {
@@ -485,7 +485,7 @@ const rec = (area, id, title, status, detail) => {
     // Real POS bill path: sell linked dish
     await page.evaluate(() => {
       try {
-        if (window.RSModal && RSModal.closeAll) RSModal.closeAll();
+        if (window.RSModal && RSModal.closeAll) {RSModal.closeAll();}
         RS.activateTab('pos-tab');
       } catch (_) {}
     });

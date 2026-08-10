@@ -144,7 +144,7 @@
           const d = l.details || l;
           const raw = String((d && (d.latency_ms || d.duration_ms || d.message)) || l.message || '');
           const m = raw.match(/(\d+)\s*ms\b/i) || raw.match(/latency[=:]\s*(\d+)/i);
-          if (m) samples.push(Number(m[1]));
+          if (m) {samples.push(Number(m[1]));}
         });
         if (samples.length) {
           lat = Math.round(samples.reduce((a, b) => a + b, 0) / samples.length);
@@ -187,8 +187,6 @@ async function pollSuperAdminGateway() {
   const RS_API = global.RS_API;
   if (!RS_API) {return;}
   // Zero-cost launch still uses FREE platform Baileys (your PC + ngrok). No paid API.
-  const isZeroCost = !!RS_API.zeroCostLaunchMode;
-
   const statusBadge = document.getElementById('saas-gateway-status');
   const phoneEl = document.getElementById('saas-gateway-phone');
   const sessionEl = document.getElementById('saas-gateway-session-saved');

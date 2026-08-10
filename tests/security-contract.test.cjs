@@ -425,8 +425,8 @@ test("dashboard interactions are optimized for instant feedback", () => {
   assert.match(dashboard, /channel\(`doppio-menu-realtime-\$\{activeTenantId\}`\)/);
   assert.match(dashboard, /event: 'menu-updated'/);
   assert.match(dashboard, /broadcastMenuUpdate\(\)/);
-  assert.match(dashboard, /await Promise\.all\(cloudWrites\)/);
-  assert.match(dashboard, /Recipe import failed for \$\{newItem\.name\}/);
+  assert.match(dashboard, /RS_DB\.putLocal\('bills'/);
+  assert.match(dashboard, /Recipe import failed for \$\{(?:record|newItem)\.name\}/);
   assert.match(dashboard, /onConflict: 'tenant_id,name'/);
   assert.match(dashboard, /onConflict: 'tenant_id,item_name'/);
   assert.match(dashboard, /table: 'doppio_bills', filter: `tenant_id=eq\.\$\{activeTenantId\}`/);

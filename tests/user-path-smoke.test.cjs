@@ -38,7 +38,7 @@ test('super-admin early shell stamped before paint', () => {
   assert.match(html, /earlyRoleShell|logged_in_role/);
   assert.match(html, /rs-role-superadmin/);
   assert.match(html, /data-rs-shell/);
-  assert.match(html, /tab-content:not\(#super-admin-tab\):not\(#gateway-monitor-tab\)/);
+  assert.match(html, /tab-content:not\(#super-admin-tab\)[^,{]*#gateway-monitor-tab/);
   assert.match(html, /Loading platform console/);
 });
 

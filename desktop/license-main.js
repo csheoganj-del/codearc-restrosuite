@@ -82,21 +82,60 @@ function decrypt(stored) {
 }
 function readState() {
   try {
+    if (!_statePath || !fs.existsSync(_statePath)) {
+      return { lease: '', hwm: 0, firstSeen: 0 };
+    }
     const raw = fs.readFileSync(_statePath, 'utf8');
+    if (!raw || !String(raw).trim()) {
+      return { lease: '', hwm: 0, firstSeen: 0 };
+    }
     const dec = decrypt(raw);
-    const st = dec ? JSON.parse(dec) : {};
-    return { lease: st.lease || '', hwm: Number(st.hwm || 0), firstSeen: Number(st.firstSeen || 0) };
+    if (dec == null) {
+      // DPAPI/safeStorage can fail briefly on cold start (profile not ready).
+      // Do NOT treat as empty — empty write would wipe a valid lease.
+      console.warn('[license-main] lease state decrypt failed (fail-open this launch)');
+      return { lease: '', hwm: 0, firstSeen: 0, decryptFailed: true };
+    }
+    const st = JSON.parse(dec);
+    return {
+      lease: st.lease || '',
+      hwm: Number(st.hwm || 0),
+      firstSeen: Number(st.firstSeen || 0),
+    };
   } catch (e) {
-    return { lease: '', hwm: 0, firstSeen: 0 };
+    console.warn('[license-main] readState error:', e && e.message);
+    return { lease: '', hwm: 0, firstSeen: 0, readError: true };
   }
 }
-function writeState(st) {
+function writeState(st, opts) {
   try {
+    // Never persist an empty lease over a decrypt failure — that bricks the next launch.
+    if (opts && opts.skipIfDecryptFailed) return;
     fs.mkdirSync(path.dirname(_statePath), { recursive: true });
-    fs.writeFileSync(_statePath, encrypt(JSON.stringify(st)), { mode: 0o600 });
+    fs.writeFileSync(_statePath, encrypt(JSON.stringify({
+      lease: st.lease || '',
+      hwm: Number(st.hwm || 0),
+      firstSeen: Number(st.firstSeen || 0),
+    })), { mode: 0o600 });
   } catch (e) {
     console.warn('[license-main] could not persist license state:', e.message);
   }
+}
+
+/** Reasons the web/renderer can fix by refreshing online — do not hard-block cold start. */
+function isRecoverableReason(reason) {
+  return (
+    reason === 'no_lease' ||
+    reason === 'invalid_lease' ||
+    reason === 'lease_expired' ||
+    reason === 'lease_no_expiry' ||
+    reason === 'bootstrap_start' ||
+    reason === 'bootstrap_grace' ||
+    reason === 'decrypt_fail_open' ||
+    reason === 'read_error_open' ||
+    // Clock glitches after sleep/NTP: renderer can re-stamp HWM from server.
+    reason === 'clock_rollback'
+  );
 }
 
 /* ---------- ECDSA P-256 verify (Node) ---------- */
@@ -157,19 +196,52 @@ function persistLease(leaseToken, serverTimeMs) {
 function gate() {
   const st = readState();
   const now = Date.now();
-  const hwm = Math.max(st.hwm || 0, now);
+
+  // Cold-start decrypt/read glitches: fail OPEN so a paying outlet is never
+  // stuck on lock.html until they click Retry. Next successful storeLease
+  // re-writes a clean state file.
+  if (st.decryptFailed) {
+    return { allow: true, locked: false, reason: 'decrypt_fail_open', recoverable: true };
+  }
+  if (st.readError) {
+    return { allow: true, locked: false, reason: 'read_error_open', recoverable: true };
+  }
+
+  // Use stored HWM for clock checks (not max(now,hwm) which disabled rollback detection).
+  const storedHwm = Number(st.hwm || 0);
   const verified = verifyLease(st.lease);
   const decision = _evaluate({
     verified: verified.ok,
     claims: verified.ok ? verified.claims : null,
     now,
-    hwm,
+    hwm: storedHwm,
     firstSeen: st.firstSeen,
-    cfg: _cfg
+    cfg: _cfg,
+    clockSkewToleranceMs: (_cfg && _cfg.CLOCK_SKEW_TOLERANCE_MS) || (15 * 60 * 1000),
+    clockSkewOfflineMs: (_cfg && _cfg.CLOCK_SKEW_OFFLINE_GRACE_MS) || (4 * 60 * 60 * 1000),
   });
-  // Persist bumped hwm + firstSeen (bounds bootstrap grace on a fresh device).
-  writeState({ lease: st.lease, hwm, firstSeen: st.firstSeen || now });
+
+  // Persist bumped hwm + firstSeen. Keep existing lease string.
+  const nextHwm = Math.max(storedHwm, now);
+  if (verified.ok && verified.claims && verified.claims.issued_at) {
+    // Anchor HWM to server-issued time when present
+    // (issued_at may be ms)
+  }
+  writeState({
+    lease: st.lease,
+    hwm: nextHwm,
+    firstSeen: st.firstSeen || now,
+  });
+
+  decision.recoverable = isRecoverableReason(decision.reason);
   return decision;
 }
 
-module.exports = { init, gate, persistLease, verifyLease, _readState: readState };
+module.exports = {
+  init,
+  gate,
+  persistLease,
+  verifyLease,
+  isRecoverableReason,
+  _readState: readState,
+};

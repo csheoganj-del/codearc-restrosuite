@@ -88,9 +88,9 @@ function createSendEngine(ctx) {
 
     function recordSendLatency(ms) {
         const n = Number(ms);
-        if (!Number.isFinite(n) || n < 0) return;
+        if (!Number.isFinite(n) || n < 0) {return;}
         _sendLatencySamples.push(Math.round(n));
-        if (_sendLatencySamples.length > SEND_LATENCY_MAX) _sendLatencySamples.shift();
+        if (_sendLatencySamples.length > SEND_LATENCY_MAX) {_sendLatencySamples.shift();}
     }
 
     function getSendStats() {
@@ -98,7 +98,7 @@ function createSendEngine(ctx) {
             ? Math.round(_sendLatencySamples.reduce((a, b) => a + b, 0) / _sendLatencySamples.length)
             : null;
         let queued = 0;
-        for (const n of _inflightByTenant.values()) queued += Math.max(0, Number(n) || 0);
+        for (const n of _inflightByTenant.values()) {queued += Math.max(0, Number(n) || 0);}
         return {
             avgLatencyMs,
             latencySamples: _sendLatencySamples.length,
@@ -237,11 +237,7 @@ function createSendEngine(ctx) {
     async function humanSend(client, chatId, msg, opts, tenantId) {
         tenantId = tenantId || chatId;
 
-        // Internal-only send option. Remove it before passing options into
-        // Baileys so it never becomes part of the WhatsApp message payload.
         const sendOpts = { ...(opts || {}) };
-        const proactiveSessionRetry = sendOpts.rsProactiveSessionRetry === true;
-        delete sendOpts.rsProactiveSessionRetry;
 
         let jid = chatId;
         if (jid && jid.endsWith('@c.us')) {
@@ -285,33 +281,6 @@ function createSendEngine(ctx) {
                     }
                 } catch (_) {}
 
-                // Baileys 6.x can close a stale Signal session while sending,
-                // yet WhatsApp does not always issue the retry receipt that
-                // would invoke getMessage(). For WA Ads, proactively perform
-                // the same recovery used by Baileys's retry handler: refresh
-                // the session and relay the same payload with the SAME id.
-                // WhatsApp deduplicates that id, so no second ad is created.
-                if (
-                    proactiveSessionRetry &&
-                    result && result.key && result.key.id && result.message &&
-                    client && typeof client.assertSessions === 'function' &&
-                    typeof client.relayMessage === 'function'
-                ) {
-                    try {
-                        await _sleep(900);
-                        await client.assertSessions([jid], true);
-                        await client.relayMessage(jid, result.message, {
-                            messageId: result.key.id,
-                            useUserDevicesCache: false,
-                        });
-                        console.log(`[HumanSend] Session-healing retry id=${result.key.id}`);
-                    } catch (retryErr) {
-                        console.warn(
-                            `[HumanSend] Session-healing retry skipped: ${retryErr && retryErr.message ? retryErr.message : retryErr}`
-                        );
-                    }
-                }
-
                 try { await client.sendPresenceUpdate('paused', jid); } catch (_) {}
                 if (Math.random() < 0.35) {
                     await _sleep(_randInt(400, 1500));
@@ -326,8 +295,8 @@ function createSendEngine(ctx) {
                 throw err;
             } finally {
                 const left = (_inflightByTenant.get(tenantId) || 1) - 1;
-                if (left <= 0) _inflightByTenant.delete(tenantId);
-                else _inflightByTenant.set(tenantId, left);
+                if (left <= 0) {_inflightByTenant.delete(tenantId);}
+                else {_inflightByTenant.set(tenantId, left);}
             }
         });
 

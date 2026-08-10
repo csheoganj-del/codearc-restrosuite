@@ -38,22 +38,22 @@
 
   function canOpenDemoScript() {
     try {
-      if (global.RS_API && RS_API.enableDemoTools) return true;
+      if (global.RS_API && RS_API.enableDemoTools) {return true;}
       const sess = global.RS_API && RS_API.session && RS_API.session();
-      if (sess && String(sess.role || '').toLowerCase() === 'superadmin') return true;
+      if (sess && String(sess.role || '').toLowerCase() === 'superadmin') {return true;}
       // Owner/manager learn-by-doing (customer training checklist)
       const role = String((sess && sess.role) || sessionStorage.getItem('logged_in_role') || '').toLowerCase();
-      if (role === 'owner' || role === 'admin' || role === 'manager') return true;
-      if (sessionStorage.getItem('rs_learn_mode') === '1') return true;
+      if (role === 'owner' || role === 'admin' || role === 'manager') {return true;}
+      if (sessionStorage.getItem('rs_learn_mode') === '1') {return true;}
       const h = String(location.hostname || '');
-      if (h === 'localhost' || h === '127.0.0.1') return true;
+      if (h === 'localhost' || h === '127.0.0.1') {return true;}
     } catch (_) {}
     return false;
   }
 
   function openDemoScript() {
     // Owners get learn-by-doing; internal demo tools still available on localhost/SA
-    if (!canOpenDemoScript()) return;
+    if (!canOpenDemoScript()) {return;}
     document.getElementById('rs-demo-overlay')?.remove();
     const state = loadState();
     const overlay = document.createElement('div');

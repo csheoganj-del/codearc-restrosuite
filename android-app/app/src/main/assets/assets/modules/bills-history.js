@@ -894,7 +894,7 @@
       'RestroSuite';
     return (
       String(name)
-        .replace(/[^\w\-]+/g, '-')
+        .replace(/[^\w-]+/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 40) || 'RestroSuite'
@@ -1650,11 +1650,6 @@
       e.preventDefault();
       const pay = document.getElementById('bills-pay-filter');
       const status = document.getElementById('bills-status-filter');
-      const bar = document.getElementById('bills-filter-hint');
-      if (bar) {
-        bar.hidden = false;
-        bar.setAttribute('aria-hidden', 'false');
-      }
       [pay, status].forEach((el) => {
         if (!el) {return;}
         el.classList.add('bills-filter-flash');
@@ -1663,9 +1658,10 @@
       if (pay) {
         try {
           pay.focus();
+          try { pay.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
         } catch (_) {}
       }
-      toast('Use date chips + Payment / Status filters', 'fa-filter');
+      // No developer tip toast — filters are already in the table header.
     });
   }
 
@@ -1967,28 +1963,13 @@
     }
   }
 
+  /** Old developer tip bar removed from UI — keep as no-op for callers. */
   function wireFilterHint() {
     const bar = document.getElementById('bills-filter-hint');
-    const dismiss = document.getElementById('bills-hint-dismiss');
-    let dismissed = false;
-    try {
-      dismissed = localStorage.getItem('rs_bills_hint_dismissed') === '1';
-    } catch (_) {}
-    if (bar && !dismissed) {
-      bar.hidden = false;
-      bar.setAttribute('aria-hidden', 'false');
-    }
-    if (dismiss && !dismiss.dataset.rsBound) {
-      dismiss.dataset.rsBound = '1';
-      dismiss.addEventListener('click', () => {
-        if (bar) {
-          bar.hidden = true;
-          bar.setAttribute('aria-hidden', 'true');
-        }
-        try {
-          localStorage.setItem('rs_bills_hint_dismissed', '1');
-        } catch (_) {}
-      });
+    if (bar) {
+      bar.hidden = true;
+      bar.setAttribute('aria-hidden', 'true');
+      try { bar.remove(); } catch (_) {}
     }
   }
 

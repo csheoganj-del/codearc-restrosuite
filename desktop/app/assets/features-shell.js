@@ -45,7 +45,8 @@
       const SETTINGS = [
         { sec: 'profile', title: 'Outlet profile', sub: 'Name, address, phone, country', kw: 'profile outlet name address phone email gstin cuisine wifi qr', find: 'Identity' },
         { sec: 'tax', title: 'Taxes & pricing', sub: 'GST, tax, round-off, loyalty, promo', kw: 'tax gst calculate taxes service charge round-off hsn inclusive happy hour loyalty promo coupon', find: 'Tax engine' },
-        { sec: 'printer', title: 'Printers & KOT', sub: 'Billing only, shift, print, drawer', kw: 'printer kot receipt thermal shift require open shift auto-print cash drawer paper billing only kitchen', find: 'Kitchen & billing' },
+        { sec: 'printer', title: 'Printers & KOT', sub: 'Billing only, shift, print, drawer', kw: 'printer kot receipt thermal text html qr shift require open shift auto-print cash drawer paper billing only kitchen print mode', find: 'Kitchen & billing' },
+        { sec: 'printer', title: 'Receipt print mode', sub: 'Settings · Printers', kw: 'receipt print mode html qr thermal text raw escpos', icon: 'fa-receipt', skey: 'set_receipt_print_mode', find: 'Receipt print mode' },
         { sec: 'gateway', title: 'WhatsApp', sub: 'Link number, send bill, alerts', kw: 'whatsapp gateway send bill after payment order ready promotional messages', find: 'Connection' },
         { sec: 'payments', title: 'Payments', sub: 'UPI / card settlement', kw: 'razorpay stripe upi payments bank', find: 'Card' },
         { sec: 'security', title: 'Security & PIN', sub: 'Admin PIN, pin gates', kw: 'pin security lock idle', find: 'Admin PIN' },
@@ -1132,7 +1133,17 @@
             ${sel('Paper size',['58 mm','80 mm'],'80 mm')}
             ${field('Kitchen station label','Main kitchen','Printed on KOT header')}
           </div>
-          <p class="set-hint" style="margin-top:10px">Use two names when counter and kitchen have separate thermals. Leave kitchen blank to use the receipt printer.</p>`) +
+          <div class="form-grid-2" style="margin-top:12px">
+            ${sel('Receipt print mode',[
+              'HTML + QR (recommended)',
+              'Thermal text (fast)'
+            ],'HTML + QR (recommended)')}
+          </div>
+          <p class="set-hint" style="margin-top:10px">
+            <b>HTML + QR</b> — same look as the bill screen (layout, ₹, QR). Desktop prints via silent Chrome to your thermal.<br>
+            <b>Thermal text</b> — plain ESC/POS text, fastest, no QR image. Use if HTML print misbehaves on your printer.<br>
+            Use two printer names when counter and kitchen have separate thermals. Leave kitchen blank to use the receipt printer.
+          </p>`) +
         setBlock('Shift (optional)', 'Most small cafés leave this OFF and just bill + print',
           `${toggle('Require open shift','When ON, staff must open a shift before Print & Pay, Hold, refunds, and cash drawer. When OFF (default), billing works without shift — open Shift only if you want float and Z-report.',false)}
           <p class="set-hint" style="margin-top:8px"><b>OFF (recommended for simple outlets):</b> no shift dialog blocking pay.<br>
@@ -2499,9 +2510,29 @@
             SET_STORE.set_operating_mode = 'Billing only';
           }
         } catch (e) {}
+        // Receipt print mode: map legacy thermal flags → dropdown labels
+        try {
+          const legacy = String(SET_STORE.set_receipt_print_mode || SET_STORE.set_thermal_mode || SET_STORE.set_receipt_thermal_mode || '').toLowerCase();
+          const rawOn = SET_STORE.set_thermal_raw === true || SET_STORE.set_thermal_raw === 'true';
+          if (rawOn || /raw|escpos|thermal text|text only|text \(fast\)/.test(legacy)) {
+            SET_STORE.set_receipt_print_mode = 'Thermal text (fast)';
+          } else if (/html|browser|formatted|qr/.test(legacy) || !SET_STORE.set_receipt_print_mode) {
+            SET_STORE.set_receipt_print_mode = 'HTML + QR (recommended)';
+          }
+        } catch (_) {}
         $$('[data-skey]', body).forEach(el=>{ const k=el.dataset.skey; if(!(k in SET_STORE))return; if(el.type==='checkbox') el.checked=!!SET_STORE[k]; else el.value=SET_STORE[k]; });
       }
-      function collect(){ $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; }); }
+      function collect(){
+        $$('[data-skey]', body).forEach(el=>{ SET_STORE[el.dataset.skey] = el.type==='checkbox'?el.checked:el.value; });
+        // Keep legacy keys in sync so older print code paths still work
+        try {
+          const mode = String(SET_STORE.set_receipt_print_mode || '');
+          const isText = /thermal text|raw|escpos|text \(fast\)/i.test(mode);
+          SET_STORE.set_thermal_mode = isText ? 'raw' : 'html';
+          SET_STORE.set_receipt_thermal_mode = SET_STORE.set_thermal_mode;
+          SET_STORE.set_thermal_raw = isText;
+        } catch (_) {}
+      }
 
       /** Push one control into live settings + refresh UI (no page reload). */
       function applyControlLive(el) {
@@ -3071,7 +3102,6 @@
         ['analytics-tab','Advanced Analytics','chart-mixed'],
         ['growth-hub-tab','Growth Hub','rocket'],
         ['settings-tab','Settings','gear'],
-        ['device-display','Display (this device)','text-height'],
         ['logout','Sign Out','right-from-bracket']
       ];
       moreBtn.addEventListener('click', (e)=>{
@@ -3096,10 +3126,9 @@
         } else if (Array.isArray(roleInfo.allowedTabs)) {
           allowed = roleInfo.allowedTabs.slice();
           if (rRole === 'manager') allowed.push('settings-tab');
-          allowed.push('device-display');
           allowed.push('logout');
         } else if (!unrestricted) {
-          allowed = ['pos-tab', 'device-display', 'logout'];
+          allowed = ['pos-tab', 'logout'];
         }
         const VISIBLE = allowed ? MORE.filter(m => allowed.includes(m[0])) : MORE;
         RSModal.open({ title:'All sections', icon:'fa-grip', size:'sm',
@@ -3116,12 +3145,6 @@
                 close();
                 if (typeof window.RS_REQUEST_LOGOUT === 'function') window.RS_REQUEST_LOGOUT();
                 else if (window.RS_SHOW_OFFLINE_LOGOUT_LOCK) window.RS_SHOW_OFFLINE_LOGOUT_LOCK();
-              } else if (b.dataset.go === 'device-display') {
-                close();
-                if (typeof window.RS_openDeviceDisplay === 'function') window.RS_openDeviceDisplay();
-                else if (window.RSProductPolish18 && typeof RSProductPolish18.openDensityPrefs === 'function') {
-                  RSProductPolish18.openDensityPrefs();
-                }
               } else {
                 close();
                 if (legacy) legacy.style.display = 'none';
@@ -3153,24 +3176,35 @@
       }
       if (lab) {
         const short =
-          state === 'wa-linked' ? (label && String(label).indexOf('+') === 0 ? label : 'On')
-          : state === 'wa-platform' ? (label && String(label).indexOf('+') === 0 ? label : 'Hub')
+          state === 'wa-linked' ? (label && String(label).indexOf('+') === 0 ? label : 'OK')
+          : state === 'wa-platform' ? 'OK'
           : state === 'wa-offline' || state === 'wa-auth-failure' ? 'Off'
           : state === 'wa-qr' ? 'Scan'
           : '…';
         lab.textContent = short;
       }
 
+      // Owner-facing title always plain language
+      const plainTip =
+        tooltip ||
+        (state === 'wa-linked'
+          ? 'WhatsApp linked · OK'
+          : state === 'wa-platform'
+            ? 'WhatsApp working · OK'
+            : state === 'wa-offline'
+              ? 'WhatsApp not linked'
+              : 'WhatsApp');
+
       pills.forEach((pillEl) => {
         WA_BADGE_STATES.forEach((cls) => pillEl.classList.remove(cls));
         pillEl.classList.add(state);
         pillEl.style.cssText = '';
-        pillEl.setAttribute('data-tooltip', tooltip || '');
-        pillEl.title = tooltip || label || 'Bill WhatsApp';
-        pillEl.setAttribute('aria-label', 'Bill WhatsApp: ' + (label || state));
+        pillEl.setAttribute('data-tooltip', plainTip);
+        pillEl.title = plainTip;
+        pillEl.setAttribute('aria-label', plainTip);
         pillEl.setAttribute('data-wa-mode', state === 'wa-linked' ? 'own' : state === 'wa-platform' ? 'platform' : state);
       });
-      window.__rsWaBadge = { state, label, tooltip };
+      window.__rsWaBadge = { state, label, tooltip: plainTip };
     }
 
     function isSuperAdminSession() {
@@ -3392,14 +3426,15 @@
           // Own linked number (live or cold lazy)
           window.__rsGatewayReady = true;
           const n = window.__rsGatewayNumber || (res && res.number) || '';
-          const short = n ? ('+' + String(n).slice(-4)) : 'On';
+          const short = n ? ('+' + String(n).slice(-4)) : 'OK';
           const cold = res.status === 'linked' || (truthy(res.linked) && !truthy(res.live));
+          // Owner plain language — no "gateway", "lazy", "session"
           setTopbarWhatsAppBadge(
             'wa-linked',
-            cold ? 'On' : short,
-            cold
-              ? 'Your WhatsApp is linked · connects automatically when sending a bill'
-              : (n ? 'WhatsApp connected · +' + n + ' · bills send from your number' : 'WhatsApp connected · ready to send bills'),
+            cold ? 'OK' : short,
+            n
+              ? 'WhatsApp linked · OK · bills send from ' + n
+              : 'WhatsApp linked · OK · ready to send bills',
             false
           );
         } else if (res && (usePlatform || platformReady || canAutomateFlag || sendMode === 'platform')) {
@@ -3408,25 +3443,29 @@
           window.__rsGatewayLastStatus = 'ready';
           window.__rsWaSendMode = 'platform';
           const pn = res.platformNumber || res.number;
-          const short = pn ? ('+' + String(pn).slice(-4)) : 'Hub';
           setTopbarWhatsAppBadge(
             'wa-platform',
-            short,
+            'OK',
             pn
-              ? 'Using central WhatsApp +' + pn + ' (not your number). Link your WhatsApp in Settings for green status and bills from your phone.'
-              : 'Using central platform WhatsApp. Link your restaurant number in Settings for green status.',
+              ? 'WhatsApp working (shared line ' + pn + '). Tip: link your own number in Settings → WhatsApp.'
+              : 'WhatsApp working. Tip: link your own restaurant number in Settings → WhatsApp.',
             false
           );
         } else if (res && (res.status === 'syncing' || res.status === 'authenticated')) {
-          setTopbarWhatsAppBadge('wa-syncing', '…', 'Almost ready — finishing WhatsApp setup', true);
+          setTopbarWhatsAppBadge('wa-syncing', '…', 'WhatsApp almost ready…', true);
         } else if (res && res.status === 'qr') {
-          setTopbarWhatsAppBadge('wa-qr', 'Scan QR', 'Open Settings → WhatsApp and scan the QR code', false);
+          setTopbarWhatsAppBadge('wa-qr', 'Scan', 'WhatsApp not linked · open Settings → WhatsApp and scan QR', false);
         } else if (res && res.status === 'auth_failure') {
-          setTopbarWhatsAppBadge('wa-auth-failure', 'Retry', gatewayReason(res, 'Please scan the QR code again'), false);
+          setTopbarWhatsAppBadge('wa-auth-failure', 'Retry', 'WhatsApp needs a new scan · open Settings → WhatsApp', false);
         } else if (res && (res.status === 'connecting' || res.status === 'starting')) {
-          setTopbarWhatsAppBadge('wa-starting', '…', 'Connecting WhatsApp…', true);
+          setTopbarWhatsAppBadge('wa-starting', '…', 'WhatsApp connecting…', true);
         } else {
-          setTopbarWhatsAppBadge('wa-offline', 'Off', gatewayReason(res, 'not connected'), false);
+          setTopbarWhatsAppBadge(
+            'wa-offline',
+            'Off',
+            'WhatsApp not linked · open Settings → WhatsApp (optional for billing)',
+            false
+          );
         }
         wireWhatsAppStatusClicks();
       } catch(err) {

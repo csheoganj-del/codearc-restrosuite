@@ -206,7 +206,7 @@ async function checkUi() {
     // dismiss common modals
     for (const sel of ['button:has-text("Got it")', 'button:has-text("Later")', 'button:has-text("Skip")', '#tour-skip-btn', '[data-ok]']) {
       const el = page.locator(sel).first();
-      if (await el.isVisible({ timeout: 300 }).catch(() => false)) await el.click().catch(() => {});
+      if (await el.isVisible({ timeout: 300 }).catch(() => false)) {await el.click().catch(() => {});}
     }
     rec('B1', 'Login to demo outlet', 'pass', CREDS.outlet);
 
@@ -218,7 +218,7 @@ async function checkUi() {
 
     await page.evaluate(() => {
       try {
-        if (window.RS && RS.activateTab) RS.activateTab('reports-tab');
+        if (window.RS && RS.activateTab) {RS.activateTab('reports-tab');}
       } catch (_) {}
     });
     await page.waitForTimeout(1200);
@@ -230,7 +230,7 @@ async function checkUi() {
 
     await page.evaluate(() => {
       try {
-        if (window.RS && RS.activateTab) RS.activateTab('pos-tab');
+        if (window.RS && RS.activateTab) {RS.activateTab('pos-tab');}
       } catch (_) {}
     });
     await page.waitForTimeout(800);

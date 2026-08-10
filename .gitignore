@@ -17,6 +17,7 @@ app/build/
 # Never commit Electron build output (huge); ship installer via downloads/
 gateway-tray/dist/
 desktop/dist/
+desktop/dist-*/
 *.apk
 *.aar
 *.exe
@@ -27,9 +28,6 @@ local-builds/*
 !downloads/
 !downloads/**
 !downloads/RestroSuite-Android.apk
-!downloads/RestroSuite-Windows-Portable.exe
-!downloads/RestroSuite-Windows-Setup.exe
-!downloads/RestroSuite-Gateway-Setup.exe
 !downloads/*.pdf
 !downloads/manifest.json
 !downloads/README.md
@@ -140,3 +138,19 @@ downloads/*.dmg
 downloads/desktop/*.exe
 downloads/desktop/*.blockmap
 
+
+# Secrets that must never be committed
+scripts/.billing-secrets.env
+scripts/.email-relay.env
+
+# Windows shell junk
+*.desktop.ini
+desktop.ini
+
+# Android release signing material — never commit
+android-app/release.jks
+android-app/*.jks
+android-app/keystore.properties
+
+# Android gradle temp build dirs
+android-app/.tmp-gradle-build*

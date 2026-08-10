@@ -52,6 +52,11 @@ let serverInstance = null;
 let lanDiscoveryInstance = null;
 let appEntryUrl = null; // set in createWindow; used by the license re-check IPC
 let tray = null;
+/** Must stay referenced — if GC'd after tray.setImage(), Windows tray icon vanishes
+ *  (often when user opens the ^ "Show hidden icons" overflow). */
+let trayImageRef = null;
+let trayIconPathRef = null;
+let trayWatchTimer = null;
 let isQuitting = false; // true only for real Quit (tray / menu), not window X
 
 // --- Single-instance lock: second launch focuses the existing window -------
@@ -396,18 +401,42 @@ function notifyStillRunning() {
   } catch (_) {}
 }
 
+/**
+ * Re-pin tray icon from disk path. Avoid ephemeral NativeImage-only icons —
+ * Windows GC + overflow (^) refresh makes them vanish.
+ */
+function reassertTrayIcon() {
+  if (!tray || isQuitting) return;
+  try {
+    if (trayIconPathRef && fs.existsSync(trayIconPathRef)) {
+      // Path-based is stable across Shell_NotifyIcon refresh
+      tray.setImage(trayIconPathRef);
+      return;
+    }
+  } catch (_) {}
+  try {
+    if (trayImageRef && !trayImageRef.isEmpty()) {
+      tray.setImage(trayImageRef);
+    }
+  } catch (_) {}
+}
+
 /** System tray / menu bar: close (X) hides; local server keeps running for silent POS. */
 function createTray() {
   if (tray) return;
   // Windows: Tray(path-to-.ico) is far more reliable than Tray(NativeImage).
-  // NativeImage-from-PNG often ends up blank in the notification area.
+  // NEVER replace a path tray with an unpinned NativeImage — when GC runs
+  // (often when user opens ^ "Show hidden icons"), the icon disappears.
   const iconPath = resolveAppIcon();
+  trayIconPathRef = iconPath;
   trayDebugLog('createTray start iconPath=' + iconPath + ' resourcesPath=' + (process.resourcesPath || ''));
   let created = false;
+  let usedPath = false;
   if (iconPath && process.platform === 'win32') {
     try {
       tray = new Tray(iconPath);
       created = true;
+      usedPath = true;
       trayDebugLog('created from path ' + iconPath);
     } catch (e) {
       trayDebugLog('path create failed ' + (e && e.message));
@@ -415,6 +444,7 @@ function createTray() {
   }
   if (!created) {
     const image = loadTrayImage();
+    trayImageRef = image; // pin — required for setImage lifetime
     try {
       tray = new Tray(image);
       created = true;
@@ -422,7 +452,8 @@ function createTray() {
     } catch (e) {
       trayDebugLog('create failed ' + (e && e.message));
       try {
-        tray = new Tray(solidTrayFallbackImage());
+        trayImageRef = solidTrayFallbackImage();
+        tray = new Tray(trayImageRef);
         created = true;
         trayDebugLog('created from solid fallback');
       } catch (e2) {
@@ -431,18 +462,24 @@ function createTray() {
       }
     }
   }
-  try {
-    // Keep brand logo (do NOT overwrite with letter/solid fallback).
-    const image = loadTrayImage();
-    if (image && !image.isEmpty()) {
-      tray.setImage(image);
-      trayDebugLog('setImage brand logo ok size=' + JSON.stringify(image.getSize()));
+  // Windows path-based tray: do NOT setImage(NativeImage) — that unpins the
+  // stable shell icon and the icon vanishes when the overflow flyout refreshes.
+  if (!usedPath) {
+    try {
+      const image = loadTrayImage();
+      trayImageRef = image;
+      if (image && !image.isEmpty()) {
+        tray.setImage(image);
+        trayDebugLog('setImage brand logo ok size=' + JSON.stringify(image.getSize()));
+      }
+    } catch (e) {
+      trayDebugLog('setImage failed ' + (e && e.message));
     }
-  } catch (e) {
-    trayDebugLog('setImage failed ' + (e && e.message));
+  } else {
+    trayDebugLog('keeping path-based tray icon (no setImage NativeImage)');
   }
   try {
-    tray.setIgnoreDoubleClickEvents(false);
+    tray.setIgnoreDoubleClickEvents(true); // single-click = open (no double-click race)
   } catch (_) {}
   tray.setToolTip('RestroSuite Desktop — running in background');
   const loginLabel = process.platform === 'darwin'
@@ -480,40 +517,55 @@ function createTray() {
     },
   ]);
   tray.setContextMenu(contextMenu);
-  tray.on('double-click', () => showMainWindow());
-  // Windows + macOS: left-click toggles window (menu still available via right-click / long-press)
-  tray.on('click', () => {
-    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && mainWindow.isFocused()) {
-      mainWindow.hide();
-    } else {
-      showMainWindow();
-    }
-  });
+  // Always show on click — never hide from tray (hide is window X only).
+  // Toggle-hide made the app "disappear" when staff clicked the tray icon.
+  const openFromTray = () => {
+    reassertTrayIcon();
+    showMainWindow();
+  };
+  tray.on('double-click', openFromTray);
+  tray.on('click', openFromTray);
+  // Right-click already opens context menu via setContextMenu
 
-  // Windows 10 hides new icons under the ^ overflow — balloon + Notification + one dialog.
+  // Re-pin icon after display / power changes (Windows overflow refresh)
+  try {
+    const { screen, powerMonitor } = require('electron');
+    const bump = () => {
+      try { reassertTrayIcon(); } catch (_) {}
+    };
+    screen.on('display-metrics-changed', bump);
+    if (powerMonitor) {
+      powerMonitor.on('resume', bump);
+      powerMonitor.on('unlock-screen', bump);
+    }
+  } catch (_) {}
+  // Light watchdog: if Shell drops the icon after overflow use, re-set path
+  if (process.platform === 'win32' && !trayWatchTimer) {
+    trayWatchTimer = setInterval(() => {
+      if (isQuitting) return;
+      try { reassertTrayIcon(); } catch (_) {}
+    }, 45000);
+    if (trayWatchTimer.unref) trayWatchTimer.unref();
+  }
+
+  // One quiet tip only (balloons themselves can glitch the tray on some PCs)
   if (process.platform === 'win32') {
     try {
       setTimeout(() => {
-        if (!tray) return;
-        try {
-          tray.displayBalloon({
-            title: 'RestroSuite Desktop is in the tray',
-            content:
-              'Look near the clock. Click ^ (Show hidden icons) if you do not see the orange R icon. Right-click for menu.',
-          });
-        } catch (_) {}
+        if (!tray || isQuitting) return;
+        reassertTrayIcon();
         try {
           if (Notification.isSupported()) {
             new Notification({
               title: 'RestroSuite Desktop is running',
-              body: 'Tray icon should be near the clock (or under ^). Double-click it to open the app.',
+              body: 'Icon is near the clock (or under ^). Click it to open. Right-click → Quit.',
             }).show();
           }
         } catch (_) {}
-      }, 800);
+      }, 1200);
     } catch (_) {}
   }
-  trayDebugLog('createTray finished ok');
+  trayDebugLog('createTray finished ok path=' + !!usedPath);
 }
 
 function createWindow() {
@@ -560,27 +612,25 @@ function createWindow() {
     if (!win.isVisible()) win.show();
   });
 
-  // Offline-lease gate: re-verify the lease in the main process before loading
-  // the dashboard. Fail OPEN on any gate error so a bug can never brick a
-  // paying outlet.
-  let locked = false;
+  // Offline-lease gate: re-verify in main for logging / HWM, but NEVER show
+  // lock.html on cold start. Staff were forced to click "Retry now" every boot
+  // even with good internet — main often has no DPAPI lease yet while the web
+  // layer still has a valid one (or can mint one online). Soft-open always;
+  // license-guard enforces after it can refresh. lock.html remains for rare
+  // manual recheck paths only.
   try {
     const decision = licenseGate.gate();
-    locked = !!decision.locked;
-    if (locked) console.warn('[main] license gate locked:', decision.reason);
+    if (decision && decision.locked) {
+      console.warn('[main] license gate advisory (soft-open always):', decision.reason || '');
+    }
   } catch (e) {
-    console.warn('[main] license gate error (failing open):', e && e.message);
+    console.warn('[main] license gate error (soft-open):', e && e.message);
   }
 
   setTimeout(() => {
-    if (locked) {
-      win.loadFile(path.join(__dirname, 'lock.html')).catch((err) => {
-        dialog.showErrorBox('RestroSuite is locked', String(err));
-      });
-      if (!win.isVisible()) win.show();
-      return;
-    }
-    win.loadURL(url).catch((err) => {
+    const bootUrl =
+      url + (url.includes('?') ? '&' : '?') + 'rs_desktop_boot=1&t=' + Date.now();
+    win.loadURL(bootUrl).catch((err) => {
       dialog.showErrorBox('RestroSuite failed to start', String(err));
     });
   }, 600);
@@ -698,20 +748,18 @@ function buildMenu() {
             try {
               uiVer = contentUpdater.localContentVersion(resolveWebRoot());
             } catch (_) {}
+            const shortUi = String(uiVer || 'bundled').split('-')[0] || uiVer;
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'RestroSuite Desktop',
               message: `${config.appName || 'RestroSuite'} Desktop`,
+              // One plain-language version story for owners (no feed URLs).
               detail:
-                `App shell: v${app.getVersion()} (${kind})\n` +
-                `UI features: ${uiVer || 'bundled'}\n` +
-                `Local server: http://localhost:${PORT}\n` +
-                `Backend: ${config.supabaseUrl || '(not set)'}\n` +
-                `Feature feed: ${(config.productionOrigin || 'https://restrosuite.codearc.co.in')}/app-update.json\n` +
-                `EXE feed: ${autoUpdater.FEED_URL}\n\n` +
-                'Two update layers:\n' +
-                '• Features (Settings, POS, kitchen modes) — download from live site when we publish.\n' +
-                '• App shell (EXE) — Setup builds update silently; Portable opens a new download.\n',
+                `App ${app.getVersion()} (${kind})\n` +
+                `Features ${shortUi}\n\n` +
+                'App = desktop installer (print, tray, updates).\n' +
+                'Features = menus, settings, POS screens (update online).\n\n' +
+                'Support: support@codearc.co.in',
             });
           },
         },
@@ -757,14 +805,46 @@ app.whenReady().then(async () => {
       catch (e) { return { error: String(e && e.message) }; }
     });
     ipcMain.handle('rs-license-recheck', () => {
-      let decision;
-      try { decision = licenseGate.gate(); }
-      catch (e) { decision = { locked: false, reason: 'gate_error' }; }
-      if (!decision.locked && appEntryUrl && mainWindow) mainWindow.loadURL(appEntryUrl).catch(() => {});
-      return { locked: !!decision.locked, reason: decision.reason };
+      // Always soft-open the web app on Retry. lock.html cannot mint a lease;
+      // the renderer license-guard does. Main gate alone used to keep staff
+      // stuck until a second click raced past a cold-start glitch.
+      try {
+        licenseGate.gate();
+      } catch (_) {}
+      if (appEntryUrl && mainWindow && !mainWindow.isDestroyed()) {
+        const u =
+          appEntryUrl +
+          (appEntryUrl.includes('?') ? '&' : '?') +
+          'rs_license_retry=1&t=' +
+          Date.now();
+        mainWindow.loadURL(u).catch(() => {});
+      }
+      return { locked: false, reason: 'soft_retry', soft: true };
     });
 
     // Wave 4 — print bridge (silent HTML thermal + printer list)
+    // Default-printer restore helpers are defined near openReceiptInSystemBrowser.
+    try {
+      app.on('before-quit', () => {
+        try {
+          const p = path.join(app.getPath('userData'), 'print-default-restore.json');
+          if (!fs.existsSync(p)) return;
+          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const name = data && data.previousDefault ? String(data.previousDefault).trim() : '';
+          if (name) {
+            try {
+              require('child_process').execFileSync(
+                'rundll32.exe',
+                ['printui.dll,PrintUIEntry', '/y', '/n', name],
+                { windowsHide: true, timeout: 5000 }
+              );
+            } catch (_) {}
+          }
+          try { fs.unlinkSync(p); } catch (_) {}
+        } catch (_) {}
+      });
+    } catch (_) {}
+
     const preferredPrinterPath = () => path.join(app.getPath('userData'), 'preferred-printer.json');
     ipcMain.handle('rs-list-printers', async () => {
       try {
@@ -794,82 +874,182 @@ app.whenReady().then(async () => {
         return { ok: false, error: String(e && e.message || e) };
       }
     });
-    ipcMain.handle('rs-print-html', async (_evt, payload) => {
-      const html = String((payload && payload.html) || '');
-      if (!html) return { ok: false, error: 'empty html' };
-      let silent = payload && payload.silent !== false; // default silent when desktop
-      let deviceName = (payload && payload.deviceName) || null;
-      if (!deviceName) {
-        try {
-          const pref = JSON.parse(fs.readFileSync(preferredPrinterPath(), 'utf8'));
-          deviceName = pref && pref.name;
-        } catch (_) {}
-      }
-      const printWin = new BrowserWindow({
-        show: false,
-        webPreferences: { offscreen: true, sandbox: true },
-      });
-      try {
-        const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
-        await printWin.loadURL(dataUrl);
-        await new Promise((r) => setTimeout(r, 250));
-        await new Promise((resolve, reject) => {
-          printWin.webContents.print(
-            {
-              silent: !!silent,
-              printBackground: true,
-              deviceName: deviceName || undefined,
-              margins: { marginType: 'none' },
-            },
-            (success, failureReason) => {
-              if (!success) reject(new Error(failureReason || 'print failed'));
-              else resolve();
-            }
-          );
-        });
-        return { ok: true, silent: !!silent, deviceName: deviceName || null };
-      } catch (e) {
-        return { ok: false, error: String(e && e.message || e) };
-      } finally {
-        try { printWin.destroy(); } catch (_) {}
-      }
-    });
-    // Wave 5 — ESC/POS raw: spool file + Windows RAW share copy when possible
+    // ── Thermal print: NEVER use Chromium webContents.print ─────────────────
+    // POS58 / ESC-POS drivers rasterize HTML (data:text/html jobs) as a solid
+    // black roll. Always send RAW bytes (or plain text via Out-Printer).
     const { execFile } = require('child_process');
+
     function buildEscPosFromText(text) {
-      const ESC = Buffer.from([0x1b, 0x40]);
-      const body = Buffer.from(String(text || ''), 'utf8');
-      const cut = Buffer.from([0x1d, 0x56, 0x00]);
-      return Buffer.concat([ESC, body, Buffer.from('\n\n\n'), cut]);
+      const ESC = Buffer.from([0x1b, 0x40]); // init
+      // ASCII-only for POS58. Keep digits intact — never turn amounts into "?12".
+      const normalized = String(text || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/[\u20B9\u00A3\u20AC]/g, 'Rs.')
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A\u200B]/g, ' ')
+        .replace(/Rs\.\s*/g, 'Rs.')
+        .replace(/([A-Za-z])Rs\./g, '$1 Rs.')
+        .replace(/[–—]/g, '-')
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/[^\x09\x0a\x20-\x7e]/g, '');
+      const body = Buffer.from(normalized, 'ascii');
+      const feed = Buffer.from('\n\n\n');
+      const cut = Buffer.from([0x1d, 0x56, 0x00]); // full cut
+      return Buffer.concat([ESC, body, feed, cut]);
     }
+
+    function htmlToPlainTextMain(html) {
+      let s = String(html || '');
+      s = s.replace(/<script[\s\S]*?<\/script>/gi, '');
+      s = s.replace(/<style[\s\S]*?<\/style>/gi, '');
+      s = s.replace(/<br\s*\/?>/gi, '\n');
+      s = s.replace(/<\/(div|p|tr|li|h[1-6]|section|table)>/gi, '\n');
+      s = s.replace(/<hr[^>]*>/gi, '\n--------------------------------\n');
+      s = s.replace(/<[^>]+>/g, '');
+      s = s
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n) || 32))
+        .replace(/&quot;/g, '"');
+      s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      return s;
+    }
+
+    function resolvePreferredPrinterName(explicit) {
+      if (explicit && String(explicit).trim()) return String(explicit).trim();
+      try {
+        const pref = JSON.parse(fs.readFileSync(preferredPrinterPath(), 'utf8'));
+        if (pref && pref.name) return String(pref.name).trim();
+      } catch (_) {}
+      return null;
+    }
+
     function resolvePrinterShare(printerName) {
       if (!printerName) return null;
       const n = String(printerName).trim();
       if (!n) return null;
       if (n.startsWith('\\\\')) return n;
-      // Local share path used by copy /b
       return '\\\\localhost\\' + n;
     }
-    function rawPrintWindows(filePath, printerName) {
+
+    /** PowerShell winspool WritePrinter — works without printer Sharing. */
+    function rawPrintWinspool(filePath, printerName) {
+      return new Promise((resolve) => {
+        if (process.platform !== 'win32') {
+          return resolve({ ok: false, error: 'raw print only on Windows' });
+        }
+        const name = String(printerName || '').trim();
+        if (!name) return resolve({ ok: false, error: 'no printer name' });
+        // Escape for PowerShell single-quoted strings
+        const pName = name.replace(/'/g, "''");
+        const pFile = String(filePath).replace(/'/g, "''");
+        const ps = `
+$ErrorActionPreference = 'Stop'
+$printerName = '${pName}'
+$filePath = '${pFile}'
+$bytes = [System.IO.File]::ReadAllBytes($filePath)
+Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class RsRawPrinter {
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+  public class DOCINFOA {
+    [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.Drv", EntryPoint = "ClosePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+  [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "StartPagePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "EndPagePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+  public static bool SendBytes(string printer, byte[] bytes) {
+    IntPtr hPrinter;
+    if (!OpenPrinter(printer.Normalize(), out hPrinter, IntPtr.Zero)) return false;
+    try {
+      DOCINFOA di = new DOCINFOA();
+      di.pDocName = "RestroSuite Receipt";
+      di.pDataType = "RAW";
+      if (!StartDocPrinter(hPrinter, 1, di)) return false;
+      try {
+        if (!StartPagePrinter(hPrinter)) return false;
+        try {
+          IntPtr p = Marshal.AllocCoTaskMem(bytes.Length);
+          Marshal.Copy(bytes, 0, p, bytes.Length);
+          int written;
+          bool ok = WritePrinter(hPrinter, p, bytes.Length, out written);
+          Marshal.FreeCoTaskMem(p);
+          return ok;
+        } finally { EndPagePrinter(hPrinter); }
+      } finally { EndDocPrinter(hPrinter); }
+    } finally { ClosePrinter(hPrinter); }
+  }
+}
+"@
+if (-not [RsRawPrinter]::SendBytes($printerName, $bytes)) {
+  throw "WritePrinter failed (Win32 $( [Runtime.InteropServices.Marshal]::GetLastWin32Error() ))"
+}
+Write-Output 'OK'
+`;
+        const tmpPs = path.join(app.getPath('userData'), 'print-spool', 'raw-print-' + Date.now() + '.ps1');
+        try {
+          fs.mkdirSync(path.dirname(tmpPs), { recursive: true });
+          fs.writeFileSync(tmpPs, ps, 'utf8');
+        } catch (e) {
+          return resolve({ ok: false, error: 'ps1 write failed: ' + (e && e.message) });
+        }
+        execFile(
+          'powershell.exe',
+          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmpPs],
+          { windowsHide: true, timeout: 20000 },
+          (err, stdout, stderr) => {
+            try { fs.unlinkSync(tmpPs); } catch (_) {}
+            if (err) {
+              return resolve({
+                ok: false,
+                error: String(err.message || err),
+                stderr: String(stderr || ''),
+                mode: 'winspool-fail',
+              });
+            }
+            resolve({ ok: true, mode: 'winspool-raw', stdout: String(stdout || '').trim() });
+          }
+        );
+      });
+    }
+
+    function rawPrintCopyShare(filePath, printerName) {
       return new Promise((resolve) => {
         if (process.platform !== 'win32') {
           return resolve({ ok: false, error: 'raw print only on Windows' });
         }
         const share = resolvePrinterShare(printerName);
         if (!share) return resolve({ ok: false, error: 'no printer name' });
-        // copy /b sends RAW bytes to the printer share (works for many thermal USB/shared printers)
         execFile(
           'cmd.exe',
           ['/c', 'copy', '/b', filePath, share],
           { windowsHide: true, timeout: 15000 },
           (err, stdout, stderr) => {
             if (err) {
-              // Fallback: PowerShell Out-Printer only works for text, not raw — report error
               return resolve({
                 ok: false,
                 error: String(err.message || err),
                 stderr: String(stderr || ''),
                 share,
+                mode: 'copy-raw-fail',
               });
             }
             resolve({ ok: true, mode: 'copy-raw', share, stdout: String(stdout || '') });
@@ -877,64 +1057,452 @@ app.whenReady().then(async () => {
         );
       });
     }
+
+    /** Plain text via Out-Printer — last resort (no Chromium). */
+    function textPrintOutPrinter(text, printerName) {
+      return new Promise((resolve) => {
+        if (process.platform !== 'win32') {
+          return resolve({ ok: false, error: 'text print only on Windows' });
+        }
+        const name = String(printerName || '').trim();
+        if (!name) return resolve({ ok: false, error: 'no printer name' });
+        const spoolDir = path.join(app.getPath('userData'), 'print-spool');
+        try { fs.mkdirSync(spoolDir, { recursive: true }); } catch (_) {}
+        const txtPath = path.join(spoolDir, 'job-' + Date.now() + '.txt');
+        const body = String(text || '')
+          .replace(/[\u20B9\u00A3\u20AC]/g, 'Rs.')
+          .replace(/[\u00A0\u202F\u2007\u2009]/g, ' ')
+          .replace(/Rs\.\s*/g, 'Rs.')
+          .replace(/([A-Za-z])Rs\./g, '$1 Rs.')
+          .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '');
+        try {
+          fs.writeFileSync(txtPath, body + '\r\n\r\n\r\n', 'ascii');
+        } catch (e) {
+          return resolve({ ok: false, error: 'txt write failed: ' + (e && e.message) });
+        }
+        const pName = name.replace(/'/g, "''");
+        const pFile = txtPath.replace(/'/g, "''");
+        const ps = `Get-Content -LiteralPath '${pFile}' -Raw | Out-Printer -Name '${pName}'`;
+        execFile(
+          'powershell.exe',
+          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps],
+          { windowsHide: true, timeout: 20000 },
+          (err, stdout, stderr) => {
+            try { fs.unlinkSync(txtPath); } catch (_) {}
+            if (err) {
+              return resolve({
+                ok: false,
+                error: String(err.message || err),
+                stderr: String(stderr || ''),
+                mode: 'out-printer-fail',
+              });
+            }
+            resolve({ ok: true, mode: 'out-printer-text', stdout: String(stdout || '') });
+          }
+        );
+      });
+    }
+
+    async function sendThermalJob({ raw, text, deviceName }) {
+      const name = resolvePreferredPrinterName(deviceName);
+      if (!name) {
+        return {
+          ok: false,
+          error: 'No printer selected. Click the printer chip in the top bar and choose POS58 Printer.',
+        };
+      }
+      const spoolDir = path.join(app.getPath('userData'), 'print-spool');
+      if (!fs.existsSync(spoolDir)) fs.mkdirSync(spoolDir, { recursive: true });
+      const file = path.join(spoolDir, 'job-' + Date.now() + '.bin');
+      let bytes = raw;
+      if (!bytes && text) bytes = buildEscPosFromText(text);
+      if (!bytes || !bytes.length) return { ok: false, error: 'empty print payload' };
+      fs.writeFileSync(file, bytes);
+
+      // 1) Winspool RAW (no share required) — correct path for POS58 USB
+      let res = await rawPrintWinspool(file, name);
+      if (res.ok) return { ok: true, spool: file, deviceName: name, ...res };
+
+      // 2) copy /b to shared printer
+      const res2 = await rawPrintCopyShare(file, name);
+      if (res2.ok) return { ok: true, spool: file, deviceName: name, ...res2 };
+
+      // 3) Plain text Out-Printer (still not Chromium)
+      const plain = text || '';
+      if (plain) {
+        const res3 = await textPrintOutPrinter(plain, name);
+        if (res3.ok) return { ok: true, spool: file, deviceName: name, ...res3 };
+        return {
+          ok: false,
+          error:
+            'Could not print to "' + name + '". ' +
+            'Tried RAW + text. Last error: ' + (res3.error || res2.error || res.error || 'unknown'),
+          deviceName: name,
+          spool: file,
+        };
+      }
+      return {
+        ok: false,
+        error:
+          'RAW print failed for "' + name + '": ' + (res.error || res2.error || 'unknown') +
+          '. Ensure the printer is online and selected in the top bar.',
+        deviceName: name,
+        spool: file,
+      };
+    }
+
+    /**
+     * Professional POS print (same HTML+QR as web, no Ctrl+P):
+     * 1) Write receipt HTML with auto window.print()
+     * 2) Temporarily set preferred thermal as Windows default printer
+     * 3) Launch Chrome/Edge with --kiosk-printing (silent, no dialog)
+     * 4) Restore previous default printer
+     *
+     * Electron webContents.print blacks POS58; system Chrome does not.
+     */
+    function findSystemBrowser() {
+      const env = process.env || {};
+      const candidates = [
+        path.join(env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(env.PROGRAMFILES || 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        path.join(env.PROGRAMFILES || 'C:\\Program Files', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        path.join(env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        path.join(env.LOCALAPPDATA || '', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      ];
+      for (const c of candidates) {
+        try {
+          if (c && fs.existsSync(c)) return c;
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    function getWindowsDefaultPrinter() {
+      return new Promise((resolve) => {
+        if (process.platform !== 'win32') return resolve(null);
+        execFile(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            "(Get-CimInstance Win32_Printer | Where-Object {$_.Default}).Name",
+          ],
+          { windowsHide: true, timeout: 8000 },
+          (err, stdout) => {
+            if (err) return resolve(null);
+            const name = String(stdout || '').trim().split(/\r?\n/).filter(Boolean)[0] || null;
+            resolve(name);
+          }
+        );
+      });
+    }
+
+    function setWindowsDefaultPrinter(printerName) {
+      return new Promise((resolve) => {
+        if (process.platform !== 'win32' || !printerName) return resolve({ ok: false });
+        const name = String(printerName).replace(/'/g, "''");
+        // PrintUI is the reliable way to set default without admin elevation
+        execFile(
+          'rundll32.exe',
+          ['printui.dll,PrintUIEntry', '/y', '/n', String(printerName)],
+          { windowsHide: true, timeout: 8000 },
+          (err) => {
+            if (!err) return resolve({ ok: true, mode: 'printui' });
+            // Fallback: WMI
+            execFile(
+              'powershell.exe',
+              [
+                '-NoProfile',
+                '-ExecutionPolicy',
+                'Bypass',
+                '-Command',
+                `$p = Get-CimInstance Win32_Printer -Filter "Name='${name}'"; if ($p) { Invoke-CimMethod -InputObject $p -MethodName SetDefaultPrinter | Out-Null; 'OK' } else { throw 'not found' }`,
+              ],
+              { windowsHide: true, timeout: 10000 },
+              (err2) => resolve({ ok: !err2, mode: err2 ? 'fail' : 'wmi' })
+            );
+          }
+        );
+      });
+    }
+
+    function injectAutoprintScript(html, opts) {
+      // NEVER put a full-screen "Printing…" overlay in the document body —
+      // kiosk-printing would print only that text on the thermal roll.
+      // Status stays on RestroSuite toast; this page is receipt-only.
+      // Print policy: never rasterize page backgrounds. Thermal GDI drivers
+      // render background fills as solid black, so receipts print on a forced
+      // white page with print-color-adjust: economy (backgrounds suppressed).
+      const suppressBackgrounds = !(opts && opts.printBackground === true);
+      const printColorAdjust = suppressBackgrounds ? 'economy' : 'exact';
+      const script =
+        '<script>(function(){' +
+        'var printed=false;' +
+        'function go(){' +
+        'if(printed)return;printed=true;' +
+        'try{window.focus()}catch(e){}' +
+        'try{window.print()}catch(e){printed=false}' +
+        '}' +
+        'function waitImgs(cb){' +
+        'var imgs=Array.prototype.slice.call(document.images||[]);' +
+        'if(!imgs.length)return cb();' +
+        'var left=imgs.length,done=false;' +
+        'function one(){if(done)return;if(--left<=0){done=true;cb()}}' +
+        'imgs.forEach(function(img){if(img.complete)one();else{img.onload=img.onerror=one}});' +
+        'setTimeout(function(){if(!done){done=true;cb()}},2500)' +
+        '}' +
+        'function start(){waitImgs(function(){setTimeout(go,300)})}' +
+        'if(document.readyState==="complete")start();' +
+        'else window.addEventListener("load",start);' +
+        'window.addEventListener("afterprint",function(){' +
+        'setTimeout(function(){try{window.close()}catch(e){}},300)' +
+        '});' +
+        'setTimeout(function(){try{window.close()}catch(e){}},10000);' +
+        '})();</script>';
+      // Ensure print CSS never shows screen-only chrome
+      const printCss =
+        '<style id="rs-print-only">' +
+        '@page{margin:2mm;size:80mm auto}' +
+        'html,body{margin:0;padding:0;background:#fff!important;color:#000!important}' +
+        '*,*:before,*:after{-webkit-print-color-adjust:' + printColorAdjust + '!important;print-color-adjust:' + printColorAdjust + '!important}' +
+        '@media print{html,body{background:#fff!important} #rs-print-status,.rs-no-print{display:none!important}}' +
+        '</style>';
+      let doc = String(html || '');
+      if (!/<html[\s>]/i.test(doc)) {
+        doc =
+          '<!doctype html><html><head><meta charset="utf-8">' +
+          printCss +
+          '</head><body>' +
+          doc +
+          '</body></html>';
+      } else if (/<\/head>/i.test(doc)) {
+        doc = doc.replace(/<\/head>/i, printCss + '</head>');
+      } else if (/<body/i.test(doc)) {
+        doc = doc.replace(/<body/i, printCss + '<body');
+      }
+      if (/<\/body>/i.test(doc)) return doc.replace(/<\/body>/i, script + '</body>');
+      return doc + script;
+    }
+
+    async function openReceiptInSystemBrowser(html, opts) {
+      const options = opts || {};
+      // dialog:true → show print dialog (Ctrl+P style). Default = silent kiosk print.
+      const wantDialog = options.dialog === true || options.silent === false;
+      const spoolDir = path.join(app.getPath('userData'), 'print-spool');
+      try {
+        if (!fs.existsSync(spoolDir)) fs.mkdirSync(spoolDir, { recursive: true });
+      } catch (e) {
+        return { ok: false, error: 'spool dir failed: ' + (e && e.message), mode: 'system-browser-fail' };
+      }
+      const safeTitle = String(options.title || 'Receipt')
+        .replace(/[^\w\-]+/g, '_')
+        .slice(0, 40) || 'Receipt';
+      const file = path.join(spoolDir, safeTitle + '-' + Date.now() + '.html');
+      try {
+        fs.writeFileSync(file, injectAutoprintScript(html, { dialog: wantDialog, printBackground: false }), 'utf8');
+      } catch (e) {
+        return { ok: false, error: 'html write failed: ' + (e && e.message), mode: 'system-browser-fail' };
+      }
+      const fileUrl = 'file:///' + file.replace(/\\/g, '/');
+      const browser = findSystemBrowser();
+
+      // Preferred thermal for this job (top-bar printer chip)
+      const targetPrinter = resolvePreferredPrinterName(options.deviceName || null);
+
+      // ── Default-printer switch with crash-safe restore ────────────────
+      // kiosk-printing uses Windows default. We may temporarily set POS58 as
+      // default, but MUST restore the previous default (file-backed so a
+      // crash mid-print still recovers on next app start).
+      const defaultRestorePath = path.join(app.getPath('userData'), 'print-default-restore.json');
+      let previousDefault = null;
+      let switchedDefault = false;
+
+      const persistPendingRestore = (name) => {
+        try {
+          fs.writeFileSync(
+            defaultRestorePath,
+            JSON.stringify({ previousDefault: name, at: Date.now() }),
+            'utf8'
+          );
+        } catch (_) {}
+      };
+      const clearPendingRestore = () => {
+        try { fs.unlinkSync(defaultRestorePath); } catch (_) {}
+      };
+      const restoreDefault = async () => {
+        if (!switchedDefault || !previousDefault) {
+          // Still clear any stale pending file
+          clearPendingRestore();
+          return;
+        }
+        try {
+          await setWindowsDefaultPrinter(previousDefault);
+        } catch (_) {}
+        clearPendingRestore();
+        switchedDefault = false;
+      };
+
+      if (!wantDialog && targetPrinter && process.platform === 'win32') {
+        try {
+          previousDefault = await getWindowsDefaultPrinter();
+          if (!previousDefault || previousDefault.toLowerCase() !== targetPrinter.toLowerCase()) {
+            persistPendingRestore(previousDefault || '');
+            const sw = await setWindowsDefaultPrinter(targetPrinter);
+            switchedDefault = !!(sw && sw.ok);
+            if (!switchedDefault) clearPendingRestore();
+          }
+        } catch (_) {
+          clearPendingRestore();
+        }
+      }
+
+      try {
+        if (browser) {
+          const { spawn } = require('child_process');
+          const profileDir = path.join(app.getPath('userData'), 'chrome-print-profile');
+          try { fs.mkdirSync(profileDir, { recursive: true }); } catch (_) {}
+          // Dedicated profile + kiosk-printing = silent print, no Ctrl+P
+          const args = [
+            '--user-data-dir=' + profileDir,
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-extensions',
+            '--disable-popup-blocking',
+            '--disable-translate',
+          ];
+          if (!wantDialog) {
+            args.push('--kiosk-printing');
+          }
+          args.push('--app=' + fileUrl);
+          const child = spawn(browser, args, {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: false,
+          });
+          child.unref();
+        } else {
+          const err = await shell.openPath(file);
+          if (err) await shell.openExternal(fileUrl);
+        }
+
+        // Restore previous Windows default quickly + retries (never leave POS58 stuck)
+        setTimeout(() => { restoreDefault().catch(() => {}); }, 4000);
+        setTimeout(() => { restoreDefault().catch(() => {}); }, 10000);
+        setTimeout(() => { restoreDefault().catch(() => {}); }, 20000);
+        setTimeout(() => {
+          try { fs.unlinkSync(file); } catch (_) {}
+        }, 10 * 60 * 1000);
+
+        return {
+          ok: true,
+          mode: wantDialog ? 'system-browser-dialog' : 'system-browser-silent',
+          browser: browser ? path.basename(browser) : 'default',
+          printer: targetPrinter || null,
+          switchedDefault,
+          file,
+        };
+      } catch (e) {
+        await restoreDefault();
+        return {
+          ok: false,
+          error: String(e && e.message || e),
+          mode: 'system-browser-fail',
+          file,
+        };
+      }
+    }
+
+    /** If a prior print crashed mid-switch, restore Windows default printer. */
+    async function recoverPendingDefaultPrinter() {
+      if (process.platform !== 'win32') return;
+      const p = path.join(app.getPath('userData'), 'print-default-restore.json');
+      try {
+        if (!fs.existsSync(p)) return;
+        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+        const name = data && data.previousDefault ? String(data.previousDefault).trim() : '';
+        if (name) {
+          await setWindowsDefaultPrinter(name);
+        }
+        try { fs.unlinkSync(p); } catch (_) {}
+      } catch (_) {
+        try { fs.unlinkSync(p); } catch (_) {}
+      }
+    }
+    // Run once handlers exist (after cold start or crash mid-print)
+    try { await recoverPendingDefaultPrinter(); } catch (_) {}
+
+    function isThermalPrinterNameMain(name) {
+      const n = String(name || '').toLowerCase();
+      if (!n) return true;
+      return /pos\s*58|pos\s*80|pos58|pos80|thermal|receipt|rongta|xprinter|xp-|epson\s*tm|gprinter|bixolon|citizen\s*ct|star\s*tsp|generic\s*\/\s*text|esc\/?pos/i.test(n);
+    }
+
+    // Primary HTML path: always real Chrome/Edge (never Electron print for receipts)
+    ipcMain.handle('rs-open-receipt-browser', async (_evt, payload) => {
+      const html = String((payload && payload.html) || '');
+      if (!html) return { ok: false, error: 'empty html' };
+      return openReceiptInSystemBrowser(html, {
+        title: (payload && payload.title) || 'Receipt',
+        deviceName: (payload && payload.deviceName) || null,
+        // Default silent POS print (no Ctrl+P). Pass dialog:true to show dialog.
+        silent: payload && payload.silent === false ? false : true,
+        dialog: payload && payload.dialog === true,
+      });
+    });
+
+    ipcMain.handle('rs-print-html', async (_evt, payload) => {
+      const html = String((payload && payload.html) || '');
+      if (!html) return { ok: false, error: 'empty html' };
+      const deviceName = resolvePreferredPrinterName((payload && payload.deviceName) || null);
+      const browserStyle =
+        payload &&
+        (payload.browserStyle === true ||
+          payload.mode === 'browser-html' ||
+          payload.mode === 'system-browser' ||
+          payload.openInBrowser === true);
+      const forceRaw =
+        payload && (payload.raw === true || payload.mode === 'raw' || payload.mode === 'escpos');
+
+      // Option A (default for formatted receipts): silent Chrome HTML to POS58
+      if (browserStyle && !forceRaw) {
+        const res = await openReceiptInSystemBrowser(html, {
+          title: (payload && payload.title) || 'Receipt',
+          deviceName,
+          silent: payload && payload.silent === false ? false : true,
+          dialog: payload && payload.dialog === true,
+        });
+        if (res && res.ok) return res;
+        console.warn('[print] system browser open failed:', res && res.error);
+      }
+
+      // RAW text for thermal (fallback or forced)
+      if (forceRaw || isThermalPrinterNameMain(deviceName)) {
+        const plain = htmlToPlainTextMain(html);
+        if (!plain) return { ok: false, error: 'empty text after html strip' };
+        return sendThermalJob({ text: plain, deviceName });
+      }
+
+      // Non-thermal A4/etc: still prefer system browser over Electron print
+      const res = await openReceiptInSystemBrowser(html, {
+        title: (payload && payload.title) || 'Print',
+      });
+      if (res && res.ok) return res;
+      const plain = htmlToPlainTextMain(html);
+      if (!plain) return { ok: false, error: 'empty text after html strip' };
+      return sendThermalJob({ text: plain, deviceName });
+    });
+
     ipcMain.handle('rs-print-escpos', async (_evt, payload) => {
       try {
         const bytesB64 = payload && payload.base64;
         const text = payload && payload.text;
-        let deviceName = (payload && payload.deviceName) || null;
-        if (!deviceName) {
-          try {
-            const pref = JSON.parse(fs.readFileSync(preferredPrinterPath(), 'utf8'));
-            deviceName = pref && pref.name;
-          } catch (_) {}
-        }
-        const spoolDir = path.join(app.getPath('userData'), 'print-spool');
-        if (!fs.existsSync(spoolDir)) fs.mkdirSync(spoolDir, { recursive: true });
-        const file = path.join(spoolDir, 'job-' + Date.now() + '.bin');
-        let raw;
-        if (bytesB64) {
-          raw = Buffer.from(String(bytesB64), 'base64');
-        } else if (text) {
-          raw = buildEscPosFromText(text);
-        } else {
-          return { ok: false, error: 'no payload' };
-        }
-        fs.writeFileSync(file, raw);
-
-        // Prefer RAW to Windows printer share
-        if (deviceName) {
-          const rawRes = await rawPrintWindows(file, deviceName);
-          if (rawRes.ok) {
-            return { ok: true, spool: file, ...rawRes, deviceName };
-          }
-          // fall through to silent HTML
-          console.warn('[print] raw copy failed, HTML silent fallback:', rawRes.error);
-        }
-
-        // Silent HTML monospace fallback (always available)
-        const previewText = text || (bytesB64 ? '[binary ESC/POS job]' : '');
-        const html = `<!doctype html><pre style="font:12px/1.3 monospace;width:280px;white-space:pre-wrap;margin:8px">${String(previewText)
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>`;
-        const printWin = new BrowserWindow({
-          show: false,
-          webPreferences: { offscreen: true, sandbox: true },
-        });
-        try {
-          await printWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-          await new Promise((r) => setTimeout(r, 200));
-          await new Promise((resolve, reject) => {
-            printWin.webContents.print(
-              { silent: true, printBackground: false, deviceName: deviceName || undefined, margins: { marginType: 'none' } },
-              (success, failureReason) => {
-                if (!success) reject(new Error(failureReason || 'print failed'));
-                else resolve();
-              }
-            );
-          });
-          return { ok: true, spool: file, mode: 'html-silent', deviceName: deviceName || null };
-        } finally {
-          try { printWin.destroy(); } catch (_) {}
-        }
+        const deviceName = (payload && payload.deviceName) || null;
+        let raw = null;
+        if (bytesB64) raw = Buffer.from(String(bytesB64), 'base64');
+        return await sendThermalJob({ raw, text, deviceName });
       } catch (e) {
         return { ok: false, error: String(e && e.message || e) };
       }
@@ -1023,7 +1591,15 @@ app.on('before-quit', () => {
 });
 
 app.on('quit', () => {
+  try {
+    if (trayWatchTimer) {
+      clearInterval(trayWatchTimer);
+      trayWatchTimer = null;
+    }
+  } catch (_) {}
   try { if (tray) { tray.destroy(); tray = null; } } catch (e) { /* noop */ }
+  trayImageRef = null;
+  trayIconPathRef = null;
   try { if (lanDiscoveryInstance) lanDiscoveryInstance.close(); } catch (e) { /* noop */ }
   try { if (serverInstance) serverInstance.close(); } catch (e) { /* noop */ }
 });

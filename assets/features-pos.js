@@ -694,7 +694,9 @@
 
     async function compilePreviewPDF(bill) {
       if (window.RSReceiptEngine && typeof RSReceiptEngine.toPDF === 'function') {
-        return RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet() });
+        // Explicit PDF export keeps the pixel-perfect preview capture (thermal is
+        // now the default for automated WhatsApp sends inside toPDF).
+        return RSReceiptEngine.toPDF(bill, { outletProfile: engineOutlet(), mode: 'preview' });
       }
       throw new Error('Receipt engine not loaded');
     }
@@ -2899,7 +2901,9 @@
         const bill = {
           no: billNo,
           time: new Date().toLocaleString(window.RS_getOutletLocale ? RS_getOutletLocale() : 'en-IN', {
-            day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
+            // Year is required: receipt engine re-parses this string, and V8 resolves
+            // a year-less "09 Aug, 2:14 pm" as 2001 (wrong year on every receipt).
+            day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
             timeZone: window.RS_getOutletTimezone ? RS_getOutletTimezone() : 'Asia/Kolkata'
           }),
           table: custSnap.table,
@@ -3006,41 +3010,98 @@
           console.warn('[Commission] record failed', commErr);
         }
 
-        // 1) Memory + DURABLE local/cloud put BEFORE clearing cart (money integrity)
+        // 1) Memory + DURABLE local seal FIRST (money integrity, never block UI on cloud)
         RS.BILLS.unshift(billRow);
         let syncStatus = 'local';
+        billRow.syncStatus = 'local';
+        bill.syncStatus = 'local';
+
+        // Local durable write only — cloud happens in background with a short UI budget
         try {
-          const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-          if (RS.saveOne) {
-            const saved = await RS.saveOne('bills', billRow);
-            if (saved && saved.id != null) {
-              billRow.id = saved.id;
-            }
+          if (window.RS_DB && typeof RS_DB.putLocal === 'function') {
+            await RS_DB.putLocal('bills', billRow.id, billRow);
           } else if (window.RS_DB && RS_DB.put) {
-            await RS_DB.put('bills', billRow.id, billRow);
+            // Fallback: put still writes local before cloud inside guard()
+            await Promise.race([
+              RS_DB.put('bills', billRow.id, { ...billRow, syncStatus: 'local' }),
+              new Promise((r) => setTimeout(r, 250)),
+            ]);
           }
-          const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
-          if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+        } catch (localErr) {
+          console.warn('[checkout] local bill seal failed', localErr);
+        }
+
+        // Clear cart immediately after local seal so paid items never stick on screen
+        function wipeCartAfterPay() {
+          try {
+            if (window.RS && typeof RS.clearCart === 'function') RS.clearCart();
+          } catch (e) {
+            console.warn('[checkout] clearCart failed', e);
+          }
+          try { resetCustomerFields(); } catch (_) {}
+          try { resetPayment(); } catch (_) {}
+        }
+        wipeCartAfterPay();
+
+        // Cloud sync: short wait for badge status, never freeze Print & Pay 15–20s
+        const syncErrorBefore = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+        let saveResolved = false;
+        const saveBillCloud = (async () => {
+          try {
+            let saved = null;
+            if (RS.saveOne) {
+              saved = await RS.saveOne('bills', billRow);
+              if (saved && saved.id != null) billRow.id = saved.id;
+            } else if (window.RS_DB && RS_DB.put) {
+              saved = await RS_DB.put('bills', billRow.id, billRow);
+              if (saved && saved.id != null) billRow.id = saved.id;
+            }
+            saveResolved = true;
+            const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+            if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+              syncStatus = 'pending';
+            } else if (navigator.onLine === false) {
+              syncStatus = 'pending';
+            } else {
+              syncStatus = 'synced';
+            }
+            billRow.syncStatus = syncStatus;
+            bill.syncStatus = syncStatus;
+            return saved;
+          } catch (e) {
+            console.warn('Bill save failed', e);
+            saveResolved = true;
             syncStatus = 'pending';
             billRow.syncStatus = 'pending';
             bill.syncStatus = 'pending';
-            RS.toast('Bill saved on this device. Cloud sync pending.', 'fa-cloud-arrow-up');
-          } else if (navigator.onLine === false) {
-            syncStatus = 'pending';
-            billRow.syncStatus = 'pending';
-            bill.syncStatus = 'pending';
-          } else {
-            syncStatus = 'synced';
-            billRow.syncStatus = 'synced';
-            bill.syncStatus = 'synced';
+            RS.toast('Bill kept on this device. Will sync when online.', 'fa-cloud-arrow-up');
+            return null;
           }
-        } catch (e) {
-          console.warn('Bill save failed', e);
+        })();
+
+        // Budget ~350ms for cloud so settle UI stays snappy; rest continues in background
+        await Promise.race([
+          saveBillCloud,
+          new Promise((r) => setTimeout(r, 350)),
+        ]);
+        if (!saveResolved) {
           syncStatus = 'pending';
           billRow.syncStatus = 'pending';
           bill.syncStatus = 'pending';
-          // Local write already attempted inside guard(); still show receipt so cashier is not stuck
-          RS.toast('Bill kept on this device. Will sync when online.', 'fa-cloud-arrow-up');
+          // Quiet: local seal already done; queue/timeout path will sync
+          saveBillCloud.then(() => {
+            try {
+              if (bill.syncStatus === 'synced' || billRow.syncStatus === 'synced') {
+                /* optional: update receipt badge if still open */
+              }
+            } catch (_) {}
+          }).catch(() => {});
+        } else if (syncStatus === 'pending' && navigator.onLine !== false) {
+          // Only toast when we know cloud failed within the budget (not mere timeout)
+          const syncErrorAfter = window.RS_LAST_CLOUD_ERROR && window.RS_LAST_CLOUD_ERROR.time;
+          if (syncErrorAfter && syncErrorAfter !== syncErrorBefore) {
+            RS.toast('Bill saved on this device. Cloud sync pending.', 'fa-cloud-arrow-up');
+          }
         }
 
         // 2) Min skeleton time, then morph same card → real Bill settled
@@ -3061,10 +3122,9 @@
             throw showErr;
           }
         }
+        // Second clear after receipt (belt + suspenders for any rehydrate race)
         requestAnimationFrame(() => {
-          try { RS.clearCart(); } catch (_) {}
-          try { resetCustomerFields(); } catch (_) {}
-          try { resetPayment(); } catch (_) {}
+          wipeCartAfterPay();
         });
         document.dispatchEvent(new CustomEvent('rs:bill-paid', {
           detail: {

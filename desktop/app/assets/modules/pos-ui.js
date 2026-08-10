@@ -228,9 +228,6 @@
   function stockClsMap() {
     return (global.RS && RS.stockCls) || { ok: 'stock-ok', low: 'stock-low', out: 'stock-out' };
   }
-  function activateTab(id) {
-    if (global.RS && typeof RS.activateTab === 'function') {return RS.activateTab(id);}
-  }
 
   /* ---- Happy hour (time-window menu pricing) ---- */
   function parseHHMM(str) {
@@ -1339,12 +1336,10 @@ function getTotals(){
   const bandMap = {};
   let totalGst = 0;
   let totalLiquorTax = 0;
-  let totalTaxableValue = 0;
 
   items.forEach(item => {
     totalGst += item.tax;
     totalLiquorTax += item.liquorTax;
-    totalTaxableValue += item.lineTaxableValue;
 
     // Only build tax bands when taxes are ON and there is actual tax/VAT.
     // Old bug: `taxPercent >= 0` always true → empty CGST/SGST/SAC on every receipt.
@@ -1470,6 +1465,23 @@ function setPromo(p) {
 function getPromo() {
   return { ...activePromo };
 }
+/** Wipe cart localStorage so paid items cannot reappear after checkout or tab switch.
+ *  Keys go through the tenant-scoped localStorage wrapper in db.js. */
+function wipeCartPersistence() {
+  try {
+    localStorage.removeItem('rs_active_cart');
+    localStorage.removeItem('rs_active_cart_discount');
+    localStorage.removeItem('rs_active_cart_tip');
+    localStorage.removeItem('rs_active_cart_customer');
+    // Known order-type keys used by renderCart / order-type tab switch
+    ['Takeaway', 'Dine-in', 'Delivery'].forEach((k) => {
+      try { localStorage.removeItem('rs_tab_cart_' + k); } catch (_) {}
+      try { localStorage.removeItem('rs_tab_cust_' + k); } catch (_) {}
+    });
+  } catch (e) {
+    console.warn('[Cart] wipe persistence failed', e);
+  }
+}
 function clearCart(){
   replaceCart([]);
   discountPct=0; tipAmount=0; loyaltyRedeem=0; loyaltyPointsUsed=0;
@@ -1478,7 +1490,20 @@ function clearCart(){
   setCovers(0);
   const d=$('#disc-input'); if(d) {d.value='';}
   const tipEl=$('#tip-input'); if(tipEl) {tipEl.value='';}
+  // Hard-wipe first so renderCart cannot re-read stale lines mid-flight
+  try { wipeCartPersistence(); } catch (_) {}
   renderCart();
+  // renderCart re-saves the (now empty) cart; wipe tab keys again then allow empty active cart save
+  try {
+    ['Takeaway', 'Dine-in', 'Delivery'].forEach((k) => {
+      try { localStorage.removeItem('rs_tab_cart_' + k); } catch (_) {}
+      try { localStorage.removeItem('rs_tab_cust_' + k); } catch (_) {}
+    });
+    // Keep empty active cart snapshot so refresh stays empty (not "missing key → load old")
+    localStorage.setItem('rs_active_cart', '[]');
+    localStorage.setItem('rs_active_cart_discount', '0');
+    localStorage.setItem('rs_active_cart_tip', '0');
+  } catch (_) {}
   if (window.innerWidth <= 1024) {closeMobilePOSCart(false);}
 }
 function getCovers() {
@@ -1781,7 +1806,6 @@ function initPOS(){
     try {
       const curActiveBtn = document.querySelector('.order-type-btn.active');
       if (curActiveBtn && curActiveBtn !== b) {
-        const outType = curActiveBtn.textContent.trim().toLowerCase();
         const tabKey = getTabKeyForOrderType(curActiveBtn.textContent.trim());
         const da = document.getElementById('delivery-address');
         const dc = document.getElementById('delivery-charge');

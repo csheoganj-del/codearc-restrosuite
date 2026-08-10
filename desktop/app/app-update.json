@@ -1,14 +1,16 @@
 {
-  "version": "v236-20260802-frictionless",
-  "date": "2026-08-02",
-  "title": "Live update v236-20260802-frictionless",
-  "summary": "Automatic deploy update — installed desktop apps will download this UI content.",
+  "version": "v293-20260808-ten-x-utility",
+  "date": "2026-08-08",
+  "title": "10x utility: version, checklist, WA plain language",
+  "summary": "Unified App+Features version chip, owner open checklist, safer print default restore, plain WhatsApp status, go-live smoke.",
   "highlights": [
-    "Automatic content release v236-20260802-frictionless",
-    "Desktop EXE picks this up via content updater (no new installer required)",
-    "Restart RestroSuite after Update now if prompted"
+    "App 2.0.x + Features v### in one chip",
+    "Open checklist for staff (sidebar)",
+    "Print restores Windows default printer safely",
+    "WhatsApp: Linked · OK language",
+    "docs/GO_LIVE_DAILY_CHECKLIST.md"
   ],
   "tour": "settle-skel-tabs",
-  "contentStamp": "5e79cf66d3c9",
-  "buildId": "5e79cf66d3c9"
+  "contentStamp": "112238f84e2d",
+  "buildId": "112238f84e2d"
 }

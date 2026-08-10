@@ -8,8 +8,6 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  let client = null;
-
   // Local/Demo mock data stores to preserve state in local mode
   const mockMasterMenu = [
     { sku: 'COF-001', name: 'Premium Espresso Blend', category: 'Beverages', price: 180.00, veg: true, status: 'Active' },
@@ -31,8 +29,7 @@
     { ingredient: 'Red Velvet Bases', nagpur: { val: 30, status: 'ok' }, delhi: { val: 15, status: 'ok' }, noida: { val: 28, status: 'ok' } }
   ];
 
-  function init(apiClient) {
-    client = apiClient;
+  function init() {
     bindEvents();
     loadDashboard();
   }

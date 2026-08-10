@@ -52,7 +52,8 @@
       if (global.RS_API && typeof RS_API.data === 'function' && !RS_API.zeroCostLaunchMode && navigator.onLine !== false) {
         const res = await Promise.race([
           RS_API.data({ operation: 'next_bill_no', day }),
-          new Promise((_, rej) => { setTimeout(() => rej(new Error('next_bill_no timeout')), 4000); }),
+          // Keep short so Print & Pay never sits on "Settling…" waiting for server sequence
+          new Promise((_, rej) => { setTimeout(() => rej(new Error('next_bill_no timeout')), 1500); }),
         ]);
         const no = (res && (res.no || res.order_id || res.data)) || null;
         if (no && typeof no === 'string' && /^RS-\d{6}-\d+$/i.test(no)) {

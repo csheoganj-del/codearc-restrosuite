@@ -11,7 +11,7 @@
 
   function toast(msg, icon) {
     if (global.RS && typeof RS.toast === 'function') {RS.toast(msg, icon);}
-    else if (typeof console !== 'undefined') {console.log('[RS10]', msg);}
+    else if (typeof console !== 'undefined') {console.warn('[RS10]', msg);}
   }
   function esc(s) {
     return String(s == null ? '' : s)
@@ -29,20 +29,6 @@
       return (global.RS_API && RS_API.session && RS_API.session()) || {};
     } catch (_) {
       return {};
-    }
-  }
-  function isTouchMobile() {
-    try {
-      return window.matchMedia('(max-width: 900px), (hover: none) and (pointer: coarse)').matches;
-    } catch (_) {
-      return window.innerWidth <= 900;
-    }
-  }
-  function isDesktopWide() {
-    try {
-      return window.matchMedia('(min-width: 1025px) and (hover: hover)').matches;
-    } catch (_) {
-      return window.innerWidth >= 1025;
     }
   }
 

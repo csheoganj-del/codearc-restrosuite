@@ -1,32 +1,27 @@
 [
   {
     "source": "/downloads/RestroSuite-Windows-Setup.exe",
-    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Setup.exe",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Windows-Setup.exe",
     "permanent": false
   },
   {
     "source": "/downloads/RestroSuite-Windows-Portable.exe",
-    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Windows-Portable.exe",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Windows-Portable.exe",
     "permanent": false
   },
   {
-    "source": "/downloads/desktop/RestroSuite-2.0.8-x64.exe",
-    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-2.0.8-x64.exe",
+    "source": "/downloads/desktop/RestroSuite-2.0.20-x64.exe",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-2.0.25-x64.exe",
     "permanent": false
   },
   {
     "source": "/downloads/RestroSuite-Mac-AppleSilicon.dmg",
-    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Mac-AppleSilicon.dmg",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Mac-AppleSilicon.dmg",
     "permanent": false
   },
   {
     "source": "/downloads/RestroSuite-Mac-Intel.dmg",
-    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Mac-Intel.dmg",
-    "permanent": false
-  },
-  {
-    "source": "/downloads/RestroSuite-Android.apk",
-    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.8/RestroSuite-Android.apk",
+    "destination": "https://github.com/csheoganj-del/restrosuite-downloads/releases/download/v2.0.25/RestroSuite-Mac-Intel.dmg",
     "permanent": false
   }
 ]

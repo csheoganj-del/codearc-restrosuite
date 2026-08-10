@@ -1109,7 +1109,6 @@
     opts = opts || {};
     const s = setupStatus();
     if (s.allLinked && !opts.force) {return '';}
-    const place = opts.place || 'here';
     let msg;
     if (!s.hasStock) {msg = 'First add store-room items (Stock), then link recipes so sales reduce stock.';}
     else if (!s.hasMenu) {msg = 'Add dishes on the menu, then link each one to stock.';}

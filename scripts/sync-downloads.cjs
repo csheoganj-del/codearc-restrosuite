@@ -222,8 +222,12 @@ function main() {
   const androidVer = readAndroidVersions();
   const desktopDir = path.join(ROOT, 'desktop', 'dist');
 
-  const apk = latestFile(path.join(ROOT, 'android-app', 'dist'), /RestroSuite.*\.apk$/i)
-    || latestFile(path.join(ROOT, 'android-app', 'dist'), /\.apk$/i);
+  // Prefer the release-signed build: a newer debug APK must never silently
+  // replace the public release APK (debug builds are unminified and debug-signed).
+  const apkDir = path.join(ROOT, 'android-app', 'dist');
+  const apk = latestFile(apkDir, /RestroSuite-.*-release-signed\.apk$/i)
+    || latestFile(apkDir, /RestroSuite-.*\.apk$/i)
+    || latestFile(apkDir, /\.apk$/i);
 
   const items = [];
   let apkMeta = null;
@@ -311,7 +315,6 @@ function main() {
   const desk = publishDesktopFeed(desktopDir, desktopPkg);
 
   // Public URLs: GitHub for large EXEs; site paths only if GH missing (local/dev)
-  const portablePublicUrl = winPortableUrl || '/downloads/RestroSuite-Windows-Portable.exe';
   const setupPublicUrl = winSetupUrl || '/downloads/RestroSuite-Windows-Setup.exe';
 
   // Public catalog: Setup installer only (portable removed — it extracts to TEMP

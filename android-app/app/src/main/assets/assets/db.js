@@ -1116,11 +1116,23 @@
       const offset = Number.isFinite(Number(options.offset)) && Number(options.offset) > 0
         ? Number(options.offset)
         : 0;
-      const rows = await API.select(m.table, {
-        order: options.order || m.order || { column: m.pk, ascending: true },
-        limit,
-        offset: offset || null,
-      });
+      let rows;
+      try {
+        rows = await API.select(m.table, {
+          order: options.order || m.order || { column: m.pk, ascending: true },
+          limit,
+          offset: offset || null,
+        });
+      } catch (err) {
+        if (isUnavailableTableError(err)) {
+          // Table is not exposed for this tenant (plan/module gated) — benign.
+          // Keep serving local data; suppress the noisy 400 + retry storm.
+          unavailableCollections[c] = Date.now();
+          persistUnavailable();
+          return LS.list(c, opts);
+        }
+        throw err;
+      }
       known[c] = new Set((rows||[]).map(r=>String(r[m.pk])));
       // Preserve client-only fields (e.g. unit cost) that older cloud schemas omit
       const mapped = (rows || []).map(m.from);
@@ -1410,6 +1422,32 @@
   const activeListRequests = {};
   const lastListFetchTime = {};
 
+  // Collections whose cloud table is not exposed for this tenant (plan/module
+  // gated — e.g. payroll/commission/owner-report tables on plans that don't
+  // include them). Tracked so background list() refreshes don't retry-and-fail
+  // on every dashboard load, spamming 400s into the console.
+  const unavailableCollections = {};
+  const UNAVAILABLE_COOLDOWN_MS = 10 * 60 * 1000; // re-probe after 10 min
+  const UNAVAILABLE_KEY = 'rs:unavailable_collections';
+  // Hydrate across page loads so the first probe is skipped too (a plan upgrade
+  // clears it naturally after the cooldown expires and the next probe succeeds).
+  try {
+    const stored = JSON.parse(localStorage.getItem(UNAVAILABLE_KEY) || '{}');
+    if (stored && typeof stored === 'object') {
+      const now = Date.now();
+      Object.keys(stored).forEach((k) => {
+        const at = Number(stored[k]);
+        if (at > now - UNAVAILABLE_COOLDOWN_MS) unavailableCollections[k] = at;
+      });
+    }
+  } catch (_) {}
+  function persistUnavailable() {
+    try { localStorage.setItem(UNAVAILABLE_KEY, JSON.stringify(unavailableCollections)); } catch (_) {}
+  }
+  function isUnavailableTableError(e) {
+    return !!(e && e.status === 400 && /not available through tenant data API/i.test(String(e && e.message || '')));
+  }
+
   const back = () => signedIn() ? CLOUD : LS;
   let cachedSettingsMap = {};
 
@@ -1473,8 +1511,10 @@
       const now = Date.now();
       const lastFetch = lastListFetchTime[c] || 0;
 
-      // Instant paint from local cache; background cloud refresh (deduped, 2.5s min gap)
-      if (!activeListRequests[c] && (now - lastFetch > 2500)) {
+      // Instant paint from local cache; background cloud refresh (deduped, 2.5s min gap).
+      // Skip collections the tenant API just told us are unavailable (cooldown window).
+      const unavailableAt = unavailableCollections[c] || 0;
+      if (!activeListRequests[c] && (now - lastFetch > 2500) && (now - unavailableAt > UNAVAILABLE_COOLDOWN_MS)) {
         activeListRequests[c] = (async () => {
           try {
             const res = await CLOUD.list(c, ...args);
@@ -1524,7 +1564,9 @@
               }
             }
           } catch(e) {
-            console.warn(`[RS_DB] background list ${c} sync failed:`, e.message);
+            if (!isUnavailableTableError(e)) {
+              console.warn(`[RS_DB] background list ${c} sync failed:`, e.message);
+            }
           } finally {
             delete activeListRequests[c];
           }
@@ -1535,7 +1577,15 @@
 
     window.dispatchEvent(new CustomEvent('rs:sync-start', { detail: { method, collection: c } }));
     try {
-      const res = await CLOUD[method](c, ...args);
+      // Hard timeout on cloud writes so POS checkout never freezes 15–20s on a hung network.
+      // Local write already completed above for put/bulkPut/del; timeout → queue + return local.
+      let res;
+      if (method === 'put' || method === 'bulkPut' || method === 'del') {
+        const ms = (c === 'bills' || c === 'pending_orders') ? 2000 : 8000;
+        res = await withTimeout(CLOUD[method](c, ...args), ms, method + ':' + c);
+      } else {
+        res = await CLOUD[method](c, ...args);
+      }
       if (res && (method === 'put' || method === 'bulkPut')) {
         try {
           if (Array.isArray(res)) {
@@ -2016,6 +2066,8 @@
     listLocal:(c)=>LS.list(c),
     listCloud:(c, opts)=>CLOUD.list(c, opts),
     writeLocal:(c,arr)=>LS.write(c,arr),
+    /** Local-only put (no cloud wait). Use for checkout seal before background sync. */
+    putLocal:(c,id,obj)=>LS.put(c,id,obj),
     put:(c,id,obj)=>guard('put',c,id,obj),
     bulkPut:(c,arr)=>guard('bulkPut',c,arr),
     del:(c,id)=>guard('del',c,id),

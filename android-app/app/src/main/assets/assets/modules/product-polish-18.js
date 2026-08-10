@@ -7,6 +7,7 @@
 
   const AUDIT_KEY = 'rs_owner_audit_v1';
   const COACH_KEY = 'rs_offline_coach_done_v1';
+  /** Legacy only — Display density / zoom feature fully removed. */
   const DENSITY_KEY = 'rs-ui-density';
 
   function toast(msg, icon) {
@@ -138,30 +139,12 @@
     } else {
       pill.classList.add('is-online');
       if (icon) {icon.className = 'fa-solid fa-cloud-check';}
-      if (txt) {txt.textContent = 'Online · synced';}
+      if (txt) {txt.textContent = 'Synced';}
       pill.title = 'Connected — cloud sync OK';
     }
-    // Version pill is support-only (hidden for restaurant users in CSS/JS)
-    const ver = document.getElementById('app-version-pill');
-    if (ver && !isSupportUiAllowed()) {
-      ver.style.display = 'none';
-    }
+    // Keep version chip visible for everyone (short build id); do not hide it.
   }
 
-  /** Dev / support UI: superadmin, explicit demo tools, or localhost only */
-  function isSupportUiAllowed() {
-    try {
-      if (role() === 'superadmin') return true;
-      if (global.RS_API && RS_API.enableDemoTools) return true;
-      const h = String(location.hostname || '');
-      if (h === 'localhost' || h === '127.0.0.1') return true;
-      if (sessionStorage.getItem('rs_debug_ui') === '1' &&
-          new URLSearchParams(location.search).get('debug') === '1') {
-        return true;
-      }
-    } catch (_) {}
-    return false;
-  }
 
   /* ---------- #4 Live access banner ---------- */
   function ensureAccessBanner() {
@@ -216,18 +199,6 @@
   }
 
   /* ---------- #5 Role empty states ---------- */
-  function injectRoleEmptyState(tabId) {
-    const el = document.getElementById(tabId);
-    if (!el || el.querySelector('.rs-role-empty')) {return;}
-    if (hasTab(tabId)) {return;}
-    const box = document.createElement('div');
-    box.className = 'rs-role-empty';
-    box.innerHTML =
-      '<div><i class="fa-solid fa-lock"></i></div>' +
-      '<h3>No access to this screen</h3>' +
-      '<p>Ask your manager to unlock this module in <b>Employees → Logins → Edit access</b>.</p>';
-    el.appendChild(box);
-  }
 
   /* ---------- #6 Mobile bottom nav by role ---------- */
   function applyRoleNav() {
@@ -296,155 +267,56 @@
     });
   }
 
-  /* ---------- #9 Density modes (this device only) ---------- */
-  function currentDensity() {
-    let m = 'comfortable';
-    try { m = localStorage.getItem(DENSITY_KEY) || 'comfortable'; } catch (_) {}
-    if (['compact', 'comfortable', 'large'].indexOf(m) === -1) m = 'comfortable';
-    return m;
-  }
-
-  function applyDensity(mode) {
-    let m = mode || currentDensity();
-    if (['compact', 'comfortable', 'large'].indexOf(m) === -1) {m = 'comfortable';}
-    document.documentElement.setAttribute('data-rs-density', m);
-    try { localStorage.setItem(DENSITY_KEY, m); } catch (_) {}
-    document.querySelectorAll('[data-density]').forEach(function (b) {
-      if (!b || !b.classList) return;
-      if (b.getAttribute('data-density')) {
-        b.classList.toggle('active', b.getAttribute('data-density') === m);
-        b.setAttribute('aria-pressed', b.getAttribute('data-density') === m ? 'true' : 'false');
-      }
-    });
-    // Sync compact chip label
-    document.querySelectorAll('[data-rs-density-label]').forEach(function (el) {
-      el.textContent = m === 'compact' ? 'Compact' : (m === 'large' ? 'Large' : 'Comfortable');
-    });
-  }
-
-  function densityPickerHtml(idPrefix) {
-    const cur = currentDensity();
-    const opts = [
-      { id: 'compact', title: 'Compact', sub: 'Small counter / phone — more items on screen' },
-      { id: 'comfortable', title: 'Comfortable', sub: 'Default size for day-to-day billing' },
-      { id: 'large', title: 'Large', sub: 'Kitchen display — easier to read from far' },
-    ];
-    return (
-      '<div class="rs-density-sheet" id="' + (idPrefix || 'rs-density-sheet') + '">' +
-      '<p class="rs-density-sheet-lead">This device only. Does not change other staff or outlets.</p>' +
-      '<div class="rs-density-options" role="group" aria-label="Display density">' +
-      opts.map(function (o) {
-        return (
-          '<button type="button" class="rs-density-opt' + (cur === o.id ? ' active' : '') + '" data-density="' + o.id + '" aria-pressed="' + (cur === o.id ? 'true' : 'false') + '">' +
-          '<span class="rs-density-opt-title">' + o.title + '</span>' +
-          '<span class="rs-density-opt-sub">' + o.sub + '</span></button>'
+  /* ---------- #9 Display density / zoom — REMOVED ---------- */
+  /** Strip any leftover density/zoom UI and attributes from older builds. */
+  function removeDensityFeatureCompletely() {
+    try { localStorage.removeItem(DENSITY_KEY); } catch (_) {}
+    try {
+      document.documentElement.removeAttribute('data-rs-density');
+      document.documentElement.removeAttribute('data-rs-ui-density');
+      if (document.body) {
+        document.body.removeAttribute('data-rs-density');
+        document.body.classList.remove(
+          'rs-density-compact',
+          'rs-density-comfortable',
+          'rs-density-large'
         );
-      }).join('') +
-      '</div></div>'
-    );
-  }
-
-  function wireDensityButtons(root, onPicked) {
-    if (!root) return;
-    root.querySelectorAll('[data-density]').forEach(function (b) {
-      b.onclick = function () {
-        const mode = b.getAttribute('data-density');
-        applyDensity(mode);
-        toast('This device: ' + mode + ' display', 'fa-text-height');
-        auditLog('device.density', mode);
-        if (typeof onPicked === 'function') onPicked(mode);
-      };
-    });
-  }
-
-  /** Modal: preferred entry for every role */
-  function openDensityPrefs() {
-    applyDensity();
-    const body = densityPickerHtml('rs-density-modal');
-    if (global.RSModal && typeof RSModal.open === 'function') {
-      RSModal.open({
-        title: 'This device · Display',
-        icon: 'fa-text-height',
-        size: 'sm',
-        body: body,
-        onMount: function (modal, close) {
-          wireDensityButtons(modal, function () {
-            // Keep modal open so they can compare; optional auto-close:
-            // setTimeout(close, 280);
-          });
-        },
-      });
-      return;
-    }
-    // Fallback if RSModal missing
-    const mode = window.prompt('Display density: compact | comfortable | large', currentDensity());
-    if (mode) applyDensity(String(mode).toLowerCase().trim());
-  }
-
-  function stripSettingsDensity() {
-    // Remove legacy block that was injected at the top of Settings
-    document.querySelectorAll('#settings-tab #rs-density-row').forEach(function (row) {
-      const wrap = row.closest('div[style], .rs-density-legacy, section');
-      if (wrap && wrap.querySelector && wrap.querySelector('#rs-density-row')) {
-        try { wrap.remove(); } catch (_) {
-          try { row.parentElement && row.parentElement.remove(); } catch (__) {}
-        }
-      } else {
-        try { row.parentElement && row.parentElement.remove(); } catch (_) {}
       }
+    } catch (_) {}
+    try {
+      const grid = document.getElementById('pos-grid');
+      if (grid) {grid.style.removeProperty('--pos-grid-size');}
+    } catch (_) {}
+    [
+      '#open-device-display',
+      '#rs-density-chip',
+      '#rs-density-row',
+      '.rs-density-sheet',
+      '.rs-density-legacy',
+    ].forEach(function (sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function (el) {
+          try { el.remove(); } catch (_) {}
+        });
+      } catch (_) {}
     });
-    // Also match our older inject markup (title "Display density" right under settings)
-    document.querySelectorAll('#settings-tab').forEach(function (tab) {
-      tab.querySelectorAll('div').forEach(function (div) {
-        if (div.id === 'rs-density-row') return;
+    // Legacy settings inject
+    try {
+      document.querySelectorAll('#settings-tab div').forEach(function (div) {
         const t = (div.textContent || '').trim();
-        if (t.indexOf('Display density') === 0 && div.querySelector('#rs-density-row')) {
+        if (t.indexOf('Display density') === 0 || t.indexOf('This device · Display') === 0) {
           try { div.remove(); } catch (_) {}
         }
       });
-    });
-  }
-
-  function injectSidebarDensityEntry() {
-    const foot = document.querySelector('.sb-foot');
-    if (!foot || document.getElementById('open-device-display')) return;
-    const help = document.getElementById('open-product-guide-btn');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'sb-foot-btn';
-    btn.id = 'open-device-display';
-    btn.title = 'This device · Display size';
-    btn.innerHTML = '<i class="fa-solid fa-text-height"></i><span>Display</span>';
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      openDensityPrefs();
-    });
-    // Between Help and Sign out when possible
-    const logout = foot.querySelector('.sb-foot-btn.logout');
-    if (help && help.parentNode === foot) {
-      if (logout) foot.insertBefore(btn, logout);
-      else foot.insertBefore(btn, help.nextSibling);
-    } else if (logout) {
-      foot.insertBefore(btn, logout);
-    } else {
-      foot.appendChild(btn);
-    }
-  }
-
-  function removeTopbarDensityChip() {
-    // Top-bar chip sat next to search and looked like "Compact bbb" — remove it.
-    // Prefer sidebar "Display" + mobile More → Display only.
-    try {
-      const chip = document.getElementById('rs-density-chip');
-      if (chip) chip.remove();
     } catch (_) {}
   }
 
-  function injectDensityControl() {
-    stripSettingsDensity();
-    removeTopbarDensityChip();
-    injectSidebarDensityEntry();
-    applyDensity();
+  function applyDensity() {
+    // no-op (feature removed) — clear any prior zoom state
+    removeDensityFeatureCompletely();
+  }
+  function openDensityPrefs() {
+    // no-op
   }
 
   /* ---------- #10 My shift summary for non-report roles ---------- */
@@ -483,41 +355,18 @@
     window.addEventListener('rs:db-sync', paint);
   }
 
-  /* ---------- #11 WA queue chip ---------- */
+  /* ---------- #11 WA queue badge on the single topbar WA button ----------
+     Do NOT inject a second WhatsApp icon (was confusing: status + queue). */
   function ensureWaChip() {
-    const right = document.getElementById('tb-right');
-    if (!right || document.getElementById('rs-wa-queue-chip')) {return;}
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.id = 'rs-wa-queue-chip';
-    chip.innerHTML = '<i class="fa-brands fa-whatsapp"></i><span class="n">0</span>';
-    chip.title = 'WhatsApp send queue';
-    chip.onclick = function () {
-      let list = [];
-      try {
-        if (global.RSWaQueue && typeof RSWaQueue.list === 'function') {list = RSWaQueue.list();}
-      } catch (_) {}
-      const failed = list.filter(function (x) { return x && (x.status === 'failed' || (x.attempts || 0) > 3); });
-      const msg =
-        list.length === 0
-          ? 'No WhatsApp messages waiting.'
-          : list.length +
-            ' in queue' +
-            (failed.length ? ' · ' + failed.length + ' failed — will retry' : ' · auto-retry when gateway is ready');
-      toast(msg, 'fa-brands fa-whatsapp');
-      try {
-        if (global.RSWaQueue && typeof RSWaQueue.process === 'function') {RSWaQueue.process();}
-      } catch (_) {}
-    };
-    const ver = document.getElementById('app-version-pill');
-    if (ver && ver.parentNode) {ver.parentNode.insertBefore(chip, ver);}
-    else {right.appendChild(chip);}
+    // Remove legacy duplicate if an older session still has it in the DOM.
+    try {
+      const legacy = document.getElementById('rs-wa-queue-chip');
+      if (legacy) {legacy.remove();}
+    } catch (_) {}
   }
 
   function paintWaChip() {
     ensureWaChip();
-    const chip = document.getElementById('rs-wa-queue-chip');
-    if (!chip) {return;}
     let n = 0;
     let failed = 0;
     try {
@@ -527,10 +376,34 @@
         failed = list.filter(function (x) { return x && (x.status === 'failed' || (x.attempts || 0) > 3); }).length;
       }
     } catch (_) {}
-    chip.classList.toggle('has-items', n > 0);
-    chip.classList.toggle('has-failed', failed > 0);
-    const span = chip.querySelector('.n');
-    if (span) {span.textContent = String(n);}
+    // Badge the canonical Bill WhatsApp status button only.
+    const btn = document.getElementById('tb-wa-status-btn');
+    if (!btn) {return;}
+    let badge = btn.querySelector('.rs-wa-q-badge');
+    if (n > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'rs-wa-q-badge';
+        badge.setAttribute('aria-hidden', 'true');
+        btn.appendChild(badge);
+      }
+      badge.textContent = n > 9 ? '9+' : String(n);
+      badge.classList.toggle('is-failed', failed > 0);
+      const base =
+        (btn.getAttribute('data-tooltip') || btn.title || 'WhatsApp').split(' · ')[0] ||
+        'WhatsApp linked · OK';
+      btn.title =
+        base +
+        ' · ' +
+        n +
+        ' bill' +
+        (n === 1 ? '' : 's') +
+        ' waiting to send' +
+        (failed ? ' (' + failed + ' need attention)' : '');
+      btn.setAttribute('data-tooltip', btn.title);
+    } else if (badge) {
+      badge.remove();
+    }
   }
 
   /* ---------- #12 86'd menu tiles ---------- */
@@ -613,7 +486,7 @@
     // Super-Admin already has its own sidebar identity (Codearc Superadmin).
     try {
       const stale = document.getElementById('rs-platform-shell-badge');
-      if (stale) stale.remove();
+      if (stale) {stale.remove();}
       document.querySelectorAll('.rs-platform-shell-badge').forEach((el) => {
         try { el.remove(); } catch (_) {}
       });
@@ -674,7 +547,6 @@
   /* ---------- #3 Settle confidence strip (enhance receipt modal) ---------- */
   function enhanceSettleModal(bill) {
     try {
-      const body = document.querySelector('.rc-settle-body, .rc-settle-modal .mh-body, #rc-paper');
       const host = document.querySelector('.rc-settle-modal .mh-body') || document.querySelector('.rc-settle-overlay .dm-body');
       if (!host || host.querySelector('.rc-settle-trust')) {return;}
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -744,7 +616,7 @@
 
   /* ---------- boot ---------- */
   function boot() {
-    applyDensity();
+    removeDensityFeatureCompletely();
     ensureSyncPill();
     paintSyncPill();
     ensureWaChip();
@@ -756,7 +628,6 @@
     applyKdsFocus();
     wireFloorLongPress();
     injectMyShiftSummary();
-    injectDensityControl();
     injectAuditPanel();
     markSoldOutTiles();
     maybeOfflineCoach();
@@ -774,11 +645,11 @@
     setTimeout(hookLiveAccess, 200);
   });
   document.addEventListener('rs:hydrated', function () {
+    removeDensityFeatureCompletely();
     applyRoleNav();
     applyKdsFocus();
     markSoldOutTiles();
     injectAuditPanel();
-    injectDensityControl();
     injectMyShiftSummary();
     setTimeout(hookSettle, 300);
   });
@@ -787,18 +658,10 @@
   window.addEventListener('rs:sync-queue-changed', paintSyncPill);
   window.addEventListener('rs:sync-queue-drained', paintSyncPill);
   window.addEventListener('rs:wa-queue-changed', paintWaChip);
-  document.addEventListener('rs:tab', function (ev) {
+  document.addEventListener('rs:tab', function () {
     applyKdsFocus();
     markSoldOutTiles();
-    // Settings used to host density — strip if any stale inject reappears
-    try {
-      const tab = ev && ev.detail && ev.detail.tab;
-      if (tab === 'settings-tab' || document.getElementById('settings-tab')?.classList?.contains('active')) {
-        stripSettingsDensity();
-      }
-    } catch (_) {
-      stripSettingsDensity();
-    }
+    removeDensityFeatureCompletely();
   });
   setInterval(paintSyncPill, 4000);
   setInterval(paintWaChip, 8000);
@@ -816,5 +679,6 @@
     humanizeCloudError: humanizeCloudError,
     ACCESS_PRESETS: ACCESS_PRESETS,
   };
-  global.RS_openDeviceDisplay = openDensityPrefs;
+  // Display density removed — keep stubs so old callers do nothing
+  global.RS_openDeviceDisplay = function () {};
 })(typeof window !== 'undefined' ? window : globalThis);
