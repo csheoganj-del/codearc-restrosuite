@@ -819,7 +819,17 @@ async function checkContentUpdate(opts) {
       detail: promptDetail,
     });
     uiOpen = true;
-    const action = await waitUiAction(0);
+    // FIX: silent background checks open no progress window, so no renderer
+    // will ever send an IPC action — waitUiAction(0) (no timer) would hang
+    // forever, leaving _busy stuck and silently disabling every later check
+    // (including the user's manual "Check for Updates"). Auto-install instead.
+    let action;
+    if (useUi) {
+      action = await waitUiAction(0);
+    } else {
+      console.log('[content-updater] silent check: auto-installing', remoteVer);
+      action = 'install';
+    }
     if (action !== 'install' && action !== 'primary') {
       rememberDismissed(remoteVer);
       _lastStatus = Object.assign({}, _lastStatus, { status: 'dismissed' });
@@ -895,8 +905,17 @@ async function checkContentUpdate(opts) {
       statusLine: 'Update complete',
     });
 
-    const next = await waitUiAction(0);
-    closeProgressWindow();
+    // FIX: same silent-mode guard as the available branch — no progress
+    // window is open in silent checks, so waitUiAction(0) would hang and
+    // _busy would stay stuck, blocking all later update checks.
+    let next;
+    if (useUi) {
+      next = await waitUiAction(0);
+      closeProgressWindow();
+    } else {
+      next = 'reload';
+      console.log('[content-updater] silent check: update applied, reloading');
+    }
     if ((next === 'reload' || next === 'primary') && typeof _onApplied === 'function') {
       try {
         _onApplied({ version: remoteVer });
