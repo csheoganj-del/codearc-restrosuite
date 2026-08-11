@@ -96,9 +96,9 @@ restrosuite/
 ### 3. Admin PIN system (RSPinModal)
 - **Location**: top of `saas-core.js` as an IIFE before the RS_SAAS code
 - **PIN storage**: SHA-256 hash stored in `RS_SETTINGS.admin_pin_hash`, persisted to settings DB
-- **Features**: 4-dot visual UI, physical keyboard support, 3-attempt lockout (30 seconds), forgot PIN via server-verified reset code
+- **Features**: 4-dot visual UI, physical keyboard support, 3-attempt lockout (30 seconds), forgot PIN via OTP to owner WhatsApp/email on file
 - **Modes**: `request(label)` = verify, `setup()` = first-time set, `change()` = verify current then set new
-- **Flows**: setup (enter → confirm), change (verify current → enter new → confirm new), forgot (server verifies reset code → set new)
+- **Flows**: setup (enter → confirm), change (verify current → enter new → confirm new), forgot (`request_pin_reset_otp` → `verify_pin_reset_otp` → set new)
 
 ### 4. Bill delete + refund with PIN gate
 - **Delete bill**: trash icon on each bill row → PIN gate → confirm dialog → removes from BILLS array → restores inventory → syncs to cloud. Toast: "Bill deleted — inventory restored"

@@ -42,9 +42,18 @@ function getCorsHeaders(req: Request) {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || Deno.env.get("PROJECT_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const SUPERADMIN_SESSION_SECRET = Deno.env.get("SUPERADMIN_SESSION_SECRET") || "";
+const OTP_SECRET = Deno.env.get("OTP_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
 const PIN_RESET_CODE_HASH = Deno.env.get("PIN_RESET_CODE_HASH")
   || Deno.env.get("MASTER_PIN_RESET_HASH")
   || "";
+const EMAIL_RELAY_URL = (Deno.env.get("EMAIL_RELAY_URL") || Deno.env.get("ZERO_COST_EMAIL_RELAY_URL") || "").trim();
+const EMAIL_RELAY_TOKEN = (
+  Deno.env.get("EMAIL_RELAY_TOKEN")
+  || Deno.env.get("ZERO_COST_EMAIL_RELAY_TOKEN")
+  || Deno.env.get("GATEWAY_TOKEN")
+  || ""
+).trim();
+const ZERO_COST_EMAILS_DISABLED = String(Deno.env.get("ZERO_COST_EMAILS_DISABLED") || "").toLowerCase() === "true";
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -457,6 +466,52 @@ async function sha256Hex(value: string) {
     .join("");
 }
 
+function randomOtp() {
+  const bytes = crypto.getRandomValues(new Uint32Array(1));
+  return String(100000 + (bytes[0] % 900000));
+}
+
+function normalizePhoneDigits(raw: string) {
+  return String(raw || "").replace(/\D/g, "");
+}
+
+function normalizeEmail(raw: string) {
+  return String(raw || "").trim().toLowerCase();
+}
+
+function maskPhone(phone: string) {
+  const digits = normalizePhoneDigits(phone);
+  if (digits.length < 4) return "****";
+  return `***${digits.slice(-4)}`;
+}
+
+function maskEmail(email: string) {
+  const e = normalizeEmail(email);
+  const at = e.indexOf("@");
+  if (at < 1) return e ? "***" : "";
+  const user = e.slice(0, at);
+  const domain = e.slice(at + 1);
+  const head = user.slice(0, Math.min(2, user.length));
+  return `${head}***@${domain}`;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** OTP hash — subject is tenantId for pin reset (binds challenge to outlet). */
+async function otpCodeHash(challengeId: string, subject: string, code: string, purpose: string) {
+  return sha256Hex(`otp:${purpose}:${challengeId}:${subject}:${code}:${OTP_SECRET}`);
+}
+
+async function phoneHash(phone: string) {
+  return sha256Hex(`phone:${phone}`);
+}
+
 async function getTenantPinResetHash(tenantId: string) {
   if (PIN_RESET_CODE_HASH) return PIN_RESET_CODE_HASH;
 
@@ -483,6 +538,106 @@ async function getTenantPinResetHash(tenantId: string) {
     );
   } catch {
     return "";
+  }
+}
+
+async function loadTenantOwnerContacts(tenantId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("saas_tenants")
+    .select("id, name, slug, email, phone")
+    .eq("id", tenantId)
+    .maybeSingle();
+  if (error) {
+    console.error("tenant-data owner contact lookup failed:", error);
+    return null;
+  }
+  if (!data) return null;
+  return {
+    id: String(data.id),
+    name: String(data.name || "your outlet"),
+    slug: String(data.slug || ""),
+    email: normalizeEmail(String(data.email || "")),
+    phone: normalizePhoneDigits(String(data.phone || "")),
+  };
+}
+
+async function sendAdminPinResetWhatsApp(phone: string, otpCode: string, outletName: string) {
+  const { url, token } = getGatewayUrlAndToken();
+  if (!url || !token) {
+    console.warn("Admin PIN reset WhatsApp skipped — gateway not configured.");
+    return false;
+  }
+  const message = [
+    "*RestroSuite*",
+    "Admin PIN reset code",
+    "",
+    `Outlet: *${outletName}*`,
+    `Your code is: *${otpCode}*`,
+    "",
+    "Valid for 10 minutes.",
+    "Never share this code. RestroSuite staff will never ask for it.",
+    "",
+    "— CodeArc Tech Labs",
+  ].join("\n");
+  const gwController = new AbortController();
+  const gwTimer = setTimeout(() => gwController.abort(), 45000);
+  try {
+    const gwRes = await fetch(`${url}/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "X-Tenant-Id": "system",
+      },
+      body: JSON.stringify({ phone, message }),
+      signal: gwController.signal,
+    });
+    if (!gwRes.ok) {
+      const gwErr = await gwRes.text().catch(() => "");
+      console.error("Admin PIN reset WhatsApp failed:", gwRes.status, gwErr.slice(0, 200));
+      return false;
+    }
+    return true;
+  } finally {
+    clearTimeout(gwTimer);
+  }
+}
+
+async function sendAdminPinResetEmail(email: string, otpCode: string, outletName: string) {
+  if (ZERO_COST_EMAILS_DISABLED || !EMAIL_RELAY_URL) {
+    console.warn("Admin PIN reset email skipped — email relay not configured.");
+    return false;
+  }
+  try {
+    const response = await fetch(EMAIL_RELAY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        ...(EMAIL_RELAY_TOKEN ? { "Authorization": `Bearer ${EMAIL_RELAY_TOKEN}` } : {}),
+      },
+      body: JSON.stringify({
+        to: email,
+        subject: "RestroSuite Admin PIN reset code",
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#1f2937">
+            <h2>Reset your Admin PIN</h2>
+            <p>A PIN reset was requested for <strong>${escapeHtml(outletName)}</strong>.</p>
+            <p style="font-size:28px;letter-spacing:8px;font-weight:800;margin:24px 0">${escapeHtml(otpCode)}</p>
+            <p>Enter this code in the RestroSuite Console. Valid for 10 minutes.</p>
+            <p>If you did not request it, ignore this email — your PIN is unchanged.</p>
+          </div>
+        `,
+      }),
+    });
+    if (!response.ok) {
+      console.error("Admin PIN reset email relay failed:", response.status);
+      return false;
+    }
+    const result = await response.json().catch(() => ({} as Record<string, unknown>));
+    return result.status === "success" || result.status === "ok" || result.ok === true;
+  } catch (e) {
+    console.error("Admin PIN reset email error:", e);
+    return false;
   }
 }
 
@@ -935,23 +1090,210 @@ serve(async (req) => {
       return jsonResponse({ data }, 200, req);
     }
 
+    // ── Admin PIN reset via OTP (WhatsApp / email to owner contact on file) ──
+    if (operation === "request_pin_reset_otp") {
+      if (!isOutletAdmin) {
+        return jsonResponse({ error: "Only outlet admins or managers can reset the Admin PIN." }, 403, req);
+      }
+      const tenantId = String(verified.tenantId || "");
+      if (!tenantId) {
+        return jsonResponse({ error: "Outlet session is missing." }, 400, req);
+      }
+
+      // Rate limit: 5 OTP sends per tenant per 10 minutes
+      const otpBucket = await sha256Hex(`admin_pin_reset_otp:${tenantId}`);
+      const { data: rlData, error: rlErr } = await supabaseAdmin.rpc("consume_api_rate_limit", {
+        p_bucket: otpBucket,
+        p_limit: 5,
+        p_window_seconds: 600,
+      });
+      if (rlErr || !rlData) {
+        return jsonResponse({ error: "Too many PIN reset requests. Wait a few minutes and try again." }, 429, req);
+      }
+
+      const tenant = await loadTenantOwnerContacts(tenantId);
+      if (!tenant) {
+        return jsonResponse({ error: "Could not load outlet contact details." }, 500, req);
+      }
+      const phone = tenant.phone;
+      const email = tenant.email;
+      if (phone.length < 10 && !email) {
+        return jsonResponse({
+          error: "No owner WhatsApp or email is on file for this outlet. Update the registration phone/email or contact RestroSuite support.",
+          code: "NO_OWNER_CONTACT",
+        }, 400, req);
+      }
+
+      const code = randomOtp();
+      const challengeId = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      // Bind OTP to this tenant so a code cannot unlock another outlet
+      const codeHash = await otpCodeHash(challengeId, tenantId, code, "admin_pin_reset");
+      const pHash = phone.length >= 10
+        ? await phoneHash(phone)
+        : await sha256Hex(`tenant:${tenantId}:admin_pin_reset`);
+
+      const { error: challengeError } = await supabaseAdmin.from("public_otp_challenges").insert({
+        id: challengeId,
+        phone_hash: pHash,
+        purpose: "admin_pin_reset",
+        code_hash: codeHash,
+        expires_at: expiresAt,
+      });
+      if (challengeError) {
+        console.error("request_pin_reset_otp challenge insert failed:", challengeError);
+        // Common cause: purpose check constraint not migrated yet
+        const hint = /purpose|check constraint|violates/i.test(String(challengeError.message || ""))
+          ? " Database migration for admin_pin_reset OTP is required."
+          : "";
+        return jsonResponse({ error: `Failed to create PIN reset code.${hint}` }, 500, req);
+      }
+
+      let deliveredWhatsapp = false;
+      let deliveredEmail = false;
+      if (phone.length >= 10) {
+        deliveredWhatsapp = await sendAdminPinResetWhatsApp(phone, code, tenant.name);
+      }
+      if (email) {
+        deliveredEmail = await sendAdminPinResetEmail(email, code, tenant.name);
+      }
+
+      if (!deliveredWhatsapp && !deliveredEmail) {
+        await supabaseAdmin.from("public_otp_challenges")
+          .update({ used_at: new Date().toISOString() })
+          .eq("id", challengeId);
+        return jsonResponse({
+          error: phone.length >= 10
+            ? "Could not send the code via WhatsApp or email. Check the gateway is online and try again."
+            : "Could not send the code by email. Configure email delivery or add a WhatsApp number to this outlet.",
+          code: "DELIVERY_FAILED",
+        }, 502, req);
+      }
+
+      try {
+        await supabaseAdmin.from("tenant_audit_logs").insert({
+          tenant_id: tenantId,
+          actor_user_id: verified.actorUserId,
+          actor_username: verified.actorUsername,
+          actor_role: verified.actorRole,
+          action: "security.pin_reset_otp_sent",
+          target_type: "doppio_business_profile",
+          metadata: {
+            channels: { whatsapp: deliveredWhatsapp, email: deliveredEmail },
+            masked_phone: phone.length >= 10 ? maskPhone(phone) : null,
+            masked_email: email ? maskEmail(email) : null,
+          },
+        });
+      } catch (_) { /* non-fatal */ }
+
+      return jsonResponse({
+        data: {
+          sent: true,
+          challenge_id: challengeId,
+          expires_at: expiresAt,
+          masked_phone: phone.length >= 10 ? maskPhone(phone) : null,
+          masked_email: email ? maskEmail(email) : null,
+          channels: { whatsapp: deliveredWhatsapp, email: deliveredEmail },
+          message: deliveredWhatsapp && deliveredEmail
+            ? "Code sent to WhatsApp and email on file."
+            : deliveredWhatsapp
+              ? "Code sent to the owner WhatsApp on file."
+              : "Code sent to the owner email on file.",
+        },
+      }, 200, req);
+    }
+
+    if (operation === "verify_pin_reset_otp") {
+      if (!isOutletAdmin) {
+        return jsonResponse({ error: "Only outlet admins or managers can reset the Admin PIN." }, 403, req);
+      }
+      const tenantId = String(verified.tenantId || "");
+      const challengeId = String(payload.challenge_id || "").trim();
+      const code = String(payload.otp_code || payload.code || "").replace(/\D/g, "");
+      if (!challengeId || code.length !== 6) {
+        return jsonResponse({ error: "Enter the 6-digit code from WhatsApp or email." }, 400, req);
+      }
+
+      const { data: challenge, error: chErr } = await supabaseAdmin
+        .from("public_otp_challenges")
+        .select("id, purpose, code_hash, expires_at, attempts, used_at")
+        .eq("id", challengeId)
+        .maybeSingle();
+
+      if (chErr) {
+        console.error("verify_pin_reset_otp lookup failed:", chErr);
+        return jsonResponse({ error: "PIN reset verification is unavailable. Try again." }, 500, req);
+      }
+      if (
+        !challenge
+        || challenge.purpose !== "admin_pin_reset"
+        || challenge.used_at
+        || Date.now() > new Date(challenge.expires_at).getTime()
+      ) {
+        return jsonResponse({ error: "This code is invalid or has expired. Request a new one." }, 400, req);
+      }
+
+      const attempts = Number(challenge.attempts || 0);
+      if (attempts >= 5) {
+        return jsonResponse({ error: "Too many incorrect attempts. Request a new code." }, 429, req);
+      }
+
+      const expected = await otpCodeHash(challengeId, tenantId, code, "admin_pin_reset");
+      if (!timingSafeEqualString(expected, String(challenge.code_hash || ""))) {
+        await supabaseAdmin.from("public_otp_challenges")
+          .update({ attempts: attempts + 1 })
+          .eq("id", challengeId)
+          .is("used_at", null);
+        return jsonResponse({ error: "Incorrect code. Check WhatsApp or email and try again." }, 400, req);
+      }
+
+      const { data: claimed, error: claimError } = await supabaseAdmin
+        .from("public_otp_challenges")
+        .update({ used_at: new Date().toISOString(), attempts: attempts + 1 })
+        .eq("id", challengeId)
+        .is("used_at", null)
+        .select("id")
+        .maybeSingle();
+
+      if (claimError || !claimed) {
+        return jsonResponse({ error: "This code was already used. Request a new one." }, 409, req);
+      }
+
+      const { error: auditError } = await supabaseAdmin.from("tenant_audit_logs").insert({
+        tenant_id: tenantId,
+        actor_user_id: verified.actorUserId,
+        actor_username: verified.actorUsername,
+        actor_role: verified.actorRole,
+        action: "security.pin_reset_otp_verified",
+        target_type: "doppio_business_profile",
+      });
+      if (auditError) console.error("tenant-data PIN reset OTP audit log failed:", auditError);
+
+      // Client clears admin_pin_hash and prompts setup after valid:true
+      return jsonResponse({ data: { valid: true } }, 200, req);
+    }
+
+    // Legacy static reset code (optional back-door if PIN_RESET_CODE_HASH / feature_flags set)
     if (operation === "verify_pin_reset_code") {
       if (!isOutletAdmin) {
-        return jsonResponse({ valid: false, error: "Only outlet admins can use PIN reset codes." }, 403, req);
+        return jsonResponse({ error: "Only outlet admins can use PIN reset codes." }, 403, req);
       }
       const code = String(payload.code || "").trim();
       if (!/^[A-Za-z0-9_-]{6,64}$/.test(code)) {
-        return jsonResponse({ valid: false, error: "Invalid reset code." }, 400, req);
+        return jsonResponse({ error: "Invalid reset code." }, 400, req);
       }
 
       const expectedHash = await getTenantPinResetHash(verified.tenantId as string);
       if (!expectedHash) {
-        return jsonResponse({ valid: false, error: "PIN reset code is not configured for this outlet." }, 503, req);
+        return jsonResponse({
+          error: "Static PIN reset codes are not used. Use Forgot PIN to receive an OTP on WhatsApp/email.",
+          code: "USE_OTP_RESET",
+        }, 503, req);
       }
 
       const providedHash = await sha256Hex(code);
       if (!timingSafeEqualString(providedHash, expectedHash)) {
-        return jsonResponse({ valid: false, error: "Invalid reset code." }, 403, req);
+        return jsonResponse({ error: "Invalid reset code." }, 403, req);
       }
 
       const { error: auditError } = await supabaseAdmin.from("tenant_audit_logs").insert({
@@ -964,7 +1306,7 @@ serve(async (req) => {
       });
       if (auditError) console.error("tenant-data PIN reset audit log failed:", auditError);
 
-      return jsonResponse({ valid: true }, 200, req);
+      return jsonResponse({ data: { valid: true } }, 200, req);
     }
 
     if (!TENANT_TABLES.has(table)) return jsonResponse({ error: "Table is not available through tenant data API." }, 400, req);

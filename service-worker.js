@@ -26,7 +26,7 @@ const CACHE_MANIFEST = {
   "/pwa.js": "43a542acc126",
   "/config.js": "951d30e1517c",
   "/assets/supabase-config.js": "a4b6cc99cce4",
-  "/assets/saas-core.js": "2c32e1dd6fee",
+  "/assets/saas-core.js": "f72c4bbaf96e",
   "/assets/db.js": "6f6f448fa46a",
   "/assets/doppio-api.js": "5358b22031aa",
   "/assets/country-currency-data.js": "e0e436e3615a",
