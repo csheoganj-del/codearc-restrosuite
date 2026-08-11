@@ -8,6 +8,7 @@
  * PIN is stored as SHA-256 hex in RS_SETTINGS.admin_pin_hash.
  * If no PIN is set, the first-use call prompts setup mode.
  * Lockout: 3 wrong attempts -> 30-second cooldown.
+ * Forgot PIN: OTP to owner WhatsApp/email on file (request_pin_reset_otp / verify_pin_reset_otp).
  */
 (function () {
   'use strict';
@@ -252,42 +253,172 @@
     document.getElementById('rs-pin-overlay')?.remove();
     const overlay = document.createElement('div');
     overlay.id = 'rs-pin-overlay';
-    const adminEmail = (() => { try { return (window.RS_API?.session?.() || {}).email || ''; } catch (e) { return ''; } })();
-    overlay.innerHTML = `<div id="rs-pin-box">
-      <div id="rs-pin-icon"><i class="fa-solid fa-circle-question"></i></div>
+    const session = (() => { try { return window.RS_API?.session?.() || {}; } catch (e) { return {}; } })();
+    const outletName = session.tenant_name || session.tenant_slug || 'this outlet';
+    overlay.innerHTML = `<div id="rs-pin-box" style="gap:14px;">
+      <div id="rs-pin-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
       <div id="rs-pin-title">Forgot PIN?</div>
-      <div id="rs-pin-label" style="text-align:center;line-height:1.6;">Enter the reset code issued by your account owner<br>${adminEmail ? `(<strong>${adminEmail}</strong>)` : ''}<br>or contact RestroSuite support.</div>
-      <input id="rs-reset-code" type="text" placeholder="Reset code" maxlength="64" autocomplete="off"
-        style="width:100%;padding:12px 14px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:18px;text-align:center;letter-spacing:6px;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;">
+      <div id="rs-pin-label" style="text-align:center;line-height:1.6;">
+        We will send a <strong>6-digit OTP</strong> to the owner WhatsApp / email on file for<br>
+        <strong>${String(outletName).replace(/[<>&"]/g, '')}</strong>.
+      </div>
+      <div id="rs-pin-dest" style="font-size:12px;color:var(--text-soft,#6b7280);text-align:center;min-height:18px;"></div>
+      <input id="rs-reset-otp" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code"
+        style="width:100%;padding:12px 14px;border:1px solid var(--stroke-2,#e5e7eb);border-radius:10px;font-family:inherit;font-size:22px;text-align:center;letter-spacing:8px;outline:none;background:var(--glass,#f9fafb);color:var(--text,#111);box-sizing:border-box;">
       <div id="rs-pin-error"></div>
-      <button id="rs-reset-submit" style="width:100%;padding:12px;background:#FF4F00;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Verify &amp; Reset</button>
+      <button id="rs-reset-submit" style="width:100%;padding:12px;background:#FF4F00;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">Verify &amp; Reset PIN</button>
+      <button id="rs-otp-send" type="button" style="width:100%;padding:10px;background:transparent;color:#FF4F00;border:1px solid rgba(255,79,0,.35);border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;">Send code</button>
       <button id="rs-pin-cancel">Cancel</button>
     </div>`;
     document.body.appendChild(overlay);
 
-    document.getElementById('rs-reset-submit').onclick = async () => {
-      const val = (document.getElementById('rs-reset-code').value || '').trim();
-      const errorEl = document.getElementById('rs-pin-error');
-      if (!val) { errorEl.textContent = 'Reset code is required.'; return; }
-      try {
-        if (!window.RS_API || !RS_API.data) throw new Error('PIN reset verification is unavailable.');
-        const verified = await RS_API.data({ operation: 'verify_pin_reset_code', code: val });
-        if (!verified || verified.valid !== true) throw new Error('Invalid reset code.');
-      } catch (e) {
-        errorEl.textContent = (e && e.message) || 'Invalid reset code.';
+    const errorEl = document.getElementById('rs-pin-error');
+    const destEl = document.getElementById('rs-pin-dest');
+    const otpInput = document.getElementById('rs-reset-otp');
+    const sendBtn = document.getElementById('rs-otp-send');
+    const submitBtn = document.getElementById('rs-reset-submit');
+    let challengeId = '';
+    let resendUntil = 0;
+    let resendTimer = null;
+
+    function setError(msg) { if (errorEl) errorEl.textContent = msg || ''; }
+    function setDest(msg) { if (destEl) destEl.textContent = msg || ''; }
+
+    function setSendCooldown(seconds) {
+      resendUntil = Date.now() + seconds * 1000;
+      if (resendTimer) clearInterval(resendTimer);
+      const tick = () => {
+        const left = Math.ceil((resendUntil - Date.now()) / 1000);
+        if (!sendBtn) return;
+        if (left <= 0) {
+          sendBtn.disabled = false;
+          sendBtn.textContent = challengeId ? 'Resend code' : 'Send code';
+          sendBtn.style.opacity = '1';
+          if (resendTimer) clearInterval(resendTimer);
+          resendTimer = null;
+          return;
+        }
+        sendBtn.disabled = true;
+        sendBtn.style.opacity = '0.65';
+        sendBtn.textContent = `Resend in ${left}s`;
+      };
+      tick();
+      resendTimer = setInterval(tick, 500);
+    }
+
+    async function sendOtp() {
+      setError('');
+      if (!window.RS_API || !RS_API.data) {
+        setError('You must be signed in to reset the Admin PIN.');
         return;
       }
-      if (window.RS_SETTINGS) delete window.RS_SETTINGS.admin_pin_hash;
+      sendBtn.disabled = true;
+      const prevLabel = sendBtn.textContent;
+      sendBtn.textContent = 'Sending…';
+      try {
+        const result = await RS_API.data({ operation: 'request_pin_reset_otp' });
+        if (!result || !result.sent || !result.challenge_id) {
+          throw new Error((result && result.error) || 'Could not send OTP.');
+        }
+        challengeId = String(result.challenge_id);
+        const parts = [];
+        if (result.channels && result.channels.whatsapp && result.masked_phone) {
+          parts.push('WhatsApp ' + result.masked_phone);
+        }
+        if (result.channels && result.channels.email && result.masked_email) {
+          parts.push('email ' + result.masked_email);
+        }
+        setDest(parts.length
+          ? ('Code sent to ' + parts.join(' and ') + '. Valid 10 minutes.')
+          : (result.message || 'Code sent. Check WhatsApp or email.'));
+        setSendCooldown(30);
+        try { otpInput && otpInput.focus(); } catch (_) {}
+      } catch (e) {
+        sendBtn.disabled = false;
+        sendBtn.textContent = prevLabel || 'Send code';
+        setError((e && e.message) || 'Failed to send code.');
+      }
+    }
+
+    async function clearAdminPinLocal() {
+      try { localStorage.removeItem('rs:admin_pin_hash'); } catch (_) {}
+      if (window.RS_SETTINGS) {
+        delete window.RS_SETTINGS.admin_pin_hash;
+        delete window.RS_SETTINGS.admin_pin;
+      }
       if (window.RS && RS.getSettings && RS.saveSettings) {
         const s = await RS.getSettings().catch(() => ({})) || {};
-        delete s.admin_pin_hash; await RS.saveSettings(s).catch(() => {});
+        delete s.admin_pin_hash;
+        delete s.admin_pin;
+        await RS.saveSettings(s).catch(() => {});
       }
-      clearAttempts(); overlay.remove();
-      const ok = await request('Set New Admin PIN', { setup: true });
-      resolve(ok);
+    }
+
+    async function verifyOtp() {
+      setError('');
+      const val = String(otpInput && otpInput.value || '').replace(/\D/g, '');
+      if (!challengeId) {
+        setError('Tap Send code first — we will message the owner contact on file.');
+        return;
+      }
+      if (val.length !== 6) {
+        setError('Enter the 6-digit code.');
+        return;
+      }
+      if (!window.RS_API || !RS_API.data) {
+        setError('PIN reset verification is unavailable.');
+        return;
+      }
+      submitBtn.disabled = true;
+      const prev = submitBtn.textContent;
+      submitBtn.textContent = 'Verifying…';
+      try {
+        const verified = await RS_API.data({
+          operation: 'verify_pin_reset_otp',
+          challenge_id: challengeId,
+          otp_code: val,
+        });
+        if (!verified || verified.valid !== true) {
+          throw new Error((verified && verified.error) || 'Incorrect or expired code.');
+        }
+        await clearAdminPinLocal();
+        clearAttempts();
+        if (resendTimer) clearInterval(resendTimer);
+        overlay.remove();
+        const ok = await request('Set New Admin PIN', { setup: true });
+        resolve(ok);
+      } catch (e) {
+        setError((e && e.message) || 'Incorrect code.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = prev || 'Verify & Reset PIN';
+      }
+    }
+
+    sendBtn.onclick = () => { sendOtp(); };
+    submitBtn.onclick = () => { verifyOtp(); };
+    if (otpInput) {
+      otpInput.addEventListener('input', () => {
+        otpInput.value = String(otpInput.value || '').replace(/\D/g, '').slice(0, 6);
+      });
+      otpInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); verifyOtp(); }
+      });
+    }
+    document.getElementById('rs-pin-cancel').onclick = () => {
+      if (resendTimer) clearInterval(resendTimer);
+      overlay.remove();
+      resolve(false);
     };
-    document.getElementById('rs-pin-cancel').onclick = () => { overlay.remove(); resolve(false); };
-    overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) {
+        if (resendTimer) clearInterval(resendTimer);
+        overlay.remove();
+        resolve(false);
+      }
+    });
+
+    // Auto-send on open for a one-tap recovery path
+    setTimeout(() => { sendOtp(); }, 80);
   }
 
   /**
