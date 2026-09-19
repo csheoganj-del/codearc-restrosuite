@@ -27,6 +27,12 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ALLOWED_PLAN_CODES, normalizePlanCode } from "../_shared/paid-access.ts";
+import {
+  activatePaidPlanFromPayment,
+  fetchRazorpayOrder,
+  fetchRazorpayPayment,
+} from "../_shared/activate-paid-plan.ts";
 
 const SUPABASE_URL            = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -262,11 +268,59 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({
       plans: publicPlans,
       current: {
-        plan_code: tenantRow?.plan_code || "starter",
-        subscription_status: tenantRow?.subscription_status || "active",
+        plan_code: tenantRow?.plan_code || "",
+        subscription_status: tenantRow?.subscription_status || "",
         subscription_current_period_end: tenantRow?.subscription_current_period_end || null,
       },
     }, 200, req);
+  }
+
+  // ── activate_plan: one-time Razorpay pay → extend paid period (idempotent)
+  if (action === "activate_plan") {
+    const session = await verifyAppSession(req);
+    if (!session) return json({ error: "Unauthorized" }, 401, req);
+    const paymentId = String(payload.razorpay_payment_id || payload.payment_id || "").trim();
+    const orderId = String(payload.razorpay_order_id || payload.order_id || "").trim();
+    const planCode = String(payload.plan_code || "").trim().toLowerCase();
+    const billingInterval = String(payload.billing_interval || "monthly").toLowerCase();
+    if (!paymentId || !orderId) {
+      return json({ error: "Missing payment proof.", code: "missing_payment" }, 400, req);
+    }
+    if (!ALLOWED_PLAN_CODES.has(planCode)) {
+      return json({ error: "Invalid plan.", code: "invalid_plan" }, 400, req);
+    }
+    if (!RZP_KEY_ID || !RZP_KEY_SECRET) {
+      return json({ error: "Billing is not configured.", code: "not_configured" }, 503, req);
+    }
+    try {
+      const payment = await fetchRazorpayPayment(paymentId, RZP_KEY_ID, RZP_KEY_SECRET);
+      if (String(payment.order_id || "") !== orderId) {
+        return json({ error: "Payment does not match this order.", code: "order_mismatch" }, 400, req);
+      }
+      const order = await fetchRazorpayOrder(orderId, RZP_KEY_ID, RZP_KEY_SECRET);
+      const orderStatus = String(order.status || "").toLowerCase();
+      if (orderStatus && orderStatus !== "paid" && orderStatus !== "attempted") {
+        // Razorpay may still show attempted until webhook; captured payment is enough.
+        if (String(payment.status || "") !== "captured") {
+          return json({ error: "Order is not paid.", code: "order_unpaid" }, 400, req);
+        }
+      }
+      const result = await activatePaidPlanFromPayment({
+        supabase,
+        tenantId: session.tenant_id,
+        payment,
+        planCode: normalizePlanCode(planCode),
+        billingInterval,
+        requireTenantMatch: true,
+      });
+      return json(result, 200, req);
+    } catch (e) {
+      console.error("activate_plan failed:", e);
+      return json({
+        error: (e && (e as Error).message) || "Could not activate plan.",
+        code: "activate_failed",
+      }, 400, req);
+    }
   }
 
   // ── create_subscription: tenant self-serve plan upgrade ───────────────────
@@ -274,13 +328,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const session = await verifyAppSession(req);
     if (!session) return json({ error: "Unauthorized" }, 401, req);
     const planCode = String(payload.plan_code || "").trim().toLowerCase();
-    if (!["starter", "growth", "enterprise"].includes(planCode)) {
+    if (!ALLOWED_PLAN_CODES.has(planCode)) {
       return json({ error: "Invalid plan." }, 400, req);
     }
     const { data: plan } = await supabase
       .from("saas_plans")
       .select("plan_code, name, price_monthly, currency, razorpay_plan_id, is_public")
-      .eq("plan_code", planCode).maybeSingle();
+      .eq("plan_code", normalizePlanCode(planCode)).maybeSingle();
     if (!plan || plan.is_public === false) {
       return json({ error: "This plan is not available for self-serve checkout." }, 400, req);
     }

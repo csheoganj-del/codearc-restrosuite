@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  fetchRazorpayPayment,
+  settleBillFromPayment,
+} from "../_shared/activate-paid-plan.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 
@@ -22,6 +26,8 @@ const OTP_SECRET = Deno.env.get("OTP_SECRET") || SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+const RZP_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID") || "";
+const RZP_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET") || "";
 
 function encodeBase64Url(bytes: Uint8Array) {
   let binary = "";
@@ -133,7 +139,8 @@ const PLAN_LIMITS: Record<string, { monthlyOrderLimit: number }> = {
 const ZERO_COST_MENU_LIMIT = 300;
 
 function activeSubscription(status: unknown) {
-  return ["active", "trialing"].includes(String(status || "active"));
+  const s = String(status ?? "").trim().toLowerCase();
+  return s === "active" || s === "trialing" || s === "past_due";
 }
 
 // Mirrors the VAT/GST/Sales-Tax fallback used by the internal dashboard's
@@ -245,12 +252,17 @@ function normalizeTableKey(raw: unknown): string {
 async function getApprovedTenant(slug: string) {
   const { data, error } = await supabaseAdmin
     .from("saas_tenants")
-    .select("id, name, status, plan_code, subscription_status")
+    .select("id, name, status, plan_code, subscription_status, subscription_current_period_end")
     .eq("slug", slug)
     .maybeSingle();
 
   if (error) throw error;
   if (!data || data.status !== "approved" || !activeSubscription(data.subscription_status)) return null;
+  const endIso = data.subscription_current_period_end as string | null;
+  if (endIso) {
+    const endMs = new Date(endIso).getTime();
+    if (Number.isFinite(endMs) && Date.now() > endMs) return null;
+  }
   return data;
 }
 
@@ -317,8 +329,25 @@ serve(async (req) => {
       }
       const gatewayUrl = (Deno.env.get("WHATSAPP_GATEWAY_URL") || Deno.env.get("NGROK_GATEWAY_URL") || "").replace(/\/+$/, "");
       const gatewayToken = Deno.env.get("WHATSAPP_GATEWAY_TOKEN") || Deno.env.get("GATEWAY_TOKEN") || "";
-      if (!gatewayUrl || !gatewayToken) {
-        return jsonResponse({ error: "WhatsApp gateway is not configured. Set WHATSAPP_GATEWAY_URL and WHATSAPP_GATEWAY_TOKEN." }, 503, req);
+      const emailRelayUrl = (Deno.env.get("EMAIL_RELAY_URL") || Deno.env.get("ZERO_COST_EMAIL_RELAY_URL") || "").trim();
+      const emailRelayToken = (
+        Deno.env.get("EMAIL_RELAY_TOKEN") ||
+        Deno.env.get("ZERO_COST_EMAIL_RELAY_TOKEN") ||
+        Deno.env.get("GATEWAY_TOKEN") ||
+        ""
+      ).trim();
+      const emailsDisabled = String(Deno.env.get("ZERO_COST_EMAILS_DISABLED") || "").toLowerCase() === "true";
+      const email = String(payload.email || "").trim().toLowerCase();
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const canWhatsApp = !!(gatewayUrl && gatewayToken);
+      const canEmail = !emailsDisabled && !!emailRelayUrl && emailOk;
+      if (!canWhatsApp && !canEmail) {
+        return jsonResponse({
+          error: canWhatsApp === false && emailOk
+            ? "WhatsApp gateway is offline. We could not email the code either — set EMAIL_RELAY_URL or keep the gateway PC online."
+            : "WhatsApp gateway is not configured. Add your email on the form so we can send the code there, or set WHATSAPP_GATEWAY_URL.",
+          code: "NO_OTP_CHANNEL",
+        }, 503, req);
       }
       const code = randomOtp();
       const challengeId = crypto.randomUUID();
@@ -358,63 +387,87 @@ serve(async (req) => {
         console.error("send_otp challenge insert failed:", challengeError);
         return jsonResponse({ error: "Failed to create OTP challenge." }, 500, req);
       }
-      try {
-        const gwController = new AbortController();
-        const gwTimer = setTimeout(() => gwController.abort(), 45000);
-        let gwRes: Response;
+      let deliveredWhatsapp = false;
+      let deliveredEmail = false;
+      let waError = "";
+      if (canWhatsApp) {
         try {
-          gwRes = await fetch(`${gatewayUrl}/send`, {
+          const gwController = new AbortController();
+          const gwTimer = setTimeout(() => gwController.abort(), 45000);
+          let gwRes: Response;
+          try {
+            gwRes = await fetch(`${gatewayUrl}/send`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${gatewayToken}`,
+                "X-Tenant-Id": "system",
+              },
+              body: JSON.stringify({ phone, message }),
+              signal: gwController.signal,
+            });
+          } finally {
+            clearTimeout(gwTimer);
+          }
+          const gwBody = await gwRes.json().catch(() => ({} as Record<string, unknown>));
+          if (gwRes.ok && gwBody.delivered !== false) {
+            deliveredWhatsapp = true;
+          } else {
+            waError = String((gwBody && (gwBody.error as string)) || `HTTP ${gwRes.status}`);
+          }
+        } catch (e) {
+          waError = e instanceof Error ? e.message : String(e);
+          console.error("send_otp WhatsApp error:", e);
+        }
+      }
+      if (canEmail) {
+        try {
+          const response = await fetch(emailRelayUrl, {
             method: "POST",
             headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${gatewayToken}`,
-              "X-Tenant-Id": "system",
+              "Content-Type": "application/json; charset=utf-8",
+              ...(emailRelayToken ? { "Authorization": `Bearer ${emailRelayToken}` } : {}),
             },
-            body: JSON.stringify({ phone, message }),
-            signal: gwController.signal,
+            body: JSON.stringify({
+              to: email,
+              subject: purpose === "recovery" ? "RestroSuite password reset code" : "RestroSuite verification code",
+              html: `<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#1f2937">
+                <h2>Your RestroSuite code</h2>
+                <p style="font-size:28px;letter-spacing:8px;font-weight:800;margin:24px 0">${code}</p>
+                <p>Valid for 10 minutes. Never share this code. RestroSuite staff will never ask for it.</p>
+              </div>`,
+            }),
           });
-        } finally {
-          clearTimeout(gwTimer);
+          const result = await response.json().catch(() => ({} as Record<string, unknown>));
+          deliveredEmail = response.ok && (result.status === "success" || result.status === "ok" || result.ok === true);
+        } catch (e) {
+          console.error("send_otp email error:", e);
         }
-        const gwBody = await gwRes.json().catch(() => ({} as Record<string, unknown>));
-        if (!gwRes.ok) {
-          const gwErr =
-            (gwBody && (gwBody.error as string)) ||
-            (typeof gwBody === "object" ? JSON.stringify(gwBody) : "gateway error");
-          console.error("send_otp gateway error:", gwRes.status, gwErr);
-          await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
-          const codeHint = String((gwBody && (gwBody as { code?: string }).code) || "");
-          let friendly = "Failed to send OTP via WhatsApp. Check the number is on WhatsApp and try again.";
-          if (codeHint === "SELF_CHAT" || /same number|self.?chat|central/i.test(String(gwErr))) {
-            friendly =
-              "That number is linked on the gateway and cannot receive the code. Use your personal WhatsApp number.";
-          } else if (codeHint === "OTP_DELIVERY_FAILED") {
-            friendly = "WhatsApp could not deliver the code right now. Wait 30 seconds and tap Resend.";
-          }
-          return jsonResponse({ error: friendly, code: codeHint || "GATEWAY_SEND_FAILED", detail: String(gwErr).slice(0, 200) }, 502, req);
-        }
-        // Prefer explicit delivery when gateway runs sync OTP path
-        if (gwBody && gwBody.delivered === false) {
-          await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
-          return jsonResponse({ error: "WhatsApp did not confirm delivery. Tap Resend in a moment." }, 502, req);
-        }
-        return jsonResponse({
-          sent: true,
-          challenge_id: challengeId,
-          expires_at: expiresAt,
-          delivered: gwBody && gwBody.delivered === true ? true : undefined,
-          tip: "Open WhatsApp on this phone. Code usually arrives within 30 seconds.",
-        }, 200, req);
-      } catch (e) {
-        console.error("send_otp fetch error:", e);
+      }
+      if (!deliveredWhatsapp && !deliveredEmail) {
         await supabaseAdmin.from("public_otp_challenges").update({ used_at: new Date().toISOString() }).eq("id", challengeId);
-        const aborted = e instanceof Error && (e.name === "AbortError" || /abort/i.test(e.message));
         return jsonResponse({
-          error: aborted
-            ? "WhatsApp gateway timed out. Keep the gateway PC online and try Resend."
-            : "Failed to reach WhatsApp gateway.",
+          error: waError
+            ? `WhatsApp could not deliver the code${emailOk ? " and email also failed" : ""}. ${emailOk ? "Check the inbox and tap Resend." : "Add your email on the form so we can send the code there."}`
+            : "Could not send the code. Keep the gateway online or add a working email.",
+          code: "OTP_DELIVERY_FAILED",
         }, 502, req);
       }
+      const channels = [];
+      if (deliveredWhatsapp) channels.push("whatsapp");
+      if (deliveredEmail) channels.push("email");
+      return jsonResponse({
+        sent: true,
+        challenge_id: challengeId,
+        expires_at: expiresAt,
+        delivered: true,
+        channels: { whatsapp: deliveredWhatsapp, email: deliveredEmail },
+        tip: deliveredEmail && !deliveredWhatsapp
+          ? "WhatsApp is offline — we emailed the same 6-digit code. Check inbox and spam."
+          : deliveredEmail
+            ? "Code sent to WhatsApp and email. Either copy works."
+            : "Open WhatsApp on this phone. Code usually arrives within 30 seconds.",
+      }, 200, req);
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1112,6 +1165,45 @@ serve(async (req) => {
       return jsonResponse({ success: true, id: notifId }, 200, req);
     }
 
+    if (action === "settle_bill") {
+      const tenant = await getApprovedTenant(String(payload.tenant_slug || ""));
+      if (!tenant) return jsonResponse({ error: "Outlet not found." }, 404, req);
+      if (!RZP_KEY_SECRET || !RZP_KEY_ID) {
+        return jsonResponse({ error: "Online pay is not configured." }, 503, req);
+      }
+      const orderId = String(payload.razorpay_order_id || payload.order_id || "").trim();
+      const paymentId = String(payload.razorpay_payment_id || payload.payment_id || "").trim();
+      const signature = String(payload.razorpay_signature || payload.signature || "").trim();
+      const billNo = String(payload.bill_no || payload.billNo || payload.no || "").trim();
+      if (!orderId || !paymentId || !signature || !billNo) {
+        return jsonResponse({ error: "Missing payment proof." }, 400, req);
+      }
+      const enc = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(RZP_KEY_SECRET),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"],
+      );
+      const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(`${orderId}|${paymentId}`));
+      const expected = Array.from(new Uint8Array(sigBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (!timingSafeEqualString(expected, signature)) {
+        return jsonResponse({ error: "Payment signature mismatch.", verified: false }, 400, req);
+      }
+      const payment = await fetchRazorpayPayment(paymentId, RZP_KEY_ID, RZP_KEY_SECRET);
+      if (String(payment.order_id || "") !== orderId) {
+        return jsonResponse({ error: "Payment does not match this order." }, 400, req);
+      }
+      const settled = await settleBillFromPayment({
+        supabase: supabaseAdmin,
+        tenantId: tenant.id,
+        billNo,
+        payment,
+      });
+      return jsonResponse({ ...settled, verified: true }, 200, req);
+    }
+
     if (action === "get_public_bill") {
       const billNo = String(payload.bill_no || payload.billNo || payload.no || payload.order_id || "").trim();
       if (!billNo) {
@@ -1122,7 +1214,7 @@ serve(async (req) => {
       // throws 22P02 ("invalid input syntax for type bigint") → "Failed to fetch bill details."
       // Printed receipt QR always carries order_id (e.g. RS-TK-260716-005).
       const billSelect =
-        "id, order_id, date_time, table_number, items, subtotal, discount, service_charge_amount, gst, cgst, sgst, total, payment_method, tenders, change, customer_name, customer_phone";
+        "id, order_id, date_time, table_number, items, subtotal, discount, service_charge_amount, gst, cgst, sgst, total, payment_method, tenders, change, customer_name, customer_phone, razorpay_payment_id";
 
       let billData: Record<string, unknown> | null = null;
       let billError: { message?: string } | null = null;
@@ -1236,7 +1328,10 @@ serve(async (req) => {
         serviceChargeAmount: Number(billData.service_charge_amount || billData.serviceChargeAmount || 0),
         gst: Number(billData.gst || 0),
         total: Number(billData.total || 0),
-        paymentMethod: String(billData.payment_method || billData.paymentMethod || "Cash"),
+        paymentMethod: billData.razorpay_payment_id
+          ? "Razorpay"
+          : String(billData.payment_method || billData.paymentMethod || "Cash"),
+        paidOnline: !!billData.razorpay_payment_id,
         customerName: String(billData.customer_name || billData.customerName || "Walk-in"),
         customerPhone: String(billData.customer_phone || billData.customerPhone || ""),
       };

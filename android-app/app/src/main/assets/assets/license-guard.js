@@ -108,10 +108,19 @@
    *  to allow, warn, or lock. This is the single source of truth for the
    *  lockout policy and is shared verbatim by the Node tests.
    * ------------------------------------------------------------------ */
+  function paidUntilMs(claims, cfg) {
+    if (!claims) return 0;
+    var leaseExp = Number(claims.lease_expires_at || 0);
+    var planExp = Number(claims.plan_expires_at || 0);
+    var grace = cfg && cfg.OFFLINE_GRACE_MS != null ? cfg.OFFLINE_GRACE_MS : (24 * 60 * 60 * 1000);
+    if (planExp > 0) return Math.max(leaseExp, planExp + grace);
+    return leaseExp;
+  }
+
   function evaluateLicense(input) {
     // input: {
-    //   verified: bool, claims: {lease_expires_at, tenant_id, device_id,...}|null,
-    //   now: ms, hwm: ms|0, firstSeen: ms|0,
+    //   verified: bool, claims: {lease_expires_at, plan_expires_at, ...}|null,
+    //   now: ms, hwm: ms|0, firstSeen: ms|0, everLeased: bool, killed: bool,
     //   cfg: { OFFLINE_WINDOW_MS, PRE_EXPIRY_WARN_MS, BOOTSTRAP_GRACE_MS, MODE },
     //   clockSkewToleranceMs?: number
     // }
@@ -126,6 +135,9 @@
       : (cfg.CLOCK_SKEW_OFFLINE_GRACE_MS != null ? cfg.CLOCK_SKEW_OFFLINE_GRACE_MS : (4 * 60 * 60 * 1000));
     var monitor = cfg.MODE === 'monitor';
 
+    // 0) Server revoke / confirmed unpaid while last online — never bypass.
+    if (input.killed) return decision(false, 'killed', { monitor: monitor });
+
     // 1) Clock-rollback check. If the wall clock reads meaningfully earlier than
     //    the highest time we have ever observed, the device clock was moved
     //    back — a classic offline-cheat. Lock and force online revalidation.
@@ -134,8 +146,7 @@
     //    locked by a bad Windows time sync during dinner service.
     if (hwm && now < hwm - skew) {
       var hwmDelta = hwm - now;
-      var hasLiveLease = !!(input.verified && input.claims &&
-        Number(input.claims.lease_expires_at || 0) > now);
+      var hasLiveLease = !!(input.verified && input.claims && paidUntilMs(input.claims, cfg) > now);
       if (hasLiveLease && hwmDelta <= offlineSkew) {
         // Fall through — treat clock as OK for this evaluation
       } else {
@@ -145,15 +156,14 @@
 
     // 2) No verified lease.
     if (!input.verified || !input.claims) {
-      // Server kill switch beats bootstrap grace: if the server explicitly
-      // refused this device/tenant, never allow via the new-device grace.
-      if (input.killed) return decision(false, 'killed', { monitor: monitor });
-      // Bootstrap grace: a device that has never banked a valid lease (fresh
-      // install offline, or an existing tenant the moment the feature ships) is
-      // allowed to run for a bounded window while it tries to fetch one.
+      // A device that already held a real licence cannot return to bootstrap
+      // by deleting the token. After paid days, it stays locked.
+      if (input.everLeased) {
+        return decision(false, 'no_lease', { monitor: monitor, everLeased: true });
+      }
+      // Bootstrap grace: first-run only (never banked a signed lease).
       var firstSeen = input.firstSeen || 0;
       if (!firstSeen) {
-        // First ever evaluation — allow, and the caller records firstSeen=now.
         return decision(true, 'bootstrap_start', { monitor: monitor, bootstrap: true });
       }
       var graceMs = cfg.BOOTSTRAP_GRACE_MS || 0;
@@ -166,8 +176,8 @@
       return decision(false, input.claims ? 'invalid_lease' : 'no_lease', { monitor: monitor });
     }
 
-    // 3) Verified lease — enforce its expiry (the bounded offline window).
-    var exp = Number(input.claims.lease_expires_at || 0);
+    // 3) Verified lease — remain usable OFFLINE until paid days end.
+    var exp = paidUntilMs(input.claims, cfg);
     if (!exp) return decision(false, 'lease_no_expiry', { monitor: monitor });
 
     if (now > exp) {
@@ -247,6 +257,65 @@
     try { if (SS) SS.removeItem(k); } catch (e2) {}
   }
 
+  var IDB_NAME = 'rs_license_v1';
+  function persistIdb() {
+    try {
+      if (!root.indexedDB) return;
+      var req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = function (ev) {
+        var db = ev.target.result;
+        if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+      };
+      req.onsuccess = function () {
+        try {
+          var db = req.result;
+          var tx = db.transaction('kv', 'readwrite');
+          tx.objectStore('kv').put({
+            lease: lsGet(CFG.STORE_LEASE_KEY) || '',
+            hwm: lsGet(CFG.STORE_HWM_KEY) || '0',
+            firstSeen: lsGet(CFG.STORE_FIRSTSEEN_KEY) || '0',
+            everLeased: lsGet(CFG.STORE_EVER_LEASED_KEY) || '',
+            killed: lsGet('rs_license_killed_v1') || ''
+          }, 'state');
+        } catch (ePut) {}
+      };
+    } catch (e) {}
+  }
+  function hydrateIdb() {
+    return new Promise(function (resolve) {
+      try {
+        if (!root.indexedDB) return resolve();
+        var req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = function (ev) {
+          var db = ev.target.result;
+          if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+        };
+        req.onerror = function () { resolve(); };
+        req.onsuccess = function () {
+          try {
+            var get = req.result.transaction('kv', 'readonly').objectStore('kv').get('state');
+            get.onsuccess = function () {
+              var row = get.result;
+              if (row && typeof row === 'object') {
+                if (row.everLeased === '1') lsSet(CFG.STORE_EVER_LEASED_KEY, '1');
+                if (row.killed === '1') lsSet('rs_license_killed_v1', '1');
+                if (row.lease && !lsGet(CFG.STORE_LEASE_KEY)) lsSet(CFG.STORE_LEASE_KEY, row.lease);
+                if (row.hwm && Number(row.hwm) > Number(lsGet(CFG.STORE_HWM_KEY) || 0)) {
+                  lsSet(CFG.STORE_HWM_KEY, String(row.hwm));
+                }
+                if (row.firstSeen && !lsGet(CFG.STORE_FIRSTSEEN_KEY)) {
+                  lsSet(CFG.STORE_FIRSTSEEN_KEY, String(row.firstSeen));
+                }
+              }
+              resolve();
+            };
+            get.onerror = function () { resolve(); };
+          } catch (eGet) { resolve(); }
+        };
+      } catch (e2) { resolve(); }
+    });
+  }
+
   function getDeviceId() {
     var k = 'rs_license_device_id_v1';
     var id = lsGet(k);
@@ -264,7 +333,8 @@
     return {
       lease: lsGet(CFG.STORE_LEASE_KEY),
       hwm: Number(lsGet(CFG.STORE_HWM_KEY) || 0),
-      firstSeen: Number(lsGet(CFG.STORE_FIRSTSEEN_KEY) || 0)
+      firstSeen: Number(lsGet(CFG.STORE_FIRSTSEEN_KEY) || 0),
+      everLeased: lsGet(CFG.STORE_EVER_LEASED_KEY) === '1'
     };
   }
   function bumpHighWaterMark(candidateMs) {
@@ -273,15 +343,25 @@
     if (next > cur) lsSet(CFG.STORE_HWM_KEY, String(next));
     return next;
   }
+  function markEverLeased() {
+    lsSet(CFG.STORE_EVER_LEASED_KEY, '1');
+    persistIdb();
+  }
   function storeLease(leaseToken, serverTimeMs) {
-    lsSet(CFG.STORE_LEASE_KEY, leaseToken);
+    if (leaseToken) {
+      lsSet(CFG.STORE_LEASE_KEY, leaseToken);
+      markEverLeased();
+    }
     if (!lsGet(CFG.STORE_FIRSTSEEN_KEY)) lsSet(CFG.STORE_FIRSTSEEN_KEY, String(Date.now()));
     bumpHighWaterMark(serverTimeMs || Date.now());
     pushLeaseToNative(leaseToken, serverTimeMs || Date.now());
+    persistIdb();
   }
   function wipeLease() {
+    // Keep everLeased + HWM. Never give bootstrap back after a real licence.
     lsDel(CFG.STORE_LEASE_KEY);
     pushLeaseToNative('', Date.now());
+    persistIdb();
   }
 
   /** Best-effort: rehydrate remember-me into sessionStorage (iPhone tab race). */
@@ -369,13 +449,16 @@
       if (res && res.status === 'active' && res.lease) {
         storeLease(res.lease, Number(res.server_time || Date.now()));
         lsDel('rs_license_killed_v1');
+        _killedThisSession = false;
         _lastRefreshMeta = { status: 'active', error: '', at: Date.now() };
         return { ok: true, status: 'active' };
       }
       // Any authoritative "not active" answer is the kill switch.
       if (res && (res.status === 'expired' || res.status === 'revoked')) {
-        wipeLease();
+        markEverLeased();
         lsSet('rs_license_killed_v1', '1');
+        _killedThisSession = true;
+        persistIdb();
         _lastRefreshMeta = { status: res.status, error: '', at: Date.now() };
         return { ok: false, status: res.status, kill: true };
       }
@@ -384,9 +467,10 @@
     } catch (err) {
       var s = err && err.status;
       if (s === 402 || s === 403) {
-        // Server explicitly refused (expired / revoked) — kill switch.
-        wipeLease();
+        markEverLeased();
         lsSet('rs_license_killed_v1', '1');
+        _killedThisSession = true;
+        persistIdb();
         _lastRefreshMeta = { status: 'expired', error: String(err && err.message || ''), at: Date.now() };
         return { ok: false, status: 'expired', kill: true };
       }
@@ -448,10 +532,11 @@
       wipeLease();
       return { wiped: true, reason: 'invalid' };
     }
-    var exp = Number(verified.claims.lease_expires_at || 0);
+    markEverLeased();
+    var exp = paidUntilMs(verified.claims, CFG);
     if (!exp || Date.now() > exp) {
-      wipeLease();
-      return { wiped: true, reason: 'expired' };
+      // Keep the expired signed lease so bootstrap can never return.
+      return { wiped: false, reason: 'expired', claims: verified.claims };
     }
     return { wiped: false, reason: 'ok', claims: verified.claims };
   }
@@ -477,13 +562,17 @@
     if (st.lease) verified = await verifyLeaseCore(st.lease);
     if (verified.ok && verified.claims) bumpHighWaterMark(Number(verified.claims.issued_at || 0));
 
+    var online = !IS_BROWSER || (typeof navigator === 'undefined') || navigator.onLine !== false;
     var result = evaluateLicense({
       verified: verified.ok,
       claims: verified.ok ? verified.claims : null,
       now: now,
       hwm: st2.hwm,
       firstSeen: st2.firstSeen,
-      killed: lsGet('rs_license_killed_v1') === '1',
+      everLeased: !!st2.everLeased,
+      killed: lsGet('rs_license_killed_v1') === '1' || _killedThisSession,
+      online: online,
+      hasSession: hasSessionToken(),
       cfg: CFG,
       clockSkewToleranceMs: CFG.CLOCK_SKEW_TOLERANCE_MS,
       clockSkewOfflineMs: CFG.CLOCK_SKEW_OFFLINE_GRACE_MS
@@ -504,10 +593,11 @@
     if (document.getElementById('rs-license-lock')) return;
     var messages = {
       clock_rollback: 'Your device clock looks incorrect (or jumped after sleep). Set the correct date/time, go online, and tap Retry.',
-      lease_expired: 'Your RestroSuite licence needs to reconnect. Please go online briefly to renew.',
-      no_lease: 'RestroSuite needs to verify your subscription on this device. Stay online and tap Retry — mobile browsers often need a second try after login.',
+      lease_expired: 'Your paid days have ended. Go online and renew to keep using RestroSuite.',
+      no_lease: 'RestroSuite needs a licence on this device. If you already paid, go online once so remaining days can be saved for offline use.',
       invalid_lease: 'RestroSuite needs to verify your subscription. Please stay online and tap Retry now.',
       lease_no_expiry: 'RestroSuite needs to verify your subscription. Please connect to the internet.',
+      killed: 'Your plan has ended or this device was deactivated. Renew to reopen POS.',
       verifying: 'Verifying your outlet licence…'
     };
     var msg = messages[reason] || messages.no_lease;
@@ -529,30 +619,30 @@
       '<div id="rs-license-lock-msg" style="font-size:14px;line-height:1.6;color:#c7cede;margin-bottom:22px">' + msg + '</div>' +
       '<button id="rs-license-retry" style="background:#FF4F00;color:#fff;border:none;border-radius:10px;' +
       'padding:12px 22px;font-weight:700;font-size:14px;cursor:pointer;min-width:140px;min-height:44px">Retry now</button>' +
+      '<button id="rs-license-pay" type="button" style="margin-top:10px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;' +
+      'padding:12px 22px;font-weight:700;font-size:14px;cursor:pointer;min-width:140px;min-height:44px">Renew plan</button>' +
       '<div style="margin-top:16px;font-size:12px;color:#8b93a7">Need help? Contact RestroSuite support.</div>' +
       '</div>';
     document.body.appendChild(el);
+    var payBtn = document.getElementById('rs-license-pay');
+    if (payBtn) payBtn.addEventListener('click', function () {
+      try {
+        if (root.RS && typeof RS.activateTab === 'function') RS.activateTab('settings-tab');
+      } catch (ePay) {}
+      try {
+        document.dispatchEvent(new CustomEvent('rs:open-billing'));
+      } catch (ePay2) {}
+    });
     var btn = document.getElementById('rs-license-retry');
     if (btn) btn.addEventListener('click', async function () {
       btn.textContent = 'Checking…'; btn.disabled = true;
       try {
         ensureSessionHydrated();
-        // Clear stale kill + junk lease (Private Safari has neither — that is why
-        // it works there). Server will re-kill if subscription is truly dead.
-        if (hasSessionToken()) lsDel('rs_license_killed_v1');
         await discardUnusableStoredLease();
         await refreshWithRetries(6, 500);
         var ev = await evaluateNow();
         if (ev.allow && !ev.locked) {
           el.remove();
-          return;
-        }
-        // Still locked but recoverable + online → soft-allow POS while we keep trying
-        if (ev.locked && hasSessionToken() && isRecoverableLockReason(ev.reason) &&
-            lsGet('rs_license_killed_v1') !== '1' && navigator.onLine !== false) {
-          await discardUnusableStoredLease();
-          el.remove();
-          startPendingLeaseLoop();
           return;
         }
         var detail = _lastRefreshMeta && _lastRefreshMeta.status
@@ -608,6 +698,7 @@
   var _started = false;
   var _lockRetryTimer = null;
   var _lockRetryCount = 0;
+  var _killedThisSession = false;
   var _pendingLeaseTimer = null;
   var _pendingLeaseCount = 0;
 
@@ -636,13 +727,14 @@
         // Only stop if the stored lease is actually valid — a stale junk lease
         // (common on normal Safari, absent in Private) must not end the loop.
         verifyLeaseCore(st.lease).then(function (v) {
-          if (v && v.ok && v.claims && Number(v.claims.lease_expires_at || 0) > Date.now()) {
+          if (v && v.ok && v.claims && paidUntilMs(v.claims, CFG) > Date.now()) {
             stopPendingLeaseLoop();
             reassess();
           } else {
-            wipeLease();
+            stopPendingLeaseLoop();
+            reassess();
           }
-        }).catch(function () { wipeLease(); });
+        }).catch(function () { reassess(); });
         return;
       }
       if (++_pendingLeaseCount > 60) {
@@ -703,9 +795,13 @@
 
   async function enforce(opts) {
     opts = opts || {};
+    try { await hydrateIdb(); } catch (eHyd) {}
     if (!CFG || !CFG.RS_LICENSE_PUBLIC_KEY_SPKI_B64 ||
         CFG.RS_LICENSE_PUBLIC_KEY_SPKI_B64 === 'REPLACE_WITH_PUBLIC_KEY') {
-      // Misconfigured build — fail OPEN rather than brick the POS, but shout.
+      if (lsGet(CFG.STORE_EVER_LEASED_KEY) === '1') {
+        showLockScreen('killed');
+        return false;
+      }
       console.error('[RSLicense] No public key configured; licence enforcement disabled.');
       return true;
     }
@@ -736,8 +832,6 @@
     // Private browsing has empty storage so it never hit this path — and worked.
     if (online && hasSessionToken()) {
       try {
-        // Stale kill flag bricks normal Safari; server re-asserts on 402/403.
-        lsDel('rs_license_killed_v1');
         await discardUnusableStoredLease();
         await refreshWithRetries(isMobileSafariLike() ? 7 : 5, 500);
       } catch (e2) {}
@@ -749,12 +843,13 @@
 
     var ev = await evaluateNow();
 
-    // Soft path: online + logged in + recoverable. Must run even when a JUNK
-    // lease string exists in localStorage (the Private-vs-normal Safari bug).
-    if (ev.locked && online && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1' &&
-        isRecoverableLockReason(ev.reason)) {
+    // Paid days still on a signed lease → never lock for being "offline".
+    // Soft path only for first-login race (no lease yet, server has not refused).
+    if (ev.locked && ev.reason !== 'killed' && ev.reason !== 'lease_expired' &&
+        !readState().everLeased &&
+        online && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1' &&
+        !_killedThisSession && isRecoverableLockReason(ev.reason)) {
       try { await discardUnusableStoredLease(); } catch (e4) {}
-      hideLockScreen();
       if (!_started) { _started = true; startWatch(); }
       startPendingLeaseLoop();
       setTimeout(function () {
@@ -762,6 +857,8 @@
           if (r && r.ok) {
             stopPendingLeaseLoop();
             reassess();
+          } else if (r && r.kill) {
+            showLockScreen('killed');
           }
         }).catch(function () {});
       }, 300);
@@ -857,12 +954,12 @@
   async function reassess() {
     var ev = await evaluateNow();
     if (ev.locked) {
-      if (navigator.onLine !== false && hasSessionToken() && lsGet('rs_license_killed_v1') !== '1' &&
+      if (ev.reason !== 'killed' && ev.reason !== 'lease_expired' &&
+          !readState().everLeased &&
+          navigator.onLine !== false && hasSessionToken() &&
+          lsGet('rs_license_killed_v1') !== '1' && !_killedThisSession &&
           isRecoverableLockReason(ev.reason)) {
-        try { await discardUnusableStoredLease(); } catch (e) {}
-        // Soft: keep POS usable while pending lease loop works.
         if (!_pendingLeaseTimer) startPendingLeaseLoop();
-        hideLockScreen();
         return;
       }
       showLockScreen(ev.reason);
@@ -877,6 +974,7 @@
   return {
     // pure / testable core
     evaluateLicense: evaluateLicense,
+    paidUntilMs: paidUntilMs,
     verifyLeaseCore: verifyLeaseCore,
     // runtime
     enforce: enforce,

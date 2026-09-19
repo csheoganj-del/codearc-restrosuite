@@ -12,6 +12,11 @@ import {
   makeInvoiceNumber,
   planDisplayName,
 } from "../_shared/billing-invoice.ts";
+import {
+  normalizeSubStatus,
+  periodStillOpen,
+  subscriptionAllowsAccess,
+} from "../_shared/paid-access.ts";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://restrosuite.codearc.co.in";
 // Exact-match origin allowlist. Add extra origins (e.g. preview deploys, custom domain)
@@ -77,16 +82,8 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const DEFAULT_ALLOWED_TABS = ALL_MODULE_TABS;
 
 function activeSubscription(status: unknown) {
-  // past_due = soft renew fail while days may still remain (handled with period check)
-  return ["active", "trialing", "past_due"].includes(String(status || "active").toLowerCase());
-}
-
-/** True when period end is still in the future (or missing → treat as open). */
-function periodStillOpen(endIso: string | null | undefined): boolean {
-  if (!endIso) return true;
-  const endMs = new Date(endIso).getTime();
-  if (!Number.isFinite(endMs)) return true;
-  return Date.now() <= endMs;
+  const s = normalizeSubStatus(status);
+  return s === "active" || s === "trialing" || s === "past_due";
 }
 
 /**
@@ -105,7 +102,7 @@ async function healFalseSuspendIfNeeded(tenant: {
   healed: boolean;
 }> {
   const status = String(tenant.status || "");
-  const sub = String(tenant.subscription_status || "active").toLowerCase();
+  const sub = normalizeSubStatus(tenant.subscription_status);
   const open = periodStillOpen(tenant.subscription_current_period_end);
   const falseLock =
     open &&
@@ -116,8 +113,8 @@ async function healFalseSuspendIfNeeded(tenant: {
 
   if (!falseLock) {
     return {
-      status: status || "approved",
-      subscription_status: sub || "active",
+      status: status || "",
+      subscription_status: sub,
       healed: false,
     };
   }
@@ -142,54 +139,7 @@ async function healFalseSuspendIfNeeded(tenant: {
   return { status: nextStatus, subscription_status: nextSub, healed: true };
 }
 
-/** No grace: access ends the moment subscription_current_period_end is past. */
-function subscriptionAllowsAccess(tenant: {
-  subscription_status?: string | null;
-  subscription_current_period_end?: string | null;
-  status?: string | null;
-}): { ok: true } | { ok: false; code: string; error: string } {
-  // Hard lock only when truly suspended AND period is over (or no period).
-  // Paid-period false locks are healed before this runs.
-  if (tenant.status === "suspended" || tenant.status === "payment_failed") {
-    return {
-      ok: false,
-      code: "subscription_inactive",
-      error:
-        "Access Denied: Account suspended. Open Plan & billing to renew, or contact RestroSuite support.",
-    };
-  }
-  const sub = String(tenant.subscription_status || "active").toLowerCase();
-  // canceled + still in period is allowed (auto-renew off, days remaining)
-  if (sub === "canceled" || sub === "cancelled") {
-    if (periodStillOpen(tenant.subscription_current_period_end)) {
-      return { ok: true };
-    }
-    return {
-      ok: false,
-      code: "subscription_expired",
-      error: "Access Denied: Your plan period has ended. Renew now to reopen POS.",
-    };
-  }
-  if (!activeSubscription(tenant.subscription_status)) {
-    return {
-      ok: false,
-      code: "subscription_inactive",
-      error: "Access Denied: Subscription is not active. Please renew your plan to continue.",
-    };
-  }
-  const endIso = tenant.subscription_current_period_end;
-  if (endIso) {
-    const endMs = new Date(endIso).getTime();
-    if (Number.isFinite(endMs) && Date.now() > endMs) {
-      return {
-        ok: false,
-        code: "subscription_expired",
-        error: "Access Denied: Your plan period has ended. Renew now to reopen POS.",
-      };
-    }
-  }
-  return { ok: true };
-}
+// subscriptionAllowsAccess imported from _shared/paid-access.ts — empty status is not active.
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
   return new Response(JSON.stringify(body), {
@@ -245,6 +195,30 @@ async function checkRateLimit(req: Request, action: string) {
     return { allowed: false, unavailable: true };
   }
   return { allowed: data === true };
+}
+
+/**
+ * Per-account failed-login cooldown. The bucket is keyed on slug+username (shared
+ * across IPs), so a distributed attacker who rotates through proxies cannot brute
+ * force one account faster than the per-IP limit would allow. Only FAILURES
+ * consume the bucket — legitimate owners signing in from several devices are
+ * never blocked by their own successful logins.
+ */
+async function consumeFailedLogin(slug: string, username: string) {
+  const bucket = await sha256Hex(
+    `tenant-access:login-account:${normalizeSlug(slug)}:${normalizeUsername(username).toLowerCase()}`,
+  );
+  const { data, error } = await supabaseAdmin.rpc("consume_api_rate_limit", {
+    p_bucket: bucket,
+    p_limit: 10,
+    p_window_seconds: 15 * 60,
+  });
+  if (error) {
+    // Fail open on RPC failure: the per-IP login limit still applies.
+    console.error("login account rate limit failed:", error);
+    return true;
+  }
+  return data === true;
 }
 
 function randomBase64Url(byteLength = 18) {
@@ -533,6 +507,10 @@ async function handleRequestRecovery(payload: Record<string, unknown>, req: Requ
     return jsonResponse(generic, 200, req);
   }
 
+  // SECURITY: a candidate matches only when EVERY supplied channel matches the
+  // registered owner contact. The old `emailOk || phoneOk` fallback let a caller
+  // combine the victim's email with their OWN phone; the shared OTP was then
+  // delivered to both, handing the attacker the code (full account takeover).
   const tenants = (candidates || []).filter((tenant) => {
     const tenantEmail = normalizeEmail(String(tenant.email || ""));
     const tenantPhone = normalizePhoneDigits(String(tenant.phone || ""));
@@ -540,12 +518,14 @@ async function handleRequestRecovery(payload: Record<string, unknown>, req: Requ
     const phoneOk = phone.length >= 10
       ? (tenantPhone === phone || tenantPhone.endsWith(phone) || phone.endsWith(tenantPhone))
       : true;
-    if (email && phone.length >= 10) return emailOk || phoneOk;
+    if (email && phone.length >= 10) return emailOk && phoneOk;
     if (email) return emailOk;
     return phoneOk;
   });
 
   if (!tenants.length) {
+    // Identical generic shape (fresh random challenge that was never issued) so
+    // callers cannot enumerate which emails/phones are registered.
     return jsonResponse(generic, 200, req);
   }
 
@@ -562,10 +542,12 @@ async function handleRequestRecovery(payload: Record<string, unknown>, req: Requ
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   await supabaseAdmin.from("tenant_password_resets").delete().eq("tenant_id", tenant.id).is("used_at", null);
-  const deliverEmailTo = email || normalizeEmail(String(tenant.email || ""));
-  const deliverPhoneTo = phone.length >= 10
-    ? phone
-    : normalizePhoneDigits(String(tenant.phone || ""));
+
+  // SECURITY: delivery is ALWAYS to the registered owner channels on file — never
+  // to the email/phone the caller supplied. Caller-supplied values are lookup
+  // hints only; an attacker must control a registered channel to receive the code.
+  const deliverEmailTo = normalizeEmail(String(tenant.email || ""));
+  const deliverPhoneTo = normalizePhoneDigits(String(tenant.phone || ""));
 
   let deliveredEmail = false;
   let deliveredWhatsapp = false;
@@ -606,13 +588,10 @@ async function handleRequestRecovery(payload: Record<string, unknown>, req: Requ
     delivered_whatsapp: deliveredWhatsapp,
   }).eq("challenge_id", challengeId);
 
-  return jsonResponse({
-    ...generic,
-    channels: {
-      email: deliveredEmail,
-      whatsapp: deliveredWhatsapp,
-    },
-  }, 200, req);
+  // No `channels` echo — its presence/absence would reveal whether the supplied
+  // email/phone is registered (an enumeration oracle). Every request, matched or
+  // not, returns the identical generic shape.
+  return jsonResponse(generic, 200, req);
 }
 
 async function handleVerifyRecoveryOtp(payload: Record<string, unknown>, req: Request) {
@@ -766,7 +745,13 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
     slug === "superadmin" &&
     username.toLowerCase() === superadminUsername.toLowerCase()
   ) {
-    if (await verifyPassword(password, superadminPasswordHash)) {
+    if (!(await verifyPassword(password, superadminPasswordHash))) {
+      if (!(await consumeFailedLogin(slug, username))) {
+        return jsonResponse({
+          error: "Too many failed sign-in attempts for this account. Wait a few minutes, then try again.",
+        }, 429, req);
+      }
+    } else {
       const adminToken = await createSignedSessionToken({
         role: "superadmin",
         username,
@@ -809,29 +794,21 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   tenant.status = healed.status;
   tenant.subscription_status = healed.subscription_status;
 
-  if (tenant.status === "suspended") {
-    return jsonResponse({
-      error:
-        "Access Denied: Account suspended. Open Plan & billing to renew, or contact RestroSuite support.",
-    }, 403, req);
-  }
-
   const subGate = subscriptionAllowsAccess(tenant);
-  if (!subGate.ok) {
-    // Mark expired so reminders / admin dashboards stay accurate (no grace).
-    if (subGate.code === "subscription_expired") {
-      try {
-        await supabaseAdmin
-          .from("saas_tenants")
-          .update({ subscription_status: "expired" })
-          .eq("id", tenant.id)
-          .in("subscription_status", ["trialing", "active", "past_due", "canceled", "cancelled"]);
-      } catch (_) { /* best-effort */ }
-    }
-    return jsonResponse({ error: subGate.error, code: subGate.code }, 402, req);
+  if (!subGate.ok && subGate.code === "subscription_expired") {
+    try {
+      await supabaseAdmin
+        .from("saas_tenants")
+        .update({ subscription_status: "expired" })
+        .eq("id", tenant.id)
+        .in("subscription_status", ["trialing", "active", "past_due", "canceled", "cancelled"]);
+    } catch (_) { /* best-effort */ }
   }
-
-  const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
+  // Unpaid tenants may still sign in — only Plan & billing is usable until they pay.
+  const billingLock = !subGate.ok;
+  const tenantTabs = billingLock
+    ? ["settings-tab"]
+    : effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
   const plan = planFor(tenant.plan_code);
 
   const usernameNormalized = username.toLowerCase();
@@ -852,6 +829,11 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
       return jsonResponse({ error: "Access Denied: Staff account is suspended." }, 403, req);
     }
     if (!await verifyPassword(password, staffUser.password_hash)) {
+      if (!(await consumeFailedLogin(slug, staffUser.username))) {
+        return jsonResponse({
+          error: "Too many failed sign-in attempts for this account. Wait a few minutes, then try again.",
+        }, 429, req);
+      }
       return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401, req);
     }
 
@@ -862,7 +844,9 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
         .eq("id", staffUser.id);
     }
 
-    const allowedTabs = effectiveTabs(staffUser.role, staffUser.allowed_tabs, tenantTabs);
+    const allowedTabs = billingLock
+      ? ["settings-tab"]
+      : effectiveTabs(staffUser.role, staffUser.allowed_tabs, tenantTabs);
     const sessionToken = await createSignedSessionToken({
       role: staffUser.role,
       username: staffUser.username,
@@ -903,10 +887,11 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
         allowed_tabs: allowedTabs,
         must_change_password: staffUser.must_change_password === true,
         data_reset_at: tenant.data_reset_at || null,
-        plan_code: tenant.plan_code || "starter",
+        plan_code: tenant.plan_code || "",
         plan_name: plan.name,
-        subscription_status: tenant.subscription_status || "active",
+        subscription_status: tenant.subscription_status || "",
         subscription_current_period_end: tenant.subscription_current_period_end || null,
+        billing_lock: billingLock,
         plan_limits: {
           max_staff: plan.maxStaff,
           monthly_order_limit: plan.monthlyOrderLimit,
@@ -920,6 +905,11 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
   const passwordMatches = await verifyPassword(password, tenant.password_hash);
 
   if (!usernameMatches || !passwordMatches) {
+    if (!(await consumeFailedLogin(slug, username))) {
+      return jsonResponse({
+        error: "Too many failed sign-in attempts for this account. Wait a few minutes, then try again.",
+      }, 429, req);
+    }
     return jsonResponse({ error: "Access Denied: Invalid Username or Password for this Outlet." }, 401, req);
   }
 
@@ -954,10 +944,11 @@ async function handleLogin(payload: Record<string, unknown>, req: Request) {
       tenant_name: tenant.name,
       allowed_tabs: tenantTabs,
       data_reset_at: tenant.data_reset_at || null,
-      plan_code: tenant.plan_code || "starter",
+      plan_code: tenant.plan_code || "",
       plan_name: plan.name,
-      subscription_status: tenant.subscription_status || "active",
+      subscription_status: tenant.subscription_status || "",
       subscription_current_period_end: tenant.subscription_current_period_end || null,
+      billing_lock: billingLock,
       plan_limits: {
         max_staff: plan.maxStaff,
         monthly_order_limit: plan.monthlyOrderLimit,
@@ -1015,28 +1006,28 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
   const healedSession = await healFalseSuspendIfNeeded(tenant);
   tenant.status = healedSession.status;
   tenant.subscription_status = healedSession.subscription_status;
-  if (tenant.status !== "approved") {
+  if (tenant.status === "pending") {
     return jsonResponse({ error: "Workspace access is not active.", code: "session_revoked" }, 403, req);
   }
   const subGateV = subscriptionAllowsAccess(tenant);
-  if (!subGateV.ok) {
-    if (subGateV.code === "subscription_expired") {
-      try {
-        await supabaseAdmin
-          .from("saas_tenants")
-          .update({ subscription_status: "expired" })
-          .eq("id", tenant.id)
-          .in("subscription_status", ["trialing", "active", "past_due", "canceled", "cancelled"]);
-      } catch (_) { /* best-effort */ }
-    }
-    return jsonResponse({ error: subGateV.error, code: subGateV.code }, 402, req);
+  if (!subGateV.ok && subGateV.code === "subscription_expired") {
+    try {
+      await supabaseAdmin
+        .from("saas_tenants")
+        .update({ subscription_status: "expired" })
+        .eq("id", tenant.id)
+        .in("subscription_status", ["trialing", "active", "past_due", "canceled", "cancelled"]);
+    } catch (_) { /* best-effort */ }
   }
+  const billingLockV = !subGateV.ok;
   const userId = String(sessionPayload.user_id || "");
   if (!userId && Number(sessionPayload.auth_version) !== Number(tenant.auth_version)) {
     return jsonResponse({ error: "Session was revoked. Please log in again.", code: "session_revoked" }, 401, req);
   }
 
-  const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
+  const tenantTabs = billingLockV
+    ? ["settings-tab"]
+    : effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
   const plan = planFor(tenant.plan_code);
 
   if (userId) {
@@ -1078,10 +1069,11 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
         tenant_name: tenant.name,
         allowed_tabs: effectiveTabs(staffUser.role, staffUser.allowed_tabs, tenantTabs),
         data_reset_at: tenant.data_reset_at || null,
-        plan_code: tenant.plan_code || "starter",
+        plan_code: tenant.plan_code || "",
         plan_name: plan.name,
-        subscription_status: tenant.subscription_status || "active",
+        subscription_status: tenant.subscription_status || "",
         subscription_current_period_end: tenant.subscription_current_period_end || null,
+        billing_lock: billingLockV,
         plan_limits: {
           max_staff: plan.maxStaff,
           monthly_order_limit: plan.monthlyOrderLimit,
@@ -1109,10 +1101,11 @@ async function handleValidateSession(payload: Record<string, unknown>, req: Requ
       tenant_name: tenant.name,
       allowed_tabs: tenantTabs,
       data_reset_at: tenant.data_reset_at || null,
-      plan_code: tenant.plan_code || "starter",
+      plan_code: tenant.plan_code || "",
       plan_name: plan.name,
-      subscription_status: tenant.subscription_status || "active",
+      subscription_status: tenant.subscription_status || "",
       subscription_current_period_end: tenant.subscription_current_period_end || null,
+      billing_lock: billingLockV,
       plan_limits: {
         max_staff: plan.maxStaff,
         monthly_order_limit: plan.monthlyOrderLimit,

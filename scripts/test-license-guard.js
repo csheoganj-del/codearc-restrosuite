@@ -70,7 +70,11 @@ async function main() {
   };
 
   const validLease = await signLease(baseClaims, key);
-  const expiredLease = await signLease({ ...baseClaims, lease_expires_at: now - DAY }, key);
+  const expiredLease = await signLease({
+    ...baseClaims,
+    lease_expires_at: now - 3 * DAY,
+    plan_expires_at: now - 3 * DAY,
+  }, key);
   const soonLease = await signLease({ ...baseClaims, lease_expires_at: now + (DAY / 2) }, key);
   // Tamper: flip a char in the payload but keep the signature.
   const tampered = (function () {
@@ -102,7 +106,11 @@ async function main() {
     ev({ verified: true, claims: baseClaims, now, hwm: now, firstSeen: now - DAY }).allow === true);
 
   check('expired lease -> locked',
-    ev({ verified: true, claims: { ...baseClaims, lease_expires_at: now - DAY }, now, hwm: now, firstSeen: now - DAY }).locked === true);
+    ev({
+      verified: true,
+      claims: { ...baseClaims, lease_expires_at: now - 3 * DAY, plan_expires_at: now - 3 * DAY },
+      now, hwm: now, firstSeen: now - 10 * DAY,
+    }).locked === true);
 
   check('clock rollback -> locked',
     ev({ verified: true, claims: baseClaims, now: now - 5 * DAY, hwm: now, firstSeen: now - 10 * DAY }).reason === 'clock_rollback');
@@ -113,11 +121,32 @@ async function main() {
   check('no lease, within bootstrap grace -> allow',
     ev({ verified: false, claims: null, now, hwm: now, firstSeen: now - DAY }).allow === true);
 
+  check('offline until remaining paid days -> allow',
+    ev({
+      verified: true,
+      claims: { ...baseClaims, lease_expires_at: now + DAY, plan_expires_at: now + 20 * DAY },
+      now, hwm: now, firstSeen: now - DAY,
+    }).allow === true);
+
+  check('after a real licence, deleting the token cannot bootstrap',
+    ev({ verified: false, claims: null, now, hwm: now, firstSeen: now, everLeased: true }).locked === true);
+
+  check('paid days ended -> locked even offline',
+    ev({
+      verified: true,
+      claims: { ...baseClaims, lease_expires_at: now - DAY, plan_expires_at: now - 2 * DAY },
+      now, hwm: now, firstSeen: now - 10 * DAY,
+    }).locked === true);
+
   check('no lease, past bootstrap grace -> locked',
     ev({ verified: false, claims: null, now, hwm: now, firstSeen: now - 5 * DAY }).locked === true);
 
   check('pre-expiry warning flag set',
-    ev({ verified: true, claims: { ...baseClaims, lease_expires_at: now + (DAY / 2) }, now, hwm: now, firstSeen: now - DAY }).warn === true);
+    ev({
+      verified: true,
+      claims: { ...baseClaims, lease_expires_at: now + (DAY / 2), plan_expires_at: now + (DAY / 2) },
+      now, hwm: now, firstSeen: now - DAY,
+    }).warn === true);
 
   check('monitor mode never blocks',
     GUARD.evaluateLicense({ cfg: Object.assign({}, CFG, { MODE: 'monitor' }),

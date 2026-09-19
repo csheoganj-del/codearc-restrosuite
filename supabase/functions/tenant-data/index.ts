@@ -378,7 +378,14 @@ const ZERO_COST_DEFAULT_LIMIT = 250;
 const ZERO_COST_MAX_LIMIT = 500;
 
 function activeSubscription(status: unknown) {
-  return ["active", "trialing"].includes(String(status || "active"));
+  const s = String(status ?? "").trim().toLowerCase();
+  return s === "active" || s === "trialing" || s === "past_due";
+}
+
+function periodStillOpen(endIso: string | null | undefined): boolean {
+  if (!endIso) return false;
+  const endMs = new Date(endIso).getTime();
+  return Number.isFinite(endMs) && Date.now() <= endMs;
 }
 
 function planFor(code: unknown) {
@@ -758,7 +765,7 @@ async function verifyTenantSession(req: Request) {
 
     const { data: tenant, error } = await supabaseAdmin
       .from("saas_tenants")
-      .select("id, status, allowed_tabs, plan_code, subscription_status, auth_version")
+      .select("id, status, allowed_tabs, plan_code, subscription_status, subscription_current_period_end, auth_version")
       .eq("id", String(payload.tenant_id || ""))
       .maybeSingle();
 
@@ -769,7 +776,9 @@ async function verifyTenantSession(req: Request) {
 
     if (!tenant) return { ok: false, error: "Workspace no longer exists." };
     if (tenant.status !== "approved") return { ok: false, error: "Workspace access is not active." };
-    if (!activeSubscription(tenant.subscription_status)) return { ok: false, error: "Workspace subscription is not active." };
+    if (!activeSubscription(tenant.subscription_status) || !periodStillOpen(tenant.subscription_current_period_end)) {
+      return { ok: false, error: "Workspace subscription is not active.", code: "subscription_inactive" };
+    }
 
     const tenantTabs = effectiveTenantTabs(tenant.allowed_tabs, tenant.plan_code);
 

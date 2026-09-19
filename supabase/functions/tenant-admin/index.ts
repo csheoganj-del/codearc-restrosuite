@@ -660,7 +660,7 @@ async function getBilling(req: Request) {
       tenant_name: tenant.name,
       tenant_slug: tenant.slug,
       plan_code: tenant.plan_code || "express",
-      subscription_status: tenant.subscription_status || "active",
+      subscription_status: tenant.subscription_status || "",
       subscription_current_period_end: tenant.subscription_current_period_end || null,
       billing_interval: tenant.billing_interval || "monthly",
       billing_kind: kind,
@@ -1040,13 +1040,8 @@ async function createImpersonationSession(payload: Record<string, unknown>, req:
   if (statusNorm !== "approved" && statusNorm !== "active") {
     return jsonResponse({ error: "Only active workspaces can be opened." }, 403, req);
   }
-  const subNorm = String(tenant.subscription_status || "active").toLowerCase();
-  // Treat empty/legacy values as active; case-insensitive match
-  if (subNorm && !["active", "trialing", "trial", ""].includes(subNorm)) {
-    return jsonResponse({
-      error: "Workspace subscription is not active (" + subNorm + "). Set Billing to Active in Manage → Account.",
-    }, 402, req);
-  }
+  // Superadmin may open any approved workspace for support.
+  // The outlet POS still license-locks until a paid period is set.
 
   const actor = String(verifiedPayload.username || "superadmin");
   const sessionToken = await createSignedSessionToken({
@@ -1090,7 +1085,7 @@ async function createImpersonationSession(payload: Record<string, unknown>, req:
       data_reset_at: tenant.data_reset_at || null,
       plan_code: tenant.plan_code || "starter",
       plan_name: plan.name,
-      subscription_status: tenant.subscription_status || "active",
+      subscription_status: tenant.subscription_status || "",
       subscription_current_period_end: tenant.subscription_current_period_end || null,
       session_token: sessionToken,
       impersonated_by: actor,

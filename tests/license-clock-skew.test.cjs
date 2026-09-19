@@ -66,6 +66,27 @@ test('small clock glitch under 15m does not lock', () => {
   assert.equal(r.reason, 'valid');
 });
 
+test('offline with remaining paid days stays open', () => {
+  const now = Date.UTC(2026, 6, 27, 12, 0, 0);
+  const DAY = 24 * 60 * 60 * 1000;
+  const r = evaluateLicense({
+    verified: true,
+    claims: {
+      lease_expires_at: now + (2 * DAY),
+      plan_expires_at: now + (12 * DAY),
+    },
+    now,
+    hwm: now,
+    firstSeen: now - DAY,
+    killed: false,
+    online: false,
+    hasSession: true,
+    cfg: { MODE: 'enforce', OFFLINE_GRACE_MS: DAY, PRE_EXPIRY_WARN_MS: 0 },
+  });
+  assert.equal(r.locked, false);
+  assert.equal(r.reason, 'valid');
+});
+
 test('large clock rollback without live lease locks', () => {
   const now = Date.UTC(2026, 6, 27, 12, 0, 0);
   const hwm = now + 2 * HOUR;

@@ -18,9 +18,13 @@
     // Auto-filled by scripts/generate-license-keys.js.
     RS_LICENSE_PUBLIC_KEY_SPKI_B64: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtyguKkhJ+rIV9Smp65g5K7Q4mf6Ru1YMdjgG6rNN5d6Ygaz3RtgbgdMLCmeGveoQr9h1HitaSTyl63OgrZz66g==",
 
-    // Max time a device may run without a fresh lease from the server.
-    // 3 days per product decision. After this the app locks until it can renew.
+    // Fallback mint window only when the tenant has no paid-until date.
+    // Paying outlets use the signed plan_expires_at (remaining paid days).
     OFFLINE_WINDOW_MS: 3 * 24 * 60 * 60 * 1000,
+
+    // Extra hours after paid-until so a device that is briefly past midnight
+    // can still reopen, go online, and renew.
+    OFFLINE_GRACE_MS: 1 * 24 * 60 * 60 * 1000,
 
     // Start warning the user this long before the lease would lock the app,
     // so lockouts never feel like an ambush.
@@ -37,12 +41,8 @@
     //               Use this for a quiet first rollout, then flip to 'enforce'.
     MODE: 'enforce',
 
-    // First-run safety net. A device that has NEVER seen a valid lease (e.g.
-    // an existing tenant the moment this feature ships, or a brand-new install
-    // that is offline on first launch) is allowed to run for this long while it
-    // keeps trying to fetch a lease when online. Once it has banked one valid
-    // lease, normal enforcement applies and this no longer matters. This is
-    // what stops the very first deploy from locking out live restaurants.
+    // First-run only (never had a signed lease). After the first lease, the
+    // remaining paid days on that lease are the only offline allowance.
     BOOTSTRAP_GRACE_MS: 3 * 24 * 60 * 60 * 1000,
 
     // Clock-rollback detection: wall clock earlier than high-water mark by more
@@ -59,6 +59,7 @@
     STORE_LEASE_KEY: 'rs_license_lease_v1',
     STORE_HWM_KEY: 'rs_license_hwm_v1',       // monotonic high-water mark (ms)
     STORE_FIRSTSEEN_KEY: 'rs_license_firstseen_v1',
+    STORE_EVER_LEASED_KEY: 'rs_license_ever_leased_v1',
   };
 
   root.RS_LICENSE_CONFIG = CONFIG;

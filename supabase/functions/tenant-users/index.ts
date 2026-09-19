@@ -50,7 +50,8 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 
 function activeSubscription(status: unknown) {
-  return ["active", "trialing"].includes(String(status || "active"));
+  const s = String(status ?? "").trim().toLowerCase();
+  return s === "active" || s === "trialing" || s === "past_due";
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {

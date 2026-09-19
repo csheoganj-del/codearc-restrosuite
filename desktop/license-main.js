@@ -45,14 +45,20 @@ function loadConfigAndPolicy(webRoot) {
 function inlineEvaluate(input) {
   const cfg = input.cfg || {};
   const now = input.now, hwm = input.hwm || 0, skew = 60 * 1000;
+  if (input.killed) return { allow: false, locked: true, reason: 'killed' };
   if (hwm && now < hwm - skew) return { allow: false, locked: true, reason: 'clock_rollback' };
   if (!input.verified || !input.claims) {
+    if (input.everLeased) return { allow: false, locked: true, reason: 'no_lease' };
     const fs2 = input.firstSeen || 0;
     if (!fs2) return { allow: true, locked: false, reason: 'bootstrap_start' };
     if (now <= fs2 + (cfg.BOOTSTRAP_GRACE_MS || 0)) return { allow: true, locked: false, reason: 'bootstrap_grace' };
     return { allow: false, locked: true, reason: 'no_lease' };
   }
-  const exp = Number(input.claims.lease_expires_at || 0);
+  const leaseExp = Number(input.claims.lease_expires_at || 0);
+  const planExp = Number(input.claims.plan_expires_at || 0);
+  const grace = (cfg.OFFLINE_GRACE_MS != null) ? cfg.OFFLINE_GRACE_MS : (24 * 60 * 60 * 1000);
+  let exp = leaseExp;
+  if (planExp > 0) exp = Math.max(leaseExp, planExp + grace);
   if (!exp) return { allow: false, locked: true, reason: 'lease_no_expiry' };
   if (now > exp) return { allow: false, locked: true, reason: 'lease_expired' };
   return { allow: true, locked: false, reason: 'valid', msUntilExpiry: exp - now };
@@ -80,31 +86,38 @@ function decrypt(stored) {
   } catch (e) {}
   return null;
 }
+function markerEverLeased() {
+  try {
+    return !!(!_statePath ? false : fs.existsSync(_statePath + '.ever'));
+  } catch (_) { return false; }
+}
+
 function readState() {
   try {
     if (!_statePath || !fs.existsSync(_statePath)) {
-      return { lease: '', hwm: 0, firstSeen: 0 };
+      return { lease: '', hwm: 0, firstSeen: 0, everLeased: markerEverLeased() };
     }
     const raw = fs.readFileSync(_statePath, 'utf8');
     if (!raw || !String(raw).trim()) {
-      return { lease: '', hwm: 0, firstSeen: 0 };
+      return { lease: '', hwm: 0, firstSeen: 0, everLeased: markerEverLeased() };
     }
     const dec = decrypt(raw);
     if (dec == null) {
       // DPAPI/safeStorage can fail briefly on cold start (profile not ready).
       // Do NOT treat as empty — empty write would wipe a valid lease.
       console.warn('[license-main] lease state decrypt failed (fail-open this launch)');
-      return { lease: '', hwm: 0, firstSeen: 0, decryptFailed: true };
+      return { lease: '', hwm: 0, firstSeen: 0, everLeased: markerEverLeased(), decryptFailed: true };
     }
     const st = JSON.parse(dec);
     return {
       lease: st.lease || '',
       hwm: Number(st.hwm || 0),
       firstSeen: Number(st.firstSeen || 0),
+      everLeased: !!(st.everLeased || markerEverLeased()),
     };
   } catch (e) {
     console.warn('[license-main] readState error:', e && e.message);
-    return { lease: '', hwm: 0, firstSeen: 0, readError: true };
+    return { lease: '', hwm: 0, firstSeen: 0, everLeased: markerEverLeased(), readError: true };
   }
 }
 function writeState(st, opts) {
@@ -116,7 +129,13 @@ function writeState(st, opts) {
       lease: st.lease || '',
       hwm: Number(st.hwm || 0),
       firstSeen: Number(st.firstSeen || 0),
+      everLeased: !!st.everLeased,
     })), { mode: 0o600 });
+    try {
+      if (st.everLeased && _statePath) {
+        fs.writeFileSync(_statePath + '.ever', '1', { mode: 0o600 });
+      }
+    } catch (_) {}
   } catch (e) {
     console.warn('[license-main] could not persist license state:', e.message);
   }
@@ -185,7 +204,8 @@ function persistLease(leaseToken, serverTimeMs) {
   const next = {
     lease: leaseToken || '',
     hwm: Math.max(st.hwm || 0, Number(serverTimeMs || 0), now),
-    firstSeen: st.firstSeen || now
+    firstSeen: st.firstSeen || now,
+    everLeased: !!(st.everLeased || leaseToken)
   };
   writeState(next);
   return next;
@@ -200,11 +220,11 @@ function gate() {
   // Cold-start decrypt/read glitches: fail OPEN so a paying outlet is never
   // stuck on lock.html until they click Retry. Next successful storeLease
   // re-writes a clean state file.
-  if (st.decryptFailed) {
-    return { allow: true, locked: false, reason: 'decrypt_fail_open', recoverable: true };
-  }
-  if (st.readError) {
-    return { allow: true, locked: false, reason: 'read_error_open', recoverable: true };
+  if (st.decryptFailed || st.readError) {
+    if (st.everLeased || markerEverLeased()) {
+      return { allow: false, locked: true, reason: 'killed', recoverable: true };
+    }
+    return { allow: true, locked: false, reason: st.decryptFailed ? 'decrypt_fail_open' : 'read_error_open', recoverable: true };
   }
 
   // Use stored HWM for clock checks (not max(now,hwm) which disabled rollback detection).
@@ -216,6 +236,7 @@ function gate() {
     now,
     hwm: storedHwm,
     firstSeen: st.firstSeen,
+    everLeased: !!(st.everLeased || markerEverLeased() || (verified.ok && verified.claims)),
     cfg: _cfg,
     clockSkewToleranceMs: (_cfg && _cfg.CLOCK_SKEW_TOLERANCE_MS) || (15 * 60 * 1000),
     clockSkewOfflineMs: (_cfg && _cfg.CLOCK_SKEW_OFFLINE_GRACE_MS) || (4 * 60 * 60 * 1000),
@@ -231,6 +252,7 @@ function gate() {
     lease: st.lease,
     hwm: nextHwm,
     firstSeen: st.firstSeen || now,
+    everLeased: !!(st.everLeased || markerEverLeased() || (verified.ok && verified.claims)),
   });
 
   decision.recoverable = isRecoverableReason(decision.reason);

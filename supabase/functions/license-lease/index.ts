@@ -144,7 +144,8 @@ async function signLease(claims: Record<string, unknown>): Promise<string> {
 }
 
 function activeSubscription(status: unknown) {
-  return ["active", "trialing"].includes(String(status ?? "active"));
+  const s = String(status ?? "").trim().toLowerCase();
+  return s === "active" || s === "trialing" || s === "past_due";
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200, req?: Request) {
@@ -210,10 +211,13 @@ serve(async (req) => {
   // The real gate: no active subscription => refuse to mint a lease. Existing
   // leases on the device will run out on their own within one offline window.
   const planExpiresAt = tenant.subscription_current_period_end || null;
+  const planEndMs = planExpiresAt ? new Date(planExpiresAt).getTime() : 0;
   const planLapsed =
     !activeSubscription(tenant.subscription_status) ||
     tenant.status !== "approved" ||
-    (planExpiresAt && Date.now() > new Date(planExpiresAt).getTime());
+    !planExpiresAt ||
+    !Number.isFinite(planEndMs) ||
+    Date.now() > planEndMs;
 
   if (planLapsed) {
     return jsonResponse({
@@ -256,7 +260,7 @@ serve(async (req) => {
     tenant_id: tenant.id,
     device_id: deviceId,
     plan: tenant.plan_code || "starter",
-    subscription_status: tenant.subscription_status || "active",
+    subscription_status: tenant.subscription_status || "",
     plan_expires_at: periodEndMs || null,
     issued_at: now,
     lease_expires_at: leaseExpiresAt,

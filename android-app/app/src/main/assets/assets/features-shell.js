@@ -1743,30 +1743,26 @@
             return null;
           }
           if (result && result.verified) {
-            let endIso = null;
-            try {
-              if (window.RS_API && typeof RS_API.activatePlan === 'function') {
-                const act = await RS_API.activatePlan({
-                  plan_code: planCode,
-                  billing_interval: billInterval,
-                  razorpay_payment_id: result.payment_id,
-                  razorpay_order_id: result.order_id,
-                });
-                if (act && act.subscription_current_period_end) {
-                  endIso = act.subscription_current_period_end;
-                  try {
-                    sessionStorage.setItem('rs_plan_code', planCode || '');
-                    sessionStorage.setItem('rs_plan_name', planName || planCode || '');
-                    sessionStorage.setItem('rs_subscription_status', 'active');
-                    sessionStorage.setItem('rs_subscription_period_end', endIso);
-                  } catch (_) {}
-                }
-              }
-            } catch (actErr) {
-              console.warn('[plan] activate_plan', actErr);
-              RS.toast((actErr && actErr.message) || 'Paid — activation pending. Contact support with payment id.', 'fa-circle-info');
+            if (!window.RS_API || typeof RS_API.activatePlan !== 'function') {
+              throw new Error('Paid, but this app cannot activate the plan. Contact support with payment id ' + (result.payment_id || ''));
             }
-            const until = endIso ? fmtDate(endIso) : fmtDate(previewEndIso(billInterval));
+            const act = await RS_API.activatePlan({
+              plan_code: planCode,
+              billing_interval: billInterval,
+              razorpay_payment_id: result.payment_id,
+              razorpay_order_id: result.order_id,
+            });
+            if (!act || !act.subscription_current_period_end) {
+              throw new Error('Paid, but plan is not active yet. Contact support with payment id ' + (result.payment_id || ''));
+            }
+            const endIso = act.subscription_current_period_end;
+            try {
+              sessionStorage.setItem('rs_plan_code', planCode || '');
+              sessionStorage.setItem('rs_plan_name', planName || planCode || '');
+              sessionStorage.setItem('rs_subscription_status', 'active');
+              sessionStorage.setItem('rs_subscription_period_end', endIso);
+            } catch (_) {}
+            const until = fmtDate(endIso);
             RS.toast((planName || planCode) + ' is live · invoice on email & WhatsApp', 'fa-circle-check');
             try {
               sessionStorage.setItem('rs_plan_success', JSON.stringify({
@@ -1774,6 +1770,11 @@
                 detail: 'Paid ' + money(rupees) + '. Active until ' + until + '. Tax invoice PDF sent to email & WhatsApp.',
                 at: Date.now(),
               }));
+            } catch (_) {}
+            try {
+              if (window.RSLicense && typeof RSLicense.refreshWithRetries === 'function') {
+                await RSLicense.refreshWithRetries(4, 400);
+              }
             } catch (_) {}
             setTimeout(() => { initPlanPanel(body); }, 350);
             return result;
@@ -2949,6 +2950,16 @@
     }
     RS.titles['settings-tab']=['Settings','Outlet · operations · access · account'];
     RS.addRenderer('settings-tab', renderSettings);
+    if (!document.documentElement.dataset.rsBillingPaywall) {
+      document.documentElement.dataset.rsBillingPaywall = '1';
+      document.addEventListener('rs:open-billing', () => {
+        try { RS.activateTab('settings-tab'); } catch (_) {}
+        const body = document.getElementById('set-body') || document.getElementById('settings-tab');
+        if (body && typeof initPlanPanel === 'function') {
+          try { initPlanPanel(body); } catch (_) {}
+        }
+      });
+    }
     const openSet = $('#open-settings'); if(openSet) openSet.addEventListener('click', ()=>RS.activateTab('settings-tab'));
 
     /* ===================== DB MODE BADGE + SESSION ===================== */

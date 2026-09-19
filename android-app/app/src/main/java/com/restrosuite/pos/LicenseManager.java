@@ -43,12 +43,14 @@ public class LicenseManager {
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEtyguKkhJ+rIV9Smp65g5K7Q4mf6Ru1YMdjgG6rNN5d6Ygaz3RtgbgdMLCmeGveoQr9h1HitaSTyl63OgrZz66g==";
 
     private static final long BOOTSTRAP_GRACE_MS = 3L * 24 * 60 * 60 * 1000; // 3 days
-    private static final long CLOCK_SKEW_TOLERANCE_MS = 60L * 1000;
+    private static final long CLOCK_SKEW_TOLERANCE_MS = 15L * 60 * 1000;
+    private static final long OFFLINE_GRACE_MS = 24L * 60 * 60 * 1000;
 
     private static final String PREFS = "rs_license_secure";
     private static final String K_LEASE = "lease";
     private static final String K_HWM = "hwm";
     private static final String K_FIRST_SEEN = "first_seen";
+    private static final String K_EVER = "ever_leased";
 
     private final SharedPreferences prefs;
 
@@ -78,6 +80,7 @@ public class LicenseManager {
         e.putString(K_LEASE, lease == null ? "" : lease);
         e.putLong(K_HWM, hwm);
         if (prefs.getLong(K_FIRST_SEEN, 0) == 0) e.putLong(K_FIRST_SEEN, now);
+        if (lease != null && !lease.isEmpty()) e.putBoolean(K_EVER, true);
         e.apply();
     }
 
@@ -109,22 +112,29 @@ public class LicenseManager {
         String lease = prefs.getString(K_LEASE, "");
         JSONObject claims = verifyLease(lease);
 
+        boolean everLeased = prefs.getBoolean(K_EVER, false);
         if (claims == null) {
-            // No valid lease: allow only during bootstrap grace.
+            if (everLeased) {
+                Log.w(TAG, "had a licence before, none now -> lock");
+                return true;
+            }
             boolean withinGrace = now <= firstSeen + BOOTSTRAP_GRACE_MS;
             if (withinGrace) return false;
             Log.w(TAG, "no valid lease past bootstrap grace -> lock");
             return true;
         }
 
-        // 3) Enforce lease expiry.
-        long exp = claims.optLong("lease_expires_at", 0);
+        prefs.edit().putBoolean(K_EVER, true).apply();
+        long leaseExp = claims.optLong("lease_expires_at", 0);
+        long planExp = claims.optLong("plan_expires_at", 0);
+        long exp = leaseExp;
+        if (planExp > 0) exp = Math.max(leaseExp, planExp + OFFLINE_GRACE_MS);
         if (exp <= 0) return true;
         if (now > exp) {
-            Log.w(TAG, "lease expired -> lock");
+            Log.w(TAG, "paid days ended -> lock");
             return true;
         }
-        return false; // valid & unexpired
+        return false; // valid & unexpired until paid-until
     }
 
     /** Verify signature + parse claims. Returns null if invalid. */

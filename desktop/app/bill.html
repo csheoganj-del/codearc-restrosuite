@@ -464,8 +464,8 @@
           const wrap = document.getElementById('bill-pay-online-wrap');
           if (wrap && totalInr >= 1) {
             const paidOnlineKey = 'rs_bill_paid_online:' + tenantSlug + ':' + (bill.no || billNo);
-            let alreadyOnline = false;
-            try { alreadyOnline = localStorage.getItem(paidOnlineKey) === '1'; } catch (_) {}
+            let alreadyOnline = /razorpay/i.test(String(bill.paymentMethod || ''));
+            try { alreadyOnline = alreadyOnline || localStorage.getItem(paidOnlineKey) === '1'; } catch (_) {}
             if (alreadyOnline) {
               wrap.innerHTML = '<div style="font-size:13px;font-weight:800;color:#059669"><i class="fa-solid fa-circle-check"></i> Paid online</div>';
               const lbl = document.getElementById('bill-pay-method-label');
@@ -517,6 +517,23 @@
                       return;
                     }
                     if (result && result.verified) {
+                      try {
+                        await fetch(endpoint, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': supabaseKey
+                          },
+                          body: JSON.stringify({
+                            action: 'settle_bill',
+                            tenant_slug: tenantSlug,
+                            bill_no: bill.no || billNo,
+                            razorpay_order_id: result.order_id || (result.raw && result.raw.razorpay_order_id),
+                            razorpay_payment_id: result.payment_id || (result.raw && result.raw.razorpay_payment_id),
+                            razorpay_signature: result.raw && result.raw.razorpay_signature
+                          })
+                        });
+                      } catch (_) {}
                       try { localStorage.setItem(paidOnlineKey, '1'); } catch (_) {}
                       wrap.innerHTML = '<div style="font-size:13px;font-weight:800;color:#059669"><i class="fa-solid fa-circle-check"></i> Paid online · ' +
                         (result.payment_id || '') + '</div>';

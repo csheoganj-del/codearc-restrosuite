@@ -219,8 +219,12 @@
                   });
                   resolve(Object.assign({}, base, { confirmed: confirmed }));
                 })
-                .catch(function () {
-                  // Signature already verified — still treat as paid for UX
+                .catch(function (confirmErr) {
+                  if (purpose === 'plan') {
+                    reject(confirmErr || new Error('Payment not confirmed on server'));
+                    return;
+                  }
+                  // POS/bill: HMAC verify already succeeded.
                   rememberPayment({
                     purpose: purpose,
                     order_id: base.order_id,
